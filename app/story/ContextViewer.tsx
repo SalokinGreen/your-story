@@ -360,6 +360,10 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
         : 36000;
+    const customMaxOutput =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
+        : 8000;
 
     // Use the actual last player input instead of a static placeholder, same
     // fallback generateStoryTurn itself uses when no explicit choice is passed.
@@ -419,6 +423,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       storyData,
       userChoice,
       customMaxContext,
+      customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
       modelName: gmModel,
       observerNote: observerNoteForPrompt,
       storyProgressNote: lastAssistantPartForNotes?.storyProgressNote,

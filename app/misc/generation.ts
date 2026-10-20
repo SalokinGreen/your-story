@@ -33,6 +33,7 @@ import {
   CHOICES_AFFIRMATION,
   GM_STAGE_DEFAULT_BUDGET,
   computeGMStageBudget,
+  getGMStageOutputTokens,
   CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
 import {
@@ -97,7 +98,6 @@ import {
 } from "@/app/misc/gmExecutor";
 import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
 import { logger } from "@/app/misc/logger";
-import { getModelConfig } from "@/app/misc/ai_prices";
 import {
   syncNewMemories,
 } from "@/app/misc/embeddings";
@@ -1972,6 +1972,7 @@ async function generateStoryTurnOnce(
         storyData,
         userChoice: gmUserChoice,
         customMaxContext: options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
+        customMaxOutput: options.customMaxOutput,
         modelName: narrationModel,
         replyLength: options.replyLength,
         pacingNote,
@@ -2001,6 +2002,7 @@ async function generateStoryTurnOnce(
           userChoice: "",
           customMaxContext:
             options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
+          customMaxOutput: options.customMaxOutput,
           modelName: narrationModel,
           replyLength: options.replyLength,
           pacingNote,
@@ -2109,6 +2111,7 @@ async function generateStoryTurnOnce(
           const { historyBudget: gmHistoryBudget } = computeGMStageBudget(
             options.customMaxContext,
             gmModel,
+            options.customMaxOutput,
           );
           const compactionResult = await ensureStoryCompacted(
             storyData,
@@ -2262,6 +2265,7 @@ async function generateStoryTurnOnce(
               storyData,
               userChoice: gmUserChoice,
               customMaxContext: currentGMBudget,
+              customMaxOutput: options.customMaxOutput,
               modelName: gmModel,
               replyLength: options.replyLength,
               pacingNote,
@@ -2334,10 +2338,7 @@ async function generateStoryTurnOnce(
               // per GM round - it used to be ignored here, which is why lowering
               // it had no effect on normal play (the GM stage's own output IS the
               // player-visible story, see gmFinalStoryContent below).
-              maxTokens: Math.min(
-                options.customMaxOutput || 12000,
-                getModelConfig(model).maxOutputTokens || 4000,
-              ),
+              maxTokens: getGMStageOutputTokens(options.customMaxOutput, model),
               // Base 0.4 for natural GM thinking, nudged by the story's
               // Chaos Factor (§2.4) - this is the GM stage's own request,
               // and its output IS the player-visible story on the common
@@ -2533,9 +2534,9 @@ async function generateStoryTurnOnce(
           // logs. `truncatedAtCap` is the signal to watch.
           {
             const finishReason = gmResult.meta?.finishReason ?? "unknown";
-            const maxTokensCap = Math.min(
-              options.customMaxOutput || 12000,
-              getModelConfig(gmModel).maxOutputTokens || 4000,
+            const maxTokensCap = getGMStageOutputTokens(
+              options.customMaxOutput,
+              gmModel,
             );
             logger.action(`GM stage round ${gmRound} finish diagnostic`, {
               finishReason,

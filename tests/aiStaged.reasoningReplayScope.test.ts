@@ -117,11 +117,6 @@ describe("buildGMStagePrompt reasoning replay scoping", () => {
     const { messages } = buildGMStagePrompt({
       storyData,
       userChoice: "try the door",
-      // Explicit budget: the default modelName's maxOutputTokens (65000)
-      // exceeds GM_STAGE_DEFAULT_BUDGET (36000), which zeroes out chat
-      // history when customMaxContext is omitted - unrelated to what this
-      // test is actually exercising.
-      customMaxContext: 200000,
     });
 
     const oldRoundMsg = messages.find(
@@ -189,7 +184,6 @@ describe("buildGMStagePrompt reasoning replay scoping", () => {
     const { messages } = buildGMStagePrompt({
       storyData,
       userChoice: "unlock the chest",
-      customMaxContext: 200000,
     });
 
     const oldRoundMsg = messages.find(

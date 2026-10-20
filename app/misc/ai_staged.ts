@@ -145,29 +145,53 @@ export { estimateTokens };
 // GM Stage uses customMaxContext (Memory Size slider) - it does the heavy lifting
 export const CHOICES_STAGE_TOKEN_BUDGET = 4000; // ~4k tokens for choices stage history
 export const GM_STAGE_DEFAULT_BUDGET = 36000; // Default GM context if no customMaxContext set
+// max_tokens a GM stage round requests when no Response Length is set.
+export const GM_STAGE_DEFAULT_OUTPUT = 12000;
+// Floor for the GM stage's input budget, so a tiny model window or a tiny
+// custom Memory Size can never leave the GM with zero (or negative) history.
+export const GM_STAGE_MIN_BUDGET = 4000;
 
 /**
- * GM Stage context budget: customMaxContext (Memory Size slider), capped by
- * the model's real limit, split 60% story history / 40% lore-mechanics-state.
+ * The max_tokens a GM stage round actually requests: the user's Response
+ * Length (customMaxOutput), capped by the model's own output limit.
+ */
+export function getGMStageOutputTokens(
+  customMaxOutput: number | undefined,
+  modelName: string,
+): number {
+  return Math.min(
+    customMaxOutput || GM_STAGE_DEFAULT_OUTPUT,
+    getModelConfig(modelName).maxOutputTokens || 4000,
+  );
+}
+
+/**
+ * GM Stage context budget: customMaxContext (Memory Size slider), split 60%
+ * story history / 40% lore-mechanics-state. Memory Size is an *input* budget,
+ * so the output reservation comes out of the model's context window, not out
+ * of Memory Size - and it reserves what the round actually requests
+ * (getGMStageOutputTokens), not the model's declared max output, which is
+ * 100k+ on several tier models and used to push the budget negative.
  * Shared by buildGMStagePrompt and compaction.ts's compaction-budget check so
  * the two can't drift apart on what "the GM stage's history budget" means.
  */
 export function computeGMStageBudget(
   customMaxContext: number | undefined,
   modelName: string,
+  customMaxOutput?: number,
 ): { historyBudget: number; infoBudget: number; totalContextBudget: number } {
-  const modelConfig = getModelConfig(modelName);
-  const modelMaxTokens = modelConfig.maxTokens;
-  const maxOutputTokens = modelConfig.maxOutputTokens || 4000;
-
-  const effectiveMaxTokens = Math.min(
+  const inputBudget =
     customMaxContext && customMaxContext > 0
       ? customMaxContext
-      : GM_STAGE_DEFAULT_BUDGET,
-    modelMaxTokens,
-  );
+      : GM_STAGE_DEFAULT_BUDGET;
+  const modelInputLimit =
+    getModelConfig(modelName).maxTokens -
+    getGMStageOutputTokens(customMaxOutput, modelName);
 
-  const totalContextBudget = effectiveMaxTokens - maxOutputTokens;
+  const totalContextBudget = Math.max(
+    GM_STAGE_MIN_BUDGET,
+    Math.min(inputBudget, modelInputLimit),
+  );
   return {
     historyBudget: Math.floor(totalContextBudget * 0.6),
     infoBudget: Math.floor(totalContextBudget * 0.4),
@@ -985,6 +1009,7 @@ export function buildGMStagePrompt({
   storyData,
   userChoice,
   customMaxContext,
+  customMaxOutput,
   modelName = "DeepSeek V4 Flash",
   replyLength = "medium",
   pacingNote,
@@ -997,6 +1022,7 @@ export function buildGMStagePrompt({
   storyData: StoryData;
   userChoice: string;
   customMaxContext?: number; // Memory Size slider - this is the main context control now
+  customMaxOutput?: number; // Response Length - the output reserved out of the model's window
   modelName?: string; // Used to get model's actual context limit
   replyLength?: ReplyLength; // Reply Length setting - controls narration verbosity
   pacingNote?: string; // Deterministic pacing nudge (see pacingFeedback.ts)
@@ -1053,7 +1079,7 @@ export function buildGMStagePrompt({
   // Calculate GM context budget from customMaxContext (Memory Size slider)
   // This is where the real context allocation happens now
   const { historyBudget, infoBudget, totalContextBudget } =
-    computeGMStageBudget(customMaxContext, modelName);
+    computeGMStageBudget(customMaxContext, modelName, customMaxOutput);
 
   // Get recent story parts for context - now uses the calculated history budget
   const recentParts = getPartsWithinTokenBudget(

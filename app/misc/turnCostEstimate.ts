@@ -177,6 +177,8 @@ export interface EstimateTurnCostParams {
   storyData?: StoryData;
   /** Memory Size slider (localStorage `customMaxContext`). */
   customMaxContext?: number;
+  /** Response Length slider (localStorage `customMaxOutput`). */
+  customMaxOutput?: number;
   /** GM tool-loop safety limit (GenerationOptions.maxToolLoops). */
   maxToolLoops?: number;
   /** Defaults to the user's stored Architecture-tab settings. */
@@ -354,6 +356,7 @@ export function estimateTurnCost(
   const { totalContextBudget } = computeGMStageBudget(
     params.customMaxContext,
     gmModel,
+    params.customMaxOutput,
   );
   const gmInputTokens = Math.round(totalContextBudget * GM_CONTEXT_FILL);
 
@@ -598,11 +601,15 @@ export function estimateTurnCost(
   };
 }
 
-/** Convenience for a config-only estimate that reads the Memory Size slider. */
+/**
+ * Convenience for a config-only estimate that reads the Memory Size and
+ * Response Length sliders.
+ */
 export function estimateTurnCostFromSettings(
   storyData?: StoryData,
 ): TurnCostEstimate {
   let customMaxContext: number | undefined;
+  let customMaxOutput: number | undefined;
   let maxToolLoops: number | undefined;
   if (typeof window !== "undefined") {
     const storedContext = localStorage.getItem("customMaxContext");
@@ -610,13 +617,23 @@ export function estimateTurnCostFromSettings(
       const parsed = parseInt(storedContext, 10);
       if (Number.isFinite(parsed) && parsed > 0) customMaxContext = parsed;
     }
+    const storedOutput = localStorage.getItem("customMaxOutput");
+    if (storedOutput) {
+      const parsed = parseInt(storedOutput, 10);
+      if (Number.isFinite(parsed) && parsed > 0) customMaxOutput = parsed;
+    }
     const storedLoops = localStorage.getItem("maxToolLoops");
     if (storedLoops) {
       const parsed = parseInt(storedLoops, 10);
       if (Number.isFinite(parsed) && parsed > 0) maxToolLoops = parsed;
     }
   }
-  return estimateTurnCost({ storyData, customMaxContext, maxToolLoops });
+  return estimateTurnCost({
+    storyData,
+    customMaxContext,
+    customMaxOutput,
+    maxToolLoops,
+  });
 }
 
 /** Re-exported so UI can label the tier a turn is predicted to run at. */

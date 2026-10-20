@@ -1115,7 +1115,11 @@ its stale claims were already false then: auth, tokens and coins went in
 - "Memory Size slider (localStorage `maxContextSize`, default 128k)" → key is
   **`customMaxContext`**, default **36,000** (`GM_STAGE_DEFAULT_BUDGET`,
   `ai_staged.ts:147`); presets 8k/16k/36k/72k/120k/200k + custom. The 60/40 split
-  is correct (`computeGMStageBudget`, applied to `min(slider, model max) − maxOutputTokens`).
+  is correct. (Updated 2026-10-21: `computeGMStageBudget` used to apply it to
+  `min(slider, model max) − maxOutputTokens`, which went negative on every model
+  declaring 36k+ output, Grok 4.5 and Kimi K3 tiers included. It is now
+  `max(4k, min(slider, model max − requested output))`, where requested output
+  is `min(Response Length, model max output)`.)
 - "Looped … until the model stops calling tools" → capped at `maxToolLoops`
   (default 10, `generation.ts:~2191`); the M2 roll gate and plan gate can force
   `tool_choice: required`.
