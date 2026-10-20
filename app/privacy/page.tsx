@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { DynamicIcon } from "../components/DynamicIcon";
 
+const ISSUES_URL = "https://github.com/SalokinGreen/your-story/issues";
+
 function Section({
   icon,
   iconClassName,
@@ -281,14 +283,23 @@ export default function PrivacyPolicy() {
           </Section>
 
           <Section
-            icon="Mail"
+            icon="MessageCircle"
             iconClassName="text-blue-400"
             title="Questions?"
           >
             <p className="text-sm leading-relaxed">
-              If you have any questions about this privacy policy or how your
-              data is handled, please reach out to us. We&apos;re happy to
-              explain anything in more detail.
+              If you have questions about this policy or how your data is
+              handled, open an issue on{" "}
+              <a
+                href={ISSUES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-300 underline hover:text-blue-200"
+              >
+                our GitHub
+              </a>
+              . Issues are public, so don&apos;t include your API keys or
+              anything from your stories you&apos;d rather keep private.
             </p>
           </Section>
 
