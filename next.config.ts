@@ -1,22 +1,10 @@
 import type { NextConfig } from "next";
-import withPWAInit from "@ducanh2912/next-pwa";
-
-const withPWA = withPWAInit({
-  dest: "public",
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: false,
-  disable: process.env.NODE_ENV === "development",
-  workboxOptions: {
-    disableDevLogs: true,
-  },
-});
 
 // Standalone (Tauri/Capacitor) build - a static export with no Next.js
 // server behind it, calling AI providers directly instead of through
 // /api/* routes (see app/misc/providerFetch.ts, app/misc/standalone.ts).
-// The normal web build (hosted on Vercel) leaves this env var unset and
-// keeps its API routes exactly as before.
+// The normal web build leaves this env var unset and keeps its API routes,
+// which `npm run dev` still uses.
 const isStandaloneBuild = process.env.NEXT_PUBLIC_STANDALONE === "true";
 
 const nextConfig: NextConfig = {
@@ -30,4 +18,4 @@ const nextConfig: NextConfig = {
     : {}),
 };
 
-export default withPWA(nextConfig);
+export default nextConfig;
