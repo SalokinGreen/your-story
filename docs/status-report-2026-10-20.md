@@ -65,22 +65,37 @@
    cross-device sync via a Cloudflare Worker. `CLAUDE.md`'s "Auth and BYOK"
    section, its env-var list, `README.md` and `docs/getting-started.md` all
    still describe Supabase.
-2. **Confirmed bug: GM countdown timers with `auto_advance` never tick.**
+2. **Confirmed bug: in the native (Tauri/Capacitor) builds, most AI side calls
+   silently never run.** Observer, Memory Keeper, Reflection, Compaction,
+   Director Assistant and Story Progress Observer — and the creator's Designer
+   chat — call `fetch("/api/generate")` directly, but the static export has no
+   API routes. Turns still complete, but no memory is ever written and the
+   Designer fails. See [§6.7](#67-native-builds-most-ai-side-calls-and-the-designer-bypass-the-standalone-wrappers).
+   The Tauri HTTP allowlist also lacks the TTS and sync hosts ([§6.8](#68-tauri-http-allowlist-is-missing-tts-and-sync-hosts)).
+3. **Confirmed bug: GM countdown timers with `auto_advance` never tick.**
    The only auto-tick code is gated on a tool (`end_gm_thinking`) the GM can
    no longer call. Front "doom clocks" are therefore inert. See [§6.1](#61-timer-auto-advance-never-fires).
-3. **Release blocker:** `app/misc/primaMateria.ts` contains word tables
+4. **Several things look live but aren't:** the GM can't end a game
+   (`game_over` not offered), the Web Research toggle does nothing
+   (`delegate_task` not offered), the Embeddings toggle points at deleted routes,
+   the PWA service worker isn't generated under Turbopack, and Vercel analytics
+   are never imported. See [§6.9–6.11](#69-embeddings-toggle-points-at-a-deleted-backend).
+5. **Release blocker:** `app/misc/primaMateria.ts` contains word tables
    transcribed verbatim from a commercial product without permission (the
    code says so itself). Must be resolved before any public release. See [§7](#7-release-blocker-prima-materia-tables).
-4. **Four branches hold unmerged work.** Two are superseded (abandon); two
+6. **Four branches hold unmerged work.** Two are superseded (abandon); two
    contain things worth salvaging by hand (a lint ratchet + real React bug
    fixes; and a `take_rest` removal that needs a product call). See [§8](#8-stranded-branches).
-5. **Two critical advisories ship to production** (`next`, Capacitor) and both
+7. **Two critical advisories ship to production** (`next`, Capacitor) and both
    clear with in-range minor bumps.
+8. **Online multiplayer sends the host's full `StoryData` (GM secrets, campaign
+   plan) to every guest,** and guests can't answer `ask_question`. See [§6.12](#612-multiplayer-guests-get-the-full-unredacted-storydata-and-cant-answer-gm-questions).
 
 **Suggested order of work** (detail in [§16](#16-recommended-plan-for-the-next-session)):
-security bumps → PR CI with a lint ratchet → fix the timer bug and the React
-render bugs → refresh `CLAUDE.md`/README → dead-code sweep → product
-decisions (`take_rest`, Prima Materia) → roadmap features.
+security bumps → PR CI with a lint ratchet → native side-call fix + Tauri
+allowlist → timer bug → React render bugs → refresh `CLAUDE.md`/README →
+dead-code sweep → product decisions (`take_rest`, Prima Materia, PWA,
+unreachable tools) → multiplayer redaction → roadmap features.
 
 ---
 
@@ -282,6 +297,23 @@ touching a file.
 
 ## 6. Confirmed bugs on master
 
+Ranked by severity (sections below are numbered in the order they were found):
+
+| # | Bug | Severity | Effort |
+|---|---|---|---|
+| 6.7 | Native builds skip side calls; Designer broken there | **High** (native) | Small–medium |
+| 6.1 | Timer `auto_advance` never fires | **Medium-high** | Small–medium |
+| 6.12 | Guests receive GM secrets; can't answer `ask_question` | Medium | Medium |
+| 6.8 | Tauri allowlist missing TTS + sync | Medium (desktop) | Small |
+| 6.2 | `linkedTimerId` never written (Fronts unlinked) | Medium | Small |
+| 6.10 | `game_over` / `delegate_task` unreachable; prompt references uncallable tools | Medium | Small (decide) |
+| 6.11 | PWA inactive; manifest icons missing | Low–medium | Small (decide) |
+| 6.9 | Embeddings toggle → deleted backend | Low | Small |
+| 6.3 | `goals.tsx` mutates StoryData in render, random keys | Low–medium | Trivial |
+| 6.4 | `NPCReactionToast` unstable key | Low | Trivial |
+| 6.5 | `useSavedImport` hook-named handler | Low | Trivial |
+| 6.6 | CLAUDE.md advertises `resolve_challenge` | Docs | Trivial |
+
 ### 6.1 Timer auto-advance never fires
 
 **Severity: medium-high (silent gameplay bug).** Verified directly.
@@ -346,6 +378,105 @@ audit; re-verify before fixing.
 - `CLAUDE.md` lists `start_challenge / record_challenge_result / resolve_challenge / cancel_challenge`.
   `resolve_challenge` (and `update_challenge`) only exist in the unreachable
   "challenge system B" in `toolSchemas.ts`/`toolExecutor.ts` — see [§10](#10-dead-code).
+
+### 6.7 Native builds: most AI side calls and the Designer bypass the standalone wrappers
+
+**Severity: high for the native apps** (commit `2a75ccb`'s message describes
+the Tauri/Capacitor apps as the real target and Vercel as a testing
+deployment). Verified by grep.
+
+The standalone (static-export) build has **no `/api/*` routes**; code must go
+through `providerFetch` (`app/misc/providerFetch.ts`), which calls the provider
+in-process when `isStandalone()`. These modules still call
+`fetch("/api/generate")` directly:
+
+- `app/misc/observer.ts` (6 call sites: ~l.943, 1039, 1162, 1313, 1502, 1667)
+- `app/misc/memoryAgent.ts:111`
+- `app/misc/reflection.ts:148`
+- `app/misc/compaction.ts:312`
+- `app/misc/directorAssistant.ts:101`
+- `app/misc/storyProgressObserver.ts:320`
+- `app/misc/subagentExecutor.ts:152` (only reachable via `delegate_task`, itself unreachable)
+- `app/creator/useDesignerSession.ts:293` — **the Designer chat**
+
+They were all added after the standalone port (`8de78ac` rewired only
+`generation.ts`). Effects in native builds: these all fail open, so turns still
+complete — but **Observer, Memory Keeper, Reflection, Compaction, Director
+Assistant and Story Progress Observer silently never run**; since the Memory
+Keeper is the only memory writer, **no memory is ever written**; and the
+**creator's Designer chat should fail outright.** (`ocrSummarizeStream.ts` also
+has a raw fetch but guards it with `isStandalone()`, so it's fine.)
+
+**Fix sketch:** route every one through `providerFetch` (or a shared
+`callModel()` helper), add a test that greps/asserts no `fetch("/api/` outside
+the `*Fetch.ts` wrappers, and smoke-test a standalone build.
+
+### 6.8 Tauri HTTP allowlist is missing TTS and sync hosts
+
+`src-tauri/capabilities/default.json` allows only `api.deepseek.com`,
+`openrouter.ai`, `api.mistral.ai`, `api.deepinfra.com`,
+`generativelanguage.googleapis.com`, `api.search.brave.com`. But `ttsCall.ts:380`
+(Cartesia `api.cartesia.ai`, ElevenLabs `api.elevenlabs.io`) and
+`syncManager.ts:266` (the sync worker URL) both use `getProviderFetch()`, which is
+Tauri's scoped plugin fetch on desktop — so **TTS and sync will very likely be
+rejected on the desktop app**. Not run-tested. Capacitor has no allowlist.
+Fix: add the TTS hosts and the sync worker origin (it's a build-time
+`NEXT_PUBLIC_SYNC_API_URL`, so either a wildcard for `*.workers.dev` / the custom
+domain or generate the capability at build time).
+
+### 6.9 Embeddings toggle points at a deleted backend
+
+Settings → AI Config still offers **"Enable Embeddings"** (`embeddingsEnabled`,
+`embeddingThreshold`). `app/misc/embeddings.ts` calls `/api/embeddings/{generate,
+search,upsert,keys,cleanup}` — those routes were deleted in `3348a4a` (PR #64).
+Turning it on makes `search_notes`/`search_memory` append "[Semantic search
+unavailable right now …]" and the post-turn memory sync fail quietly. Fix: remove
+the toggle and the dead client (or rebuild embeddings BYOK-side), along with
+`semanticSearchFallback.ts`.
+
+### 6.10 Unreachable GM tools with live-looking UI or prompt references
+
+See the full list in [§11.3](#113-gm-tool-catalogue). The user-visible consequences:
+
+- **`game_over` is never offered** — the GM has no way to end a game (the
+  executor, with a "downed player" gate at `toolExecutor.ts:~2215`, is intact).
+- **`delegate_task` is never offered** — so Settings' **Web Research toggle and
+  Brave Search key do nothing**, and `subagentExecutor.ts` + `/api/web-search`
+  are dead.
+- The GM prompt still instructs the model to call **`request_continuation`**
+  (`ai_staged.ts:1537`), which it can't; `roll_table`'s description mentions
+  **`reaction_check`**, also not offered. Either re-offer them or delete the
+  references.
+- `reaction_check` and `negotiate_price` have tests and struct support but are
+  not offered — decide whether they come back.
+
+### 6.11 PWA layer is inactive
+
+`next.config.ts` wraps the config with `@ducanh2912/next-pwa`, a **webpack**
+plugin, but Next 16 builds with **Turbopack** — after both production builds on
+2026-10-20 there is **no `public/sw.js`**. `public/manifest.json` also points at
+`/icon-192x192.png`, `/icon-384x384.png`, `/icon-512x512.png`, which **don't
+exist** in `public/`. So the "installable/offline" PWA promised by
+`docs/pwa-setup.md` isn't working, while the dependency still contributes most of
+the `npm audit` high-severity chain ([§4.1](#41-npm-audit-2026-10-20)). Fix: either drop
+next-pwa (and the manifest) or migrate to a Turbopack-compatible solution, and
+generate the icons (`generate-icons.sh` exists at the repo root).
+
+### 6.12 Multiplayer: guests get the full, unredacted StoryData and can't answer GM questions
+
+- `NetSession.broadcastSnapshot()` (`app/misc/multiplayer/session.ts:~440`) sends
+  the host's entire `StoryData` in every `state_snapshot` — **including secrets,
+  `to_be_revealed` lore and `gm_plan` notes**. Guests' UIs may not show them, but
+  anyone with devtools can read the GM's plan. A spoiler/cheating issue rather
+  than a security one (games are among friends), but worth a redaction pass.
+- No wire message relays **`ask_question`** or **`ask_for_roll`** (no
+  `ask_question` reference anywhere in `app/misc/multiplayer/`), so these modals
+  only appear on the host — **online guests can't answer GM questions** or
+  respond to manual roll requests themselves.
+- Invite links are built from `window.location.origin`; from a native build that
+  origin isn't a shareable web URL, so links copied inside the apps likely won't
+  open for others (inference, untested).
+- `story_delta` is defined in `types.ts` but never sent or handled.
 
 ---
 
@@ -522,13 +653,389 @@ None is harmful today, but each is a trap for a future edit.
 | `parseDifficulty` | `gmExecutor.ts:673` | Zero callers anywhere. |
 | `SkillTreeEditor` / `SkillTreeView` | `app/components/` | Imported nowhere. |
 | Unused imports | `REST_CONFIG` in `ai_staged.ts:6`; `executeTools` in `generation.ts:98` | Part of the 298 `no-unused-vars`. |
+| Components with no importers | `CharacterSheetEditor`, `CharacterSheetTemplateEditor`, `ClockCategorySelector`, `MassLoreImageGenerator`, `LocalStoryList`, `LocalAdventureList`, `IconAttribution`, `LoadingButton` (all `app/components/`) | Verified: 0 importers in `app/` or `tests/`. |
+| Modules with no importers | `app/misc/adventureExport.ts`, `sample_adventures.ts`, `imageCompression.ts` | Verified. |
+| Dead client for deleted routes | `app/misc/embeddings.ts`, `semanticSearchFallback.ts` | See [§6.9](#69-embeddings-toggle-points-at-a-deleted-backend). |
+| Unreachable-by-model tool executors | 17 tools, see [§11.3](#113-gm-tool-catalogue) | Decide re-offer vs delete per tool. |
+| Routes with no caller | `api/ocr/summarize` (non-streaming); `api/web-search` (only for unreachable `delegate_task`) | |
+| Unused wire message | `story_delta` in `app/misc/multiplayer/types.ts` | |
+| Unused dependencies | `@vercel/analytics`, `@vercel/speed-insights` (never imported) | Wire them in `app/layout.tsx` or drop them. |
+| Stray file | `app/components/TTSControls.tsx.backup` | Delete. |
+| Stale code comment | `observer.ts` says "no settings UI exists yet" | The Architecture tab exists. |
 | Deprecated struct fields | `structs.ts` (11 `deprecated` markers) | Back-compat for old saves — keep, but don't build on them. |
 
 ---
 
 ## 11. What's live today — feature inventory
 
-<!-- INVENTORY -->
+Built by reading the code on `1b0b2a8` ("wired" = code paths connected from
+UI to engine, not observed running). Settings are localStorage keys unless
+noted.
+
+### 11.1 Turn pipeline — `app/misc/generation.ts`
+
+- **Entry points** (`app/story/page.tsx`): `handleCustomInput` (typed/voice,
+  ~l.1850), `handleChoice` / `handleChoiceWithAction` (~l.2589 / ~l.3073),
+  `handleRetry` (~l.3545 — reuses the saved GM conversation, regenerates
+  narration only), and the online host's batched turn.
+- **`generateStoryTurn()`** (l.843) — outer wrapper: opens a cost ledger
+  (`turnCost.ts`), snapshots pre-turn state, carries forward last turn's
+  observer/story-progress/repetition/knowledge notes, loops
+  `generateStoryTurnOnce()` with at most one observer reset
+  (`MAX_OBSERVER_RESETS = 1`), runs the observer (blocking or background), then a
+  **background wave**: deferred observer → Memory Keeper → Director Assistant
+  (only if `increment_scene` ran) → Story Progress Observer → final cost log.
+- **`generateStoryTurnOnce()`** (l.1859):
+  - *Stage 0* embedding prefetch — intentionally off.
+  - *Stage 0.5* **GM stage** (always): two-pass lore visibility → tier router →
+    `ensureStoryCompacted` + `ensureStoryReflected` → round loop up to
+    `maxToolLoops` (default 10). Prompt built once per turn by
+    `buildGMStagePrompt` (stable prefix for provider caching); each round
+    streams via `providerFetch("/api/generate-stream")`; context overflow halves
+    the budget once; model failure falls back one tier; leaked tool-call markup is
+    stripped/recovered (`toolCallFallback.ts`, DeepSeek DSML + GLM shapes); tools
+    run through `executeGMTools`; loop ends on the first round with no tool calls.
+    Then gates: **M2 roll gate** (combat / challenge / high-deadly stakes with no
+    roll → forced round with `tool_choice: required`, ≤2×), **plan gate** (beat
+    completed without the next written → forced round, ≤2×), leniency audit (log only).
+  - *Stage 1* **story**: if the GM's rounds already wrote prose, that is the
+    story (visible-text extraction, divider pruning, `deAiifyText`); otherwise the
+    same conversation continues with `buildStoryContinuationPrompt(...)` and
+    streams. Narration model: `getEffectiveNarrationModelKey()` — default
+    **Mistral Small 3.2**, override `narrationModelOverride`.
+  - *Stage 3* **choices**: `buildChoicesPrompt` + `generateChoicesWithRetry`.
+  - *Stage 4* `syncNewMemories` — only if embeddings enabled (dead, see [§6.9](#69-embeddings-toggle-points-at-a-deleted-backend)).
+  - Finally `checkNarrationConsistency`, then the `ScenePart` is built.
+- **Per-turn settings:** `maxToolLoops` (10), `customMaxContext`
+  (**default 36,000** = `GM_STAGE_DEFAULT_BUDGET`, `ai_staged.ts:147` — not
+  "`maxContextSize` 128k" as CLAUDE.md says), `customMaxOutput` (8000),
+  `embeddingsEnabled`, `embeddingThreshold`, `webResearchEnabled`, `usePrefill`,
+  `storytellerMode` (narrator/dm), `deAiifyWords`, `replyLength`, sampling
+  settings — all in Settings → AI Config.
+
+### 11.2 Reasoning tiers — `app/misc/reasoningTiers.ts`
+
+| Tier | Model | Effort | Intended use |
+|---|---|---|---|
+| T0 | Mistral Nemo | none | banter |
+| T1 | Mistral Small 3.2 | none | default (`SCENE_BASELINE_TIER`) |
+| T2 | Grok 4.5 | high | rules, combat |
+| T3 | Kimi K3 | xhigh | boss fights, campaign-shaping calls |
+
+- **Starting tier** = max of: hard floor (session zero → T3; combat → T2, or T3
+  for a single active enemy), deterministic classifier (combat 2/3, challenge 1,
+  active main thread 2, else 0), last turn's tier decayed one step toward T1, and
+  any observer-forced tier. A T0 classifier call labels long (>200 char) input
+  when state gives no signal.
+- **Mid-turn:** tier re-read every round, so `set_reasoning_tier` applies next
+  round; `stakesFloor` forces T2 for "high" and T3 for "deadly" rolls
+  (`gmExecutor.ts:~2081`); T3 capped at 3 calls per scene key, then clamped to T2.
+- **Overrides:** `reasoningTierOverrides`, `narrationModelOverride` (AIConfigTab).
+- Note: decay never goes below T1, so the GM stage never actually *starts* at
+  T0; T0 is only used by the classifier and as a failure fallback.
+
+### 11.3 GM tool catalogue
+
+Two schema sources: `app/misc/gmTools.ts` (`GM_TOOL_SCHEMAS`, 37 tools) and
+`app/misc/toolSchemas.ts` (`TOOL_SCHEMAS`, 41). The whitelist is in
+`buildGMStagePrompt()` (`ai_staged.ts` — `legacyToolNames` ~l.1708 filtered from
+`GM_TOOL_SCHEMAS`, `stateToolNames` ~l.1764 from `TOOL_SCHEMAS`). Execution:
+`executeGMTools()` (`gmExecutor.ts`), falling through to
+`executeStateTools`/`executeTools()` (`toolExecutor.ts`). Partly pinned by
+`tests/aiStaged.gmStageToolWhitelist.test.ts`.
+
+**Offered to the model (56 + 1 conditional):**
+
+| Area | Tools |
+|---|---|
+| Dice / resolution | `formula_roll`, `opposed_formula`, `gm_roll` (hidden, always digital), `calculate` (the only verdict), `npc_roll`, `ask_for_roll` (**only when `diceMode === "manual"`**) |
+| Oracle / entropy | `fate_question` (6 outcomes incl. "Yes, but"/"No, but"), `roll_table` (~40 built-ins + `pm_*`), `roll_portent` (peek/pinch/portent), `generate_name` (rolls constraints, not names), `increment_scene` (scene check, chaos, tension, director move) |
+| Challenges | `start_challenge`, `record_challenge_result` (auto-resolves at threshold), `cancel_challenge` |
+| Combat | `start_combat`, `add_combatant`, `remove_combatant`, `update_combatant_stat`, `toggle_combatant_condition`, `advance_turn`, `end_combat` |
+| NPCs | `add_npc`, `update_npc`, `remove_npc`, `npc_reaction` |
+| Threads / goals | `create_thread`, `update_thread`, `resolve_thread`, `abandon_thread`; `create_goal`, `update_goal`, `complete_goal`, `fail_goal`, `delete_goal` |
+| Timers | `manage_timer` (create/advance/toggle_pause/cancel/trigger) — auto-advance broken, [§6.1](#61-timer-auto-advance-never-fires) |
+| Notes / lore | `read_notes`, `search_notes`, `create_note`, `edit_note`, `delete_note`, `edit_lore_replace`, `edit_lore_append`, `edit_lore_prepend`, `edit_lore_insert`, `merge_lore`, `duplicate_lore` |
+| Memory | `search_memory` only — `add_memory` deliberately excluded; the Memory Keeper is the sole writer |
+| Campaign plan / session zero | `start_game`, `advance_plan`, `open_side_beat`, `close_side_beat` |
+| Director acks | `resolve_random_event`, `acknowledge_director_move` |
+| Player interaction / state | `ask_question` (1–3 multiple-choice/free-text questions; pauses the turn), `get_game_state`, `take_rest` |
+| Meta | `set_reasoning_tier` |
+
+**Defined but never offered (17):** `request_continuation` (*the GM prompt
+still tells the model to use it*, `ai_staged.ts:1537`), `end_gm_thinking`,
+`reaction_check` (has tests; `roll_table`'s description mentions it),
+`negotiate_price` (has tests), `delegate_task` (sub-agents + web research —
+`subagentExecutor.ts` and `/api/web-search` exist only for it, so the **Web
+Research toggle and Brave key in Settings do nothing**), `game_over` (**the GM
+currently has no way to end the game**), `add_ability`/`remove_ability`/
+`modify_ability`/`upgrade_ability`/`reset_ability_cooldown` (soft-deprecated),
+`list_inactive_notes`, `toggle_lore`, `add_memory` (deliberate),
+`update_challenge`, `resolve_challenge`, `skip_tools`. Name clashes:
+`start_challenge`, `cancel_challenge`, `take_rest`, `add_npc` exist in both files —
+the `gmTools.ts` version is sent. Caveat: `executeGMTools` still has `case`
+branches for several of these, so a model that emitted one anyway (e.g. via
+leaked-text recovery) would probably execute it.
+
+### 11.4 Observer (per turn) — `app/misc/observer.ts`
+
+| Flag | Judge | Default |
+|---|---|---|
+| `response_length` | free word-count trip → LLM decides if length was earned | rewrite/reset |
+| `player_agency` | LLM | rewrite/reset |
+| `outcome_narration_mismatch` | LLM, all comparisons at once; mixed outcomes capped at "minor" | rewrite/reset |
+| `missing_oracle_or_table` | shared LLM call (`checkToolUsageGaps`) | log only |
+| `missing_scene_increment` | same call | log only |
+| `tier_escalation_missed` | LLM; skipped at top tier | reset |
+
+- Suspended during session zero and before a character sheet exists.
+  `plausibleResetFlagTypes()` decides from free signals whether to **block**
+  (a reset-eligible check could fire) or run in the **background** after the
+  player has control. `player_agency` is always background.
+- A major flag → `rewriteFlaggedNarration` (prose only; rolls/tools/state kept;
+  choices regenerated; GM history reconciled). Full rollback + fresh attempt only
+  if the rewrite fails or for `tier_escalation_missed` (retries ≥1 tier higher).
+  Background flags can rewrite but never roll back. A speculative shortened
+  rewrite runs in parallel with the length judge.
+- Settings → Architecture (`ArchitectureSettingsTab.tsx`): `observerCheckSettings`
+  (per flag `{enabled, triggersReset, sensitivity 0–10}`), `observerModelOverride`.
+  (The "no settings UI exists yet" comment in `observer.ts` is stale.)
+- Player sees toasts ("Narration revised…", "GM response was reset…"), an
+  **Undo revision** button (`observerRewriteOriginal`); surviving flags go on
+  `ScenePart.observerFlags`/`correctedObserverFlags` and into the next GM prompt.
+
+### 11.5 Story Progress Observer — `app/misc/storyProgressObserver.ts`
+
+LLM check-in every N accepted turns (`storyProgressCheckInterval`, default 10,
+range 2–50) over the last 6 narration turns, threads, goals, spotlight neglect
+and tension vs target. Emits on_track / dragging / rushing + advice, repeated
+phrases (deterministic n-gram pre-pass + LLM triage) and NPC knowledge
+inconsistencies → `ScenePart.storyProgressNote` / `repetitionNote` /
+`knowledgeNote`, injected into the next GM prompt. **GM-only** (player sees them
+only in Debug Logs). Override `storyProgressObserverModelOverride`. Neither the
+override nor the interval is in `SYNCABLE_SETTINGS_KEYS`.
+
+### 11.6 Director layer
+
+- **State:** `AGMTState` (`structs.ts`) — `chaosFactor` 1–9, `sceneCount`,
+  `tension` 0–10, `lastOracleTurn`, `tint`, `lastTintShiftScene`.
+- **On `increment_scene`** (`toolExecutor.ts:~1925`): `checkScene` (Normal /
+  Altered / Interrupted) → `adjustChaosFactor` / `adjustTension` →
+  `selectDirectorMove()` (`mythic.ts:646`), deterministic priority:
+  `tick_a_clock` → `announce_future_badness` → `put_someone_in_a_spot` (tension ≥8
+  or lagging arc) → `spotlight_couch_player` → `reveal_unwelcome_truth` (lore
+  `to_be_revealed`) → `spotlight_tag` (start-wizard tags, `tagFocusExamples.ts`)
+  → `offer_opportunity`. Moves queue in `pendingDirectorMoves` until
+  `acknowledge_director_move`; random events (with a portent) queue in
+  `pendingRandomEvents` until `resolve_random_event`.
+- **Director Assistant** (`directorAssistant.ts`): LLM side call on
+  `increment_scene` turns; updates `storyData.directorAssistant.threadSpotlight` /
+  `npcSpotlight` neglect counters that `selectDirectorMove` reads. Override
+  `directorAssistantModelOverride`. Couch-player spotlight is tracked separately
+  in `page.tsx` (`multiplayer.couchPlayerFocus`, `playerStyleCounts`).
+- **Prima Materia** (`primaMateria.ts`): `rollPortent` (12 archetypes × sol/nox,
+  6 relations), `selectFrame` (literal: combat/challenge; structural: timers or 2+
+  threads; personal: NPCs), tint day/neutral/night changed only by a Lens Shift
+  (doubles on 2d12), `formatTintLine` into both GM and narrator prompts, `pm_*`
+  tables, `rollComplication()` seeding two pressure moves. Licensing: [§7](#7-release-blocker-prima-materia-tables).
+
+### 11.7 Memory, reflection, compaction
+
+- **Memory Keeper** (`memoryAgent.ts`) — sole memory writer; background, ≤3
+  entries/turn, importance 0–10. Override `memoryKeeperModelOverride`.
+- **Retrieval** — GM calls `search_memory` / `search_notes` (literal/tokenized
+  ranking). The semantic fallback (`semanticSearchFallback.ts`) is dead.
+- **Reflection** (`reflection.ts`) — at GM-stage start once 30 importance points
+  accumulate; ≤3 insights/pass at importance 8; `memoryReflectedThroughIndex`.
+  Override `reflectionModelOverride`.
+- **Auto-compaction** (`compaction.ts`, `ensureStoryCompacted`) — every turn,
+  folds aged-out history into `scene.summary` once ≥1,500 uncovered tokens
+  (summary capped at 1,500), snaps to scene boundaries, validates against
+  tracked entities; uses the story model (no override); "Recap…" toast.
+- **Manual compaction** (`storyCompaction.ts`, Story Editor → `CompactStoryModal`)
+  — prune old metadata, archive resolved threads/goals, opt-in destructive
+  summarization, "spin off a new story".
+- `updateStoryData` in `page.tsx` dedupes memory and caps it by model (`aiModel`).
+
+### 11.8 Campaign plan & session zero — `app/misc/campaignPlan.ts`
+
+- One `gm_plan` note "Campaign Plan" (spine, fronts, secrets & clues, character
+  arcs) + one arc note per player. Spine presets (`CAMPAIGN_SPINE_PRESETS`):
+  short 5 / **medium 7 (default)** / long 15 beats; `PlanState` tracks the beat.
+- Enforced: `start_game` errors until `hasCampaignPlan()` (`gmExecutor.ts:~3705`);
+  `create_note` refuses "Campaign Plan" until notes were read this turn (when
+  lore/mechanics/GM notes exist); plan gate forces `advance_plan`;
+  `getSetupReminder` nudges at 5 turns, urgently at 10.
+- Session zero: `startFreeformStoryLocally()` (`localStoryManager.ts:321`, from the
+  `GuidedStoryStart` wizard) sets `sessionZeroActive` → T3 floor, observer
+  suspended; `start_game` names the story and clears it.
+  `startAdventureLocally()` (creator adventures) does **not** enter session zero.
+
+### 11.9 Multiplayer
+
+- **Couch co-op (one device):** `StoryData.multiplayer.couchPlayers` from the
+  wizard (colour, personality, wish tags, archetype); `PlayerBubbles.tsx`
+  draggable per-player mic bubbles (Mistral STT, 3 s silence timeout); floor
+  control (`floorControl.ts`); saved profiles (`user_settings.ts`); hot-seat modes
+  host/any/timer.
+- **Online P2P** (`app/misc/multiplayer/`): `NetSession` (`session.ts`) +
+  `useNetSession.ts`. **Host-authoritative**: only the host generates and
+  broadcasts full `StoryData` in `state_snapshot`. Transports: Trystero torrent
+  (default, all 5 trackers), nostr, mqtt; PeerJS cloud; `manual` throws "isn't
+  implemented yet". (`@trystero-p2p/nostr` and `/core` are imported but only
+  present transitively via `trystero`.)
+- **Wire messages** (`types.ts`): `state_snapshot`, `player_action`,
+  `player_pass`, `presence_join`, `presence_activity`, `turn_status` (batching via
+  `turnBatch.ts` — waits for all to submit/pass), `story_stream`, `tts_audio`
+  (host's MP3 relayed — guests need no TTS key), `floor_state/take/release`,
+  `dice_throw_request/result` (acting guest throws on their own device in
+  physical mode), `ooc_chat` (never shown to the GM), `backend_switch`.
+  `story_delta` is defined but never sent or handled.
+- **Entry:** Library → `HostGameModal` / `JoinGameModal`; wizard "Play Online";
+  Story Editor → `OnlinePlayEditor` (copy invite link); 6-char room codes (no
+  0/O/1/I); `?join=CODE&provider=BACKEND` deep link → `createJoinPlaceholderStory`
+  → `/story?storyId=…&join=…&joinBackend=…`, auto-join + `ProfilePickerModal`;
+  auto-host via `?hostName=`.
+- Wired end to end and tested (`tests/multiplayer.*`, `tests/turnBatch.test.ts`):
+  batching, streaming, TTS relay, floor control, dice relay, OOC chat, profile
+  claiming. Gaps: [§6.12](#612-multiplayer-guests-get-the-full-unredacted-storydata-and-cant-answer-gm-questions).
+
+### 11.10 Cross-device sync — `app/misc/syncManager.ts`, `sync-worker/`
+
+- Manual only (Settings → Sync → "Sync Now", `syncAll()`); no background sync.
+  `SYNC_COMPLETED_EVENT` reloads library/story. Requires
+  `NEXT_PUBLIC_SYNC_API_URL` at build time.
+- Random sync key = only credential; worker stores its SHA-256. Client-side
+  **AES-GCM**, key via **PBKDF2-SHA256, 100k iterations, fixed salt
+  `your-story-sync-v1`**.
+- Buckets: stories, adventures, notes, folders, settings (allowlist in
+  `syncableSettingsKeys.ts`; **API keys excluded**), tables (legacy). Per-item
+  merge `{id, updatedAt, payload}` — newer wins per item; deletions inferred from
+  `yourStory_syncedIds_<bucket>`; state version "2".
+- Worker: 60 req/min per key+IP; CORS via `ALLOWED_ORIGINS`; **each bucket is
+  one KV value (25 MiB cap)** — a possible ceiling for large libraries (untested).
+- `SyncConflictModal` is imported in `page.tsx` but effectively unused (merge is
+  automatic).
+
+### 11.11 Native & desktop shells
+
+- One switch: `NEXT_PUBLIC_STANDALONE=true` → `output: "export"`. Tauri
+  (`src-tauri/tauri.conf.json`: `frontendDist: ../out`, `beforeBuildCommand`
+  runs the standalone build; Rust registers the http plugin + log plugin in
+  debug). Capacitor (`webDir: out`, `CapacitorHttp` patches `fetch`;
+  `android/` and `ios/App` checked in).
+- Without API routes, wrappers call provider logic in-process when standalone:
+  `providerFetch.ts`, `ttsFetch.ts`, `sttFetch.ts`, `ocrFetch.ts`,
+  `ocrSummarizeStream.ts`, `creatorFetch.ts`, `webSearchFetch.ts` → shared
+  `providerCall.ts`, `ttsCall.ts`, `sttCall.ts`, `ocrCall.ts`,
+  `ocrSummarizeCall.ts`, `ocrMergeCall.ts`, `generateImageCall.ts`,
+  `webSearchCall.ts`. `platformFetch.ts`'s `getProviderFetch()` returns Tauri's
+  plugin fetch under Tauri, plain `fetch` otherwise.
+- **Gaps:** side calls + Designer bypass the wrappers ([§6.7](#67-native-builds-most-ai-side-calls-and-the-designer-bypass-the-standalone-wrappers));
+  Tauri allowlist incomplete ([§6.8](#68-tauri-http-allowlist-is-missing-tts-and-sync-hosts));
+  unverified risk that `CapacitorHttp` buffers responses so SSE streaming on
+  Android/iOS arrives all at once.
+
+### 11.12 TTS / STT
+
+- **TTS** (BYOK; `TTS_MODELS` in `ai_prices.ts`, `ttsCall.ts`): Cartesia Sonic-3,
+  ElevenLabs Flash v2.5; text cleaned (`cleanTextForTTS`, `cleanTextForSpeech`).
+  `TTSControls.tsx`: live sentence-by-sentence narration while streaming,
+  auto-narrate (`ttsAutoGenerate`), scrubbable seek bar + prev/next sentence,
+  IndexedDB cache (`YourStoryTTSCache`, last 5 messages per story), guest relay.
+  Keys: `ttsEnabled`, `ttsAutoGenerate`, `ttsLastVoice`, `ttsModel`, `ttsVolume`,
+  `ttsCustomVoices`, `cartesiaKey`, `elevenlabsKey`.
+- **STT:** Mistral `voxtral-mini-latest` (`sttCall.ts`, 10 MB cap) in
+  `STTButton.tsx`, couch bubbles, ask-question modal; toggle `sttEnabled`.
+- Stray file: `app/components/TTSControls.tsx.backup`.
+
+### 11.13 PDF / OCR / Markdown import — `app/components/PDFImporter.tsx`
+
+- Opened from Library → Notes (saves into a folder) and the in-story Lore editor.
+  Accepts `.pdf .png .jpg .webp .txt .md`; PDFs ≤100 MB.
+- PDF: ~20-page chunks ≤4 MB (Vercel 4.5 MB body limit) → Mistral OCR
+  (`ocrCall.ts`, `/v1/ocr`; image-strip retry `pdfImageStrip.ts`, then halve the
+  range) → summarize (`streamSummarizeOCR` → `/api/ocr/summarize-stream`, or
+  in-process when standalone; any LLM provider) → continuation rounds (default 5,
+  ≤15, 240 s budget; reports `incomplete`/`unreachedParts`) → live note parsing
+  (`partialNotes.ts`).
+- Text/Markdown: split at headings into ~30k-char chunks (`textImportChunks.ts`).
+- Cross-chunk merge: deterministic title similarity (0.7) then AI pass
+  (`ocrMerge.ts` → `/api/ocr/merge`).
+- Output `{lore, mechanicNotes, tableNotes, summary}` (tables as `type: "table"`
+  notes; legacy shapes converted by `tableNotes.ts`). Resumable imports in
+  `YourStoryPDFImportsDB`; settings in `pdfImporterSettings`.
+- `/api/ocr/summarize` (non-streaming) has no client caller.
+
+### 11.14 Adventure creator — Game Designer (`/creator`, `?edit=<id>`)
+
+`app/creator/page.tsx` (model `designerModel`, output `designerMaxOutput`),
+`DesignerChat.tsx`, `AdventureInspector.tsx`, `useDesignerSession.ts` (≤5 tool
+rounds/message, 24 messages of history, `saveLocalAdventure`,
+`importFromLibrary()`), `designer_ai.ts`, `designer_executor.ts` (applies to a
+copy; forces mechanics/character-sheet notes `alwaysOn`). **12 designer tools:**
+`set_adventure_info`, `set_premise`, `write_note`, `delete_note`, `write_npcs`,
+`delete_npcs`, `write_goals`, `delete_goals`, `set_starting_choices`,
+`write_presets`, `delete_presets`, `set_character_sheet_template`.
+
+### 11.15 Library — `app/library/`
+
+Home screen of folder tiles + recent stories (`LibraryHome`) → `FolderDetailView`
+(`libraryScope.ts`) or flat Stories / Adventures / Notes lists. Folders in
+localStorage `yourStory_folders` (flat, shared across item types); notes in
+`YourStoryNotesLibraryDB`; `migrateTablesLibraryToNotes()` on every load.
+Export/import in the UI: `.folder` bundles (`folderLibraryExport.ts`), `.notes`
+(`notesLibraryExport.ts`), legacy `.tables` import. `adventureExport.ts`
+(`.adventure`) has no importer and there's no per-story/per-adventure export UI.
+
+### 11.16 3D dice tray
+
+`@3d-dice/dice-box` via `DiceThrowModal.tsx`, `diceThrow.ts`,
+`diceControlChannel.ts`, `diceColors.ts`. Only in `diceMode === "physical"`
+(modes `ai | manual | physical`); `gm_roll` never uses it.
+`scripts/patchDiceBox.mjs` (postinstall) decodes dice-box's base64-inlined physics
+worker and patches `rollDie` (hold under pointer / throw with gesture velocity +
+spin), `stepSim` (steer held dice; replace the never-firing settle check that made
+every roll hit the 5 s timeout) and injects a `BroadcastChannel("ys-dice-control")`.
+Structural matching, idempotent, but **tied to dice-box 1.1.4's minified output**
+— it throws if that changes, so don't bump dice-box casually. Dev harness
+`/dev/dice-spike` is reachable in production builds.
+
+### 11.17 Storage (Supabase is gone)
+
+- **IndexedDB:** `YourStoryDB` (`local_stories`, `undo_snapshots`, undo depth 8),
+  `YourStoryAdventuresDB`, `YourStoryNotesLibraryDB`, `YourStoryTablesLibraryDB`
+  (legacy), `YourStoryPDFImportsDB`, `YourStoryTTSCache`, a font DB.
+- **localStorage:** provider keys (`openRouterKey`, `deepseekKey`, `googleKey`,
+  `mistralKey`, `deepinfraKey`, `braveSearchKey`, `cartesiaKey`, `elevenlabsKey`)
+  and all settings.
+- **Server-side state:** only the optional sync worker. API routes are stateless.
+
+### 11.18 API routes (all POST, BYOK, stateless)
+
+| Route | Purpose |
+|---|---|
+| `api/generate` | non-streaming LLM proxy — DeepSeek, OpenRouter, Mistral, DeepInfra, **Google** (`providerCall.ts`) |
+| `api/generate-stream` | SSE version |
+| `api/tts/generate` | Cartesia / ElevenLabs, streamed audio |
+| `api/stt/transcribe` | Mistral Voxtral |
+| `api/ocr/process` | Mistral OCR for a page range |
+| `api/ocr/summarize` | non-streaming notes extraction — **no caller** |
+| `api/ocr/summarize-stream` | streaming notes extraction (used) |
+| `api/ocr/merge` | AI cross-chunk merge |
+| `api/creator/generate-image` | OpenRouter / DeepInfra images (`LoreImageGenerator`) |
+| `api/web-search` | Brave proxy — only for unreachable `delegate_task` |
+
+### 11.19 Other live pieces
+
+Per-turn cost ledger + estimate (`turnCost.ts`, `turnCostEstimate.ts`,
+`TurnCostPanel` in AI Config and Architecture tabs); `deAiify.ts`;
+`pacingFeedback.ts` (reply-length trend nudge); `consistencyCheck.ts` (dead NPC
+narrated present → toast); `lore.ts` triggers + per-turn visibility;
+`noteMentions.ts` (clickable note/NPC highlights in prose); `gmAdvice.ts` (GM
+tips, player archetypes); `nameGenerator.ts`; `LogViewer` + `ContextViewer` debug
+tabs; story-stage sampling settings; `ObjectivesStrip`, `ChapterNav`; undo stack
+also restores observer rewrites.
 
 ---
 
@@ -615,10 +1122,13 @@ dead duplicates listed in [§10](#10-dead-code)). Know which one you're editing.
   `stories | adventures | notes | tables | folders | settings`. Deployed in July
   (PR #117); current deployment state unverified. `NEXT_PUBLIC_SYNC_API_URL`
   must be baked in at build time for each target.
-- **Web hosting:** Vercel (`@vercel/analytics`, `@vercel/speed-insights`;
-  `sync-worker/README.md` calls it "the Vercel testing deployment"); the
-  production domain appears to be `your-story.io` (it is in the sync worker's
-  `ALLOWED_ORIGINS`). Deployment state unverified from here.
+- **Web hosting:** Vercel — `sync-worker/README.md` calls it "the Vercel
+  testing deployment", and commit `2a75ccb` describes the native apps as the real
+  target. The production domain appears to be `your-story.io` (it is in the sync
+  worker's `ALLOWED_ORIGINS`). Deployment state unverified from here.
+  `@vercel/analytics` and `@vercel/speed-insights` are dependencies but **nothing
+  imports them** (so no analytics are collected); `@capacitor/core` is likewise
+  not imported by app code (Capacitor still needs it at native build time).
 - **Local dev:** `.claude/launch.json` defines `your-story-dev` (`npm run dev`,
   port 3000).
 - **Root-level docs that are historical:** `VERCEL_AUTH_FIX.md` (Supabase auth
@@ -637,12 +1147,24 @@ dead duplicates listed in [§10](#10-dead-code)). Know which one you're editing.
    freeform character sheets ([§8.2](#82-clauderemove-rest-tool-gm-kj333b--redo-fresh)).
 3. **`next-pwa` replacement** — accept the build-time advisories, or migrate
    the PWA layer ([§4.1](#41-npm-audit-2026-10-20)).
-4. **Native apps** — are desktop/mobile builds still a goal? If yes: run
-   `build-apps.yml` once and decide on code-signing; if no, consider removing
-   `src-tauri/`, `android/`, `ios/` and the Capacitor/Tauri deps.
-5. **Frontier 1 (NPCs as agents)** and **H6/H8** — explicitly gated on owner
-   approval by the design docs.
-6. **Branch cleanup** — OK to delete ~100 merged remote branches?
+4. **Native apps** — commit history says they're the real target. If so,
+   [§6.7](#67-native-builds-most-ai-side-calls-and-the-designer-bypass-the-standalone-wrappers)/[§6.8](#68-tauri-http-allowlist-is-missing-tts-and-sync-hosts)
+   are top priority; run `build-apps.yml` once and decide on code-signing. If
+   not, consider removing `src-tauri/`, `android/`, `ios/` and the Capacitor/Tauri deps.
+5. **Unreachable tools** — re-offer or delete each of `game_over`,
+   `delegate_task` (+ Web Research toggle, Brave key, `/api/web-search`),
+   `reaction_check`, `negotiate_price`, `request_continuation` ([§6.10](#610-unreachable-gm-tools-with-live-looking-ui-or-prompt-references)).
+6. **PWA** — fix it (Turbopack-compatible service worker + real icons) or drop
+   next-pwa and the manifest ([§6.11](#611-pwa-layer-is-inactive)).
+7. **Embeddings** — delete the toggle and client, or rebuild semantic search
+   client-side/BYOK ([§6.9](#69-embeddings-toggle-points-at-a-deleted-backend)).
+8. **Multiplayer redaction** — how much GM-only state guests may receive
+   ([§6.12](#612-multiplayer-guests-get-the-full-unredacted-storydata-and-cant-answer-gm-questions)).
+9. **Analytics** — wire in `@vercel/analytics`/`speed-insights` or remove them
+   (and check `app/privacy/page.tsx`, which still describes Supabase auth).
+10. **Frontier 1 (NPCs as agents)** and **H6/H8** — explicitly gated on owner
+    approval by the design docs.
+11. **Branch cleanup** — OK to delete ~100 merged remote branches?
 
 ---
 
@@ -659,28 +1181,39 @@ Ordered by value ÷ (effort × risk). Each is sized to be one PR.
    `npx vitest run`, `node scripts/lint-ratchet.mjs` (salvaged from `b4fcf9b`,
    baseline regenerated). Optionally `npm run build`. **Done when:** the PR
    itself shows the check green and a deliberately added lint error fails it.
-3. **Timer auto-advance fix + `end_gm_thinking` removal** *(medium)* —
+3. **Native side calls + Tauri allowlist** *(small–medium, high value if the
+   apps are the target)* — [§6.7](#67-native-builds-most-ai-side-calls-and-the-designer-bypass-the-standalone-wrappers),
+   [§6.8](#68-tauri-http-allowlist-is-missing-tts-and-sync-hosts). Route all
+   eight modules through `providerFetch`; add a test forbidding raw
+   `fetch("/api/` outside the `*Fetch.ts` wrappers; add Cartesia, ElevenLabs and
+   the sync origin to `src-tauri/capabilities/default.json`. **Done when:** a
+   `NEXT_PUBLIC_STANDALONE=true` build runs a turn with observer + memory keeper
+   active (check Debug Logs), and the Designer replies.
+4. **Timer auto-advance fix + `end_gm_thinking` removal** *(medium)* —
    [§6.1](#61-timer-auto-advance-never-fires). Add a test that an `auto_advance`
    timer ticks once per completed GM turn and triggers at 0. Consider folding
    in [§6.2](#62-storythreadlinkedtimerid--threshold-are-never-written)
    (`linkedTimerId`).
-4. **React render bugs** *(small)* — [§6.3–6.5](#63-goalstsx-mutates-storydata-during-render--random-keys),
+5. **React render bugs** *(small)* — [§6.3–6.5](#63-goalstsx-mutates-storydata-during-render--random-keys),
    delete `SkillTreeEditor`/`SkillTreeView`, `eslint --fix` for `prefer-const`;
    lower the ratchet baseline.
-5. **Docs refresh** *(small, no code)* — rewrite the stale parts of `CLAUDE.md`
+6. **Docs refresh** *(small, no code)* — rewrite the stale parts of `CLAUDE.md`
    per [§12](#12-documentation-drift) (auth/Supabase/env vars, API routes, directory map,
    tool list, add Observer / multiplayer / sync / native / Prima Materia /
    campaign-plan sections); rewrite `README.md`; fix `docs/getting-started.md`;
    mark `VERCEL_AUTH_FIX.md`, `ENCRYPTION_IMPLEMENTATION.md`,
    `docs/story-encryption.md` and the `*.sql` files as historical (or move them
    to `docs/archive/`); update `architecture-frontier.md`'s Frontier 6.
-6. **Dead-code sweep** *(medium)* — challenge system B, duplicate `take_rest`,
-   `mythic.ts` local `AGMTState`, `parseDifficulty`, unused imports
-   ([§10](#10-dead-code)).
-7. **Product decisions** ([§15](#15-decisions-that-need-the-product-owner)) — then act on `take_rest` and Prima Materia.
-8. **Roadmap** — `ask_question` spotlight gap → per-chapter tension target +
-   sparkline → NPC-scoped reflection ([§9.1](#91-the-frontier-docs-if-you-only-do-three-things-next)).
-9. **Later / opportunistic** — split the 5k-line files (`page.tsx`,
+7. **Dead-code sweep** *(medium)* — challenge system B, duplicate `take_rest`,
+   `mythic.ts` local `AGMTState`, `parseDifficulty`, orphan components/modules,
+   `TTSControls.tsx.backup`, unused imports ([§10](#10-dead-code)).
+8. **Product decisions** ([§15](#15-decisions-that-need-the-product-owner)) — then act on `take_rest`,
+   Prima Materia, PWA, embeddings and the unreachable tools.
+9. **Multiplayer** — redact GM-only state from guest snapshots; relay
+   `ask_question`/`ask_for_roll` to guests ([§6.12](#612-multiplayer-guests-get-the-full-unredacted-storydata-and-cant-answer-gm-questions)).
+10. **Roadmap** — `ask_question` spotlight gap → per-chapter tension target +
+    sparkline → NPC-scoped reflection ([§9.1](#91-the-frontier-docs-if-you-only-do-three-things-next)).
+11. **Later / opportunistic** — split the 5k-line files (`page.tsx`,
    `PDFImporter.tsx`, `gmExecutor.ts`, `mythic.ts`) when touching them; pay down
    `any`; major upgrades (TS 7, Vitest 5, ESLint 10) one at a time; delete merged
    remote branches.
