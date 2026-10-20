@@ -115,7 +115,10 @@ import { fillTemplate } from "../misc/characterSheetTemplate";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn } from "../misc/generation";
-import { MAX_UNDO_STACK_SIZE } from "../misc/localStoryManager";
+import {
+  MAX_UNDO_STACK_SIZE,
+  ensureStoryArrays,
+} from "../misc/localStoryManager";
 import { GMNPCReactionResult } from "../misc/gmExecutor";
 import { tickCooldowns } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
@@ -1261,8 +1264,10 @@ function StoryPageContent() {
         },
       );
 
-      //Initializegoalarraysiftheydon'texist(forbackwardscompatibility)
-      if (!loadedStoryData.goals) loadedStoryData.goals = [];
+      // Backfill required arrays an older save, or a story started from a
+      // Game Designer adventure before startAdventureLocally() did this,
+      // never had - several readers would crash on them.
+      ensureStoryArrays(loadedStoryData);
 
       // Convert any legacy structured customTables into "table" notes. Runs
       // before processLoreTriggers so the new notes get their triggers

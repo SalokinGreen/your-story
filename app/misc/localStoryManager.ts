@@ -162,6 +162,32 @@ export async function saveLocalStory(
   });
 }
 
+// The arrays StoryData declares as required. A story doesn't always carry
+// them: an adventure's storyTemplate is only a Partial<StoryData> (the Game
+// Designer's draftToAdventure() leaves out the legacy stat/inventory arrays,
+// and npcs when there are none), and older saves predate some of them. Code
+// that still reads these unguarded crashes the story page on a missing one.
+const REQUIRED_STORY_ARRAYS = [
+  "memory",
+  "chapters",
+  "stats",
+  "resources",
+  "inventory",
+  "abilities",
+  "lore",
+  "goals",
+  "relationships",
+  "npcs",
+] as const;
+
+/** Fills in any required StoryData array that's missing, in place. */
+export function ensureStoryArrays(storyData: StoryData): StoryData {
+  for (const key of REQUIRED_STORY_ARRAYS) {
+    if (!Array.isArray(storyData[key])) storyData[key] = [];
+  }
+  return storyData;
+}
+
 /**
  * Creates a new local story from an adventure's story template and returns
  * the new story's local ID. This is the entry point for "playing" an
@@ -181,7 +207,7 @@ export async function startAdventureLocally(
       ? localStorage.getItem("defaultUserNotes") || ""
       : "";
 
-  const newStoryData = {
+  const newStoryData = ensureStoryArrays({
     ...adventure.storyTemplate,
     story_name: `${adventure.title || "Adventure"} - ${new Date().toLocaleDateString()}`,
     player_name: playerName,
@@ -197,7 +223,7 @@ export async function startAdventureLocally(
       ...(initialLore || []),
       ...(adventure.storyTemplate?.customTables || []).map(customTableToNote),
     ],
-  } as unknown as StoryData;
+  } as unknown as StoryData);
 
   await saveLocalStory(localId, newStoryData);
 
