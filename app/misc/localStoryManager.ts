@@ -6,6 +6,7 @@ import {
   StoryLore,
 } from "./structs";
 import { customTableToNote } from "./tableNotes";
+import { ensureStoryDataArrays } from "./storyDataDefaults";
 import { ARCHETYPE_INFO } from "./gmAdvice";
 import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
 
@@ -181,7 +182,9 @@ export async function startAdventureLocally(
       ? localStorage.getItem("defaultUserNotes") || ""
       : "";
 
-  const newStoryData = {
+  // A Designer-made adventure's template has none of the legacy stat-block
+  // arrays, so they're filled in here (see ensureStoryDataArrays).
+  const newStoryData = ensureStoryDataArrays({
     ...adventure.storyTemplate,
     story_name: `${adventure.title || "Adventure"} - ${new Date().toLocaleDateString()}`,
     player_name: playerName,
@@ -197,7 +200,7 @@ export async function startAdventureLocally(
       ...(initialLore || []),
       ...(adventure.storyTemplate?.customTables || []).map(customTableToNote),
     ],
-  } as unknown as StoryData;
+  } as unknown as StoryData);
 
   await saveLocalStory(localId, newStoryData);
 
