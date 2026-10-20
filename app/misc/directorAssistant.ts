@@ -23,8 +23,8 @@
  */
 
 import { StoryData } from "./structs";
-import { getCustomModelIfUUID } from "./user_settings";
-import { recordSideCall, SideCallCostContext } from "./turnCost";
+import { SideCallCostContext } from "./turnCost";
+import { callSideModel, ProviderKeys } from "./sideModelCall";
 
 const SYSTEM_PROMPT = `You are the spotlight-tracking layer for an interactive story's AI game master. Read one completed turn (the player's action and the GM's narration) plus a list of the story's currently active plot threads and tracked NPCs.
 
@@ -36,14 +36,11 @@ Respond with ONLY a JSON object, no other text:
 {"threads": ["<exact thread title>", ...], "npcs": ["<exact NPC name>", ...]}
 Return empty arrays if nothing on the lists meaningfully advanced this turn.`;
 
-export interface DirectorAssistantApiOptions extends SideCallCostContext {
+export interface DirectorAssistantApiOptions
+  extends SideCallCostContext,
+    ProviderKeys {
   model: string;
   token: string | null;
-  openRouterKey?: string;
-  deepseekKey?: string;
-  googleKey?: string;
-  mistralKey?: string;
-  deepinfraKey?: string;
   abortSignal?: AbortSignal;
   /** Optional override from layerSettings.ts's director assistant model/effort override - unset preserves prior behavior of never sending this field. */
   reasoningEffort?: string;
@@ -98,42 +95,24 @@ async function callDirectorAssistantApi(
   }\n"""\n\nGM's narration:\n"""\n${narration.trim()}\n"""`;
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: user },
-        ],
-        model: apiOptions.model,
-        maxTokens: 200,
-        temperature: 0.2,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "director",
+      label: "Director Assistant",
+      model: apiOptions.model,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: user },
+      ],
+      keys: apiOptions,
+      maxTokens: 200,
+      temperature: 0.2,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "director",
-      "Director Assistant",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     if (!content) return null;
 
     return extractJudgment(content);

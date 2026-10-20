@@ -45,6 +45,7 @@ import APIKeysModal from "../components/APIKeysModal";
 import CompactStoryModal from "./menu/CompactStoryModal";
 import FullScreenView from "../components/FullScreenView";
 import { useAPIKeys } from "../misc/APIKeysContext";
+import { pickProviderKeys } from "../misc/sideModelCall";
 import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import type { MPBackend } from "../misc/multiplayer/types";
 
@@ -367,9 +368,7 @@ export default function MenuPage({
         ? localStorage.getItem("aiModel") || "DeepSeek V4 Flash"
         : "DeepSeek V4 Flash",
     token: null,
-    openRouterKey: apiKeys.openRouterKey,
-    deepseekKey: apiKeys.deepseekKey,
-    googleKey: apiKeys.googleKey,
+    ...pickProviderKeys(apiKeys),
   };
 
   const handleStoryCompacted = async (updated: StoryData) => {
