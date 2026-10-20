@@ -4,10 +4,11 @@
  * The GM tool-stage can hand off a self-contained job (flesh out an NPC,
  * write up a location, chase down scattered lore, look something up on the
  * internet) to a separate, narrowly-scoped LLM call instead of doing it
- * inline. This file builds that call's prompt, fires it at `/api/generate`,
- * and parses the structured result back out - it never touches StoryData
- * directly, matching the rest of the tool-execution layer's rule that only
- * the GM tool executors (gmExecutor.ts) mutate state.
+ * inline. This file builds that call's prompt, sends it through
+ * callSideModel() (sideModelCall.ts), and parses the structured result back
+ * out - it never touches StoryData directly, matching the rest of the
+ * tool-execution layer's rule that only the GM tool executors
+ * (gmExecutor.ts) mutate state.
  */
 
 import { StoryData, StoryLore } from "./structs";
@@ -15,15 +16,9 @@ import { DelegateTaskParams } from "./gmTools";
 import { AnyModelKey, ReasoningEffort, resolveTier, fallbackTier } from "./reasoningTiers";
 import { logger } from "./logger";
 import { webSearchFetch } from "./webSearchFetch";
-import { recordSideCall } from "./turnCost";
+import { callSideModel, ProviderKeys } from "./sideModelCall";
 
-export interface SubagentApiKeys {
-  openRouterKey?: string;
-  deepseekKey?: string;
-  googleKey?: string;
-  mistralKey?: string;
-  deepinfraKey?: string;
-}
+export type SubagentApiKeys = ProviderKeys;
 
 export interface SubagentContext {
   apiKeys?: SubagentApiKeys;
@@ -147,38 +142,19 @@ async function callGenerate(
   model: AnyModelKey,
   reasoningEffort: ReasoningEffort,
   apiKeys: SubagentApiKeys | undefined,
-  token: string | null | undefined,
 ): Promise<string> {
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({
-      messages,
-      model,
-      maxTokens: 800,
-      temperature: 0.7,
-      reasoningEffort,
-      openRouterKey: apiKeys?.openRouterKey,
-      deepseekKey: apiKeys?.deepseekKey,
-      googleKey: apiKeys?.googleKey,
-      mistralKey: apiKeys?.mistralKey,
-      deepinfraKey: apiKeys?.deepinfraKey,
-    }),
+  const result = await callSideModel({
+    stage: "subagent",
+    label: "Delegated sub-agent task",
+    model: String(model),
+    messages,
+    keys: apiKeys,
+    maxTokens: 800,
+    temperature: 0.7,
+    reasoningEffort,
   });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.error || `Sub-agent call failed: ${response.status}`,
-    );
-  }
-
-  const data = await response.json();
-  recordSideCall("subagent", "Delegated sub-agent task", String(model), data);
-  return data.content || "";
+  if (!result.ok) throw new Error(result.error);
+  return result.data.content || "";
 }
 
 /**
@@ -192,7 +168,6 @@ async function callGenerateWithFallback(
   messages: ChatMessage[],
   startTier: number,
   apiKeys: SubagentApiKeys | undefined,
-  token: string | null | undefined,
 ): Promise<string> {
   let tier: number | null = startTier;
   let lastError: unknown;
@@ -204,7 +179,6 @@ async function callGenerateWithFallback(
         resolved.modelKey,
         resolved.reasoningEffort,
         apiKeys,
-        token,
       );
     } catch (error) {
       lastError = error;
@@ -296,7 +270,6 @@ async function runWebResearch(
       messages,
       1,
       context.apiKeys,
-      context.token,
     );
     const parsed = extractJSONFromContent(content) as { summary?: string };
     if (!parsed.summary) throw new Error("Sub-agent returned no summary");
@@ -332,7 +305,6 @@ export async function runDelegateTask(
       messages,
       defaultTierFor(params.task_type),
       context.apiKeys,
-      context.token,
     );
     const parsed = extractJSONFromContent(content) as Record<string, unknown>;
 

@@ -73,9 +73,9 @@
  *   uncertain outcome instead of consulting fate_question/roll_table, or
  *   narrated a scene transition without calling increment_scene.
  *
- * All LLM-backed checks use the same fetch("/api/generate") pattern as
- * reflection.ts's callReflectionApi - non-streaming, caller-supplied model,
- * fails open (no flag) on any API error. Regex can't reliably judge any of
+ * All LLM-backed checks go through callSideModel() (sideModelCall.ts), the
+ * same as reflection.ts's callReflectionApi - non-streaming, caller-supplied
+ * model, fails open (no flag) on any API error. Regex can't reliably judge any of
  * these; they need actual reading comprehension. checkResponseLength's
  * justification pass is the one exception to "fails open (no flag)": failing
  * open there means falling back to the deterministic flag its word-count
@@ -109,8 +109,8 @@ import { ReplyLength, getLengthGuidance } from "./ai_staged";
 import { ChatMessage } from "./chatMessage";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
 import { parseTaggedContent } from "./turnTimeline";
-import { getCustomModelIfUUID } from "./user_settings";
-import { recordSideCall, SideCallCostContext } from "./turnCost";
+import { SideCallCostContext } from "./turnCost";
+import { callSideModel, ProviderKeys } from "./sideModelCall";
 import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
 
 // ============================================================
@@ -940,39 +940,21 @@ ${rewriteRules}`;
       })();
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages,
-        model: apiOptions.model,
-        maxTokens: Math.max(400, Math.ceil(band.high * 3)),
-        temperature: 0.7,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "observer_rewrite",
+      label: "Narration rewrite",
+      model: apiOptions.model,
+      messages,
+      keys: apiOptions,
+      maxTokens: Math.max(400, Math.ceil(band.high * 3)),
+      temperature: 0.7,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "observer_rewrite",
-      "Narration rewrite",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     return content || null;
   } catch {
     return null;
@@ -1036,42 +1018,24 @@ Respond with ONLY a JSON object, no other text:
   )}${contextBlock}\n\nGM's narration (${words} words, vs. a ~${ceilingWords} word ceiling):\n"""\n${narration.trim()}\n"""`;
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        model: apiOptions.model,
-        maxTokens: 200,
-        temperature: 0,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "observer",
+      label: "response_length judge",
+      model: apiOptions.model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      keys: apiOptions,
+      maxTokens: 200,
+      temperature: 0,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "observer",
-      "response_length judge",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     if (!content) return null;
 
     return extractLengthJustificationJson(content);
@@ -1080,14 +1044,11 @@ Respond with ONLY a JSON object, no other text:
   }
 }
 
-export interface ObserverApiOptions extends SideCallCostContext {
+export interface ObserverApiOptions
+  extends SideCallCostContext,
+    ProviderKeys {
   model: string;
   token: string | null;
-  openRouterKey?: string;
-  deepseekKey?: string;
-  googleKey?: string;
-  mistralKey?: string;
-  deepinfraKey?: string;
   abortSignal?: AbortSignal;
   /** Optional override from layerSettings.ts's observer model/effort override - unset preserves prior behavior of never sending this field. */
   reasoningEffort?: string;
@@ -1159,42 +1120,24 @@ Respond with ONLY a JSON object, no other text:
   )}\n\nGM's narration in response:\n"""\n${narration.trim()}\n"""`;
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        model: apiOptions.model,
-        maxTokens: 200,
-        temperature: 0,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "observer",
+      label: "player_agency judge",
+      model: apiOptions.model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      keys: apiOptions,
+      maxTokens: 200,
+      temperature: 0,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "observer",
-      "player_agency judge",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     if (!content) return null;
 
     return extractAgencyCheckJson(content);
@@ -1310,42 +1253,24 @@ Respond with ONLY a JSON object, no other text:
   )}`;
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        model: apiOptions.model,
-        maxTokens: 200,
-        temperature: 0,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "observer",
+      label: "outcome_narration_mismatch judge",
+      model: apiOptions.model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      keys: apiOptions,
+      maxTokens: 200,
+      temperature: 0,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "observer",
-      "outcome_narration_mismatch judge",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     if (!content) return null;
 
     return extractOutcomeMismatchJson(content);
@@ -1499,42 +1424,24 @@ Given the GM's narration below, judge only the question(s) above. Respond with O
   )}`;
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        model: apiOptions.model,
-        maxTokens: 200,
-        temperature: 0,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "observer",
+      label: "tool-usage-gap judge",
+      model: apiOptions.model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      keys: apiOptions,
+      maxTokens: 200,
+      temperature: 0,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "observer",
-      "tool-usage-gap judge",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     if (!content) return null;
 
     return extractToolUsageJson(content);
@@ -1664,42 +1571,24 @@ Respond with ONLY a JSON object, no other text:
   const user = `Player's declared action:\n"""\n${playerChoice.trim() || "(none - opening scene)"}\n"""\n\nGM's narration (ran at tier ${tierUsed}):\n"""\n${narration.trim()}\n"""`;
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        model: apiOptions.model,
-        maxTokens: 200,
-        temperature: 0,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "observer",
+      label: "tier_escalation judge",
+      model: apiOptions.model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      keys: apiOptions,
+      maxTokens: 200,
+      temperature: 0,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "observer",
-      "tier_escalation judge",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     if (!content) return null;
 
     return extractTierEscalationJson(content);

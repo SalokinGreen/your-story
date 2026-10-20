@@ -15,7 +15,8 @@
 import { StoryData, ScenePart } from "./structs";
 import { getPartsWithinTokenBudget, cleanString } from "./ai_staged";
 import { estimateTokens } from "./tokenCounter";
-import { recordSideCall } from "./turnCost";
+import { ChatMessage } from "./chatMessage";
+import { callSideModel, ProviderKeys } from "./sideModelCall";
 
 // Below this many uncovered tokens, summarizing isn't worth an extra LLM
 // call yet - wait for more to accumulate.
@@ -290,12 +291,9 @@ ${
   return { system, user };
 }
 
-export interface CompactionApiOptions {
+export interface CompactionApiOptions extends ProviderKeys {
   model: string;
   token: string | null;
-  openRouterKey?: string;
-  deepseekKey?: string;
-  googleKey?: string;
   abortSignal?: AbortSignal;
 }
 
@@ -306,32 +304,22 @@ export interface CompactionResult {
 }
 
 async function callSummarizeApi(
-  messages: { role: string; content: string }[],
+  messages: ChatMessage[],
   apiOptions: CompactionApiOptions
 ): Promise<string | null> {
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiOptions.token}`,
-    },
-    body: JSON.stringify({
-      messages,
-      model: apiOptions.model,
-      maxTokens: Math.ceil(MAX_SUMMARY_TOKENS * 1.3),
-      temperature: 0.2,
-      openRouterKey: apiOptions.openRouterKey,
-      deepseekKey: apiOptions.deepseekKey,
-      googleKey: apiOptions.googleKey,
-    }),
-    signal: apiOptions.abortSignal,
+  const result = await callSideModel({
+    stage: "compaction",
+    label: "History summarization",
+    model: apiOptions.model,
+    messages,
+    keys: apiOptions,
+    maxTokens: Math.ceil(MAX_SUMMARY_TOKENS * 1.3),
+    temperature: 0.2,
+    abortSignal: apiOptions.abortSignal,
   });
+  if (!result.ok) return null;
 
-  if (!response.ok) return null;
-
-  const data = await response.json();
-  recordSideCall("compaction", "History summarization", apiOptions.model, data);
-  const summary = (data.content || "").trim();
+  const summary = (result.data.content || "").trim();
   return summary || null;
 }
 
@@ -371,7 +359,7 @@ export async function runCompactionPlan(
   apiOptions: CompactionApiOptions
 ): Promise<CompactionResult> {
   const { system, user } = buildCompactionPrompt(plan);
-  const messages = [
+  const messages: ChatMessage[] = [
     { role: "system", content: system },
     { role: "user", content: user },
   ];
@@ -388,7 +376,7 @@ export async function runCompactionPlan(
   let warnings = validateCompactionSummary(plan, firstSummary, storyData);
 
   if (warnings.length > 0) {
-    const revisionMessages = [
+    const revisionMessages: ChatMessage[] = [
       { role: "system", content: system },
       { role: "user", content: buildRevisionUserMessage(plan, firstSummary, warnings) },
     ];

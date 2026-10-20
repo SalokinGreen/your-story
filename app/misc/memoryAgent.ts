@@ -14,7 +14,7 @@
  * Complementary to, not overlapping with, reflection.ts: this pass decides
  * what raw facts from THIS turn are worth keeping; reflection.ts later
  * synthesizes higher-level insights from clusters of already-stored raw
- * memories. Same fetch("/api/generate") pattern as reflection.ts's
+ * memories. Same callSideModel() call as reflection.ts's
  * callReflectionApi - non-streaming, caller-supplied model, fails non-fatal
  * (an API failure just means no memory gets written this turn, never blocks
  * the turn itself).
@@ -26,8 +26,8 @@
 
 import { StoryData } from "./structs";
 import { countNameMentions } from "./compaction";
-import { getCustomModelIfUUID } from "./user_settings";
-import { recordSideCall, SideCallCostContext } from "./turnCost";
+import { SideCallCostContext } from "./turnCost";
+import { callSideModel, ProviderKeys } from "./sideModelCall";
 
 // Mirrors the guidance the GM's own add_memory tool used to carry
 // (toolSchemas.ts) - kept in sync in spirit, not literally imported, since
@@ -48,14 +48,11 @@ Respond with ONLY a JSON array, no other text. Return an empty array if nothing 
 
 const MAX_ENTRIES_PER_TURN = 3;
 
-export interface MemoryAgentApiOptions extends SideCallCostContext {
+export interface MemoryAgentApiOptions
+  extends SideCallCostContext,
+    ProviderKeys {
   model: string;
   token: string | null;
-  openRouterKey?: string;
-  deepseekKey?: string;
-  googleKey?: string;
-  mistralKey?: string;
-  deepinfraKey?: string;
   abortSignal?: AbortSignal;
   /** Optional override from layerSettings.ts's memory keeper model/effort override - unset preserves prior behavior of never sending this field. */
   reasoningEffort?: string;
@@ -108,42 +105,24 @@ async function callMemoryAgentApi(
   }\n"""\n\nGM's narration:\n"""\n${narration.trim()}\n"""`;
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: user },
-        ],
-        model: apiOptions.model,
-        maxTokens: 300,
-        temperature: 0.3,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "memory_keeper",
+      label: "Memory Keeper",
+      model: apiOptions.model,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: user },
+      ],
+      keys: apiOptions,
+      maxTokens: 300,
+      temperature: 0.3,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "memory_keeper",
-      "Memory Keeper",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     if (!content) return [];
 
     return extractCandidates(content);

@@ -53,8 +53,8 @@
  */
 
 import { StoryData } from "./structs";
-import { getCustomModelIfUUID } from "./user_settings";
-import { recordSideCall, SideCallCostContext } from "./turnCost";
+import { SideCallCostContext } from "./turnCost";
+import { callSideModel, ProviderKeys } from "./sideModelCall";
 import { storyProgress, targetTensionForProgress } from "./mythic";
 
 /** Turns between check-ins when no interval is explicitly configured (see layerSettings.ts). */
@@ -163,14 +163,11 @@ export function findRepeatedPhrases(turns: string[]): RepeatedPhraseCandidate[] 
 
 export type StoryProgressStatus = "on_track" | "dragging" | "rushing";
 
-export interface StoryProgressApiOptions extends SideCallCostContext {
+export interface StoryProgressApiOptions
+  extends SideCallCostContext,
+    ProviderKeys {
   model: string;
   token: string | null;
-  openRouterKey?: string;
-  deepseekKey?: string;
-  googleKey?: string;
-  mistralKey?: string;
-  deepinfraKey?: string;
   abortSignal?: AbortSignal;
   /** Optional override from layerSettings.ts's story-progress-observer model/effort override. */
   reasoningEffort?: string;
@@ -317,42 +314,24 @@ async function callStoryProgressApi(
   const user = `${buildContextSummary(storyData)}\n\nRecent narration:\n"""\n${buildNarrationWindow(turns)}\n"""${phraseCandidatesBlock}`;
 
   try {
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiOptions.token}`,
-      },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: buildSystemPrompt(phraseCandidates.length > 0) },
-          { role: "user", content: user },
-        ],
-        model: apiOptions.model,
-        maxTokens: 250,
-        temperature: 0.3,
-        openRouterKey: apiOptions.openRouterKey,
-        deepseekKey: apiOptions.deepseekKey,
-        googleKey: apiOptions.googleKey,
-        mistralKey: apiOptions.mistralKey,
-        deepinfraKey: apiOptions.deepinfraKey,
-        customModel: getCustomModelIfUUID(apiOptions.model),
-        reasoningEffort: apiOptions.reasoningEffort,
-      }),
-      signal: apiOptions.abortSignal,
+    const result = await callSideModel({
+      stage: "progress_observer",
+      label: "Story Progress Observer",
+      model: apiOptions.model,
+      messages: [
+        { role: "system", content: buildSystemPrompt(phraseCandidates.length > 0) },
+        { role: "user", content: user },
+      ],
+      keys: apiOptions,
+      maxTokens: 250,
+      temperature: 0.3,
+      reasoningEffort: apiOptions.reasoningEffort,
+      abortSignal: apiOptions.abortSignal,
+      costTurnId: apiOptions.costTurnId,
     });
+    if (!result.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    recordSideCall(
-      "progress_observer",
-      "Story Progress Observer",
-      apiOptions.model,
-      data,
-      apiOptions,
-    );
-    const content = (data.content || "").trim();
+    const content = (result.data.content || "").trim();
     if (!content) return null;
 
     return extractJudgment(content);

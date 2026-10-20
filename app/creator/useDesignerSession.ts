@@ -33,6 +33,7 @@ import {
 import { APIKeys } from "@/app/misc/APIKeysContext";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 import { getRequiredKeyForModel } from "@/app/misc/ai_prices";
+import { callSideModel } from "@/app/misc/sideModelCall";
 
 /** A turn can trigger several rounds of tool calls before the model settles. */
 const MAX_TOOL_ROUNDS = 5;
@@ -290,35 +291,20 @@ export function useDesignerSession({
             draft: draftRef.current,
           });
 
-          const response = await fetch("/api/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messages: aiMessages,
-              tools: getDesignerToolsForAPI(),
-              model,
-              maxTokens: maxOutputTokens,
-              temperature: 0.8,
-              openRouterKey: apiKeys.openRouterKey,
-              deepseekKey: apiKeys.deepseekKey,
-              googleKey: apiKeys.googleKey,
-              mistralKey: apiKeys.mistralKey,
-              deepinfraKey: apiKeys.deepinfraKey,
-              customModel,
-            }),
-            signal: controller.signal,
+          // Not billed to a turn (there is none here), so no `stage`.
+          const result = await callSideModel({
+            label: "Game Designer",
+            model,
+            messages: aiMessages,
+            tools: getDesignerToolsForAPI(),
+            keys: apiKeys,
+            maxTokens: maxOutputTokens,
+            temperature: 0.8,
+            abortSignal: controller.signal,
           });
+          if (!result.ok) throw new Error(result.error);
 
-          if (!response.ok) {
-            const data = await response
-              .json()
-              .catch(() => ({ error: "Unknown error" }));
-            throw new Error(
-              data.error || `The model call failed (${response.status}).`,
-            );
-          }
-
-          const data = await response.json();
+          const data = result.data;
           // Tool-call markup a backend leaked into `content` (see
           // toolCallFallback.ts) is never something to show the author - the
           // call itself is recovered into `toolCalls` before it gets here.

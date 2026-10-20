@@ -42,6 +42,7 @@ import {
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
+import { pickProviderKeys } from "@/app/misc/sideModelCall";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   runObserver,
@@ -2116,9 +2117,11 @@ async function generateStoryTurnOnce(
             {
               model: options.storyModel || gmModel,
               token,
-              openRouterKey: options.openRouterKey,
-              deepseekKey: options.deepseekKey,
-              googleKey: options.googleKey,
+              // All five, not just the ones this model "usually" needs: the
+              // default storyModel is the Mistral narration model, and
+              // leaving a provider out here is how compaction silently never
+              // ran (status report §6.13).
+              ...pickProviderKeys(options),
               abortSignal: options.abortSignal,
             },
           );
@@ -2156,9 +2159,7 @@ async function generateStoryTurnOnce(
               options.storyModel || gmModel,
             ),
             token,
-            openRouterKey: options.openRouterKey,
-            deepseekKey: options.deepseekKey,
-            googleKey: options.googleKey,
+            ...pickProviderKeys(options),
             abortSignal: options.abortSignal,
           };
           const reflectionResult = await ensureStoryReflected(

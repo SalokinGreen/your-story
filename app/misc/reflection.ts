@@ -17,7 +17,9 @@
  */
 
 import { StoryData, MemoryEntry, getMemoryContent } from "./structs";
-import { recordSideCall, SideCallCostContext } from "./turnCost";
+import { SideCallCostContext } from "./turnCost";
+import { ChatMessage } from "./chatMessage";
+import { callSideModel, ProviderKeys } from "./sideModelCall";
 
 // Cumulative importance (sum of each new memory's 0-10 importance, or a
 // mid-value default for memories with no self-rated importance) that must
@@ -125,12 +127,11 @@ export function applyReflection(
   }
 }
 
-export interface ReflectionApiOptions extends SideCallCostContext {
+export interface ReflectionApiOptions
+  extends SideCallCostContext,
+    ProviderKeys {
   model: string;
   token: string | null;
-  openRouterKey?: string;
-  deepseekKey?: string;
-  googleKey?: string;
   abortSignal?: AbortSignal;
   /** Optional override from layerSettings.ts's reflection model/effort override - unset preserves prior behavior of never sending this field. */
   reasoningEffort?: string;
@@ -142,33 +143,24 @@ export interface ReflectionResult {
 }
 
 async function callReflectionApi(
-  messages: { role: string; content: string }[],
+  messages: ChatMessage[],
   apiOptions: ReflectionApiOptions
 ): Promise<string[] | null> {
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiOptions.token}`,
-    },
-    body: JSON.stringify({
-      messages,
-      model: apiOptions.model,
-      maxTokens: 300,
-      temperature: 0.4,
-      openRouterKey: apiOptions.openRouterKey,
-      deepseekKey: apiOptions.deepseekKey,
-      googleKey: apiOptions.googleKey,
-      reasoningEffort: apiOptions.reasoningEffort,
-    }),
-    signal: apiOptions.abortSignal,
+  const result = await callSideModel({
+    stage: "reflection",
+    label: "Reflection",
+    model: apiOptions.model,
+    messages,
+    keys: apiOptions,
+    maxTokens: 300,
+    temperature: 0.4,
+    reasoningEffort: apiOptions.reasoningEffort,
+    abortSignal: apiOptions.abortSignal,
+    costTurnId: apiOptions.costTurnId,
   });
+  if (!result.ok) return null;
 
-  if (!response.ok) return null;
-
-  const data = await response.json();
-  recordSideCall("reflection", "Reflection", apiOptions.model, data, apiOptions);
-  const content = (data.content || "").trim();
+  const content = (result.data.content || "").trim();
   if (!content) return [];
 
   return content
@@ -193,7 +185,7 @@ export async function ensureStoryReflected(
   if (!plan) return { ran: false };
 
   const { system, user } = buildReflectionPrompt(plan);
-  const messages = [
+  const messages: ChatMessage[] = [
     { role: "system", content: system },
     { role: "user", content: user },
   ];
