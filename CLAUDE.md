@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Read `docs/status-report-2026-10-20.md` first.** It is a full audit of the
+> repo as of 2026-10-20 (after ~11 weeks idle): health checks, confirmed bugs,
+> stranded branches, a recommended plan, and a list of the places where this
+> file is wrong (§12 — notably: there is no Supabase/auth any more, the only env
+> vars are `NEXT_PUBLIC_SITE_URL`/`NEXT_PUBLIC_STANDALONE`/`NEXT_PUBLIC_SYNC_API_URL`,
+> and the Memory Size default is 36k, not 128k). Where the two disagree, trust
+> the report until this file is rewritten.
+
 ## What this is
 
 Your Story is a Next.js 16 (App Router) + React 19 + TypeScript app: an AI-powered,
