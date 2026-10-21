@@ -32,11 +32,13 @@ cannot override. The layering:
   `diceFormula.ts`. Memory and consistency: `memoryAgent.ts`,
   `reflection.ts`, `compaction.ts`, `observer.ts`, `consistencyCheck.ts`.
   Direction: `directorAssistant.ts`, `storyProgressObserver.ts`,
-  `campaignPlan.ts`. Providers: `providerCall.ts` (one function per
-  provider), `providerFetch.ts` (calls the provider in-process on the
+  `campaignPlan.ts`. Providers: `providerCall.ts` (`generateNonStreaming()`
+  and `generateStream()`, branching per provider and normalising the
+  response), `providerFetch.ts` (calls the provider in-process on the
   standalone build), `sideModelCall.ts` (every AI side call goes through
-  `callSideModel()`). Storage: the `local*Manager.ts` files (IndexedDB, the
-  only storage there is) and `syncManager.ts`. The Game Designer:
+  `callSideModel()`). Storage is on the device: the `local*Manager.ts` files
+  (IndexedDB, and localStorage for folders, keys and settings), plus
+  `syncManager.ts` for optional encrypted sync through `sync-worker/`. The Game Designer:
   `designer_ai.ts`, `designer_tools.ts`, `designer_executor.ts`.
 - `app/api/` — thin BYOK proxies (`generate`, `generate-stream`, `ocr/*`,
   `tts`, `stt`, `creator/generate-image`, `web-search`). They know nothing

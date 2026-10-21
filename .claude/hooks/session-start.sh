@@ -25,10 +25,16 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-# Next 16 needs Node >= 20.9; Vitest 4 needs 20, 22 or >= 24.
+# Next 16 needs Node >= 20.9 (its `engines`); Vitest 4 supports 20, 22 and
+# >= 24, so the odd releases 21 and 23 are refused too.
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-if [ "$NODE_MAJOR" -lt 20 ]; then
+NODE_MINOR="$(node -p 'process.versions.node.split(".")[1]')"
+if [ "$NODE_MAJOR" -lt 20 ] || { [ "$NODE_MAJOR" -eq 20 ] && [ "$NODE_MINOR" -lt 9 ]; }; then
   echo "node $(node -v) is too old: Next 16 needs >= 20.9. The suite will not run."
+  exit 1
+fi
+if [ "$NODE_MAJOR" -eq 21 ] || [ "$NODE_MAJOR" -eq 23 ]; then
+  echo "node $(node -v) is outside Vitest 4's range (20, 22 or >= 24). The suite will not run."
   exit 1
 fi
 

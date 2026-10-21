@@ -64,7 +64,8 @@ design — fixed RPG systems, structured inventory, conditions, XP — to a
 current, trust `app/misc/structs.ts` and recent git history over prose
 docs.** Adventures are authored in conversation with a **Game Designer**
 AI, a different character from the GM. Keys are always the player's own
-(BYOK); there are no accounts and no server-side storage.
+(BYOK); there are no accounts, and a player's data lives on their device
+(optional cross-device sync keeps only encrypted copies on the server).
 
 ## The working loop
 
@@ -87,8 +88,11 @@ what a session actually does:
   change is its go-ahead.
 - **A plan handed to the author gets published as an artifact.** The markdown
   in `docs/` stays the source of truth; the artifact is the reading copy, and
-  the author reads that one. Hand over the link, not just the path. Load the
-  `artifact-design` skill before writing the page.
+  the author reads that one. Hand over the link, not just the path. The
+  `Artifact` tool and the `artifact-design` skill come with Claude Code in
+  the desktop app and on claude.ai, not with this repository; load the skill
+  before writing the page. A session without the `Artifact` tool hands over
+  the markdown path and says the reading copy is owed.
 - **Design and implementation planning are two documents, not one.** The
   design says what and why; the implementation plan says which files, which
   signatures, in what slice order, and what breaks. A design that names no
@@ -342,9 +346,12 @@ always runs **before** the story stage:
    sheet and mechanics notes and decides on rolls and state changes. Its
    budget comes from `computeGMStageBudget()`: the Memory Size slider
    (localStorage `customMaxContext`, default `GM_STAGE_DEFAULT_BUDGET` =
-   36,000), capped so the input plus one round's reply (the Response Length,
-   default 12,000, capped by the model's own maximum) fits the model's
-   window, and never below 4,000; split 60% story history / 40% info.
+   36,000), capped so the input plus one round's reply fits the model's
+   window, and never below 4,000; split 60% story history / 40% info. The
+   reply reserved is the Response Length setting (localStorage
+   `customMaxOutput`, 8,000 by default in the UI, which gameplay passes in)
+   capped by the model's own maximum; `GM_STAGE_DEFAULT_OUTPUT` (12,000) is
+   only the helper's fallback when no Response Length is given.
 2. **The story stage** — the narrator. If the GM's final round already wrote
    prose (no tool call that round), that content *is* the story. Otherwise the
    same conversation is continued with `buildStoryContinuationPrompt()`,
@@ -355,10 +362,11 @@ always runs **before** the story stage:
    `storyData.autoGenerateChoices` is on. It is off by default.
 
 `app/api/generate/route.ts` and `app/api/generate-stream/route.ts` are dumb
-proxies: they take `{ messages, tools?, model, ... }`, forward to whichever
-provider the model implies (DeepSeek, OpenRouter, Mistral, DeepInfra, Google
-AI Studio — one function each in `providerCall.ts`), and return or stream the
-raw result. They know nothing about `StoryData`, prompts or tools. **The
+proxies: they take `{ messages, tools?, model, ... }` and hand them to
+`providerCall.ts`, whose two entry points, `generateNonStreaming()` and
+`generateStream()`, branch on the provider the model implies (DeepSeek,
+OpenRouter, Mistral, DeepInfra, Google AI Studio) and normalise each
+provider's response into one shape. They know nothing about `StoryData`, prompts or tools. **The
 standalone build has no API routes**: `providerFetch()` calls the provider
 in-process when `isStandalone()`. Google gets a filtered tool list
 (`GOOGLE_ESSENTIAL_TOOLS`), which is stale (§6.14).
@@ -448,8 +456,10 @@ report's §11.3. The ones that shape play:
   and the `edit_lore_*` / `merge_lore` / `duplicate_lore` family — the GM's
   way of reading and updating lore, secrets, the character sheet and the
   mechanics note.
-- `search_memory` — durable recall. **The Memory Keeper (`memoryAgent.ts`) is
-  the only memory writer**; `add_memory` is no longer offered.
+- `search_memory` — durable recall. The GM does not write memory:
+  `add_memory` is no longer offered. The Memory Keeper (`memoryAgent.ts`)
+  writes the turn memories, and Reflection (`reflection.ts`) appends its
+  synthesised insights.
 
 **Executors that exist but are not offered:** `game_over` (so the GM cannot
 end a game), `delegate_task` (so the Web Research toggle and Brave key do
@@ -530,7 +540,8 @@ survives because the OCR pipeline uses it.
 (tension, chaos, tint, director state). `LoreType` is `lore`,
 `character_sheet`, `mechanics`, `secret`, `table`, `dm_instructions`,
 `story_instructions` and `gm_plan`, plus six legacy aliases; notes have a
-two-pass `visibility` (`hidden`, `to_be_revealed`, `check_per_turn`). Fields
+two-pass `visibility`: `always_reveal` (the default when unset), `hidden`,
+`to_be_revealed` and `check_per_turn`. Fields
 marked `DEPRECATED` are back-compat only — grep for it before assuming a
 field is live.
 
@@ -572,9 +583,12 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 - **Coins and Stripe are fully removed.** Cost figures in the UI
   (`turnCost.ts`, `TurnCostPanel.tsx`) are real dollar estimates against the
   player's own key. Don't reintroduce a coin or credit concept.
-- **Storage is local.** The `local*Manager.ts` files (IndexedDB) are the only
-  storage. Optional encrypted cross-device sync runs through a Cloudflare
-  Worker (`sync-worker/`, `syncManager.ts`, `NEXT_PUBLIC_SYNC_API_URL`).
+- **Storage is on the device.** The `local*Manager.ts` files keep stories,
+  adventures and the libraries in IndexedDB (folders in localStorage), and
+  keys and settings live in localStorage. Optional cross-device sync stores
+  encrypted blobs in Cloudflare KV through a Worker (`sync-worker/`,
+  `syncManager.ts`, `NEXT_PUBLIC_SYNC_API_URL`); the server never sees the
+  plaintext.
 - **The native shells.** `NEXT_PUBLIC_STANDALONE=true` builds the static
   export; `isStandalone()` (`standalone.ts`) switches code paths;
   `providerFetch` and `getProviderFetch()` (`platformFetch.ts` — Tauri's scoped
