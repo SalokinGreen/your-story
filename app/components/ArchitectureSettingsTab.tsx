@@ -174,7 +174,9 @@ function Toggle({
 /**
  * A model + reasoning-effort override for one AI side-call stage (Observer,
  * Memory Keeper, Reflection). Off by default - the stage runs on
- * SIDE_AGENT_DEFAULT_MODEL_KEY (decision 51).
+ * SIDE_AGENT_DEFAULT_MODEL_KEY (decision 51); `offNote` replaces that line
+ * for a stage whose unpinned default is not just that (the Observer, whose
+ * rewrite follows the narration voice, decision 52).
  */
 function StageOverrideCard({
   icon,
@@ -183,6 +185,7 @@ function StageOverrideCard({
   override,
   onChange,
   customModels,
+  offNote,
 }: {
   icon: string;
   title: string;
@@ -190,6 +193,7 @@ function StageOverrideCard({
   override: ModelEffortOverride | null;
   onChange: (override: ModelEffortOverride | null) => void;
   customModels: CustomModel[];
+  offNote?: string;
 }) {
   const pinned = override !== null;
   const effective: ModelEffortOverride = override ?? {
@@ -237,7 +241,7 @@ function StageOverrideCard({
         </div>
       ) : (
         <p className="text-xs text-blue-300/40 italic">
-          Off - runs on {SIDE_AGENT_DEFAULT_MODEL_KEY}.
+          {offNote ?? `Off - runs on ${SIDE_AGENT_DEFAULT_MODEL_KEY}.`}
         </p>
       )}
     </div>
@@ -469,6 +473,7 @@ export default function ArchitectureSettingsTab() {
           override={observerModelOverride}
           onChange={handleObserverModelChange}
           customModels={customModels}
+          offNote={`Off - checks run on ${SIDE_AGENT_DEFAULT_MODEL_KEY}; rewrites use the narration model.`}
         />
 
         <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">

@@ -79,14 +79,16 @@ real turns on the author's OpenRouter key, so it waits for the author's go.
   call costing several times a tenth of a cent, or taking several seconds,
   which would mean OpenRouter is not honouring `reasoning.effort: low` for
   Haiku.
-- **The Observer's rewrite on Haiku.** The rewrite writes the prose the
-  player reads, and it now runs on Claude Haiku 5.5 unless the Observer is
-  pinned. In a story with violence or mature themes, let the Observer flag a
-  turn (a player-agency or outcome mismatch is the easiest to provoke).
-  *Failure looks like:* a refusal or a softened rewrite replacing the scene,
-  or "Observer rewrite call failed, falling back to full-turn reset" in the
-  Debug Logs every time. Then pin the Observer to GLM 5.3, or keep the rewrite
-  on the narration model.
+- **The Observer's rewrite on the narration voice (decision 52).** The
+  Observer's judges run on Claude Haiku 5.5, but an unpinned Observer's
+  rewrite runs on the narration voice (GLM 5.3 by default). In a story with
+  violence or mature themes, let the Observer flag a turn (a player-agency or
+  outcome mismatch is the easiest to provoke), and read the rewrite's line in
+  the Debug Logs. *Expected:* the judge calls name Claude Haiku 5.5 and the
+  rewrite call names GLM 5.3, and the rewritten scene keeps its tone.
+  *Failure looks like:* a rewrite call naming Haiku (a call site still on the
+  judges' options), a refusal or a softened scene, or "Observer rewrite call
+  failed, falling back to full-turn reset" every time.
 - **An existing profile with only a Mistral or DeepSeek key.** Its saved
   overrides still apply, but a slot with none now defaults to an OpenRouter
   model. *Expected:* a turn that stops with a message naming the missing

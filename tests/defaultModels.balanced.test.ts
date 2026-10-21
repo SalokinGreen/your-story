@@ -35,6 +35,7 @@ import {
   getDirectorAssistantModelOverride,
   getStoryProgressObserverModelOverride,
   resolveSideCallModel,
+  resolveObserverRewriteModel,
 } from "@/app/misc/layerSettings";
 import {
   isClaudeCliModel,
@@ -257,12 +258,11 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
     expect(resolveSideCallModel(null).model).toBe("Claude Haiku 5.5");
   });
 
-  it("is what the turn cost estimate prices every side agent at, and the narrator at GLM 5.3", () => {
+  it("is what the turn cost estimate prices every side agent at, and the narrator (and the rewrite) at GLM 5.3", () => {
     const lines = estimateTurnCost().lines;
     const modelOf = (stage: string) => lines.find((l) => l.stage === stage)?.modelKey;
     for (const stage of [
       "observer",
-      "observer_rewrite",
       "memory_keeper",
       "director",
       "progress_observer",
@@ -272,6 +272,7 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
     }
     expect(modelOf("narration")).toBe("GLM 5.3");
     expect(modelOf("choices")).toBe("GLM 5.3");
+    expect(modelOf("observer_rewrite")).toBe("GLM 5.3");
   });
 
   it("keeps a layer's pin, model and effort", () => {
@@ -370,5 +371,48 @@ describe("an unpinned side agent never reaches the Claude subscription (decision
       model: SONNET_SUBSCRIPTION,
       reasoningEffort: "low",
     });
+  });
+});
+
+describe("the Observer's rewrite follows the narration voice, not the judges (decision 52)", () => {
+  it("runs an unpinned Observer's rewrite on the narration model, with no effort of its own", () => {
+    expect(resolveObserverRewriteModel(getObserverModelOverride(), String(getEffectiveNarrationModelKey()))).toEqual({
+      model: "GLM 5.3",
+    });
+    // ...while its judges stay on the side-agent default.
+    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5" });
+  });
+
+  it("follows a narration voice the player picked", () => {
+    localStorage.setItem("narrationModelOverride", "Mistral Nemo");
+    expect(resolveObserverRewriteModel(null, String(getEffectiveNarrationModelKey()))).toEqual({
+      model: "Mistral Nemo",
+    });
+  });
+
+  it("takes a pinned Observer's model and effort with it", () => {
+    localStorage.setItem(
+      "observerModelOverride",
+      JSON.stringify({ modelKey: "Mistral Medium 3.1", reasoningEffort: "low" }),
+    );
+    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3")).toEqual({
+      model: "Mistral Medium 3.1",
+      reasoningEffort: "low",
+    });
+  });
+
+  it("falls a subscription pin this device cannot run, or a stale pin, to the narration voice", () => {
+    fakeCli.platform = false;
+    localStorage.setItem(
+      "observerModelOverride",
+      JSON.stringify({ modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "low" }),
+    );
+    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3")).toEqual({ model: "GLM 5.3" });
+
+    localStorage.setItem(
+      "observerModelOverride",
+      JSON.stringify({ modelKey: "Grok Code Fast 1", reasoningEffort: "low" }),
+    );
+    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3")).toEqual({ model: "GLM 5.3" });
   });
 });

@@ -74,6 +74,7 @@ import {
   getStoryProgressObserverModelOverride,
   getStoryProgressCheckInterval,
   resolveSideCallModel,
+  resolveObserverRewriteModel,
 } from "@/app/misc/layerSettings";
 import {
   outputToScenePart,
@@ -951,8 +952,9 @@ export async function generateStoryTurn(
     // is not: each side agent takes its own through resolveSideCallModel
     // (the player's pin from Settings > Architecture, else
     // SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51), which overrides the
-    // `model` here. This `model` is the narration model, and only the choices
-    // re-derivation after an Observer rewrite uses it. It has to be an
+    // `model` here. This `model` is the narration model, which the choices
+    // re-derivation after an Observer rewrite uses, and the rewrite itself
+    // when the Observer is unpinned (decision 52). It has to be an
     // AI_MODELS key (or a custom model's UUID): GenerationMeta.model is the
     // provider's own id, which the proxy can't resolve and silently swaps for
     // DeepSeek V4 Flash.
@@ -979,6 +981,16 @@ export async function generateStoryTurn(
     const observerApiOptions = {
       ...sideCallApiOptions,
       ...resolveSideCallModel(observerModelOverride),
+    };
+    // The rewrite writes the prose the player reads, so an unpinned Observer
+    // rewrites on the narration voice, not the side-agent default its judges
+    // use (decision 52); a pinned Observer rewrites on its pin.
+    const observerRewriteApiOptions = {
+      ...sideCallApiOptions,
+      ...resolveObserverRewriteModel(
+        observerModelOverride,
+        String(sideCallApiOptions.model),
+      ),
     };
 
     // Choices are parsed from the narration, so a rewrite invalidates them -
@@ -1224,7 +1236,7 @@ export async function generateStoryTurn(
           const s = settingsFor(observerSettings, type);
           return s.enabled && s.triggersReset;
         }),
-        apiOptions: { ...observerApiOptions, abortSignal: speculationAbort.signal },
+        apiOptions: { ...observerRewriteApiOptions, abortSignal: speculationAbort.signal },
       })
         // Attached immediately, before anything awaits this: a speculation
         // that fails (or is aborted as unwanted) must never surface as an
@@ -1383,12 +1395,10 @@ export async function generateStoryTurn(
               // ...and what it was trying to do with them, so the fix keeps
               // the deliberate parts of the draft intact.
               narrationThoughts: result.narrationThoughts,
-              // Same model/effort the Observer was just judged with (the
-              // Architecture tab's override, if the user pinned one, else the
-              // side-agent default) - not sideCallApiOptions, or the rewrite
-              // would silently skip that override and run on the narration
-              // model.
-              apiOptions: observerApiOptions,
+              // The Observer's pin if the player set one, else the narration
+              // voice (decision 52) - not sideCallApiOptions, or the rewrite
+              // would silently skip that pin.
+              apiOptions: observerRewriteApiOptions,
             });
           } catch (rewriteError) {
             logger.action(
@@ -1594,7 +1604,7 @@ export async function generateStoryTurn(
                   characterContext: observerCharacterContext,
                   conversationMessages: result.gmPromptMessages,
                   narrationThoughts: result.narrationThoughts,
-                  apiOptions: observerApiOptions,
+                  apiOptions: observerRewriteApiOptions,
                 });
               } catch (rewriteError) {
                 logger.action(

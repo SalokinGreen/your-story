@@ -472,9 +472,12 @@ Story Progress Observer, compaction and reflection) runs on
 `SIDE_AGENT_DEFAULT_MODEL_KEY` in `layerSettings.ts`, Claude Haiku 5.5,
 whatever the narration voice is (decision 51, which revised decision 19);
 `resolveSideCallModel(override)` takes no fallback model, so a side agent can
-never inherit the narration or GM model, or a subscription one. The choices
-call, including the one re-run after an Observer rewrite, stays on the
-narration model. A model handed to a call must be an
+never inherit the narration or GM model, or a subscription one. The
+Observer's rewrite is the exception, because it writes the prose the player
+reads: an unpinned Observer rewrites on the narration voice
+(`resolveObserverRewriteModel`, decision 52) while its judges stay on Haiku.
+The choices call, including the one re-run after an Observer rewrite, stays
+on the narration model. A model handed to a call must be an
 `AI_MODELS` key or a custom model's UUID, never `GenerationMeta.model` (the
 provider's own id), which `getModelConfig()` silently swaps for DeepSeek V4
 Flash. A saved choice (a tier, the narration voice, a side agent, a lore image

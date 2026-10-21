@@ -206,6 +206,28 @@ export function resolveSideCallModel(
   return { model: override.modelKey, reasoningEffort: override.reasoningEffort };
 }
 
+/**
+ * The model the Observer's rewrite runs on (decision 52). The rewrite is not a
+ * verdict: it writes the prose the player reads in place of the draft, so
+ * when the Observer is unpinned it follows the narration voice (the caller
+ * passes getEffectiveNarrationModelKey(), which already falls back from a
+ * subscription voice this device cannot run) instead of the side-agent
+ * default, and a dark or violent scene is not refused or softened by a model
+ * the player never chose for prose. A pinned Observer takes its rewrite with
+ * it, as before, and a subscription pin this device cannot run falls to the
+ * narration voice too, not to SIDE_AGENT_DEFAULT_MODEL_KEY.
+ */
+export function resolveObserverRewriteModel(
+  override: ModelEffortOverride | null,
+  narrationModel: string,
+): { model: string; reasoningEffort?: string } {
+  if (!override) return { model: narrationModel };
+  if (isClaudeCliModel(override.modelKey) && !canRunClaudeCliModel()) {
+    return { model: narrationModel };
+  }
+  return { model: override.modelKey, reasoningEffort: override.reasoningEffort };
+}
+
 // ============================================================
 // OBSERVER PER-FLAG-TYPE SETTINGS
 // ============================================================

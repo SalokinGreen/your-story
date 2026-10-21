@@ -50,6 +50,7 @@ import {
   getStoryProgressCheckInterval,
   getObserverSettings,
   resolveSideCallModel,
+  resolveObserverRewriteModel,
 } from "@/app/misc/layerSettings";
 import { ObserverSettings, settingsFor } from "@/app/misc/observer";
 import { ObserverFlagType } from "@/app/misc/structs";
@@ -344,6 +345,12 @@ export function estimateTurnCost(
   const progressCall = resolveSideCallModel(
     getStoryProgressObserverModelOverride(),
   );
+  // The rewrite writes player-facing prose, so an unpinned Observer rewrites
+  // on the narration voice (decision 52).
+  const rewriteCall = resolveObserverRewriteModel(
+    getObserverModelOverride(),
+    narrationModel,
+  );
 
   // --- Context budget the GM stage will be filled to ------------------
   const { totalContextBudget } = computeGMStageBudget(
@@ -452,8 +459,8 @@ export function estimateTurnCost(
     plans.push({
       stage: "observer_rewrite",
       label: "Observer rewrite",
-      modelKey: observerCall.model,
-      reasoningEffort: observerCall.reasoningEffort,
+      modelKey: rewriteCall.model,
+      reasoningEffort: rewriteCall.reasoningEffort,
       inputPerCall: Math.round(gmInputTokens * OBSERVER_REWRITE_INPUT_FILL),
       outputPerCall: NARRATION_OUTPUT_TOKENS,
       expectedCalls: calibratedCalls(
