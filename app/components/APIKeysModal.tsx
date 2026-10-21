@@ -28,9 +28,27 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
     connectOpenRouter,
     disconnectOpenRouter,
     isConnectingOpenRouter,
+    awaitingOpenRouterCode,
+    submitOpenRouterCode,
+    cancelOpenRouterConnect,
   } = useAPIKeys();
 
   const [showKeys, setShowKeys] = useState(false);
+  const [openRouterCode, setOpenRouterCode] = useState("");
+
+  const handleSubmitOpenRouterCode = async () => {
+    if (!openRouterCode.trim() || isConnectingOpenRouter) return;
+    try {
+      await submitOpenRouterCode(openRouterCode);
+      setOpenRouterCode("");
+      addNotification("OpenRouter connected", "success");
+    } catch (error) {
+      addNotification(
+        error instanceof Error ? error.message : "Couldn't connect OpenRouter",
+        "failure",
+      );
+    }
+  };
   const [activeTab, setActiveTab] = useState<
     | "config"
     | "llm"
@@ -274,10 +292,50 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                             name="ExternalLink"
                             className="w-3 h-3"
                           />
-                          Or connect with OAuth instead
+                          {awaitingOpenRouterCode
+                            ? "Reopen the OpenRouter sign-in page"
+                            : "Or connect with OAuth instead"}
                         </>
                       )}
                     </button>
+                    {awaitingOpenRouterCode && (
+                      <div className="mt-2 p-2.5 bg-white/[0.03] border border-white/10 rounded-lg space-y-2">
+                        <p className="text-xs text-blue-200/70">
+                          Sign in on the OpenRouter page that just opened in
+                          your browser, then paste the code it shows you here.
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={openRouterCode}
+                            onChange={(e) => setOpenRouterCode(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSubmitOpenRouterCode();
+                            }}
+                            placeholder="Paste code"
+                            autoComplete="off"
+                            spellCheck={false}
+                            className="flex-1 min-w-0 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                          />
+                          <button
+                            onClick={handleSubmitOpenRouterCode}
+                            disabled={!openRouterCode.trim() || isConnectingOpenRouter}
+                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50"
+                          >
+                            Connect
+                          </button>
+                          <button
+                            onClick={() => {
+                              setOpenRouterCode("");
+                              cancelOpenRouterConnect();
+                            }}
+                            className="px-2 py-1 text-xs text-blue-200/70 hover:text-white rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

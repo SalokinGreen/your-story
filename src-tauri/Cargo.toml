@@ -6,7 +6,7 @@ authors = ["you"]
 license = ""
 repository = ""
 edition = "2021"
-rust-version = "1.88"
+rust-version = "1.90"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,15 +15,19 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.3", features = [] }
+tauri-build = { version = "2.7.3", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3", features = [] }
+tauri = { version = "2.12.4", features = [] }
 tauri-plugin-log = "2"
 # Native HTTP client exposed to the frontend as @tauri-apps/plugin-http's
 # fetch() - bypasses the webview's CORS sandbox, unlike the browser's own
 # fetch(). See app/misc/platformFetch.ts.
 tauri-plugin-http = "2"
+# Opens URLs in the system browser (app/misc/openExternal.ts) - the
+# OpenRouter sign-in, and every target="_blank" link via the click handler
+# the plugin injects. Scoped to https:// in capabilities/default.json.
+tauri-plugin-opener = "2.7.2"
