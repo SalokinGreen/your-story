@@ -242,3 +242,24 @@ be re-read before any public release.
 1. **Claude Fable 5.1 through OpenRouter** — left out (decision 15).
 2. **The phone and synced subscription models** — fall back to the slot's
    default model with a notice (decision 16).
+
+## 8. Addendum — GLM through Z.ai and OpenRouter (decision 18)
+
+The author asked for Z.ai's GLM Coding Plan. Z.ai's FAQ limits the plan to
+"officially supported tools and products" and says subscribers "shall not use
+the subscription benefits in any unsupported tools or scenarios"; a game
+master is neither, including through the `claude` CLI. So, instead:
+
+- **Z.ai as a direct provider.** The player's own Z.ai API key on the
+  **general** pay-as-you-go endpoint, `https://api.z.ai/api/paas/v4` — never
+  the coding endpoints (`/api/coding/paas/v4`, `/api/anthropic`). Models:
+  GLM-5.3 (`glm-5.3`, $1.40 / $4.40 per M, cached input $0.26) and
+  GLM-5.3-Flash ($0.15 / $0.50, cached $0.03); 1M context, 128k output, tool
+  calling. Thinking cannot be disabled; `reasoning_effort` is `low`, `high`
+  or `max`. Works on every platform.
+- **GLM 5.3 through OpenRouter** — `z-ai/glm-5.3` and `z-ai/glm-5.3-flash`, next
+  to the existing GLM 5.2, for a device with no Z.ai key.
+
+The guardrail, as a rule for the build: the Z.ai provider calls only the
+general endpoint, and the desktop allowlist admits only `api.z.ai/api/paas/*`,
+so a Coding Plan key cannot be used through the app by accident.
