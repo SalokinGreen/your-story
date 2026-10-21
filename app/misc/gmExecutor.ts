@@ -102,8 +102,6 @@ import {
 import {
   currentTint,
   formatPortentForModel,
-  isPrimaMateriaTable,
-  pluck,
   rollPortent,
   selectFrame,
   type PortentMode,
@@ -2998,37 +2996,6 @@ function executeRollTable(
 ): GMToolResult {
   // Try as AGMT element table (normalize name: spaces to underscores, lowercase)
   const normalizedName = params.table_name.toLowerCase().replace(/\s+/g, "_");
-
-  // Prima Materia tables are checked first: their names are all `pm_`-
-  // prefixed so they can't collide with the AGMT set, and a couple of them
-  // (pm_names, pm_actions) would otherwise be shadowed by similarly-named
-  // built-ins.
-  if (isPrimaMateriaTable(normalizedName)) {
-    const pluckResult = pluck(
-      normalizedName,
-      normalizedName === "pm_quest_prompts" ? 3 : 1
-    )!;
-    const displayName =
-      params.display_name ||
-      `${normalizedName.replace(/^pm_/, "").replace(/_/g, " ")} (Prima Materia)`;
-    return {
-      toolName: "roll_table",
-      toolCallId,
-      success: true,
-      result: {
-        type: "roll_table",
-        tableName: normalizedName,
-        result: pluckResult.result,
-        reason: params.reason,
-        displayName: params.display_name,
-      } as GMRollTableResult,
-      contextForStory:
-        `[${displayName}: "${pluckResult.result}"]\n` +
-        `[Rolled: ${pluckResult.detail}]\n` +
-        `[Reason: ${params.reason}]\n` +
-        `[This is an input, not a script - work it into the fiction on your own terms, and don't name the table or the dice in narration.]`,
-    };
-  }
 
   const isAgmtTable = (MYTHIC_TABLE_NAMES as string[]).includes(normalizedName);
 
