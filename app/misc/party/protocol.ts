@@ -64,6 +64,7 @@ export type PhoneMessage =
   | { type: "spotlight_release" }
   | { type: "line"; text: string; kind: LineKind }
   // A recorded take, split into ordered chunks (the Android app, PR P2).
+  // seq counts from 0 and the take's mimeType rides on the first chunk.
   | {
       type: "voice_chunk";
       takeId: string;

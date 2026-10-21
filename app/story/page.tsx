@@ -68,6 +68,8 @@ import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import OOCChatPanel from "../components/OOCChatPanel";
 import ProfilePickerModal from "../components/ProfilePickerModal";
+import { PartyLobbyModal } from "../components/PartyLobby";
+import { usePartyHost } from "./usePartyHost";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
 import AskQuestionModal from "../components/AskQuestionModal";
@@ -571,6 +573,10 @@ function StoryPageContent() {
   const askQuestionResolveRef = useRef<
     ((answer: AskQuestionAnswer | null) => void) | null
   >(null);
+  // Party mode: the request id of a roll or question currently shown on a
+  // player's phone rather than in the modals above (null when it isn't).
+  const partyRollRequestIdRef = useRef<string | null>(null);
+  const partyQuestionRequestIdRef = useRef<string | null>(null);
   // Networked multiplayer: which local player(s), if known, triggered the
   // turn currently in flight - set right before generateStoryTurn is called
   // (see handleCustomInput/handleChoiceWithAction). Read by requestDiceThrow
@@ -833,6 +839,44 @@ function StoryPageContent() {
       pending.resolve(result.faces);
     },
   });
+
+  // Party mode (desktop app only): every player plays from their own phone on
+  // the home network, and this screen is the table. The server runs only
+  // while the table is open; see app/misc/party/ and usePartyHost.
+  const party = usePartyHost({
+    storyData,
+    setStoryData,
+    turnBusy: loading || !!loadingStage,
+    submitTurn: (text, speakerIds, kind) =>
+      handleCustomInput(text, undefined, speakerIds, kind),
+    mistralKey,
+  });
+  const [partyLobbyOpen, setPartyLobbyOpen] = useState(false);
+  // Party mode and an online room can't run together: the phone table and
+  // the online guests would both feed one story.
+  const partyStatus = party.status;
+  const stopParty = party.stop;
+  useEffect(() => {
+    if (netSession && partyStatus !== "off") void stopParty();
+  }, [netSession, partyStatus, stopParty]);
+  // The phone's roll or question prompt, answered at the desktop instead.
+  const partyPending = party.table?.pending;
+  const partyCancelRequest = party.cancelRequest;
+  const answerPartyRequestHere = useCallback(
+    (requestId: string) => {
+      const pending = partyPending?.find((p) => p.requestId === requestId);
+      if (!pending) return;
+      partyCancelRequest(requestId);
+      if (pending.kind === "roll") {
+        partyRollRequestIdRef.current = null;
+        setManualRollRequest(pending.request as ManualRollRequest);
+      } else {
+        partyQuestionRequestIdRef.current = null;
+        setAskQuestionRequest(pending.request as AskQuestionRequest);
+      }
+    },
+    [partyPending, partyCancelRequest],
+  );
 
   // Guest's only link (the host) dropped. Rather than silently falling back to
   // a local view, keep the session info and surface a reconnect banner (see
@@ -3407,6 +3451,14 @@ function StoryPageContent() {
   function requestManualRoll(request: ManualRollRequest) {
     return new Promise<ManualRollAnswer | null>((resolve) => {
       manualRollResolveRef.current = resolve;
+      // Party mode: a roll for a player on a phone goes to their phone.
+      const partyId = party.offerRoll(request, (answer) =>
+        resolveManualRoll(answer),
+      );
+      if (partyId) {
+        partyRollRequestIdRef.current = partyId;
+        return;
+      }
       setManualRollRequest(request);
     });
   }
@@ -3415,6 +3467,10 @@ function StoryPageContent() {
     manualRollResolveRef.current?.(answer);
     manualRollResolveRef.current = null;
     setManualRollRequest(null);
+    if (partyRollRequestIdRef.current) {
+      party.cancelRequest(partyRollRequestIdRef.current);
+      partyRollRequestIdRef.current = null;
+    }
   }
 
   // Ask-question tool: called by the GM executor when ask_question fires.
@@ -3422,6 +3478,14 @@ function StoryPageContent() {
   function requestPlayerAnswer(request: AskQuestionRequest) {
     return new Promise<AskQuestionAnswer | null>((resolve) => {
       askQuestionResolveRef.current = resolve;
+      // Party mode: questions for a player on a phone go to their phone.
+      const partyId = party.offerQuestion(request, (answer) =>
+        resolveAskQuestion(answer),
+      );
+      if (partyId) {
+        partyQuestionRequestIdRef.current = partyId;
+        return;
+      }
       setAskQuestionRequest(request);
     });
   }
@@ -3430,6 +3494,10 @@ function StoryPageContent() {
     askQuestionResolveRef.current?.(answer);
     askQuestionResolveRef.current = null;
     setAskQuestionRequest(null);
+    if (partyQuestionRequestIdRef.current) {
+      party.cancelRequest(partyQuestionRequestIdRef.current);
+      partyQuestionRequestIdRef.current = null;
+    }
   }
 
   // Physical dice mode: called by the GM executor when a formula roll can
@@ -5039,6 +5107,11 @@ function StoryPageContent() {
             turnLobby={turnLobby}
             onTurnLobbyStartNow={hostForceStartTurn}
             onTurnLobbyPass={passThisRound}
+            partyTable={party.table}
+            onPartyGo={party.go}
+            onPartyJoin={() => setPartyLobbyOpen(true)}
+            onPartyRemove={party.removePlayer}
+            onPartyAnswerHere={answerPartyRequestHere}
           />
           </div>
         )}
@@ -5155,6 +5228,7 @@ function StoryPageContent() {
             }}
             onLeaveNetRoom={leaveNetRoom}
             onSwitchNetBackend={switchNetBackend}
+            party={party}
             autoOpenSection={autoOpenOnlineSection ? "online" : undefined}
           />
         )}
@@ -5178,6 +5252,14 @@ function StoryPageContent() {
           unreadCount={
             showOOCChat ? 0 : Math.max(0, oocMessages.length - oocLastSeenCount)
           }
+        />
+      )}
+
+      {/* Party mode: the QR again, for someone joining mid-game */}
+      {partyLobbyOpen && (
+        <PartyLobbyModal
+          party={party}
+          onClose={() => setPartyLobbyOpen(false)}
         />
       )}
 
