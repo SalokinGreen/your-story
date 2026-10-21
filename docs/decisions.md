@@ -32,3 +32,16 @@ Q&A that followed it.
 | 7 | "Copy invite link" in the native apps | **Copy a text invite** with the room code and connection type, since a native origin is not a link anyone else can open (PR #198). |
 | 8 | OpenRouter "Connect" in the native apps | **The system browser and a pasted code**: OpenRouter's headless PKCE flow, the auth page opened by `tauri-plugin-opener` / Capacitor Browser, the code pasted back into the app (PR #201). The web build keeps the redirect flow. |
 | 9 | How sessions work in this repo | **Beat Them Right's working loop**: its `CLAUDE.md` working rules, `docs/workflow.md`, and its `.claude/` agents, skills, hook and permissions, adapted to this repo. Kilo is not carried over: "You can ignore the kilo workflow since I moved to claude agents." |
+
+### Interview four — party mode on the desktop (2026-10-21)
+
+Numbers 10–20 belong to the Claude/GLM design (`claude/claude-gm-design`) and
+the side-agents fix (PR #204); they land with those PRs.
+
+| # | question | decision |
+|---|---|---|
+| 21 | What party mode is | **The desktop app is the table; every player plays from their own phone.** The desktop shows a QR code. Scanning it opens the Android app if installed, otherwise a phone web client served by the desktop over the home network. The spotlight rule carries over: taking it from someone locks them out for a cooldown. Later, an auto-voice mode gives the spotlight to whoever is speaking. (The author's request.) |
+| 22 | What the phone shows | **A controller**, Jackbox-style: that player's character, their spotlight button and cooldown, typing or voice input, the suggested choices, and rolls or questions the GM asks them. The desktop shows the story. **Phones never receive the GM's secrets.** |
+| 23 | When the turn goes to the GM | **Like today: lines queue, then anyone taps "Go"**, on a phone or the desktop. |
+| 24 | The spotlight cooldown in party mode | **About 15 seconds, as a setting.** (Couch mode's 4 s is unchanged.) |
+| 25 | Phones that join through the browser | **Type and tap; voice needs the Android app.** A plain-HTTP page on the home network gets no microphone, and a self-signed certificate would show every guest a warning. |
