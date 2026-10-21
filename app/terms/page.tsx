@@ -3,6 +3,81 @@
 import { useRouter } from "next/navigation";
 import { DynamicIcon } from "../components/DynamicIcon";
 
+const ISSUES_URL = "https://github.com/SalokinGreen/your-story/issues";
+
+function Section({
+  icon,
+  iconClassName,
+  title,
+  children,
+}: {
+  icon: string;
+  iconClassName: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
+      <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+        <DynamicIcon name={icon} className={`w-5 h-5 ${iconClassName}`} />
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Point({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <DynamicIcon
+        name="Check"
+        className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
+      />
+      <div>
+        <h3 className="font-medium text-white">{title}</h3>
+        <p className="text-sm text-blue-200/60">{children}</p>
+      </div>
+    </div>
+  );
+}
+
+function Bullet({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <span className="text-blue-400 shrink-0">•</span>
+      <span className="flex-1 min-w-0">{children}</span>
+    </li>
+  );
+}
+
+function Forbidden({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <DynamicIcon name="X" className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+      <span className="flex-1 min-w-0">{children}</span>
+    </li>
+  );
+}
+
+function Summary({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <DynamicIcon
+        name="Check"
+        className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
+      />
+      <span className="flex-1 min-w-0">{children}</span>
+    </li>
+  );
+}
+
 export default function TermsOfService() {
   const router = useRouter();
 
@@ -22,38 +97,38 @@ export default function TermsOfService() {
             Terms of Service
           </h1>
           <p className="text-blue-200/40 text-sm">
-            Last updated: November 27, 2025
+            Last updated: October 21, 2026
           </p>
         </div>
 
         {/* Content */}
         <div className="space-y-8 text-blue-200/80">
-          {/* Introduction */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="FileText" className="w-5 h-5 text-blue-400" />
-              Welcome to Your Story
-            </h2>
+          <Section
+            icon="FileText"
+            iconClassName="text-blue-400"
+            title="Welcome to Your Story"
+          >
             <p className="leading-relaxed">
-              By using Your Story, you agree to these terms. We&apos;re still in
-              alpha and these terms will evolve as we grow, but the core
-              principles will remain: be respectful, create responsibly, and
-              have fun.
+              By using Your Story, you agree to these terms. Your Story runs on
+              your device: there are no accounts, your stories are saved
+              locally, and the AI is run by providers you choose, with API keys
+              you bring yourself. The core principles are simple: be
+              respectful, create responsibly, and have fun.
             </p>
             <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
               <p className="text-sm text-amber-200 flex items-start gap-2">
                 <DynamicIcon
-                  name="AlertTriangle"
+                  name="TriangleAlert"
                   className="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>
-                  <strong>Alpha Notice:</strong> These terms are a work in
-                  progress. We&apos;ll notify users of significant changes as we
-                  finalize them.
+                  <strong>Alpha Notice:</strong> Your Story is still in alpha,
+                  and these terms will change as the app does. When they
+                  change, the date at the top of this page changes too.
                 </span>
               </p>
             </div>
-          </section>
+          </Section>
 
           {/* Age Requirement */}
           <section className="bg-red-500/10 rounded-xl border border-red-500/30 p-6">
@@ -66,425 +141,225 @@ export default function TermsOfService() {
                 You must be at least 18 years old to use Your Story.
               </p>
               <p className="text-sm text-blue-200/60">
-                This platform involves AI-generated content that may include
-                mature themes, violence, and other content not suitable for
-                minors. By creating an account, you confirm that you are 18
-                years of age or older.
-              </p>
-              <p className="text-sm text-red-300">
-                If we discover that a user is under 18, their account will be
-                terminated immediately.
+                The AI can generate mature themes, violence, and other content
+                not suitable for minors. By using the app, you confirm that you
+                are 18 years of age or older.
               </p>
             </div>
           </section>
 
-          {/* Acceptable Use */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="ThumbsUp" className="w-5 h-5 text-green-400" />
-              Acceptable Use
-            </h2>
+          <Section
+            icon="ThumbsUp"
+            iconClassName="text-green-400"
+            title="Acceptable Use"
+          >
             <div className="space-y-4">
               <p>When using Your Story, you agree to:</p>
               <div className="grid gap-3">
-                <div className="flex items-start gap-3">
-                  <DynamicIcon
-                    name="Check"
-                    className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                  />
-                  <div>
-                    <h3 className="font-medium text-white">
-                      Create responsibly
-                    </h3>
-                    <p className="text-sm text-blue-200/60">
-                      Use the platform for creative storytelling and
-                      entertainment
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <DynamicIcon
-                    name="Check"
-                    className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                  />
-                  <div>
-                    <h3 className="font-medium text-white">Respect others</h3>
-                    <p className="text-sm text-blue-200/60">
-                      Don&apos;t harass, threaten, or target real people in
-                      public content
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <DynamicIcon
-                    name="Check"
-                    className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                  />
-                  <div>
-                    <h3 className="font-medium text-white">Keep it legal</h3>
-                    <p className="text-sm text-blue-200/60">
-                      Don&apos;t use the platform for illegal purposes or to
-                      generate illegal content
-                    </p>
-                  </div>
-                </div>
+                <Point title="Create responsibly">
+                  Use the app for creative storytelling and entertainment
+                </Point>
+                <Point title="Respect others">
+                  Don&apos;t harass or threaten the people you play with
+                  online, and don&apos;t target real people in anything you
+                  share
+                </Point>
+                <Point title="Keep it legal">
+                  Don&apos;t use the app for illegal purposes or to generate
+                  illegal content
+                </Point>
               </div>
             </div>
-          </section>
+          </Section>
 
-          {/* Prohibited Content */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Ban" className="w-5 h-5 text-red-400" />
-              Prohibited Content
-            </h2>
+          <Section
+            icon="Ban"
+            iconClassName="text-red-400"
+            title="Prohibited Content"
+          >
             <div className="space-y-3">
               <p className="text-sm">
                 The following content is strictly prohibited:
               </p>
               <ul className="space-y-2 text-sm">
-                <li className="flex items-start gap-2">
-                  <DynamicIcon
-                    name="X"
-                    className="w-4 h-4 text-red-400 shrink-0 mt-0.5"
-                  />
-                  <span className="flex-1 min-w-0">
-                    Content sexualizing minors in any way (zero tolerance)
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <DynamicIcon
-                    name="X"
-                    className="w-4 h-4 text-red-400 shrink-0 mt-0.5"
-                  />
-                  <span className="flex-1 min-w-0">
-                    Real person harassment or defamation
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <DynamicIcon
-                    name="X"
-                    className="w-4 h-4 text-red-400 shrink-0 mt-0.5"
-                  />
-                  <span className="flex-1 min-w-0">
-                    Content promoting violence against real individuals or
-                    groups
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <DynamicIcon
-                    name="X"
-                    className="w-4 h-4 text-red-400 shrink-0 mt-0.5"
-                  />
-                  <span className="flex-1 min-w-0">
-                    Instructions for illegal activities or creating weapons
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <DynamicIcon
-                    name="X"
-                    className="w-4 h-4 text-red-400 shrink-0 mt-0.5"
-                  />
-                  <span className="flex-1 min-w-0">
-                    Spam, scams, or malicious content
-                  </span>
-                </li>
+                <Forbidden>
+                  Content sexualizing minors in any way (zero tolerance)
+                </Forbidden>
+                <Forbidden>Real person harassment or defamation</Forbidden>
+                <Forbidden>
+                  Content promoting violence against real individuals or groups
+                </Forbidden>
+                <Forbidden>
+                  Instructions for illegal activities or creating weapons
+                </Forbidden>
+                <Forbidden>Spam, scams, or malicious content</Forbidden>
               </ul>
               <p className="text-sm text-blue-200/60 mt-4">
-                Private stories are your business, but public adventures and
-                shared content must follow these rules.
+                These rules apply to everything you share: what you send to
+                other players in online play, and stories, adventures or notes
+                you pass on as exported files. Content sexualizing minors is
+                not allowed anywhere, private stories included. Beyond that,
+                what you play on your own is your business, within the law and
+                your AI provider&apos;s usage policy, which applies to every
+                request you send with your key.
               </p>
             </div>
-          </section>
+          </Section>
 
-          {/* Moderation */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Shield" className="w-5 h-5 text-purple-400" />
-              Moderation
-            </h2>
+          <Section
+            icon="Scale"
+            iconClassName="text-purple-400"
+            title="Your Responsibility"
+          >
             <div className="space-y-4">
-              <p>
-                We have moderators who review public content and respond to
-                reports. Here&apos;s how moderation works:
-              </p>
-              <div className="grid gap-3 text-sm">
-                <div className="flex items-start gap-3 p-3 bg-blue-950/50 rounded-lg">
-                  <DynamicIcon
-                    name="Eye"
-                    className="w-5 h-5 text-blue-400 shrink-0"
-                  />
-                  <div>
-                    <h3 className="font-medium text-white">
-                      Public content review
-                    </h3>
-                    <p className="text-blue-200/60">
-                      Public adventures may be reviewed to ensure they follow
-                      our guidelines
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 bg-blue-950/50 rounded-lg">
-                  <DynamicIcon
-                    name="Flag"
-                    className="w-5 h-5 text-amber-400 shrink-0"
-                  />
-                  <div>
-                    <h3 className="font-medium text-white">Report system</h3>
-                    <p className="text-blue-200/60">
-                      Users can report content that violates our terms (coming
-                      soon)
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 bg-blue-950/50 rounded-lg">
-                  <DynamicIcon
-                    name="Lock"
-                    className="w-5 h-5 text-green-400 shrink-0"
-                  />
-                  <div>
-                    <h3 className="font-medium text-white">
-                      Private stories stay private
-                    </h3>
-                    <p className="text-blue-200/60">
-                      We don&apos;t proactively monitor private stories unless
-                      reported
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <Point title="We can't see what you make">
+                Your stories are saved on your device, so nobody reviews them.
+                There are no moderators, no reporting system, and no accounts
+                to warn, suspend or ban.
+              </Point>
+              <Point title="What you generate and share is up to you">
+                You&apos;re responsible for what you ask the AI to write, and
+                for what you do with it and who you share it with.
+              </Point>
+              <Point title="Your AI provider has its own rules">
+                Providers can enforce their usage policies on requests made
+                with your key, up to suspending your account with them.
+                That&apos;s between you and the provider.
+              </Point>
+              <Point title="Choose who you play with">
+                Online play connects players&apos; devices directly, and
+                nobody moderates the rooms. The host&apos;s device sends the
+                whole story, including notes the GM keeps hidden, to everyone
+                in the room, so only play online with people you trust.
+              </Point>
             </div>
-          </section>
+          </Section>
 
-          {/* Account Actions */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Gavel" className="w-5 h-5 text-amber-400" />
-              Account Actions & Bans
-            </h2>
-            <div className="space-y-4">
-              <p>
-                Violating these terms may result in action against your account:
-              </p>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-300 text-xs font-bold shrink-0">
-                    1
-                  </span>
-                  <div>
-                    <h3 className="font-medium text-white">Warning</h3>
-                    <p className="text-blue-200/60">
-                      First-time minor violations typically result in a warning
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-300 text-xs font-bold shrink-0">
-                    2
-                  </span>
-                  <div>
-                    <h3 className="font-medium text-white">Content removal</h3>
-                    <p className="text-blue-200/60">
-                      Violating content may be removed or made private
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center text-red-300 text-xs font-bold shrink-0">
-                    3
-                  </span>
-                  <div>
-                    <h3 className="font-medium text-white">
-                      Temporary suspension
-                    </h3>
-                    <p className="text-blue-200/60">
-                      Repeated violations may result in temporary account
-                      suspension
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-red-500/30 flex items-center justify-center text-red-400 text-xs font-bold shrink-0">
-                    4
-                  </span>
-                  <div>
-                    <h3 className="font-medium text-white">Permanent ban</h3>
-                    <p className="text-blue-200/60">
-                      Severe violations or repeated offenses result in permanent
-                      ban
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg mt-4">
-                <p className="text-sm text-red-200 flex items-start gap-2">
-                  <DynamicIcon
-                    name="AlertTriangle"
-                    className="w-4 h-4 shrink-0 mt-0.5"
-                  />
-                  <span>
-                    <strong>Instant ban offenses:</strong> Content sexualizing
-                    minors, underage users, or severe illegal content will
-                    result in immediate permanent ban without warning.
-                  </span>
-                </p>
-              </div>
-            </div>
-          </section>
+          <Section
+            icon="PenTool"
+            iconClassName="text-pink-400"
+            title="Your Content"
+          >
+            <ul className="space-y-2 text-sm">
+              <Bullet>
+                You own the stories, adventures and notes you create. We
+                don&apos;t claim any ownership over them.
+              </Bullet>
+              <Bullet>
+                Your content is saved on your device. We don&apos;t have a copy
+                and can&apos;t read it. If you use sync, it&apos;s encrypted on
+                your device before it&apos;s uploaded.
+              </Bullet>
+              <Bullet>You can delete your content at any time.</Bullet>
+              <Bullet>
+                We don&apos;t train AI on your stories, and we don&apos;t keep
+                them anywhere we could read them.
+              </Bullet>
+              <Bullet>
+                Only import PDFs, rulebooks and other material you have the
+                right to use.
+              </Bullet>
+            </ul>
+          </Section>
 
-          {/* Your Content */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="PenTool" className="w-5 h-5 text-pink-400" />
-              Your Content
-            </h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <p>You retain ownership of stories and adventures you create</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <p>
-                  Your stories are encrypted with keys derived from your login -
-                  we can&apos;t read them
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <p>
-                  By making content public, you grant us permission to display
-                  it on the platform
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <p>You can delete your content at any time</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <p>
-                  We don&apos;t train AI on your stories - and couldn&apos;t
-                  even if we wanted to (they&apos;re encrypted)
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* AI Provider Keys */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="KeyRound" className="w-5 h-5 text-yellow-400" />
-              AI Provider Keys
-            </h2>
+          <Section
+            icon="KeyRound"
+            iconClassName="text-yellow-400"
+            title="AI Provider Keys"
+          >
             <div className="space-y-3 text-sm">
               <p>
                 Your Story has no in-app purchases and no credit balance. All AI
                 generation runs on API keys you supply yourself:
               </p>
               <ul className="space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    You bring your own keys (OpenRouter, DeepSeek, Google,
-                    Mistral, DeepInfra, and the TTS/STT providers) and are
-                    billed directly by those providers
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    Your keys are stored in your browser and are sent only to
-                    the provider the request is going to
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    We don&apos;t control provider pricing, rate limits, or
-                    availability, and can&apos;t refund what a provider charges
-                    you
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    Cost figures shown in the app are estimates from published
-                    provider prices, not a bill
-                  </span>
-                </li>
+                <Bullet>
+                  You bring your own keys (OpenRouter, DeepSeek, Google,
+                  Mistral, DeepInfra, and the voice providers Cartesia and
+                  ElevenLabs) and are billed directly by those providers
+                </Bullet>
+                <Bullet>
+                  Your keys are saved only on your device and are sent only to
+                  the provider they belong to (through our relay, in the
+                  browser version)
+                </Bullet>
+                <Bullet>
+                  Your use of each provider is governed by your agreement with
+                  it, including its pricing and usage policies
+                </Bullet>
+                <Bullet>
+                  We don&apos;t control provider pricing, rate limits, or
+                  availability, and can&apos;t refund what a provider charges
+                  you
+                </Bullet>
+                <Bullet>
+                  Cost figures shown in the app are estimates from published
+                  provider prices, not a bill
+                </Bullet>
               </ul>
             </div>
-          </section>
+          </Section>
 
-          {/* Service Availability */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Server" className="w-5 h-5 text-cyan-400" />
-              Service Availability
-            </h2>
+          <Section
+            icon="Server"
+            iconClassName="text-cyan-400"
+            title="Service Availability"
+          >
             <div className="space-y-3 text-sm">
               <p>
-                We strive to keep Your Story running smoothly, but as an alpha
-                service:
+                Your Story runs on your device, so most of it doesn&apos;t
+                depend on us. Still, as an alpha app:
               </p>
               <ul className="space-y-2 text-blue-200/60">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    The service is provided &quot;as is&quot; without guarantees
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    We may have downtime for maintenance or updates
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    Features may change or be removed as we develop the platform
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    We&apos;re not liable for any losses related to service
-                    interruptions
-                  </span>
-                </li>
+                <Bullet>
+                  The app is provided &quot;as is&quot; without guarantees
+                </Bullet>
+                <Bullet>
+                  The parts we run - the relay the browser version uses for AI
+                  requests, and the optional sync server - may have downtime
+                  for maintenance or updates
+                </Bullet>
+                <Bullet>
+                  AI providers and the matchmaking services used for online
+                  play are run by others, and we don&apos;t control their
+                  availability
+                </Bullet>
+                <Bullet>
+                  Features may change or be removed as we develop the app
+                </Bullet>
+                <Bullet>
+                  Your stories live on your device. Clearing this site&apos;s
+                  data in your browser or uninstalling the app deletes them, so
+                  keep backups by exporting folders from the Library or by
+                  using sync
+                </Bullet>
+                <Bullet>
+                  We&apos;re not liable for any losses related to service
+                  interruptions or lost data
+                </Bullet>
               </ul>
             </div>
-          </section>
+          </Section>
 
-          {/* Contact */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Mail" className="w-5 h-5 text-blue-400" />
-              Questions or Appeals?
-            </h2>
+          <Section
+            icon="MessageCircle"
+            iconClassName="text-blue-400"
+            title="Questions?"
+          >
             <p className="text-sm leading-relaxed">
-              If you have questions about these terms, believe you were wrongly
-              actioned, or need to report a violation, please reach out to us.
-              We aim to be fair and will review appeals in good faith.
+              If you have questions about these terms, open an issue on{" "}
+              <a
+                href={ISSUES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-300 underline hover:text-blue-200"
+              >
+                our GitHub
+              </a>
+              . Issues are public, so don&apos;t include your API keys or
+              anything from your stories you&apos;d rather keep private.
             </p>
-          </section>
+          </Section>
 
           {/* Summary Box */}
           <section className="bg-green-500/10 rounded-xl border border-green-500/30 p-6">
@@ -493,70 +368,29 @@ export default function TermsOfService() {
               TL;DR
             </h2>
             <ul className="space-y-2 text-sm">
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  You must be 18 or older to use this platform
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Don&apos;t create content sexualizing minors (instant ban)
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Be respectful - don&apos;t harass real people
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Moderators review public content and reports
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Violations may lead to warnings, suspension, or ban
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Your content is yours - we don&apos;t claim ownership
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Stories are encrypted - we can&apos;t read them, no AI
-                  training
-                </span>
-              </li>
+              <Summary>You must be 18 or older to use Your Story</Summary>
+              <Summary>
+                Never create content sexualizing minors, not even privately
+              </Summary>
+              <Summary>
+                Be respectful - don&apos;t harass other players or target real
+                people
+              </Summary>
+              <Summary>
+                We can&apos;t see your stories: no accounts, no moderators, no
+                bans
+              </Summary>
+              <Summary>
+                You&apos;re responsible for what you generate and share, and
+                your AI provider&apos;s rules apply
+              </Summary>
+              <Summary>
+                Your content is yours and stays on your device - no AI training
+              </Summary>
+              <Summary>
+                No in-app purchases - you pay AI providers directly with your
+                own keys
+              </Summary>
             </ul>
           </section>
         </div>
