@@ -1,6 +1,6 @@
 /**
  * Every AI call a turn makes has to carry the key for its model's provider -
- * all five are BYOK and the proxy picks the one it needs (providerCall.ts's
+ * all six are BYOK and the proxy picks the one it needs (providerCall.ts's
  * resolveProviderAndKey), so a call that forwards only some of them fails
  * with NO_API_KEY whenever the model lives on a provider it left out.
  *
@@ -19,6 +19,7 @@ import { createMockGMFetch } from "./helpers/mockGMFetch";
 import type { MemoryEntry, StoryData } from "@/app/misc/structs";
 
 const MISTRAL_KEY = "mistral-test-key";
+const ZAI_KEY = "zai-test-key";
 const NARRATION = "The lock clicks open. The corridor beyond is dark.";
 
 /** ~1,500 tokens apiece - several of these age well past a small history budget. */
@@ -138,5 +139,30 @@ describe("side calls forward every provider key", () => {
         (m) => typeof m !== "string" && m.isReflection === true,
       ),
     ).toBe(true);
+  });
+
+  it("forwards a Z.ai key to every call, the sixth provider (decision 18)", async () => {
+    const { fetchMock, calls } = createFetchMock();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const options: GenerationOptions = {
+      storyModel: NARRATION_MODEL_KEY,
+      toolsModel: NARRATION_MODEL_KEY,
+      choicesModel: NARRATION_MODEL_KEY,
+      enableTools: true,
+      skipChoices: true,
+      replyLength: "medium",
+      customMaxContext: 8000,
+      zaiKey: ZAI_KEY,
+    };
+
+    await generateStoryTurn(storyDueForCompactionAndReflection(), "I pick the lock", options, {});
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+
+    expect(calls.length).toBeGreaterThan(2);
+    const missingKey = calls
+      .filter((call) => call.body.zaiKey !== ZAI_KEY)
+      .map((call) => `${call.url}: ${call.body.messages[0]?.content?.slice(0, 60)}`);
+    expect(missingKey).toEqual([]);
   });
 });

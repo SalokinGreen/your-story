@@ -52,6 +52,44 @@ calls were spent on the checks before building (plan, "B0").
 - **macOS and Linux.** Only Windows was built and run; the environment list
   for the child differs there (`claude_cli.rs`, `PASSED_ENV`).
 
+## 2026-10-21 — GLM through Z.ai and OpenRouter (PR C of the Claude GM plan)
+
+Request shaping is unit-tested (`tests/providerCall.zai.test.ts`); no
+request has reached Z.ai. A played turn spends the author's Z.ai credit, so
+it waits for the author's go.
+
+- **One played turn on "GLM 5.3 (Z.ai)".** Save a Z.ai API key (Settings →
+  API Keys, "Z.ai API key (pay-as-you-go, not the Coding Plan)"), set tier 1
+  to "GLM 5.3 (Z.ai)" and play a turn in a combat scene so the GM rolls. The
+  GM should call `formula_roll`, then narrate; the Debug Logs should show
+  "AI generation (stream) complete" lines with `provider: "zai"` and no
+  error. Do it once in the desktop app too (`tauri build`), which can reach
+  only `https://api.z.ai/api/paas/*`. *Failure looks like:* a 400 naming
+  `thinking`, `reasoning_effort` or `tool_choice` (Z.ai changed what GLM-5.3
+  accepts); "url not allowed on the configured scope" in the desktop app
+  (the allowlist); a 401 or "insufficient balance" with a key that only has
+  a GLM Coding Plan behind it - expected, because the plan does not cover
+  the general API. Tier 1 runs at effort `none`, which adds the GM's
+  `<thinking>` prefill; it is dropped from round 2 on, so `<thinking>` text
+  in the prose or a 400 on round 2 would mean it was not.
+- **The roll gate on Z.ai.** In the same scene, a turn where the GM first
+  narrates without rolling: the gate's re-prompt should get a roll on the
+  next round. Z.ai accepts only `tool_choice: "auto"`, so the forcing rests
+  on the re-prompt alone. *Failure looks like:* the gate firing twice, then
+  prose without a roll.
+- **"GLM 5.3 Flash (Z.ai)" as the narration voice.** One turn where the GM
+  rolls, so the story stage runs on Flash. *Failure looks like:* "model not
+  found" (the id `glm-5.3-flash` is wrong) or a 400 about `stop` (Z.ai takes
+  one stop word, and the app sends one).
+- **Z.ai's content moderation.** Z.ai's direct API moderates content (error
+  code 1301), so a violent or mature scene can fail a turn there that
+  OpenRouter's other hosts would answer. Worth knowing before choosing it
+  for a dark campaign; not something the app can change.
+- **GLM 5.3 through OpenRouter.** With only an OpenRouter key, one turn on
+  "GLM 5.3 Flash". Compare the turn cost panel with openrouter.ai/activity:
+  the catalog prices it at Z.ai's own $0.15 / $0.50, but OpenRouter may
+  route to a cheaper or dearer provider.
+
 ## 2026-10-21 — Claude through OpenRouter (Route A of the Claude GM plan)
 
 Request shaping is unit-tested (`tests/providerCall.anthropic.test.ts`), but

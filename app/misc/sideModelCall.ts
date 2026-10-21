@@ -31,7 +31,7 @@ import { recordSideCall, SideCallCostContext, TurnCostStage } from "./turnCost";
 import { getCustomModelIfUUID } from "./user_settings";
 
 /**
- * The five AI-provider keys the /api/generate proxy can pick from. Every key
+ * The six AI-provider keys the /api/generate proxy can pick from. Every key
  * is optional because a user only saves the ones they have; the proxy picks
  * the one the model's provider needs and reports NO_API_KEY if it's absent.
  */
@@ -41,10 +41,11 @@ export interface ProviderKeys {
   googleKey?: string;
   mistralKey?: string;
   deepinfraKey?: string;
+  zaiKey?: string;
 }
 
 /**
- * Copies exactly the five provider keys out of any larger bag (generation
+ * Copies exactly the six provider keys out of any larger bag (generation
  * options, the APIKeys context) - so a side-call options object can be built
  * with one spread that can't forget a provider, and so unrelated secrets in
  * that bag (TTS, web search) never ride along to the proxy.
@@ -56,6 +57,7 @@ export function pickProviderKeys(source: ProviderKeys | undefined): ProviderKeys
     googleKey: source?.googleKey,
     mistralKey: source?.mistralKey,
     deepinfraKey: source?.deepinfraKey,
+    zaiKey: source?.zaiKey,
   };
 }
 

@@ -365,7 +365,7 @@ always runs **before** the story stage:
 proxies: they take `{ messages, tools?, model, ... }` and hand them to
 `providerCall.ts`, whose two entry points, `generateNonStreaming()` and
 `generateStream()`, branch on the provider the model implies (DeepSeek,
-OpenRouter, Mistral, DeepInfra, Google AI Studio) and normalise each
+OpenRouter, Mistral, DeepInfra, Google AI Studio, Z.ai) and normalise each
 provider's response into one shape. They know nothing about `StoryData`, prompts or tools. **The
 standalone build has no API routes**: `providerFetch()` calls the provider
 in-process when `isStandalone()`. Google gets a filtered tool list
@@ -412,7 +412,7 @@ variable reaches it, `claude_cli.rs`'s `build_env` and its test) with the
 argument list built in Rust, never taken from the webview.
 
 **Every AI side call goes through `callSideModel()`** (`sideModelCall.ts`):
-it uses `providerFetch`, forwards all five provider keys, records the turn
+it uses `providerFetch`, forwards all six provider keys, records the turn
 cost, and logs failures to the Debug Logs instead of swallowing them.
 `tests/noRawApiFetch.test.ts` fails on a raw `fetch("/api/...")` outside the
 `*Fetch.ts` wrappers.
@@ -619,8 +619,19 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 - **There is no auth, no account and no database.** `app/layout.tsx` wraps
   only `NotificationProvider` and `APIKeysProvider`.
 - **AI is BYOK, always.** Keys live in the player's storage, read through
-  `useAPIKeys()` (`APIKeysContext.tsx`): five LLM keys (OpenRouter, DeepSeek,
-  Google, Mistral, DeepInfra) plus Brave Search, Cartesia and ElevenLabs.
+  `useAPIKeys()` (`APIKeysContext.tsx`): six LLM keys (OpenRouter, DeepSeek,
+  Google, Mistral, DeepInfra, Z.ai) plus Brave Search, Cartesia and
+  ElevenLabs. **The Z.ai key is for Z.ai's general pay-as-you-go API only**
+  (decision 18): `providerCall.ts` calls `ZAI_CHAT_COMPLETIONS_URL`
+  (`/api/paas/v4`) and nothing else, and the desktop allowlist admits only
+  `https://api.z.ai/api/paas/*`. Never add the GLM Coding Plan's endpoints
+  (`/api/coding/paas/v4`, `/api/anthropic`): Z.ai limits that plan to its
+  supported coding tools, and `tests/providerCall.zai.test.ts` fails on
+  either. Z.ai's GLM-5.3 always thinks, so its requests carry
+  `thinking: {type: "enabled"}` and `reasoning_effort` low, high or max,
+  `tool_choice` `auto` (the only value Z.ai accepts), `temperature` clamped
+  to [0, 1], the same 4,096 `max_tokens` floor as Claude, and the model's
+  `reasoning_content` handed back inside a tool loop.
   OpenRouter can also be connected by PKCE sign-in: a redirect on the web, the
   system browser and a pasted code in the native apps (`openRouterOAuth.ts`,
   `openExternal.ts`, decision 8). `getAvailableModels()` (`ai_prices.ts`) is

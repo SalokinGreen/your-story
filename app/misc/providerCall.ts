@@ -35,6 +35,8 @@ export type Provider =
   | "mistral"
   | "deepinfra"
   | "google"
+  // Z.ai's general pay-as-you-go API (decision 18), never its Coding Plan.
+  | "zai"
   // The player's Claude subscription through the `claude` CLI, desktop only.
   // providerFetch.ts hands these to claudeCli.ts before anything here runs.
   | "claude-cli";
@@ -70,6 +72,7 @@ export interface GenerateRequestBody {
   googleKey?: string;
   mistralKey?: string;
   deepinfraKey?: string;
+  zaiKey?: string;
   customModel?: CustomModel;
   // Streaming-only extras - ignored by generateNonStreaming.
   samplingSettings?: SamplingSettings;
@@ -248,14 +251,42 @@ export function isAnthropicViaOpenRouter(
 }
 
 /**
- * The smallest `max_tokens` a Claude request goes out with. Claude 5.5 always
- * thinks and its thinking counts against `max_tokens`, so the 200-300 token
- * caps the side agents use for a short verdict can be spent before any text
- * arrives; and OpenRouter documents turning `reasoning.effort` into a
- * thinking budget of at least 1,024 tokens that must stay below `max_tokens`.
- * A cap, not a charge: the reply is as short as the prompt asks for.
+ * Models whose thinking cannot be turned off: Claude 5.5 through OpenRouter,
+ * and GLM-5.3 whether straight from Z.ai or through OpenRouter
+ * (`z-ai/glm-5.3…`). They get the max_tokens floor below, never effort
+ * "none", and the mid-history prefill dropped.
  */
-const CLAUDE_MIN_MAX_TOKENS = 4096;
+function alwaysThinks(config: Pick<AIModelConfig, "provider" | "model">, provider: Provider): boolean {
+  return (
+    isAnthropicViaOpenRouter(config) ||
+    provider === "zai" ||
+    (provider === "openrouter" && config.model.toLowerCase().startsWith("z-ai/glm-5.3"))
+  );
+}
+
+/**
+ * The smallest `max_tokens` a request to a model that always thinks goes out
+ * with: Claude 5.5 and GLM-5.3, neither of which can turn thinking off. Thinking counts against `max_tokens`, so the 200-300 token caps the
+ * side agents use for a short verdict can be spent before any text arrives;
+ * and OpenRouter documents turning `reasoning.effort` into a thinking budget
+ * of at least 1,024 tokens that must stay below `max_tokens`. A cap, not a
+ * charge: the reply is as short as the prompt asks for.
+ */
+const ALWAYS_THINKING_MIN_MAX_TOKENS = 4096;
+
+/**
+ * Z.ai's general chat-completions endpoint - the only Z.ai URL this app
+ * calls. The Coding Plan's endpoints (`/api/coding/paas/v4`, `/api/anthropic`)
+ * are for Z.ai's supported coding tools only (decision 18), and the desktop
+ * allowlist admits `/api/paas/*` alone, so a Coding Plan key cannot be spent
+ * through the app by accident.
+ */
+export const ZAI_CHAT_COMPLETIONS_URL = "https://api.z.ai/api/paas/v4/chat/completions";
+
+/** Z.ai takes `temperature` only in [0, 1]. */
+function clampTemperature(provider: Provider, temperature: number): number {
+  return provider === "zai" ? Math.min(1, Math.max(0, temperature)) : temperature;
+}
 
 /**
  * Claude only: OpenRouter's own billed figure for the call, which prices the
@@ -284,11 +315,40 @@ function applyReasoningEffort(
   provider: Provider,
   reasoningEffort?: string,
   isClaude = false,
+  thinksAlways = false,
 ): void {
   // Claude 5.5's thinking cannot be disabled ("none" is a 400), so a tier
   // set to "none" runs at the lowest effort Claude has instead.
   if (isClaude && reasoningEffort === "none") {
     requestBody.reasoning = { effort: "low" };
+    return;
+  }
+
+  // GLM-5.3 through OpenRouter: the same model as Z.ai's, so the same rule -
+  // never "none", and a call with no effort of its own (a side agent) runs
+  // at low rather than the model's own default.
+  if (
+    thinksAlways &&
+    !isClaude &&
+    provider === "openrouter" &&
+    (!reasoningEffort || reasoningEffort === "none")
+  ) {
+    requestBody.reasoning = { effort: "low" };
+    return;
+  }
+
+  // Z.ai's GLM-5.3 always thinks and takes reasoning_effort low, high or max
+  // only (docs.z.ai, chat completions), so the tier's five levels collapse
+  // onto those three and thinking is turned on explicitly. A call with no
+  // effort of its own (a side agent) runs at low: Z.ai's default is max.
+  if (provider === "zai") {
+    requestBody.thinking = { type: "enabled" };
+    requestBody.reasoning_effort =
+      reasoningEffort === "xhigh"
+        ? "max"
+        : reasoningEffort === "normal" || reasoningEffort === "high"
+          ? "high"
+          : "low";
     return;
   }
 
@@ -355,13 +415,14 @@ function getApiKey(
   provider: Provider,
   body: Pick<
     GenerateRequestBody,
-    "openRouterKey" | "deepseekKey" | "googleKey" | "mistralKey" | "deepinfraKey"
+    "openRouterKey" | "deepseekKey" | "googleKey" | "mistralKey" | "deepinfraKey" | "zaiKey"
   >,
 ): string | null {
   if (provider === "deepseek") return body.deepseekKey || null;
   if (provider === "mistral") return body.mistralKey || null;
   if (provider === "deepinfra") return body.deepinfraKey || null;
   if (provider === "google") return body.googleKey || null;
+  if (provider === "zai") return body.zaiKey || null;
   if (provider === "claude-cli") return null; // the CLI's own sign-in, never a key
   return body.openRouterKey || null;
 }
@@ -372,6 +433,7 @@ const PROVIDER_NAMES: Record<Provider, string> = {
   google: "Google AI Studio",
   mistral: "Mistral",
   deepinfra: "DeepInfra",
+  zai: "Z.ai",
   "claude-cli": "Claude (subscription)",
 };
 
@@ -425,16 +487,16 @@ function resolveModelConfig(
 /**
  * `tool_choice` for a request that offers tools. Google always gets
  * "required"; a caller-forced round (the roll and plan gates) gets
- * "required" - except on Claude, where forced tool use is a 400. There the
- * gate's own user message, which already says a tool call is required, does
- * the forcing.
+ * "required" - except on Claude, where forced tool use is a 400, and on
+ * Z.ai, which accepts only "auto". There the gate's own user message, which
+ * already says a tool call is required, does the forcing.
  */
 function resolveToolChoice(
   provider: Provider,
   toolChoice: GenerateRequestBody["toolChoice"],
   isClaude: boolean,
 ): "required" | "auto" {
-  if (isClaude) return "auto";
+  if (isClaude || provider === "zai") return "auto";
   return toolChoice === "required" || provider === "google" ? "required" : "auto";
 }
 
@@ -452,6 +514,7 @@ function buildEndpoint(provider: Provider, hasPrefill: boolean, hasTools: boolea
     return "https://api.deepinfra.com/v1/openai/chat/completions";
   if (provider === "google")
     return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+  if (provider === "zai") return ZAI_CHAT_COMPLETIONS_URL;
   return "https://openrouter.ai/api/v1/chat/completions";
 }
 
@@ -468,18 +531,18 @@ function buildHeaders(provider: Provider, apiKey: string): Record<string, string
 }
 
 /**
- * Claude only: within the current turn (after the last user message), drop a
- * plain assistant message (no tool calls, no reasoning) that sits directly
- * before another assistant message carrying tool calls or reasoning. In
- * practice that is the GM stage's `<thinking>` prefill once a round has been
- * appended after it: consecutive assistant messages merge into one turn, and
- * the turn that continues a tool loop must open with its thinking block, not
- * with the prefill's text. Earlier turns are left alone - there a plain
+ * Models that always think (Claude, GLM-5.3): within the current turn (after
+ * the last user message), drop a plain assistant message (no tool calls, no
+ * reasoning) that sits directly before another assistant message carrying
+ * tool calls or reasoning. In practice that is the GM stage's `<thinking>`
+ * prefill once a round has been appended after it: consecutive assistant
+ * messages merge into one turn, and for Claude the turn that continues a
+ * tool loop must open with its thinking block, not with the prefill's text. Earlier turns are left alone - there a plain
  * assistant message is prose the player read (a round the roll gate sent
  * back, whose re-prompt is not saved), and only the final turn has to open
  * with thinking.
  */
-function dropClaudeMidHistoryPrefills(messages: ChatMessage[]): ChatMessage[] {
+function dropMidHistoryPrefills(messages: ChatMessage[]): ChatMessage[] {
   const lastUserIndex = messages.map((m) => m.role).lastIndexOf("user");
   return messages.filter((m, i) => {
     if (i <= lastUserIndex) return true;
@@ -517,6 +580,7 @@ function buildRequestMessages(
   config: Pick<AIModelConfig, "provider" | "model">,
 ): any[] {
   const isClaude = isAnthropicViaOpenRouter(config);
+  const thinksAlways = alwaysThinks(config, provider);
 
   // For DeepSeek/DeepInfra/Mistral/Google with tools: strip the prefill since
   // these providers don't handle prefill well with function calling. Claude
@@ -528,14 +592,15 @@ function buildRequestMessages(
       ((provider === "deepseek" ||
         provider === "deepinfra" ||
         provider === "mistral" ||
-        provider === "google") &&
+        provider === "google" ||
+        provider === "zai") &&
         hasTools))
   ) {
     processedMessages = messages.slice(0, -1);
   }
 
-  if (isClaude) {
-    processedMessages = dropClaudeMidHistoryPrefills(processedMessages);
+  if (thinksAlways) {
+    processedMessages = dropMidHistoryPrefills(processedMessages);
   }
 
   // For Mistral: normalize tool call IDs to match their strict format requirement
@@ -674,6 +739,16 @@ function buildRequestMessages(
       }
     }
 
+    // Z.ai's thinking guide: inside a tool loop, "thinking blocks should be
+    // explicitly preserved and returned together with the tool results", in
+    // the same `reasoning_content` field - the current turn's only (after the
+    // last user message): earlier turns' reasoning would only be unbudgeted
+    // payload. Leaving it out degrades the reply rather than failing, so
+    // there is no empty fallback as for DeepSeek.
+    if (provider === "zai" && m.role === "assistant" && m.reasoning && index > lastUserIndex) {
+      msg.reasoning_content = m.reasoning;
+    }
+
     if (
       index === processedMessages.length - 1 &&
       m.role === "assistant" &&
@@ -800,13 +875,14 @@ async function requestNonStreaming(
     const headers = buildHeaders(provider, apiKey);
     const isClaude = isAnthropicViaOpenRouter(config);
 
+    const thinksAlways = alwaysThinks(config, provider);
     const requestBody: any = {
       model: config.model,
       messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
-      max_tokens: isClaude ? Math.max(maxTokens, CLAUDE_MIN_MAX_TOKENS) : maxTokens,
+      max_tokens: thinksAlways ? Math.max(maxTokens, ALWAYS_THINKING_MIN_MAX_TOKENS) : maxTokens,
     };
     // Claude 5.5 rejects any non-default sampling value.
-    if (!isClaude) requestBody.temperature = temperature;
+    if (!isClaude) requestBody.temperature = clampTemperature(provider, temperature);
 
     if (hasTools) {
       const toolsToUse = provider === "google" ? filterToolsForGoogle(tools!) : tools;
@@ -814,7 +890,7 @@ async function requestNonStreaming(
       requestBody.tool_choice = resolveToolChoice(provider, toolChoice, isClaude);
     }
 
-    applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude);
+    applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude, thinksAlways);
 
     const providerFetch = getProviderFetch();
     const response = await providerFetch(endpoint, {
@@ -1001,16 +1077,17 @@ export function generateStream(
         const headers = buildHeaders(provider, apiKey);
         const isClaude = isAnthropicViaOpenRouter(config);
 
+        const thinksAlways = alwaysThinks(config, provider);
         const requestBody: any = {
           model: config.model,
           messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
-          max_tokens: isClaude ? Math.max(maxTokens, CLAUDE_MIN_MAX_TOKENS) : maxTokens,
+          max_tokens: thinksAlways ? Math.max(maxTokens, ALWAYS_THINKING_MIN_MAX_TOKENS) : maxTokens,
           stream: true,
           stream_options: { include_usage: true },
         };
         // Claude 5.5 rejects any non-default sampling value, so it gets
         // neither the base temperature nor the story stage's settings.
-        if (!isClaude) requestBody.temperature = temperature;
+        if (!isClaude) requestBody.temperature = clampTemperature(provider, temperature);
 
         if (
           samplingSettings &&
@@ -1049,10 +1126,12 @@ export function generateStream(
           requestBody.tool_choice = resolveToolChoice(provider, toolChoice, isClaude);
         }
 
-        applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude);
+        applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude, thinksAlways);
 
         if (stop && stop.length > 0) {
-          requestBody.stop = stop;
+          // Z.ai's reference has long taken a single stop word; the story
+          // stage's markers are stripped client-side as well.
+          requestBody.stop = provider === "zai" ? stop.slice(0, 1) : stop;
         }
 
         const providerFetch = getProviderFetch();

@@ -81,6 +81,7 @@ function CreatorPage() {
         googleKey: !!apiKeys.googleKey,
         mistralKey: !!apiKeys.mistralKey,
         deepinfraKey: !!apiKeys.deepinfraKey,
+        zaiKey: !!apiKeys.zaiKey,
       },
       { requireToolCalling: true },
     ).map(([key, config]) => [key, config.name]);

@@ -215,6 +215,7 @@ export interface GenerationOptions {
   googleKey?: string;
   mistralKey?: string;
   deepinfraKey?: string;
+  zaiKey?: string;
   // Embedding-based context retrieval
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
@@ -594,6 +595,7 @@ interface ChoicesFetchOptions {
   googleKey?: string;
   mistralKey?: string;
   deepinfraKey?: string;
+  zaiKey?: string;
   abortSignal?: AbortSignal;
 }
 
@@ -637,6 +639,7 @@ async function generateChoicesWithRetry(
         googleKey: fetchOptions.googleKey,
         mistralKey: fetchOptions.mistralKey,
         deepinfraKey: fetchOptions.deepinfraKey,
+        zaiKey: fetchOptions.zaiKey,
         customModel: getCustomModelIfUUID(fetchOptions.model),
       },
       fetchOptions.abortSignal,
@@ -959,6 +962,7 @@ export async function generateStoryTurn(
       googleKey: options.googleKey,
       mistralKey: options.mistralKey,
       deepinfraKey: options.deepinfraKey,
+      zaiKey: options.zaiKey,
       abortSignal: options.abortSignal,
     };
 
@@ -998,6 +1002,7 @@ export async function generateStoryTurn(
               googleKey: options.googleKey,
               mistralKey: options.mistralKey,
               deepinfraKey: options.deepinfraKey,
+              zaiKey: options.zaiKey,
               abortSignal: options.abortSignal,
             },
           );
@@ -2056,6 +2061,7 @@ async function generateStoryTurnOnce(
                 googleKey: options.googleKey,
                 mistralKey: options.mistralKey,
                 deepinfraKey: options.deepinfraKey,
+                zaiKey: options.zaiKey,
                 customModel: getCustomModelIfUUID(classifierModel),
               },
             );
@@ -2355,6 +2361,7 @@ async function generateStoryTurnOnce(
               googleKey: options.googleKey,
               mistralKey: options.mistralKey,
               deepinfraKey: options.deepinfraKey,
+              zaiKey: options.zaiKey,
               customModel: getCustomModelIfUUID(model),
               // Set only on the round immediately after the M2 gate fires -
               // forces the model to call some tool rather than relying on
@@ -2715,6 +2722,7 @@ async function generateStoryTurnOnce(
                   googleKey: options.googleKey,
                   mistralKey: options.mistralKey,
                   deepinfraKey: options.deepinfraKey,
+                  zaiKey: options.zaiKey,
                 },
                 token,
                 webResearchEnabled: options.webResearchEnabled,
@@ -3169,6 +3177,7 @@ async function generateStoryTurnOnce(
         googleKey: options.googleKey,
         mistralKey: options.mistralKey,
         deepinfraKey: options.deepinfraKey,
+        zaiKey: options.zaiKey,
         customModel: getCustomModelIfUUID(narrationModel),
         // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
         // Also stop on [STOP] marker for player agency stopping points
@@ -3451,6 +3460,7 @@ async function generateStoryTurnOnce(
             googleKey: options.googleKey,
             mistralKey: options.mistralKey,
             deepinfraKey: options.deepinfraKey,
+            zaiKey: options.zaiKey,
             abortSignal: options.abortSignal,
           },
         );
@@ -3713,6 +3723,7 @@ export async function generateSimple(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
+    zaiKey?: string;
     customModel?: CustomModel;
   },
 ): Promise<{
@@ -3731,6 +3742,7 @@ export async function generateSimple(
     googleKey: options.googleKey,
     mistralKey: options.mistralKey,
     deepinfraKey: options.deepinfraKey,
+    zaiKey: options.zaiKey,
     customModel: options.customModel,
   });
 
@@ -3763,6 +3775,7 @@ export async function* generateSimpleStream(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
+    zaiKey?: string;
   },
 ): AsyncGenerator<StreamEvent> {
   const response = await providerFetch("/api/generate-stream", {
@@ -3776,6 +3789,7 @@ export async function* generateSimpleStream(
     googleKey: options.googleKey,
     mistralKey: options.mistralKey,
     deepinfraKey: options.deepinfraKey,
+    zaiKey: options.zaiKey,
   });
 
   if (!response.ok) {
@@ -3798,6 +3812,7 @@ export async function generateChoicesOnly(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
+    zaiKey?: string;
   },
 ): Promise<Choice[]> {
   // No backend auth system anymore - see generateStoryTurn's comment above.
@@ -3824,6 +3839,7 @@ export async function generateChoicesOnly(
       googleKey: options.googleKey,
       mistralKey: options.mistralKey,
       deepinfraKey: options.deepinfraKey,
+      zaiKey: options.zaiKey,
     },
   );
 

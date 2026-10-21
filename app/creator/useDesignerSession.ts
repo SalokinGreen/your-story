@@ -44,6 +44,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   googleKey: "Google",
   mistralKey: "Mistral",
   deepinfraKey: "DeepInfra",
+  zaiKey: "Z.ai",
 };
 /** How much conversation to replay. Draft state is injected separately. */
 const HISTORY_LIMIT = 24;

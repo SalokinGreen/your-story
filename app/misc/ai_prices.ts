@@ -163,21 +163,105 @@ export const AI_MODELS = {
       "Google's latest Gemini 3 Flash preview via AI Studio. Requires your own Google API key (BYOK). Great for creative tasks.",
     bannerUrl: undefined,
   },
+  // OpenRouter prices GLM per provider endpoint, from $0.03 to $2.31 per M
+  // input on 2026-10-21, and its model listing shows whichever endpoint sorts
+  // first ($0.034 in / $7.00 out for GLM 5.2). The GLM entries use the model
+  // maker's own price on OpenRouter (Z.ai's endpoint), the most common one
+  // and close to the median; what a call actually costs depends on routing.
   "GLM 5.2": {
     name: "GLM 5.2",
     original_model: "GLM 5.2",
     model: "z-ai/glm-5.2",
     maxTokens: 1048576,
     maxOutputTokens: 128000,
-    inputPrice: 0.65,
-    outputPrice: 2.1,
+    inputPrice: 1.4,
+    outputPrice: 4.4,
     provider: "openrouter",
     supportsToolCalling: true,
     finetunes: [],
     strengths: ["long context", "powerful", "nsfw", "agentic"],
     weaknesses: ["price"],
     description:
-      "Z.ai's current flagship - #1 open-weight model on the Artificial Analysis intelligence index, strong on long-horizon agentic work and complex storytelling. Replaces GLM 4.6.",
+      "Z.ai's previous flagship - strong on long-horizon agentic work and complex storytelling. Superseded by GLM 5.3.",
+    bannerUrl: undefined,
+  },
+
+  "GLM 5.3": {
+    name: "GLM 5.3",
+    original_model: "GLM 5.3",
+    model: "z-ai/glm-5.3",
+    maxTokens: 1048576,
+    maxOutputTokens: 128000,
+    inputPrice: 1.4,
+    outputPrice: 4.4,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["long context", "powerful", "agentic", "latest"],
+    weaknesses: ["always thinks"],
+    description:
+      "Z.ai's current flagship, through your OpenRouter key. Strong long-horizon tool use and storytelling; thinking cannot be turned off. For a device without a Z.ai key.",
+    bannerUrl: undefined,
+  },
+
+  "GLM 5.3 Flash": {
+    name: "GLM 5.3 Flash",
+    original_model: "GLM 5.3 Flash",
+    model: "z-ai/glm-5.3-flash",
+    maxTokens: 1048576,
+    maxOutputTokens: 128000,
+    inputPrice: 0.15,
+    outputPrice: 0.5,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["cost-effective", "long context", "tool calling", "latest"],
+    weaknesses: ["always thinks"],
+    description:
+      "Z.ai's fast, cheap GLM 5.3, through your OpenRouter key. Good for the light GM tiers.",
+    bannerUrl: undefined,
+  },
+
+  // ============================================
+  // Z.AI MODELS (BYOK - the player's own Z.ai key, decision 18)
+  // ============================================
+  // Z.ai's general pay-as-you-go API only (providerCall.ts
+  // ZAI_CHAT_COMPLETIONS_URL), never the GLM Coding Plan. Prices from
+  // docs.z.ai's pricing page, 2026-10-21; cached input is $0.26 / $0.03.
+
+  "GLM 5.3 (Z.ai)": {
+    name: "GLM 5.3 (Z.ai)",
+    original_model: "glm-5.3",
+    model: "glm-5.3",
+    maxTokens: 1048576,
+    maxOutputTokens: 128000,
+    inputPrice: 1.4,
+    outputPrice: 4.4,
+    provider: "zai",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["long context", "powerful", "agentic", "latest"],
+    weaknesses: ["always thinks"],
+    description:
+      "Z.ai's current flagship, straight from Z.ai on your own pay-as-you-go Z.ai key (not the Coding Plan). Thinking cannot be turned off.",
+    bannerUrl: undefined,
+  },
+
+  "GLM 5.3 Flash (Z.ai)": {
+    name: "GLM 5.3 Flash (Z.ai)",
+    original_model: "glm-5.3-flash",
+    model: "glm-5.3-flash",
+    maxTokens: 1048576,
+    maxOutputTokens: 128000,
+    inputPrice: 0.15,
+    outputPrice: 0.5,
+    provider: "zai",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["cost-effective", "long context", "tool calling", "latest"],
+    weaknesses: ["always thinks"],
+    description:
+      "Z.ai's fast, cheap GLM 5.3, straight from Z.ai on your own pay-as-you-go Z.ai key (not the Coding Plan).",
     bannerUrl: undefined,
   },
 
@@ -1014,6 +1098,7 @@ export interface APIKeysAvailable {
   googleKey?: boolean;
   mistralKey?: boolean;
   deepinfraKey?: boolean;
+  zaiKey?: boolean;
 }
 
 /**
@@ -1028,6 +1113,7 @@ const PROVIDER_KEY_FIELD: Partial<
   google: "googleKey",
   mistral: "mistralKey",
   deepinfra: "deepinfraKey",
+  zai: "zaiKey",
 };
 
 export interface AvailableModelOptions {
@@ -1079,7 +1165,8 @@ export function hasAnyAIKey(keys: APIKeysAvailable): boolean {
     keys.deepseekKey ||
     keys.googleKey ||
     keys.mistralKey ||
-    keys.deepinfraKey
+    keys.deepinfraKey ||
+    keys.zaiKey
   );
 }
 
@@ -1118,6 +1205,7 @@ export interface AIModelConfig {
     | "mistral"
     | "deepinfra"
     | "google"
+    | "zai"
     | "claude-cli";
   supportsToolCalling?: boolean; // Whether this model supports function calling
   inputPrice: number;
