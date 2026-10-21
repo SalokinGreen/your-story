@@ -69,6 +69,12 @@ function rawApiFetchLines(file: string): number[] {
     .filter((n) => n > 0);
 }
 
+// Both tests read every file under app/ synchronously. On a loaded machine (a
+// build or another suite running) that has gone past Vitest's 5 s default and
+// failed a run that passed alone, twice on 2026-10-21; a generous limit keeps
+// the check meaningful without making it flaky.
+const SCAN_TIMEOUT_MS = 30_000;
+
 describe('no raw fetch("/api/...") outside the *Fetch.ts wrappers', () => {
   it("routes every client-side /api/* call through a standalone-aware wrapper", () => {
     const offenders: string[] = [];
@@ -86,7 +92,7 @@ describe('no raw fetch("/api/...") outside the *Fetch.ts wrappers', () => {
         "standalone build. Use callSideModel() (sideModelCall.ts) for AI side " +
         "calls, or the matching *Fetch.ts wrapper for anything else.",
     ).toEqual([]);
-  });
+  }, SCAN_TIMEOUT_MS);
 
   it("keeps the allowlist honest - every allowed file still has a raw call", () => {
     for (const rel of Object.keys(ALLOWED)) {
@@ -97,5 +103,5 @@ describe('no raw fetch("/api/...") outside the *Fetch.ts wrappers', () => {
         `app/${rel} no longer makes a raw /api/* call - drop it from ALLOWED`,
       ).toBeGreaterThan(0);
     }
-  });
+  }, SCAN_TIMEOUT_MS);
 });
