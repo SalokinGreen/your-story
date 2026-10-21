@@ -1,7 +1,7 @@
 # Party mode — design
 
-**Status:** draft for the author's review, 2026-10-21. Not approved to build.
-Decisions 21–25 in [`decisions.md`](decisions.md). Implementation plan:
+**Status:** approved to build, 2026-10-21 (decision 28).
+Decisions 21–28 in [`decisions.md`](decisions.md). Implementation plan:
 [`party-mode-implementation-plan.md`](party-mode-implementation-plan.md).
 
 ## 1. What it is
@@ -115,8 +115,8 @@ setting (default 15 s, decision 24):
 - while you hold it you can **add lines** — typed, or spoken in the app;
 - release it, or let someone take it.
 
-Open question 1 asks whether the spotlight should gate typed lines and choice
-taps too (this design's default) or only voice, as on the couch today.
+In party mode the spotlight gates everything — voice, typed lines and choice
+taps (decision 26).
 
 ### 4.5 Turns (decision 23)
 
@@ -184,10 +184,7 @@ It pauses while the desktop's own TTS is speaking, since every phone hears it.
 Tap-to-take stays as the fallback. The party protocol reserves a message for
 these features now, so adding the mode later changes no message shapes.
 
-## 8. Open questions for the author
+## 8. Answered questions
 
-1. **Does the spotlight gate typed lines and choice taps too?** This design's
-   default is yes: in party mode you need the spotlight to add anything. The
-   alternative is today's couch rule, where it gates only voice.
-2. **Should the desktop show a QR again mid-game** for late joiners? Default:
-   yes, from a "Join" button; late joiners start with an empty queue.
+1. **The spotlight gates typed lines and choice taps too** (decision 26).
+2. **Late joiners scan in mid-game** from a "Join" button (decision 27).

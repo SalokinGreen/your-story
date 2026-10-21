@@ -1,7 +1,7 @@
 # Party mode — implementation plan
 
-**Status:** draft for the author's review, 2026-10-21. Not approved to build.
-Design: [`party-mode-design.md`](party-mode-design.md). Decisions 21–25. File
+**Status:** approved to build, 2026-10-21 (decision 28).
+Design: [`party-mode-design.md`](party-mode-design.md). Decisions 21–28. File
 references come from a code map of master at `b864251`. Line numbers are
 approximate (`~`); re-check them before editing.
 
@@ -131,8 +131,8 @@ export function buildPlayerView(s: PartyHostState, story: StoryData, playerId: s
 
 - Use `floorControl.ts` for the spotlight. Give `takeFloor` a `cooldownMs`
   parameter, defaulting to today's 4000, so couch mode is unchanged.
-- A `line` or voice take is accepted only from the spotlight holder (design
-  open question 1; this is the default).
+- A `line` (typed or a choice tap) or a voice take is accepted only from the
+  spotlight holder (decision 26).
 - `go` from anyone turns the queue into one `SubmitTurn`, built exactly as
   `PlayerBubbles` builds its Generate payload today: `> Name: text` joined by
   newlines, unique `speakerIds`, and `kind: "voice"` if any line was spoken.
@@ -194,6 +194,7 @@ and party share it.
 - `app/story/menu/OnlinePlayEditor.tsx`, or a new `PartyModeEditor.tsx` in the
   Menu: start and stop party mode, and the cooldown setting
   (`partySpotlightCooldownMs`, default 15000, kept in localStorage).
+- Late joiners: a "Join" button on the table screen shows the lobby QR again at any time (decision 27).
 - The roster: party joins add `CouchPlayer` entries the way online joins do
   (`page.tsx:~767-802`), so the GM prompt's player lines, the setup note and
   the spotlight ledger all see party players.
@@ -304,7 +305,6 @@ transcribes them. Voice is only offered when the phone is in the app
 - Create a Windows Firewall rule at install time, scoped to private networks
   and the local subnet. This needs the NSIS hooks, and a per-machine install
   to get elevation.
-- A "Join" QR available mid-game.
 - Whatever the first real party turns up.
 
 ## 4. Tests that need people and phones
