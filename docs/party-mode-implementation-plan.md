@@ -337,3 +337,80 @@ These go to `docs/pending_tests.md`:
 
 Auto-voice; an iOS app path; play from outside the home network; players
 at the desktop itself; voice in the browser client.
+
+## 7. S0 status (2026-10-21)
+
+**Not run yet: the author had no phone to hand.** The spike is built and
+waiting. By decision 29, S2 went ahead first; nothing from S1 onward is
+built until S0 passes.
+
+- **The spike:** a throwaway axum binary. It serves a static export, a
+  `/party` echo page and `/ws` (token, Origin and private-range checks), and
+  logs every request with its peer address to `spike.log` beside the exe.
+  Source: the session notes folder, `party-spike-src/`. Built exe:
+  `%LOCALAPPDATA%\Temp\pspike\party-spike.exe`. Build it with
+  `CARGO_TARGET_DIR` set to a short path: under the session scratchpad,
+  `link.exe` fails with LNK1104 because the path passes 260 characters.
+- **The session can't start it.** The permission classifier refuses to open
+  a LAN port ("Expose Local Services"), so the author runs it:
+  `party-spike.exe <an out/ dir> 8787 spike`, then opens
+  `http://192.168.0.85:8787/party?t=spike` on a phone on the same Wi-Fi.
+- **What this PC looks like, checked beforehand:**
+  - The wired "Ethernet" adapter is `192.168.0.85/24`, gateway
+    `192.168.0.1`, and Windows marks it **Private**.
+  - "Ethernet 2" has a default route to `25.0.0.1` (a VPN-style adapter),
+    is marked Public and carries no traffic.
+  - Tailscale is `100.122.14.19`; the Bluetooth PAN is `169.254.39.80`.
+  - So the interface picker matters: `local_ip()` has to pick
+    `192.168.0.85`, not the 25.x or Tailscale addresses.
+  - All three firewall profiles are on with NotifyOnListen, so a prompt is
+    expected.
+  - Port 8787 is outside the reserved TCP ranges (1036, 5357, 50000–50059).
+
+## 8. Decisions made during implementation
+
+### 2026-10-21, S2
+
+- **Seats need a key to reconnect.** `hello` reclaims a seat only with its
+  `playerId` and a `seatKey` that is sent only to that phone (in its own
+  view's `me`). The roster every phone sees lists seat ids, so an id alone
+  would let any phone take any seat. A newer connection with the right key
+  wins the seat, and the stale socket is kicked: a phone back from sleep can
+  arrive before its old socket is noticed as dead.
+- **Phones can claim an open seat.** `join{seatId}` takes over a seat from
+  the story's existing roster, or a seat whose phone dropped, so a couch
+  story continued in party mode doesn't get a second Mara. Seat keys last one
+  party session; after the desktop restarts party mode, a returning phone
+  taps its name under the open seats.
+- **Line breaks in typed lines and names become spaces.** Otherwise a phone
+  could forge a `> Tom: …` line inside the turn text. This happens when a
+  line is taken in, before `buildTurnText`, which stays byte-identical to the
+  old builder.
+- **`answer` carries one item per question,**
+  `{selectedLabel?, customText?, skipped}[]`, rather than the plan's single
+  `text`. `ask_question` batches one to three questions with options. Only a
+  label the GM offered counts as a pick, and custom text counts only where
+  `allow_custom` isn't false.
+- **"Roll for me" is `roll_result{value: null}`.** It resolves the existing
+  manual-roll promise with null, the executor's "skipped, roll it digitally"
+  path. No new roll path.
+- **Go needs no spotlight.** Any seated phone or the desktop can tap it
+  (decision 23 says "anyone"). It needs a non-empty queue and no turn in
+  progress, and it sets the turn to generating at once, so a double tap can't
+  submit twice.
+- **What "the queue locks" means.** While a turn is generating there are no
+  new lines (typed, choice, or the start of a voice take) and no Go. A voice
+  take that was accepted before the turn started still queues once it is
+  transcribed, and waits for the next Go.
+- **A phone with no seat gets a lobby view.** It holds the roster, the
+  palette, the archetype labels and the open seats, and no narration, sheet,
+  queue or choices. The phone page then needs no app imports beyond the
+  protocol's types. The palette moved to `app/misc/multiplayer/palette.ts`,
+  and `CouchPlayersEditor` re-exports it.
+- **`buildPlayerView` takes `now`.** Lockouts are sent as milliseconds
+  remaining, because a phone's clock isn't the desktop's.
+- **The player's sheet** is chosen only from `character_sheet` notes that
+  are on, not flagged `secrtet` and `always_reveal`. The note owned through
+  `ownerCouchPlayerId` wins over a "Character: <name>" title.
+- **Limits:** 8 seats, 20 queued lines, 1,000 characters a line, 32
+  characters a name, and 10 MB for a voice take.

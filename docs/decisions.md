@@ -48,3 +48,4 @@ the side-agents fix (PR #204); they land with those PRs.
 | 26 | Does the spotlight gate typing and choices in party mode | **Yes, everything.** In party mode you need the spotlight to add any line: voice, typed, or a choice tap. |
 | 27 | Joining after the game has started | **Yes, through a "Join" button** that shows the QR again; the newcomer picks a name and colour and joins the table and the GM's player list. |
 | 28 | Build party mode | **Yes, starting with PR P1** ("Yes, start with PR P1"): `docs/party-mode-implementation-plan.md` as written, beginning with the S0 spike with the author and a phone. Each PR needs its own yes to merge (decision 5). |
+| 29 | The S0 phone test had to wait | **Build S2 first, stop before S1** ("Build S2 meanwhile"): the pure-TypeScript protocol, host state machine, redaction boundary and turn-text extraction went ahead while the author had no phone to hand. Nothing in Rust, no UI and nothing that opens a port until S0 passes. |
