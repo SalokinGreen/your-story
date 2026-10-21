@@ -12,54 +12,39 @@ session cannot do".
 
 ## 2026-10-21 — Claude on the subscription (Route B of the Claude GM plan)
 
-Built and launched here; the CLI's status shows in Settings. No turn was
-played: a played turn draws on the author's Claude plan, so it waits for the
-author's go (`claude-gm-implementation-plan.md` §5). The two approved Haiku
-calls were spent on the checks before building (plan, "B0").
+The author gave the go on 2026-10-21 and the checks were run in the built
+desktop app: a played GM turn with rolls, Stop, the Designer, the choices
+stage in stream mode, the cost label, side agents staying off the
+subscription, and online play blocking it. The results, with numbers, are in
+`claude-gm-implementation-plan.md` → "First live run". What is left:
 
-- **One played turn on "Claude Sonnet (subscription)", timed.** In the
-  desktop app (`npx tauri build`, then `src-tauri/target/release/app.exe`),
-  set every tier to "Claude Sonnet (subscription)" and play a turn in a
-  combat scene, so the GM rolls. Expect a few seconds' start-up for each GM
-  round, then narration. The turn cost panel should show the GM lines as $0
-  "on your subscription", and the Debug Logs should have no "Claude CLI run
-  failed" line. Note the wall time. *Failure looks like:* "The claude CLI's
-  answer did not match the response format" (the schema or the
-  `structured_output` reading); "The claude CLI failed: unknown option …"
-  (a flag the installed CLI version no longer has); the story arriving
-  without the roll, or the roll gate's "This scene requires a roll" twice,
-  then prose (the forced round's `minItems` not holding).
-- **Stop during a GM round kills the CLI.** Start a turn on a subscription
-  tier and press Stop while it is thinking. The turn should revert at once,
-  and Task Manager should show no `claude.exe` left from the app within a
-  second (with an npm-installed CLI, no `node.exe` running `claude` either:
-  Stop kills the process tree). *Failure looks like:* a `claude.exe` or
-  `node.exe` still running after the turn reverted (the cancel never reached
-  `claude_cli_cancel`, or the tree kill did not run).
-- **Narration on the subscription.** Set the narration voice to "Claude
-  Haiku (subscription)" and play a turn where the GM rolls, so the story
-  stage runs separately. The prose should stream in a few words at a time.
-  *Failure looks like:* the text arriving all at once (no partial events),
-  or a 400-style error about tool use (the story stage sends the GM's tool
-  calls without tools; here they are text blocks, so it should not).
-- **The Game Designer on the subscription.** In the creator, pick "Claude
-  Sonnet (subscription)" and ask for an NPC. The Designer should write the
-  NPC into the draft.
+- **The first round of a fresh conversation sometimes makes no tool call.**
+  In the live run 2 of 2 fresh conversations did it once: the GM's first turn
+  answered "my dice and note tools aren't responding" with no tool calls, and
+  the Designer's first run wrote nothing before retrying; every later round
+  (20 or so) called tools correctly. Watch for it when playing: start a few
+  new stories on "Claude Sonnet (subscription)" and note how often the very
+  first turn comes back without a character sheet or a `start_game`. A Retry
+  recovers it. The plan lists a proposed fix; none is built.
+- **The story stage on the subscription.** The GM wrote its own prose in every
+  turn so far, so the separate story stage (the one that cuts the text at the
+  `[STOP]` markers) never ran. Stream mode itself is confirmed (the choices
+  stage ran in it). To see the story stage: a turn where the GM's last round
+  is only tool calls. *Failure looks like:* the text arriving all at once, or
+  `[GAME MASTER State Update]` text left in the prose.
+- **Stop with an npm-installed CLI.** Confirmed with the native `claude.exe`
+  (gone within about a second). With `claude.cmd` from an npm install, Task
+  Manager should show no `node.exe` running `claude` after Stop either.
 - **Synced settings on the phone or the web build.** Sync from the desktop
   with a subscription tier set, then open Settings → AI Config on another
   device. A "Claude subscription" box should list the tier and say which
-  default it uses there, and a turn should run on that default.
-- **Online play blocks the subscription (decision 29).** In the desktop app
-  with a subscription tier or narration voice set, host an online game
-  ("Host online"). A notice should say which slots run their default models,
-  Settings → AI Config should list them under "Claude subscription" with the
-  tier badge reading "Not used online", and a turn should run on the default
-  models with no `claude.exe` launched. Leave the session: the subscription
-  models should come back. Play solo and on a couch (several players on the
-  one device): the subscription should run as before. *Failure looks like:*
-  a `claude.exe` launching during the online game (the flag
-  `useNetSession` publishes did not reach `claudeCliModels`), or the
-  subscription staying off after leaving the room.
+  default it uses there, and a turn should run on that default. (The web
+  build's box was checked in the preview with the keys set by hand; a real
+  sync was not.)
+- **Couch co-op with the subscription.** Solo play was used for every
+  subscription turn above. Two or more players on one device should run on
+  the subscription as well, and so should party mode once it is on master
+  (decision 30).
 - **macOS and Linux.** Only Windows was built and run; the environment list
   for the child differs there (`claude_cli.rs`, `PASSED_ENV`).
 

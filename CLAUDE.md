@@ -248,6 +248,17 @@ The `verify` skill has every command and how to read it. The things that bite:
 - **Inside Tauri a request to a missing path returns `index.html` with
   200 OK**, so a stray `fetch("/api/...")` fails as a JSON `SyntaxError`,
   not a 404.
+- **Driving a built app over WebView2's debugging port: use your own port
+  and your own profile, and check who owns the port.** Several sessions run
+  at once, and `--remote-debugging-port=9222` is the number everyone copies.
+  A second app on the same port, or on the same WebView2 profile, leaves your
+  driver talking to *another session's* app (on 2026-10-21 one created a
+  stray story in a session's party-mode app). Launch with
+  `WEBVIEW2_USER_DATA_FOLDER=<a short folder>` (a long path, such as the
+  scratchpad's, makes IndexedDB fail with "Internal error opening backing
+  store") and a port of your own, then confirm the port's owner is a
+  `msedgewebview2` whose parent is your `app.exe` before sending a command.
+  Close only the `app.exe` whose path is your worktree's.
 
 ## Devlogs
 

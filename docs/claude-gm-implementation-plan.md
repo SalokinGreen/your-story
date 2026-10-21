@@ -709,3 +709,92 @@ addendum (`f4fe2cd`) merged in.
     Left as they are: the fail-closed check still passes a CLI that stops
     emitting `system/init` altogether, and a cancel invoke can still beat the
     run's map insert by microseconds.
+
+### 2026-10-21 — First live run on the subscription (the author's go)
+
+The author said "Go" to the checks that were waiting on their plan and keys.
+Run in the built desktop app (the merged code at `486fc72`), on the author's
+Max plan, signed in as before (`apiProvider: firstParty`), in a throwaway
+WebView2 profile with no provider keys, so only the subscription route could
+run. Every subscription tier set to "Claude Sonnet (subscription)" at effort
+`low`, the narration voice on "Claude Haiku (subscription)". About 19 CLI runs
+in all. **The OpenRouter and Z.ai checks were not run**: no key is saved in
+the app, and a session does not enter one.
+
+**What was confirmed live**
+
+1. **A full GM turn works end to end.** A new story, retried once after the
+   first attempt (item 6), ran **5 CLI rounds in 76.9 s**: `set_reasoning_tier`,
+   `search_notes` and `generate_name` in round 1; three `create_note` calls
+   (character sheet, mechanics, campaign plan) in round 2; `start_game` and
+   `formula_roll` in round 3, with the tier switching from 3 to 1 mid-turn;
+   a second roll in round 4 and the prose in round 5. The engine executed
+   every call, the story was named by the GM, and the cost was **$0**. Rounds
+   took about 8–35 s each (longer when the model wrote a lot).
+2. **Stop kills the process.** Pressed mid-round: the run's `claude.exe` was
+   gone **within about a second** (the watcher polls at 0.1–0.9 s), no relaunch
+   followed, and nothing was left running.
+3. **The folders stay clean.** After about 19 runs the working folder
+   (`<app data>\claude-cli`) was empty and no prompt file was left in
+   `<cache>\claude-cli-prompts`.
+4. **Stream mode.** The choices stage runs tool-less on the narration model:
+   it came back in **4.7 s and 6.6 s** with 5 and 6 parsed choices, which show
+   as tappable chips under the prose.
+5. **The Designer works on the subscription.** One request produced the
+   title, premise, opening prose, a mechanics note, a character sheet, a
+   lore note, 4 NPCs, 3 goals and 3 opening choices. Two CLI runs, 57.8 s and
+   7 s.
+6. **The cost estimate** labels the GM and tier lines "on your subscription"
+   at $0.
+7. **Decision 12 holds.** With a subscription narration voice, the Observer's
+   judges, the Memory Keeper and the rewrite all went to the default
+   narration model (Mistral Small 3.2) and failed on the missing key; none
+   launched the CLI. Exactly one CLI run per GM or choices call.
+8. **Online play blocks the subscription (decision 29).** Hosting an online
+   game posted "Online play: your Claude subscription models are not used
+   while this game is online (Tier 0, Tier 1, Tier 2, Tier 3, Narration run
+   on their default models instead)"; Settings showed four "Not used online"
+   badges and listed each slot's default; a turn resolved tier 1 to Mistral
+   Small 3.2 and launched **no** CLI process. After leaving the room, the
+   badges and the note were gone and the status read "Signed in (Max)".
+
+**What the run found (open, nothing changed)**
+
+- **The first round of a fresh conversation sometimes makes no tool call.**
+  The GM's first turn answered "(OOC: my dice and note tools aren't
+  responding on my end …)" with `hadToolCalls: false`: the model never tried
+  a call, so session zero could not progress. The Designer's first run
+  likewise opened with "the last attempt didn't write anything, so I'm
+  retrying" (and took 57.8 s). Retry fixed both, and every later round (about
+  20) called tools correctly, in the same session and the same prompt. The
+  likely cause is that the transcript holds no example of the `tool_calls`
+  protocol yet: with the CLI's own tools off, the model sees only its answer
+  channel and can read the GM prompt's "call the tool" as unfulfillable. Not
+  verified. **Proposed, for the author's call:** (a) a short worked example of
+  a `tool_calls` answer in the answer-protocol paragraph, which is in the
+  system prompt and so stable across rounds; (b) log each run's `num_turns`,
+  duration, `is_error` and stderr tail in the Debug Logs, so a miss is
+  diagnosable (today the CLI's own events are not kept); (c) if (a) is not
+  enough, an engine guard that re-asks once when session zero's first round
+  has no tool call and no `start_game` is pending.
+- **The prompt is large.** The GM round's system prompt file was **107,773
+  bytes**: 62% of it the 56 tool schemas (67 KB), 26.5 KB the GM prompt itself,
+  12.9 KB the stable history, under 1 KB the protocol. The Designer's is 14.9
+  KB. Whether later rounds read it from the CLI's prompt cache was not
+  measured (the app records only summed usage); rounds 3–5 were fast (8–12 s),
+  which is consistent with it.
+- **The token figure in the Debug Logs is about twice the real prompt.** A
+  round showed 113,731 prompt tokens against a 107 KB prompt (roughly 33–45k
+  tokens). The CLI's `result` usage sums its two internal API calls (the
+  structured-answer tool round trip). Display only: the cost is $0 either way.
+- **Latency matches the design's warning (§4.6)**: 5 or 6 GM rounds make a
+  turn of 77–99 s, with a launch of about 3 s per round. A turn that the
+  Observer resets (it did once, on a 214-word turn against the "medium"
+  ceiling of about 85 words) pays for a second GM pass.
+
+**Process note.** Two sessions drove built apps over WebView2's debugging
+port 9222 at once. This session's first attempt therefore talked to another
+session's party-mode app (a stray empty story was created there; that session
+was told), and a profile folder under the long scratchpad path made IndexedDB
+fail. `CLAUDE.md` now says to give a driven app its own `--remote-debugging-port`
+and a short `WEBVIEW2_USER_DATA_FOLDER`, and to check who owns the port first.
