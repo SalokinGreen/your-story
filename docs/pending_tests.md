@@ -10,6 +10,46 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-21 — Claude on the subscription (Route B of the Claude GM plan)
+
+Built and launched here; the CLI's status shows in Settings. No turn was
+played: a played turn draws on the author's Claude plan, so it waits for the
+author's go (`claude-gm-implementation-plan.md` §5). The two approved Haiku
+calls were spent on the checks before building (plan, "B0").
+
+- **One played turn on "Claude Sonnet (subscription)", timed.** In the
+  desktop app (`npx tauri build`, then `src-tauri/target/release/app.exe`),
+  set every tier to "Claude Sonnet (subscription)" and play a turn in a
+  combat scene, so the GM rolls. Expect a few seconds' start-up for each GM
+  round, then narration. The turn cost panel should show the GM lines as $0
+  "on your subscription", and the Debug Logs should have no "Claude CLI run
+  failed" line. Note the wall time. *Failure looks like:* "The claude CLI's
+  answer did not match the response format" (the schema or the
+  `structured_output` reading); "The claude CLI failed: unknown option …"
+  (a flag the installed CLI version no longer has); the story arriving
+  without the roll, or the roll gate's "This scene requires a roll" twice,
+  then prose (the forced round's `minItems` not holding).
+- **Stop during a GM round kills the CLI.** Start a turn on a subscription
+  tier and press Stop while it is thinking. The turn should revert at once,
+  and Task Manager should show no `claude.exe` left from the app within a
+  second. *Failure looks like:* a `claude.exe` still running after the turn
+  reverted (the cancel never reached `claude_cli_cancel`).
+- **Narration on the subscription.** Set the narration voice to "Claude
+  Haiku (subscription)" and play a turn where the GM rolls, so the story
+  stage runs separately. The prose should stream in a few words at a time.
+  *Failure looks like:* the text arriving all at once (no partial events),
+  or a 400-style error about tool use (the story stage sends the GM's tool
+  calls without tools; here they are text blocks, so it should not).
+- **The Game Designer on the subscription.** In the creator, pick "Claude
+  Sonnet (subscription)" and ask for an NPC. The Designer should write the
+  NPC into the draft.
+- **Synced settings on the phone or the web build.** Sync from the desktop
+  with a subscription tier set, then open Settings → AI Config on another
+  device. A "Claude subscription" box should list the tier and say which
+  default it uses there, and a turn should run on that default.
+- **macOS and Linux.** Only Windows was built and run; the environment list
+  for the child differs there (`claude_cli.rs`, `PASSED_ENV`).
+
 ## 2026-10-21 — Claude through OpenRouter (Route A of the Claude GM plan)
 
 Request shaping is unit-tested (`tests/providerCall.anthropic.test.ts`), but

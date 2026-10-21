@@ -17,6 +17,10 @@
 
 import { AI_MODELS, AIModelKey, getModelConfig } from "@/app/misc/ai_prices";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
+import {
+  isClaudeCliAvailablePlatform,
+  isClaudeCliModel,
+} from "@/app/misc/claudeCliModels";
 import { StoryData, CombatState, ReasoningTierState } from "@/app/misc/structs";
 
 export type ReasoningEffort = "none" | "low" | "normal" | "high" | "xhigh";
@@ -148,12 +152,27 @@ export function resetTierOverrides(): void {
   notifyConfigChanged();
 }
 
-/** REASONING_TIERS with any user overrides applied - this is what resolveTier() reads. */
+/**
+ * Whether this device can run a model at all. A Claude subscription model
+ * runs only through the desktop app's `claude` CLI, but tier and narration
+ * choices sync between devices (syncableSettingsKeys.ts), so one can arrive
+ * on a phone or the web build (decision 16).
+ */
+function runsOnThisDevice(modelKey: string): boolean {
+  return !isClaudeCliModel(modelKey) || isClaudeCliAvailablePlatform();
+}
+
+/**
+ * REASONING_TIERS with any user overrides applied - this is what resolveTier()
+ * reads. An override this device cannot run (a synced subscription model off
+ * the desktop) is skipped, so that slot uses its default; Settings shows why
+ * (getSubscriptionFallbacks).
+ */
 export function getEffectiveTiers(): ReasoningTier[] {
   const overrides = getTierOverrides();
   return REASONING_TIERS.map((tier, i) => {
     const o = overrides[i];
-    return o
+    return o && runsOnThisDevice(o.modelKey)
       ? {
           modelKey: o.modelKey,
           reasoningEffort: o.reasoningEffort,
@@ -178,9 +197,50 @@ export function setNarrationModelOverride(modelKey: AnyModelKey | null): void {
   notifyConfigChanged();
 }
 
-/** NARRATION_MODEL_KEY with any user override applied - always used in place of the constant. */
+/**
+ * NARRATION_MODEL_KEY with any user override applied - always used in place
+ * of the constant. Like getEffectiveTiers, an override this device cannot run
+ * falls back to the default.
+ */
 export function getEffectiveNarrationModelKey(): AnyModelKey {
-  return getNarrationModelOverride() || NARRATION_MODEL_KEY;
+  const override = getNarrationModelOverride();
+  return override && runsOnThisDevice(override) ? override : NARRATION_MODEL_KEY;
+}
+
+export interface SubscriptionFallback {
+  /** "Tier 2" or "Narration". */
+  slot: string;
+  /** The subscription model the synced setting names. */
+  modelKey: string;
+  /** What this device uses instead. */
+  fallbackModelKey: string;
+}
+
+/**
+ * Decision 16: the slots whose synced Claude subscription model this device
+ * cannot run, and the default each uses here instead - for Settings' notice.
+ * Empty on the desktop app.
+ */
+export function getSubscriptionFallbacks(): SubscriptionFallback[] {
+  const fallbacks: SubscriptionFallback[] = [];
+  getTierOverrides().forEach((o, i) => {
+    if (o && !runsOnThisDevice(o.modelKey)) {
+      fallbacks.push({
+        slot: `Tier ${i}`,
+        modelKey: o.modelKey,
+        fallbackModelKey: REASONING_TIERS[i].modelKey,
+      });
+    }
+  });
+  const narration = getNarrationModelOverride();
+  if (narration && !runsOnThisDevice(narration)) {
+    fallbacks.push({
+      slot: "Narration",
+      modelKey: narration,
+      fallbackModelKey: NARRATION_MODEL_KEY,
+    });
+  }
+  return fallbacks;
 }
 
 // ============================================================

@@ -31,3 +31,11 @@ tauri-plugin-http = "2"
 # OpenRouter sign-in, and every target="_blank" link via the click handler
 # the plugin injects. Scoped to https:// in capabilities/default.json.
 tauri-plugin-opener = "2.7.2"
+
+# The bridge to the player's own `claude` CLI (src/claude_cli.rs,
+# docs/claude-gm-design.md §4): spawning it with a cleared environment,
+# streaming its stdout, killing it on Stop, and finding it on PATH. Desktop
+# only - a phone cannot run the CLI (decision 10).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macros", "rt"] }
+which = "8"

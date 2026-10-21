@@ -11,7 +11,8 @@
  * (Settings UI) and generation.ts (actually applying the overrides).
  */
 
-import { AnyModelKey, ReasoningEffort } from "./reasoningTiers";
+import { AnyModelKey, NARRATION_MODEL_KEY, ReasoningEffort } from "./reasoningTiers";
+import { isClaudeCliAvailablePlatform, isClaudeCliModel } from "./claudeCliModels";
 import {
   ObserverSettings,
   ObserverCheckSettings,
@@ -150,7 +151,17 @@ export function resolveSideCallModel(
   override: ModelEffortOverride | null,
   fallbackModel: string,
 ): { model: string; reasoningEffort?: string } {
-  if (!override) return { model: fallbackModel };
+  // Decision 12: the side agents run on the Claude subscription only when the
+  // player points one there. A subscription model reaching them as the
+  // fallback (the narration or GM model) is swapped for the default
+  // narration model, so a subscription narration voice does not quietly add
+  // a CLI launch for every side call.
+  const fallback = isClaudeCliModel(fallbackModel) ? NARRATION_MODEL_KEY : fallbackModel;
+  if (!override) return { model: fallback };
+  // Decision 16: a synced subscription override this device cannot run.
+  if (isClaudeCliModel(override.modelKey) && !isClaudeCliAvailablePlatform()) {
+    return { model: fallback };
+  }
   return { model: override.modelKey, reasoningEffort: override.reasoningEffort };
 }
 

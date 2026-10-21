@@ -62,6 +62,11 @@ export interface ModelPrice {
   provider: string;
   /** True when we have no price data at all (unpriced custom model). */
   unpriced: boolean;
+  /**
+   * A Claude subscription model through the `claude` CLI: $0 per call
+   * because the player's plan covers it, not because a price is missing.
+   */
+  onSubscription: boolean;
 }
 
 /**
@@ -82,6 +87,7 @@ export function getModelPrice(modelKey: string): ModelPrice {
       displayName: custom.name,
       provider: "openrouter",
       unpriced: !hasPrices,
+      onSubscription: false,
     };
   }
 
@@ -93,6 +99,7 @@ export function getModelPrice(modelKey: string): ModelPrice {
       displayName: config.name,
       provider: config.provider,
       unpriced: false,
+      onSubscription: config.provider === "claude-cli",
     };
   }
 
@@ -102,6 +109,7 @@ export function getModelPrice(modelKey: string): ModelPrice {
     displayName: modelKey,
     provider: "unknown",
     unpriced: true,
+    onSubscription: false,
   };
 }
 

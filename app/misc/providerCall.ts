@@ -34,7 +34,10 @@ export type Provider =
   | "openrouter"
   | "mistral"
   | "deepinfra"
-  | "google";
+  | "google"
+  // The player's Claude subscription through the `claude` CLI, desktop only.
+  // providerFetch.ts hands these to claudeCli.ts before anything here runs.
+  | "claude-cli";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -359,6 +362,7 @@ function getApiKey(
   if (provider === "mistral") return body.mistralKey || null;
   if (provider === "deepinfra") return body.deepinfraKey || null;
   if (provider === "google") return body.googleKey || null;
+  if (provider === "claude-cli") return null; // the CLI's own sign-in, never a key
   return body.openRouterKey || null;
 }
 
@@ -368,6 +372,7 @@ const PROVIDER_NAMES: Record<Provider, string> = {
   google: "Google AI Studio",
   mistral: "Mistral",
   deepinfra: "DeepInfra",
+  "claude-cli": "Claude (subscription)",
 };
 
 /** Check if a string looks like a UUID (custom model ID). */
@@ -695,6 +700,17 @@ function resolveProviderAndKey(
   const model = body.model && body.model.trim() ? body.model : "DeepSeek V4 Flash";
   const { config } = resolveModelConfig(model, body.customModel);
   const provider = config.provider as Provider;
+
+  // providerFetch sends subscription models to the CLI bridge first, so one
+  // only gets here where the CLI cannot run: the web build or a phone.
+  if (provider === "claude-cli") {
+    return {
+      error: `${model} runs only in the desktop app, through the claude CLI signed in to your Claude subscription. Pick another model on this device.`,
+      status: 400,
+      code: "CLI_UNAVAILABLE",
+    };
+  }
+
   const apiKey = getApiKey(provider, body);
 
   if (!apiKey) {

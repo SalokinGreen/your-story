@@ -149,6 +149,8 @@ export interface TurnCostEstimateLine {
   calibrated: boolean;
   /** True when the model has no price data, so this line reads $0 wrongly. */
   unpriced: boolean;
+  /** True when the line runs on the player's Claude plan (rightly $0). */
+  onSubscription: boolean;
   /** Why this line is fractional / what drives it, for the UI's tooltip. */
   note?: string;
 }
@@ -281,6 +283,7 @@ function planToLine(
     highUsd: costPerCall * plan.highCalls,
     calibrated,
     unpriced: price.unpriced,
+    onSubscription: price.onSubscription,
     note: plan.note,
   };
 }

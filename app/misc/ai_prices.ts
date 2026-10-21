@@ -1,3 +1,8 @@
+import {
+  getCachedClaudeCliStatus,
+  isClaudeCliAvailablePlatform,
+} from "@/app/misc/claudeCliModels";
+
 export const AI_MODELS = {
   "Grok 4.5": {
     name: "Grok 4.5",
@@ -323,6 +328,68 @@ export const AI_MODELS = {
     weaknesses: ["price"],
     description:
       "Anthropic's most capable Claude in the catalog, through your OpenRouter key. For the heavy tiers - boss fights and campaign-shaping beats - where judgement matters more than cost.",
+    bannerUrl: undefined,
+  },
+  // ============================================
+  // CLAUDE ON THE PLAYER'S SUBSCRIPTION (docs/claude-gm-design.md §4)
+  // ============================================
+  // The desktop app runs these through the player's own signed-in `claude`
+  // CLI (claudeCli.ts), not an API key, so they cost nothing per call here.
+  // Offered only on the desktop with the CLI signed in (getAvailableModels,
+  // ModelSelect); elsewhere a synced choice falls back to the slot's default
+  // (reasoningTiers.ts, decision 16). Keys must match claudeCliModels.ts.
+
+  "Claude Opus (subscription)": {
+    name: "Claude Opus (subscription)",
+    original_model: "claude-opus-5-5",
+    model: "claude-opus-5-5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 0,
+    outputPrice: 0,
+    provider: "claude-cli",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["powerful", "reasoning", "creativity", "long context"],
+    weaknesses: ["desktop only", "slower turns"],
+    description:
+      "Claude Opus 5.5 on your own Claude plan, through the claude CLI on this computer. No per-call cost; it draws on your plan's usage limits, and each round takes a few extra seconds to start.",
+    bannerUrl: undefined,
+  },
+
+  "Claude Sonnet (subscription)": {
+    name: "Claude Sonnet (subscription)",
+    original_model: "claude-sonnet-5-5",
+    model: "claude-sonnet-5-5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 0,
+    outputPrice: 0,
+    provider: "claude-cli",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["creativity", "tool calling", "reasoning", "long context"],
+    weaknesses: ["desktop only", "slower turns"],
+    description:
+      "Claude Sonnet 5.5 on your own Claude plan, through the claude CLI on this computer. No per-call cost; it draws on your plan's usage limits, and each round takes a few extra seconds to start.",
+    bannerUrl: undefined,
+  },
+
+  "Claude Haiku (subscription)": {
+    name: "Claude Haiku (subscription)",
+    original_model: "claude-haiku-5-5",
+    model: "claude-haiku-5-5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 0,
+    outputPrice: 0,
+    provider: "claude-cli",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["tool calling", "long context"],
+    weaknesses: ["desktop only", "slower turns"],
+    description:
+      "Claude Haiku 5.5 on your own Claude plan, through the claude CLI on this computer. No per-call cost; it draws on your plan's usage limits, and each round takes a few extra seconds to start.",
     bannerUrl: undefined,
   },
   // ============================================
@@ -949,10 +1016,12 @@ export interface APIKeysAvailable {
   deepinfraKey?: boolean;
 }
 
-/** Maps a model's provider onto the key field that unlocks it. */
-const PROVIDER_KEY_FIELD: Record<
-  AIModelConfig["provider"],
-  keyof APIKeysAvailable
+/**
+ * Maps a model's provider onto the key field that unlocks it. The Claude
+ * subscription has none: the `claude` CLI's own sign-in unlocks it.
+ */
+const PROVIDER_KEY_FIELD: Partial<
+  Record<AIModelConfig["provider"], keyof APIKeysAvailable>
 > = {
   openrouter: "openRouterKey",
   deepseek: "deepseekKey",
@@ -981,6 +1050,11 @@ export function getAvailableModels(
 
   return entries.filter(([, config]) => {
     if (options.requireToolCalling && !config.supportsToolCalling) return false;
+    if (config.provider === "claude-cli") {
+      return (
+        isClaudeCliAvailablePlatform() && !!getCachedClaudeCliStatus()?.loggedIn
+      );
+    }
     const field = PROVIDER_KEY_FIELD[config.provider];
     return field ? !!keys[field] : false;
   });
@@ -1043,7 +1117,8 @@ export interface AIModelConfig {
     | "deepseek"
     | "mistral"
     | "deepinfra"
-    | "google";
+    | "google"
+    | "claude-cli";
   supportsToolCalling?: boolean; // Whether this model supports function calling
   inputPrice: number;
   outputPrice: number;

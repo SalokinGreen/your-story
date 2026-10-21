@@ -28,7 +28,12 @@ import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
 import ModelSelect from "./ModelSelect";
 import TurnCostPanel from "./TurnCostPanel";
+import ClaudeSubscriptionPanel, { useClaudeCliStatus } from "./ClaudeSubscriptionPanel";
 import { notifyTurnCostInputsChanged } from "@/app/misc/turnCost";
+import {
+  describeClaudeCliStatus,
+  isClaudeCliAvailablePlatform,
+} from "@/app/misc/claudeCliModels";
 
 // Maps an AI_MODELS provider string to the APIKeys field that must be
 // configured for that provider - used to flag tiers with a missing key.
@@ -50,6 +55,7 @@ const REASONING_EFFORTS: ReasoningEffort[] = [
 
 export default function AIConfigTab() {
   const { hasKey } = useAPIKeys();
+  const cliStatus = useClaudeCliStatus();
 
   // Reasoning-tier + narration model overrides, and user-added custom
   // (OpenRouter BYOK) models. All persisted to localStorage - see
@@ -429,8 +435,18 @@ export default function AIConfigTab() {
             const override = tierOverrides[index];
             const tier = override ?? defaultTier;
             const config = getModelConfig(tier.modelKey);
+            const isSubscription = config.provider === "claude-cli";
             const keyField = PROVIDER_KEY_FIELD[config.provider];
             const keyConfigured = keyField ? hasKey(keyField) : true;
+            // A subscription tier needs no key but a signed-in CLI, and the
+            // turn stops (no fallback to a paid tier) when it has none.
+            const cliProblem = !isSubscription
+              ? null
+              : !isClaudeCliAvailablePlatform()
+                ? "Desktop only"
+                : cliStatus?.loggedIn
+                  ? null
+                  : describeClaudeCliStatus(cliStatus);
             return (
               <div
                 key={index}
@@ -442,7 +458,7 @@ export default function AIConfigTab() {
                       {index}
                     </span>
                     <span className="text-[10px] font-medium uppercase tracking-wide text-blue-300/50 truncate">
-                      {config.provider}
+                      {isSubscription ? "claude subscription" : config.provider}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -453,6 +469,15 @@ export default function AIConfigTab() {
                       >
                         <DynamicIcon name="AlertTriangle" className="w-3 h-3" />
                         No key
+                      </span>
+                    )}
+                    {cliProblem && (
+                      <span
+                        title="This tier runs through the claude CLI on your Claude plan - see Claude subscription below"
+                        className="flex items-center gap-1 text-[10px] text-amber-300"
+                      >
+                        <DynamicIcon name="TriangleAlert" className="w-3 h-3" />
+                        {cliProblem}
                       </span>
                     )}
                     {override && (
@@ -506,6 +531,8 @@ export default function AIConfigTab() {
           the API Keys tab.
         </p>
       </div>
+
+      <ClaudeSubscriptionPanel />
 
       {/* Custom Models */}
       <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
