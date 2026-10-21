@@ -341,7 +341,7 @@ at the desktop itself; voice in the browser client.
 ## 7. S0 status (2026-10-21)
 
 **Not run yet: the author had no phone to hand.** The spike is built and
-waiting. By decision 29, S2 went ahead first; nothing from S1 onward is
+waiting. By decision 31, S2 went ahead first; nothing from S1 onward is
 built until S0 passes.
 
 - **The spike:** a throwaway axum binary. It serves a static export, a
