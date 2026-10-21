@@ -1,12 +1,8 @@
 /**
- * Prima Materia oracle.
- *
- * The load-bearing assertions here are the ones about *indexing*. The
- * appendix tables are 12x12 grids read against a die-face order that the
- * book never states outright - it has to be inferred from the grids
- * themselves. Get it wrong and nothing throws: every roll still returns a
- * plausible word, just the wrong one, forever. So the known-cell tests
- * below are the real safety net, not the mechanism tests.
+ * Prima Materia oracle: the portent mechanism, Frames, Tint and the Lens
+ * Shift, plus the director's complication seeds. The book's appendix word
+ * tables are no longer shipped (see the provenance banner in
+ * primaMateria.ts), so nothing here pins table contents.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
@@ -15,12 +11,10 @@ import {
   RELATION_GROUP,
   applyLensShift,
   formatPortentForModel,
-  isPrimaMateriaTable,
   keywordsFor,
-  pluck,
+  rollComplication,
   rollPortent,
   selectFrame,
-  PRIMA_MATERIA_TABLE_NAMES,
   type Tint,
 } from "@/app/misc/primaMateria";
 import type { StoryData } from "@/app/misc/structs";
@@ -30,7 +24,7 @@ afterEach(() => {
 });
 
 /**
- * Feed rollPortent/pluck a fixed sequence of die faces. Values are
+ * Feed rollPortent a fixed sequence of die faces. Values are
  * mid-bucket for the same floating-point reason mythicFateChart.test.ts
  * documents - `(face - 1) / sides` can floor back to the previous face.
  */
@@ -82,123 +76,18 @@ describe("symbol sets", () => {
   });
 });
 
-describe("appendix table indexing", () => {
-  // These pin the inferred die-face order (ARCHETYPE_ORDER) against cells
-  // read directly off the book's printed grids. If someone "tidies" the
-  // archetype order to match the Quick Reference sheet's 4x3 layout, every
-  // one of these breaks - which is exactly what should happen.
-  const KNOWN_CELLS: Array<{
-    table: string;
-    sol: number;
-    nox: number;
-    expected: string;
-  }> = [
-    // Actions, row 1 (Fortune) x column 1 (Fortune)
-    { table: "pm_actions", sol: 1, nox: 1, expected: "Acquire" },
-    // Actions, row 3 (Knowledge) x column 3 (Knowledge)
-    { table: "pm_actions", sol: 3, nox: 3, expected: "Analyze" },
-    // Actions, row 9 (Calm) x column 12 (Self) - the row's last cell
-    { table: "pm_actions", sol: 9, nox: 12, expected: "Be" },
-    // Dispositions, row 9 (Calm) x column 1 (Fortune)
-    { table: "pm_dispositions", sol: 9, nox: 1, expected: "Patient" },
-    // Dispositions, row 3 (Knowledge) x column 3 (Knowledge)
-    { table: "pm_dispositions", sol: 3, nox: 3, expected: "Analytical" },
-    // Landmarks, row 1 (Fortune) x column 1 (Fortune)
-    { table: "pm_landmarks", sol: 1, nox: 1, expected: "Crossroads" },
-  ];
-
-  for (const { table, sol, nox, expected } of KNOWN_CELLS) {
-    it(`${table}[${ARCHETYPE_ORDER[sol - 1]}][${
-      ARCHETYPE_ORDER[nox - 1]
-    }] is "${expected}"`, () => {
-      mockRolls([
-        { face: sol, sides: 12 },
-        { face: nox, sides: 12 },
-      ]);
-      expect(pluck(table)!.result).toBe(expected);
-    });
-  }
-
-  it("reports which faces produced a grid result", () => {
-    mockRolls([
-      { face: 3, sides: 12 },
-      { face: 9, sides: 12 },
-    ]);
-    const result = pluck("pm_actions")!;
-    expect(result.detail).toBe("Sol Knowledge × Nox Calm");
-  });
-
-  it("every 12x12 table is complete - no ragged rows", () => {
-    for (const table of ["pm_actions", "pm_dispositions", "pm_landmarks", "pm_names"]) {
-      for (let sol = 1; sol <= 12; sol++) {
-        for (let nox = 1; nox <= 12; nox++) {
-          mockRolls([
-            { face: sol, sides: 12 },
-            { face: nox, sides: 12 },
-          ]);
-          const result = pluck(table);
-          expect(result, `${table} ${sol},${nox}`).not.toBeNull();
-          expect(result!.result.length, `${table} ${sol},${nox}`).toBeGreaterThan(0);
-        }
-      }
+describe("complication seeds", () => {
+  it("returns a non-empty seed from every face", () => {
+    const seeds = new Set<string>();
+    // 24 entries - walk every face via mid-bucket values.
+    for (let face = 1; face <= 24; face++) {
+      vi.spyOn(Math, "random").mockReturnValue((face - 0.5) / 24);
+      const seed = rollComplication();
+      expect(seed.length, `face ${face}`).toBeGreaterThan(0);
+      seeds.add(seed);
+      vi.restoreAllMocks();
     }
-  });
-
-  it("every 6x6 table is complete", () => {
-    for (const table of ["pm_complications", "pm_quest_prompts"]) {
-      for (let row = 1; row <= 6; row++) {
-        for (let col = 1; col <= 6; col++) {
-          mockRolls([
-            { face: row, sides: 6 },
-            { face: col, sides: 6 },
-          ]);
-          const result = pluck(table, 1);
-          expect(result!.result.length, `${table} ${row},${col}`).toBeGreaterThan(0);
-        }
-      }
-    }
-  });
-
-  it("labels complications with the book's own axis names", () => {
-    mockRolls([
-      { face: 1, sides: 6 },
-      { face: 1, sides: 6 },
-    ]);
-    expect(pluck("pm_complications")!.detail).toBe("Drive/Risk");
-  });
-
-  it("draws three fragments for a quest prompt, per the sheet's 'roll x3'", () => {
-    mockRolls([
-      { face: 1, sides: 6 },
-      { face: 1, sides: 6 },
-      { face: 2, sides: 6 },
-      { face: 2, sides: 6 },
-      { face: 3, sides: 6 },
-      { face: 3, sides: 6 },
-    ]);
-    const result = pluck("pm_quest_prompts", 3)!;
-    expect(result.result.split(" / ")).toHaveLength(3);
-  });
-
-  it("indexes the quick plucks by the Syzygy face order", () => {
-    mockRolls([{ face: 1, sides: 6 }]);
-    expect(pluck("pm_decision")!.result).toBe("Yes");
-    mockRolls([{ face: 3, sides: 6 }]);
-    const yesBut = pluck("pm_decision")!;
-    expect(yesBut.result).toBe("Yes but");
-    expect(yesBut.detail).toBe("Syzygy: from");
-  });
-
-  it("returns null for a name that isn't a Prima Materia table", () => {
-    expect(pluck("dungeon")).toBeNull();
-    expect(isPrimaMateriaTable("dungeon")).toBe(false);
-    expect(isPrimaMateriaTable("pm_actions")).toBe(true);
-  });
-
-  it("namespaces every table under pm_ so it can't collide with the AGMT set", () => {
-    for (const name of PRIMA_MATERIA_TABLE_NAMES) {
-      expect(name.startsWith("pm_")).toBe(true);
-    }
+    expect(seeds.size).toBe(24);
   });
 });
 
@@ -411,8 +300,8 @@ describe("model-facing formatting", () => {
     // most obvious reading of two common nouns - the keyword sets are what
     // stop that, so they must actually reach the prompt.
     expect(text).toContain("Fortune (Sol) against Mind (Nox)");
-    expect(text).toContain("luck, timing, treasure");
-    expect(text).toContain("doubt, anxiety, obsession");
+    expect(text).toContain(keywordsFor("Fortune", "sol"));
+    expect(text).toContain(keywordsFor("Mind", "nox"));
     expect(text).toContain("chthonic");
     expect(text).toContain("Character psychology & motivation");
   });

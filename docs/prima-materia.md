@@ -4,39 +4,31 @@ An alchemical oracle by Man Alone, produced by Dice Nest (December 2025),
 adapted here as a second oracle layer alongside Mythic. Implemented in
 `app/misc/primaMateria.ts`.
 
-## ⚠️ Provenance — this is not cleared for public release
+## Provenance — the book's tables are not shipped
 
-**The appendix word lists in `primaMateria.ts` are transcribed verbatim from
-a commercial product we do not own, reproduced without permission.** This
-was a deliberate, explicit call for the alpha, while the app is private and
-unreleased. It is not a licensing position and it does not survive contact
-with a public build.
+PR #188 transcribed the book's appendix word tables (dispositions, actions,
+landmarks, names, complications, quest prompts, quick plucks) and its Quick
+Reference keyword sets into `primaMateria.ts` verbatim, without permission.
+The repository turned out to be public, so on **2026-10-21** they were
+stripped (option 2 of the three this section used to list):
 
-What's encumbered: `DISPOSITIONS`, `ACTIONS`, `LANDMARKS`, `NAMES`,
-`COMPLICATIONS`, `QUEST_PROMPTS`, `QUICK_PLUCKS` — the tables at the bottom
-of the file. The keyword sets (`SOL_KEYWORDS`/`NOX_KEYWORDS`) are also
-lifted from the book's Quick Reference sheet, though they're short enough
-to be arguable.
+- **The `pm_*` tables are gone.** `roll_table` no longer accepts them. A
+  player who owns the book can import their copy through the OCR/PDF
+  importer as `type: "table"` notes, and the GM rolls those like any other
+  table note.
+- **The keyword sets are rewritten.** `SOL_KEYWORDS`/`NOX_KEYWORDS` are
+  original placeholders written for this project, so `roll_portent` keeps
+  working.
+- **Complication seeds are a short original list** (`COMPLICATION_SEEDS`)
+  instead of the book's 6×6 grid.
 
-What isn't: the mechanism. Three dice, twelve archetypes, six relations,
-Frames, Tint, the Lens Shift state machine — systems aren't copyrightable,
-and the engine works unchanged whatever happens to the table data.
+What stays is the mechanism: three dice, twelve archetypes, six relations,
+Frames, Tint and the Lens Shift. Systems aren't copyrightable.
 
-Before this ships to anyone outside the project, do one of:
-
-1. **Get permission.** Man Alone is a solo designer and the book actively
-   invites people to build with the system; a licence or a revenue share is
-   a real option, and the honest one. The book's own promo code suggests
-   they'd rather be asked than not.
-2. **Strip the tables and let users bring their own.** The ingestion path
-   already exists — the OCR/PDF importer writes `type: "table"` notes and
-   the notes library imports them, so a user who owns the book can load
-   their copy in and the `pm_*` tables simply aren't shipped. This is the
-   lowest-friction option and needs no new code, only deletions.
-3. **Replace them with originally-authored equivalents.** Most expensive,
-   fully unencumbered.
-
-Option 2 is the default if nobody does anything, because it's a deletion.
+**Git history still contains the original text** (PR #188 and every commit
+up to the strip). Rewriting public history is a separate decision.
+Asking Man Alone for permission is still open, and would let the tables
+come back properly.
 
 ## What it is
 
@@ -44,8 +36,8 @@ Three dice:
 
 - **Sol** (d12) and **Nox** (d12) carry the *same* twelve archetypes:
   Fortune, Body, Knowledge, Safety, Mind, Spirit, Freedom, Nature, Calm,
-  Connection, Society, Self. Sol reads them bright (Fortune = luck, timing,
-  reward), Nox reads them shadowed (Fortune = gamble, debt, misfortune).
+  Connection, Society, Self. Sol reads them bright (Fortune = a windfall,
+  good timing), Nox reads them shadowed (Fortune = a bad bet, an unpaid cost).
   These are not good and bad — they're the two faces a concept has.
 - **Syzygy** (d6) carries six prepositions: *within, against, from, toward,
   over, between*. Grouped celestial (within/between/toward — the terms
@@ -74,8 +66,8 @@ Three modes are implemented:
 | `pinch` | 2d12 | two concepts, both true at once, no relation |
 | `portent` | 2d12 + d6 | two concepts joined by a relation — the default |
 
-**Pull/Pass is deliberately not implemented.** The book's fourth mode is
-"roll two, discard one on gut instinct, no justification required" — a
+**Pull/Pass is deliberately not implemented.** The book's fourth mode rolls
+two and lets you freely discard one. That's a
 model-picks-its-own-outcome hole, the same anti-pattern already closed for
 reasoning-tier self-escalation and director-move self-selection. A model
 handed a veto uses it on whatever inconveniences it. The three modes above
@@ -114,10 +106,10 @@ The story's standing tonal register: Day / Neutral / Night. Starts Neutral.
 
 `chaosFactor` and `tension` are both *intensity* dials; nothing in the
 director layer tracked tonal **register**, so the GM drifted monotone and
-only varied tone when tension moved. The book names the gap precisely: "in a
-GM-led game, the GM naturally senses when change is needed; in solo play,
-that intuition is harder to externalize." An LLM GM has the same defect for
-the same reason.
+only varied tone when tension moved. The book makes the same point about
+solo play: a human GM feels when the tone needs to change, and a solo player
+needs that sense externalised. An LLM GM has the same defect for the same
+reason.
 
 A **Lens Shift** fires on doubles (both d12s showing the same archetype).
 Which die is "prime" is resolved in the book by physical proximity to the
@@ -141,44 +133,23 @@ the narrator never sees is a register that doesn't affect the words the
 player reads. Neutral emits nothing, which is the common case and costs no
 prompt budget.
 
-### Pluck tables — `roll_table`, `pm_` prefix
+### Complication seeds — `rollComplication()`
 
-`pm_dispositions`, `pm_actions`, `pm_complications`, `pm_quest_prompts`,
-`pm_landmarks`, `pm_names`, plus one-roll oracles `pm_weather`, `pm_scale`,
-`pm_time`, `pm_distance`, `pm_power`, `pm_genus`, `pm_state`, `pm_agency`,
-`pm_intensity`, `pm_rate`, `pm_decision`.
-
-These lean toward *pressure* where the existing AGMT built-ins lean toward
-*scenery* — which is why `pm_complications` also now seeds the director's
-two pressure moves (`announce_future_badness`, `put_someone_in_a_spot`) via
+The director's two pressure moves (`announce_future_badness`,
+`put_someone_in_a_spot`) carry a rolled seed in
 `PendingDirectorMove.complicationSeed`. The engine already decided *which*
-move fires; without a seed the move's actual content was pure model
+move fires; without a seed, the move's actual content was pure model
 improvisation, which is where its habitual complications came from.
 
-#### The die-face order is load-bearing
-
-The 12×12 tables are indexed by a face order the book never states outright
-— it has to be inferred from the grids. It is the Quick Reference sheet's
-4×3 layout read **column-wise**:
-
-```
-Fortune, Body, Knowledge, Safety, Mind, Spirit,
-Freedom, Nature, Calm, Connection, Society, Self
-```
-
-Get this wrong and nothing throws — every roll still returns a plausible
-word, just the wrong one, forever. `tests/primaMateria.test.ts` pins known
-cells from three separate tables against it. Don't "tidy" `ARCHETYPE_ORDER`
-to match the printed sheet.
-
-The two 6×6 tables (complications, quest prompts) print axis labels the book
-never ties to any die, so they're rolled as two independent d6s rather than
-inventing a mapping and quietly getting it wrong.
+The seeds come from `COMPLICATION_SEEDS`, a 24-entry original list. Until
+2026-10-21 they came from the book's 6×6 complications grid, which was
+stripped along with the other appendix tables (see Provenance). The `pm_*`
+`roll_table` tables that PR #188 added were removed at the same time.
 
 ## Also shipped alongside: "yes, but" / "no, but"
 
-Not Prima Materia's mechanism, but its Quick Plucks decision row (Yes / No /
-Yes but / No but / Yes and / No and) exposed a real gap: `askFate` had four
+Not Prima Materia's mechanism, but its quick decision oracle (yes and no,
+each with a "but" and an "and" variant) exposed a real gap: `askFate` had four
 outcomes, and "and" was covered by the exceptional results while "but" — the
 costed success, the consolation failure — had no oracle equivalent at all.
 Partial success has existed on the dice side for a long time via
@@ -202,10 +173,10 @@ to nothing at extreme targets the same way the exceptional bands already do.
 
 | File | Change |
 | --- | --- |
-| `app/misc/primaMateria.ts` | new — symbols, rolls, Frames, Tint, Pluck tables |
+| `app/misc/primaMateria.ts` | new — symbols, rolls, Frames, Tint, complication seeds (book tables stripped 2026-10-21) |
 | `app/misc/structs.ts` | `AGMTState.tint`/`lastTintShiftScene`, `PendingRandomEvent.portent`, `PendingDirectorMove.complicationSeed` |
 | `app/misc/gmTools.ts` | `roll_portent` schema; `roll_table` + `fate_question` descriptions |
-| `app/misc/gmExecutor.ts` | `executeRollPortent`, `pm_` tables in `executeRollTable`, portent on random events |
+| `app/misc/gmExecutor.ts` | `executeRollPortent`, portent on random events (`pm_` tables removed 2026-10-21) |
 | `app/misc/mythic.ts` | "but" bands in `askFate`/`fateThresholds`; complication seeds on pressure moves |
 | `app/misc/ai_staged.ts` | Tint in both oracle sections and the story continuation prompt; portent on pending events |
 | `app/misc/generation.ts` | passes the tint line to the story stage |

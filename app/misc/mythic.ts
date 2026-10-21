@@ -681,7 +681,7 @@ export function selectDirectorMove(
       move: "announce_future_badness",
       targetThreadId: thread?.id,
       context: `Scene check result: ${sceneType}`,
-      complicationSeed: rollComplication().result,
+      complicationSeed: rollComplication(),
       createdAt: Date.now(),
     };
   }
@@ -712,7 +712,7 @@ export function selectDirectorMove(
         : `Tension running high (${tension}/10)`,
       hardnessForcesChoice: true,
       hardnessTarget: alliedNpc ? "someone_they_love" : undefined,
-      complicationSeed: rollComplication().result,
+      complicationSeed: rollComplication(),
       createdAt: Date.now(),
     };
   }
@@ -731,7 +731,7 @@ export function selectDirectorMove(
       context: `Story pacing is lagging its arc (tension ${tension}/10 vs. an expected ~${Math.round(
         targetTension
       )}/10 at this point in the story)`,
-      complicationSeed: rollComplication().result,
+      complicationSeed: rollComplication(),
       createdAt: Date.now(),
     };
   }

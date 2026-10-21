@@ -1324,16 +1324,7 @@ BUILT-IN TABLES (always available):
 - Items: magic_item, scavenging_results
 - Narrative: plot_twists, cryptic_message, curses, visions_dreams
 - Atmosphere: smells, sounds, adventure_tone
-- Other: names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions
-
-PRIMA MATERIA TABLES (\`pm_\` prefix - these lean toward *pressure* rather than scenery, and are usually the better reach when you need a force acting on the scene rather than a thing sitting in it):
-- pm_dispositions: an NPC's or faction's underlying stance ("Transactional", "Feral", "Introspective"). Pairs well with \`reaction_check\` - that gives you how warm they are, this gives you what they're *like*.
-- pm_actions: what an NPC, creature or faction does next, when you'd otherwise reach for the obvious verb
-- pm_complications: what goes wrong, or what pressure enters. Reach for this before inventing a complication yourself.
-- pm_quest_prompts: three fragments to combine into a quest, goal or thread seed
-- pm_landmarks: a place, feature or waypoint
-- pm_names: a bank of odd, human, un-fantasy-generic names
-- Quick one-roll oracles: pm_weather, pm_scale, pm_time, pm_distance, pm_power, pm_genus, pm_state, pm_agency, pm_intensity, pm_rate, pm_decision`,
+- Other: names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions`,
     parameters: {
       type: "object",
       properties: {
@@ -1378,7 +1369,7 @@ MODES:
 - \`peek\`: one die, one concept. A tonal nudge, nothing more. Good for a quick cue when you don't need synthesis.
 
 WHAT COMES BACK:
-- Each concept arrives with a polarity. **Sol** is the bright reading (Fortune = luck, reward, timing). **Nox** is the shadowed reading of the *same* concept (Fortune = gamble, debt, misfortune). These are not good and bad - they're the two faces a concept genuinely has.
+- Each concept arrives with a polarity. **Sol** is the bright reading (Fortune = a windfall, good timing, a lucky break). **Nox** is the shadowed reading of the *same* concept (Fortune = a bad bet, an unpaid cost, a curse). These are not good and bad - they're the two faces a concept genuinely has.
 - The relation comes tagged **celestial** (the two align/agree/work together) or **chthonic** (they're at odds/in tension/separate). Let that steer whether the condition is a gift or a cost.
 - A **Frame** is chosen for you by the engine - Literal (what's physically happening), Personal (what's happening inside someone), or Structural (how factions/systems/large forces are shifting). Read the result through that frame. You don't pick it and you shouldn't argue with it; it's set from what's actually live in the story right now.
 - Occasionally a **Lens Shift** fires (the dice matched). That moves the story's standing tonal register between Day / Neutral / Night. It is not an event - do not narrate "something shifted". It changes the register of everything that follows.

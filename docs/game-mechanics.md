@@ -142,11 +142,9 @@ warning: the appendix tables are unlicensed and alpha-only.**
   reaches the narrator stage, not just the GM stage.
 - **`roll_table`**: rolls on a **built-in** element table (character traits,
   locations, plot twists, atmosphere, and more) for on-the-fly inspiration.
-  The `pm_`-prefixed tables (`pm_complications`, `pm_dispositions`,
-  `pm_actions`, `pm_quest_prompts`, and the one-roll oracles) come from
-  Prima Materia and lean toward *pressure* where the rest lean toward
-  *scenery*; `pm_complications` also seeds the director's two pressure
-  moves.
+  (The Prima Materia `pm_` tables were removed on 2026-10-21; see
+  `docs/prima-materia.md`. The director's two pressure moves now draw their
+  complication seed from an original list instead.)
 - **The adventure's own tables are notes**, not a structured type the engine
   rolls. A table is a `StoryLore` entry with `type: "table"` that names a die
   and lists what each number gives, plus whatever prose the author wants

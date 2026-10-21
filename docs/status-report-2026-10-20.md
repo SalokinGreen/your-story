@@ -533,6 +533,12 @@ generate the icons (`generate-icons.sh` exists at the repo root).
 
 ## 7. Release blocker: Prima Materia tables
 
+> **Update 2026-10-21: resolved by stripping (option 2).** The repo turned
+> out to be public already. The book's tables and keyword sets were removed;
+> the keywords and complication seeds were replaced with original
+> placeholders, and the `pm_*` `roll_table` tables are gone. Git history
+> still holds the original text. See `docs/prima-materia.md` → Provenance.
+
 `docs/prima-materia.md` opens with **"⚠️ Provenance — this is not cleared for
 public release"**: the appendix word lists in `app/misc/primaMateria.ts`
 (`DISPOSITIONS`, `ACTIONS`, `LANDMARKS`, `NAMES`, `COMPLICATIONS`,

@@ -2,26 +2,17 @@
  * Prima Materia - an alchemical oracle (Man Alone / Dice Nest, Dec 2025).
  *
  * ─────────────────────────────────────────────────────────────────────────
- * PROVENANCE / LICENSING - READ BEFORE SHIPPING PUBLICLY
+ * PROVENANCE
  *
- * The mechanics in this file (three dice, a relational grammar, Frames,
- * Tint) are transcribed from a commercial product this project does not
- * own. The archetype and relation *sets* are arguably uncopyrightable
- * single words, but the appendix word lists at the bottom of this file
- * (dispositions, actions, landmarks, names, complications, quest prompts,
- * quick plucks) are verbatim creative expression from the book and are
- * reproduced here WITHOUT permission.
- *
- * This is deliberate and explicitly authorised for the alpha, where the
- * app is private and unreleased. It is NOT cleared for public release.
- * Before this ships to anyone outside the project, one of:
- *   1. get written permission from Man Alone / Dice Nest, or
- *   2. strip PRIMA_MATERIA_PLUCK_TABLES and let users import their own
- *      copy as `type: "table"` notes (the OCR importer and notes library
- *      already support exactly this), or
- *   3. replace the appendix lists with originally-authored equivalents.
- * The engine below works unchanged under all three - only the table data
- * at the bottom is encumbered. See docs/prima-materia.md.
+ * This file implements the book's *mechanics* - three dice, twelve
+ * archetypes, six relations, Frames, Tint, the Lens Shift - which are
+ * systems, not expression. It contains none of the book's text: the
+ * appendix word tables (dispositions, actions, landmarks, names,
+ * complications, quest prompts, quick plucks) and the Quick Reference
+ * keyword sets were transcribed verbatim in PR #188 and removed on
+ * 2026-10-21. The keyword sets and complication seeds below are original
+ * placeholders written for this project. A player who owns the book can
+ * import its tables as `type: "table"` notes. See docs/prima-materia.md.
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Why this exists alongside mythic.ts: Mythic's meaning tables hand the
@@ -59,16 +50,9 @@ export type Archetype =
   | "Self";
 
 /**
- * Face order of the two d12s.
- *
- * This is NOT the order the book's Quick Reference sheet prints the
- * archetypes in (that sheet lays them out as a 4x3 grid). It's that grid
- * read *column-wise*, which is the order the appendix Pluck tables are
- * actually indexed by - verified against three separate tables (Actions
- * row 3 = Knowledge: "Appraise, Examine, Analyze..."; NPC Reactions row 9
- * = Calm: "Patient, Relaxed, Unhurried..."; row 1 = Fortune in both).
- * Getting this wrong would silently misindex every 12x12 table below, so
- * `tests/primaMateria.test.ts` pins a few known cells.
+ * Face order of the two d12s. The portent mechanism works with any order;
+ * this one was chosen to match how the book's appendix tables are indexed,
+ * and it's kept as-is so seeded tests and existing saves stay reproducible.
  */
 export const ARCHETYPE_ORDER: readonly Archetype[] = [
   "Fortune",
@@ -123,44 +107,40 @@ export const RELATION_GROUP: Record<Relation, RelationGroup> = {
   over: "chthonic",
 };
 
-/** Keyword sets from the book's Quick Reference sheet, verbatim. */
+/**
+ * What each archetype points at when read bright (Sol) or shadowed (Nox).
+ * Original placeholder sets written for this project - not the book's
+ * Quick Reference keywords. They exist so the model has something more
+ * specific than a bare noun like "Fortune" to interpret.
+ */
 export const SOL_KEYWORDS: Record<Archetype, string> = {
-  Fortune: "luck, timing, treasure, prophecy, wish, favor, reward, coincidence",
-  Body: "health, strength, motion, endurance, sensation, labor, presence",
-  Knowledge:
-    "information, insight, evidence, memory, understanding, learning, awareness",
-  Safety: "protection, shelter, stability, security, refuge, assurance, control",
-  Mind: "thought, focus, clarity, planning, reasoning, intention, attention",
-  Spirit: "faith, meaning, resolve, hope, conviction, purpose, belief",
-  Freedom:
-    "choice, agency, movement, independence, escape, possibility, initiative",
-  Nature:
-    "environment, surroundings, weather, growth, cycles, essence, terrain",
-  Calm: "rest, stillness, patience, quiet, balance, recovery, peace",
-  Connection:
-    "bond, communication, alliance, trust, cooperation, relationship, contact",
-  Society: "community, culture, order, roles, institutions, norms, belonging",
-  Self: "identity, agency, desire, integrity, choice, ownership, voice",
+  Fortune: "a windfall, good timing, a lucky break, an opening, a gift",
+  Body: "vigour, a steady hand, speed, stamina, comfort, physical presence",
+  Knowledge: "a clue, a revelation, expertise, a record, a lesson, recognition",
+  Safety: "a haven, defences, supplies, a safe route, a fallback",
+  Mind: "a clear head, a plan, cunning, concentration, a good idea, composure",
+  Spirit: "courage, devotion, a calling, renewed hope, inner strength, grace",
+  Freedom: "an open road, options, a way out, self-rule, daring, room to move",
+  Nature: "fair weather, fertile land, the seasons, wildlife, abundance",
+  Calm: "respite, a pause, healing, quiet, equilibrium, contentment",
+  Connection: "friendship, an ally, a message, loyalty, kinship, an introduction",
+  Society: "a community, custom, law, standing, a guild or faction, hospitality",
+  Self: "a personal goal, honesty, pride, a talent, a choice of one's own",
 };
 
 export const NOX_KEYWORDS: Record<Archetype, string> = {
-  Fortune: "gamble, risk, chance, loss, debt, misfortune, uncertainty",
-  Body: "injury, fatigue, pain, limitation, hunger, illness, vulnerability",
-  Knowledge:
-    "secrets, misinformation, ignorance, distortion, gaps, lies, confusion",
-  Safety: "threat, exposure, danger, instability, pressure, fear, precarity",
-  Mind: "doubt, anxiety, obsession, distraction, bias, fear, fixation",
-  Spirit:
-    "despair, guilt, emptiness, doubt, temptation, crisis, disillusionment",
-  Freedom: "constraint, pursuit, exile, instability, lawlessness, consequence",
-  Nature:
-    "disaster, decay, wilderness, physics, exposure, forces, inevitability",
-  Calm: "stagnation, suppression, numbness, delay, avoidance, inertia, silence",
-  Connection:
-    "entanglement, obligation, dependence, exposure, leverage, conflict, expectation",
-  Society:
-    "pressure, hierarchy, surveillance, conformity, control, politics, exclusion",
-  Self: "ego, shame, isolation, doubt, denial, fear, self-conflict",
+  Fortune: "a bad bet, an unpaid cost, bad timing, a curse, a stroke of ill luck",
+  Body: "a wound, exhaustion, sickness, a physical limit, clumsiness",
+  Knowledge: "a false lead, a blind spot, a forgotten fact, a rumour, a lie",
+  Safety: "an ambush, a weak point, peril, a breach, nowhere to hide, alarm",
+  Mind: "second-guessing, a fixation, paranoia, a wandering mind, prejudice",
+  Spirit: "hopelessness, remorse, a crisis of faith, hollowness, cynicism",
+  Freedom: "a cage, a pursuer, banishment, chaos, a price for leaving, no way back",
+  Nature: "a storm, rot, the untamed wild, hard terrain, the inevitable",
+  Calm: "a rut, things left unsaid, apathy, a stall, putting it off, an eerie hush",
+  Connection: "a tangled loyalty, a favour owed, reliance, betrayal, blackmail, a feud",
+  Society: "red tape, a pecking order, watching eyes, faction politics, being shut out",
+  Self: "vanity, loneliness, self-deception, a hidden flaw, being at war with oneself",
 };
 
 export function keywordsFor(
@@ -277,10 +257,10 @@ export const TINT_INFO: Record<Tint, { label: string; guidance: string }> = {
 /**
  * Why Tint exists at all: `chaosFactor` and `tension` are both *intensity*
  * dials. Nothing in the director layer tracked tonal *register*, so the GM
- * drifted monotone and only varied tone when tension moved. The book names
- * the gap precisely - "in a GM-led game, the GM naturally senses when
- * change is needed; in solo play, that intuition is harder to
- * externalize." An LLM GM has the same defect for the same reason.
+ * drifted monotone and only varied tone when tension moved. The book makes
+ * the same point about solo play: a human GM feels when the tone needs to
+ * change, and a solo player needs that sense externalised. An LLM GM has
+ * the same defect for the same reason.
  *
  * A Lens Shift fires on doubles (both d12s showing the same archetype).
  * Deliberately keyed to the *portent* dice and not to `askFate`'s d100,
@@ -351,16 +331,13 @@ function rollRelation(): { relation: Relation; roll: number } {
 /**
  * The three modes worth implementing.
  *
- * Pull/Pass - the book's fourth mode - is deliberately NOT here. "Roll
- * two, discard one on gut instinct, no justification required" is a
+ * Pull/Pass - the book's fourth mode, where you roll two and freely
+ * discard one - is deliberately NOT here. It's a
  * model-picks-its-own-outcome hole, the same anti-pattern already closed
  * for reasoning-tier self-escalation and director-move self-selection. A
  * model handed a veto reliably vetoes whatever inconveniences it. Peek,
  * Pinch and Portent are all safe because the engine fixes the result and
  * the model only interprets it.
- *
- * Pluck is a separate entry point (`pluck`, below) since it reads word
- * tables rather than producing symbols.
  */
 export type PortentMode = "peek" | "pinch" | "portent";
 
@@ -536,223 +513,48 @@ export function formatPortentForModel(result: PortentResult): string {
 }
 
 // ---------------------------------------------------------------------------
-// Pluck - the dice as pure randomisers into word tables
+// Complication seeds for the director layer
 // ---------------------------------------------------------------------------
-//
-// See the provenance banner at the top of this file. Everything from here
-// down is transcribed table data, not mechanism.
-
-/** 12x12 tables, indexed [sol][nox] using ARCHETYPE_ORDER on both axes. */
-type Grid = readonly (readonly string[])[];
-
-const DISPOSITIONS: Grid = [
-  ["Opportunistic","Indulgent","Speculative","Risk-averse","Calculating","Hopeful","Restless","Foraging","Complacent","Transactional","Status-seeking","Self-interested"],
-  ["Hardy","Physical","Practical","Guarded","Reactive","Vital","Unrestrained","Feral","Sedate","Tactile","Laboring","Instinctive"],
-  ["Shrewd","Clinical","Analytical","Cautious","Reflective","Inquisitive","Unorthodox","Observant","Measured","Advisory","Educated","Introspective"],
-  ["Conservative","Protected","Prepared","Sheltered","Anxious","Reassured","Restrained","Hoarding","Stabilizing","Defensive","Rule-bound","Reserved"],
-  ["Scheming","Distracted","Rational","Wary","Obsessive","Contemplative","Contrarian","Adaptive","Detached","Interpretive","Ideological","Self-aware"],
-  ["Faithful","Ascetic","Seeking","Trusting","Visionary","Devout","Liberated","Animistic","Centered","Compassionate","Ritualized","Purpose-driven"],
-  ["Adventurous","Reckless","Experimental","Defiant","Erratic","Ecstatic","Unbound","Nomadic","Unsettled","Elusive","Nonconformist","Self-directed"],
-  ["Seasonal","Animalistic","Instinct-led","Burrowed","Primitive","Reverent","Wandering","Wild","Still","Pack-oriented","Tribal","Survival-focused"],
-  ["Patient","Relaxed","Unhurried","Grounded","Untroubled","Serene","Unpressured","Dormant","Tranquil","Receptive","Agreeable","Content"],
-  ["Networking","Affectionate","Communicative","Supportive","Empathic","Bonded","Open","Symbiotic","Reassuring","Relational","Communal","Interdependent"],
-  ["Ambitious","Disciplined","Institutional","Regulated","Conventional","Ceremonial","Constrained","Domesticated","Predictable","Cooperative","Conforming","Role-defined"],
-  ["Driven","Sensory","Self-taught","Guarding","Self-critical","Convicted","Independent","Self-preserving","Centered","Selective","Individualist","Self-focused"],
-];
-
-const ACTIONS: Grid = [
-  ["Acquire","Indulge","Speculate","Hedge","Calculate","Hope","Gamble","Forage","Wait","Trade","Compete","Claim"],
-  ["Endure","Strike","Practice","Guard","React","Breathe","Run","Hunt","Rest","Touch","Labor","Sense"],
-  ["Appraise","Examine","Analyze","Verify","Reason","Question","Experiment","Observe","Reflect","Explain","Teach","Learn"],
-  ["Preserve","Protect","Prepare","Secure","Worry","Trust","Restrict","Store","Stabilize","Defend","Regulate","Withdraw"],
-  ["Scheme","Distract","Organize","Anticipate","Obsess","Imagine","Dissent","Adapt","Detach","Interpret","Ideologize","Assess"],
-  ["Believe","Fast","Seek","Entrust","Envision","Devote","Liberate","Revere","Center","Comfort","Ritualize","Commit"],
-  ["Risk","Leap","Test","Defy","Disrupt","Exalt","Escape","Roam","Unsettle","Evade","Reject","Choose"],
-  ["Cycle","Feed","Instinct","Burrow","Simplify","Honor","Wander","Grow","Hibernate","Bond","Tribalize","Survive"],
-  ["Wait","Relax","Ponder","Ground","Soothe","Accept","Release","Dormant","Settle","Receive","Acquiesce","Be"],
-  ["Network","Embrace","Communicate","Support","Empathize","Bind","Open","Symbiose","Reassure","Relate","Cooperate","Share"],
-  ["Advance","Discipline","Institutionalize","Enforce","Conform","Ceremonialize","Limit","Domesticate","Normalize","Coordinate","Organize","Roleplay"],
-  ["Pursue","Indulge","Study","Guard","Critique","Convict","Assert","Endure","Center","Select","Differentiate","Define"],
-];
-
-const LANDMARKS: Grid = [
-  ["Crossroads","Causeway","Landmark","Haven","Boundary","Pilgrimage","Open road","Floodplain","Meadow","Trade route","Market town","Homestead"],
-  ["Quarry","Cliff","Trail","Shelter","Maze","Standing stones","Pass","Ravine","Clearing","Ford","Outpost","Camp"],
-  ["Ruins","Excavation","Library","Watchtower","Labyrinth","Shrine","Old road","Fossil bed","Observatory","Message post","Academy","Study"],
-  ["Stronghold","Wall","Surveyed land","Fort","Checkpoint","Sanctuary","Barricade","High ground","Refuge","Gate","Citadel","Safehouse"],
-  ["Borderland","Switchbacks","Map edge","Perimeter","Dead end","Vision site","Detour","Badlands","Plateau","Signal hill","District","Hideout"],
-  ["Sacred path","Processional way","Inscribed stones","Blessed ground","Meditation site","Temple","Open sky","Ancient grove","Still water","Gathering circle","Holy city","Hermitage"],
-  ["Frontier","Scramble","Unmapped land","Escape route","Wilderness edge","Sky altar","Open plains","Steppe","Wide horizon","Driftway","Free city","Wanderer's camp"],
-  ["Delta","Mountain","River source","Cave","Foglands","World tree","Migration path","Forest","Lake","Animal trail","Farmland","Burrow"],
-  ["Pasture","Low hill","Survey point","Quiet harbor","Stillness","Zen garden","Open shore","Marsh","Pond","Rest stop","Village green","Retreat"],
-  ["Caravan stop","Bridge","Waystation","Checkpoint","Crossing","Pilgrim road","Open gate","River bend","Meeting ground","Hub","Town","Doorway"],
-  ["Capital","Barracks","Archive","Garrison","Performance","Cathedral","Restricted zone","Canals","Plaza","Road network","City","Residence"],
-  ["Claim","Dwelling","Personal map","Hideaway","Inner boundary","Sanctum","Private path","Garden","Quiet room","Threshold","Neighborhood","Home"],
-];
-
-const NAMES: Grid = [
-  ["Cookie","Harper","Magnolia","Harrison","Luna","Griscilla","Carrie","Carver","Bostwick","Dunston","Melba","Helden"],
-  ["Quigley","Pierce","Vince","Roma","Bernadette","Pella","Ervin","Magna","Perrin","Alva","Prince","Maynard"],
-  ["Crockett","Dewey","Rana","Arven","Mini","Sera","Frank","Connie","Sherbert","Vargas","Norman","Doris"],
-  ["Eleanor","Cartwright","Amblin","Guy","Xia","Benz","Sir","Panda","Monroe","Bradley","Wayne","Dustty"],
-  ["Bug","Lala","Vanna","Portia","Kenneth","Zead","Blink","Salvatore","Suliman","Bean","Tank","Mundi"],
-  ["Jesh","Leppy","Dumars","Priya","Blessing","Jorma","Oliver","Anna","Sedgwick","Gary Wayne","Holly","Herman"],
-  ["Frolly","Scott","Umberto","Estevez","Winnifred","Sky","Tana","Solly","Wendall","Darby","Fern","Wanda"],
-  ["Delia","Montana","River","Nick","Foggy","Wodin","Mega","Finn","Lana","Andi","Farrah","Burroughs"],
-  ["Vespin","Louis","Suriya","Quentin","Solamente","Zenni","Owen","Marsha","Pom","Reisling","Keith","Ruth"],
-  ["Corlin","Bert","Candy","Cheech","Innis","Pinter","Huron","Tad","Meena","Bub","Torrin","Dennis"],
-  ["Kelsey","Barry","Archie","Gogo","Millicent","Cat","Reynolds","Lulu","Plank","Reed","Clint","Remus"],
-  ["Bambi","Dwight","Percy","Hilt","Inez","Stone","Presley","Gart","Flip","Teresa","Kimberly","Bunny"],
-];
 
 /**
- * The 6x6 tables. The book prints axis labels (Drive/Vitality/Reason/
- * Order/Will/Harmony down, Risk/Vulnerability/Belief/Doubt/Wildness/
- * Obligation across) but never states which die indexes which axis, and
- * the labels don't map onto the twelve archetypes in any way the text
- * makes explicit. Rather than invent a mapping and quietly get it wrong,
- * these are rolled as two independent d6s - mechanically sound, uses dice
- * that are actually in the set, and stays honest about the ambiguity.
+ * Original placeholder list written for this project. It replaces the
+ * book's 6x6 complications grid, which was removed along with the other
+ * appendix tables (see the provenance banner at the top of this file).
+ *
+ * `selectDirectorMove` already decides *which* pressure move fires
+ * (`announce_future_badness` / `put_someone_in_a_spot`). Without a seed,
+ * the move's actual content is pure model improvisation, which is where
+ * its habitual complications come from. Each entry is deliberately
+ * setting-agnostic, so the model has to shape it to the fiction.
  */
-const COMPLICATION_ROWS = ["Drive","Vitality","Reason","Order","Will","Harmony"] as const;
-const COMPLICATION_COLS = ["Risk","Vulnerability","Belief","Doubt","Wildness","Obligation"] as const;
-
-const COMPLICATIONS: Grid = [
-  ["A bold option avails itself, but could be dangerous","Your hastiness creates a problem","Personal values are put to the test","A piece of the puzzle is revealed","Someone acts out of character, causing surprise","Following duty or loyalty in this moment would mean leaving the path"],
-  ["Overexertion leads to exhaustion or harm","Survival depends on confronting fear or discomfort","Something suddenly changes; the hair on your neck stands","Weariness clouds judgment","Nature (or the immediate environment) asserts itself","Labor of some kind is demanded by a power that is hard to refuse"],
-  ["Something about \"the plan\" just showed a crack","New knowledge reveals an unfortunate truth","Something supernatural appears to happen… can it be explained?","Something is found (or said) that conflicts with expectations","Things are starting to feel a little chaotic","You feel the tug of responsibility even if you wish it were not so"],
-  ["You are confronted by a challenge","Structures fail under pressure","Authority is justified by tradition or doctrine","Rules/tradition proves inadequate to the situation","You encounter something out of place","Compliance is enforced whether you like it or not"],
-  ["A personal choice suddenly has consequences","Resolve falters under emotional strain","Your willpower, stamina, or endurance is tested","An event occurs that makes you question your allegiances","A temptation is revealed that conflicts with values/purpose","A choice emerges that pits your wants and needs against another"],
-  ["Hint or rumor of a danger is conveyed","One of two things is required to advance: balance or trust","Surprising agreement or consensus is found","Tension rises, the source is not obvious","Something in the environment suddenly changes","For safety or stability a price must be paid"],
+const COMPLICATION_SEEDS: readonly string[] = [
+  "Someone wants something, and now is the worst time to say no",
+  "A resource that was being counted on runs out or proves unreliable",
+  "An old decision comes back with a cost attached",
+  "Help arrives, but it comes with strings",
+  "The way forward closes, and another opens somewhere less welcome",
+  "Two things worth keeping can't both be kept",
+  "Gear, a plan or a person that was relied on breaks at the worst moment",
+  "A rival makes their move while attention is elsewhere",
+  "Whatever was coming arrives sooner than expected",
+  "An ally's private agenda surfaces",
+  "What was told turns out to be only half the story",
+  "A small mistake is noticed by exactly the wrong person",
+  "The place itself turns hostile: ground, weather or structure",
+  "Someone innocent ends up standing in the way",
+  "Succeeding here will draw attention nobody wants",
+  "Someone calls in a favour that is owed",
+  "The thing being sought has changed hands",
+  "A wound or weakness from earlier picks this moment to matter",
+  "Someone with official standing takes an interest",
+  "Two threats that were separate start working together",
+  "Something that was holding a danger back stops holding",
+  "Someone who could have been helped earlier pays the price now",
+  "A reputation arrives before the people it belongs to",
+  "The quiet option disappears; whatever happens next will be loud",
 ];
 
-const QUEST_PROMPTS: Grid = [
-  ["Deliver hazardous materials","Rescue missing child","Protect holy artifact","Determine traitorous ally","Navigate difficult terrain","Fulfill ancient promise"],
-  ["Disarm dangerous traps","Delve into crumbling tunnel","Retrieve exotic medicine","Complete dying request","Save endangered land","Locate wayward sibling"],
-  ["Find unique key","Recover saintly remains","Travel famous path","Eliminate deceitful member","Follow questionable map","Spy on suspicious worker"],
-  ["Help growing rebellion","Aid burgeoning resistance","Punish evil sinners","Send deadly message","Destroy protected landmark","Interrogate only witness"],
-  ["Reconquer lawful property","Guard rightful heir","Tame wild beast","Capture wanted thief","Secure resounding victory","Track down lost relative"],
-  ["Save innocent group","Reconstitute partial writing","Maintain convenient delusion","Trust former opponents","Devour healthy meals","Accept chaotic ingredients"],
-];
-
-/**
- * The Quick Reference "Plucks" sheet: one-row oracles indexed by a single
- * Syzygy roll, in RELATION_ORDER.
- */
-const QUICK_PLUCKS: Record<string, readonly string[]> = {
-  decision: ["Yes", "No", "Yes but", "No but", "Yes and", "No and"],
-  weather: ["Clear", "Bright", "Rain", "Wind", "Snow", "Fog"],
-  scale: ["Tiny", "Small", "Average", "Large", "Huge", "Massive"],
-  time: ["Dawn", "Morning", "Noon", "Afternoon", "Evening", "Night"],
-  distance: ["Immediate", "Near", "Reachable", "Far", "Distant", "Unreachable"],
-  power: ["Emerging", "Internal", "Opposed", "External", "Unstable", "Combining"],
-  genus: ["Object", "Animal", "Plant", "Person", "Inhuman", "Spectral"],
-  state: ["Solid", "Liquid", "Gas", "Energy", "Data/void", "Arcane/ethereal"],
-  agency: ["Controlled", "Contested", "Influenced", "Aligned", "Autonomous", "Dominant"],
-  intensity: ["Off/faint", "Low", "Moderate", "Strong", "Extreme", "Omnipotent"],
-  // The book prints "Study" in this row, which is plainly an OCR/typo for
-  // "Steady" given its neighbours (Static, Slow, Uneven, _, Rapid, Sudden).
-  rate: ["Static", "Slow", "Uneven", "Steady", "Rapid", "Sudden"],
-};
-
-export type PluckTable =
-  | "pm_dispositions"
-  | "pm_actions"
-  | "pm_landmarks"
-  | "pm_names"
-  | "pm_complications"
-  | "pm_quest_prompts"
-  | `pm_${string}`;
-
-const GRID_12_TABLES: Record<string, Grid> = {
-  pm_dispositions: DISPOSITIONS,
-  pm_actions: ACTIONS,
-  pm_landmarks: LANDMARKS,
-  pm_names: NAMES,
-};
-
-const GRID_6_TABLES: Record<string, Grid> = {
-  pm_complications: COMPLICATIONS,
-  pm_quest_prompts: QUEST_PROMPTS,
-};
-
-/** Every Prima Materia table name `roll_table` will accept. */
-export const PRIMA_MATERIA_TABLE_NAMES: string[] = [
-  ...Object.keys(GRID_12_TABLES),
-  ...Object.keys(GRID_6_TABLES),
-  ...Object.keys(QUICK_PLUCKS).map((k) => `pm_${k}`),
-];
-
-export function isPrimaMateriaTable(name: string): boolean {
-  return PRIMA_MATERIA_TABLE_NAMES.includes(name);
-}
-
-export interface PluckResult {
-  table: string;
-  result: string;
-  /** Axis labels for the grid tables, so the roll is legible in the log. */
-  detail: string;
-}
-
-/**
- * Roll on a Prima Materia table. `count` only applies to pm_quest_prompts,
- * whose sheet is labelled "(roll x3)" - three fragments meant to be
- * combined into one quest.
- */
-export function pluck(table: string, count = 1): PluckResult | null {
-  const grid12 = GRID_12_TABLES[table];
-  if (grid12) {
-    const sol = rollArchetype();
-    const nox = rollArchetype();
-    return {
-      table,
-      result: grid12[sol.roll - 1][nox.roll - 1],
-      detail: `Sol ${sol.archetype} × Nox ${nox.archetype}`,
-    };
-  }
-
-  const grid6 = GRID_6_TABLES[table];
-  if (grid6) {
-    const draws: string[] = [];
-    const details: string[] = [];
-    const n = table === "pm_quest_prompts" ? Math.max(1, Math.min(3, count)) : 1;
-    for (let i = 0; i < n; i++) {
-      const row = rollDie(6);
-      const col = rollDie(6);
-      draws.push(grid6[row - 1][col - 1]);
-      details.push(
-        table === "pm_complications"
-          ? `${COMPLICATION_ROWS[row - 1]}/${COMPLICATION_COLS[col - 1]}`
-          : `${row}×${col}`
-      );
-    }
-    return {
-      table,
-      result: draws.join(" / "),
-      detail: details.join(", "),
-    };
-  }
-
-  const quick = QUICK_PLUCKS[table.replace(/^pm_/, "")];
-  if (quick) {
-    const roll = rollDie(6);
-    return {
-      table,
-      result: quick[roll - 1],
-      detail: `Syzygy: ${RELATION_ORDER[roll - 1]}`,
-    };
-  }
-
-  return null;
-}
-
-/**
- * A complication rolled for the director layer. `selectDirectorMove`
- * already decides *which* move fires; until now the actual content of an
- * `announce_future_badness` / `put_someone_in_a_spot` was left entirely to
- * the model, which is where its habitual complications came from. This
- * gives the move a rolled seed to work from.
- */
-export function rollComplication(): PluckResult {
-  return pluck("pm_complications")!;
+/** One complication seed for a director pressure move. */
+export function rollComplication(): string {
+  return COMPLICATION_SEEDS[rollDie(COMPLICATION_SEEDS.length) - 1];
 }
