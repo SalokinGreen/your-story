@@ -22,6 +22,7 @@ import {
   summarizeOCR,
   splitIntoWindows,
   MAX_PROMPT_CHARS,
+  callProviderAI,
 } from "@/app/misc/ocrSummarizeCall";
 
 describe("processParserResult", () => {
@@ -909,5 +910,31 @@ describe("processParserResult tolerates the shapes models actually write", () =>
     expect(result.lore).toEqual([]);
     expect(result.mechanicNotes).toEqual([]);
     expect(result.tableNotes.map((t) => t.title)).toEqual(["Omens"]);
+  });
+});
+
+describe("callProviderAI temperature", () => {
+  beforeEach(() => {
+    mockProviderFetch.mockReset();
+    mockProviderFetch.mockImplementation(async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "{}" }, finish_reason: "stop" }] }),
+    }));
+  });
+
+  function sentBody(): Record<string, unknown> {
+    return JSON.parse(mockProviderFetch.mock.calls[0][1].body as string);
+  }
+
+  it("sends no temperature to Claude through OpenRouter, which rejects it", async () => {
+    // The PDF importer's model picker lists every catalog model, Claude
+    // included (docs/claude-gm-design.md §3.2).
+    await callProviderAI("openrouter", "sys", "user", "anthropic/claude-sonnet-5.5", 4000, "key");
+    expect(sentBody()).not.toHaveProperty("temperature");
+  });
+
+  it("keeps temperature 0.3 for every other model", async () => {
+    await callProviderAI("openrouter", "sys", "user", "z-ai/glm-5.2", 4000, "key");
+    expect(sentBody().temperature).toBe(0.3);
   });
 });

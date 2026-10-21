@@ -230,6 +230,67 @@ describe("Claude 5.5 request shaping", () => {
     expect(body.messages[2].tool_calls).toHaveLength(1);
   });
 
+  it("keeps an earlier turn's prose that sits directly before a tool-calling message", async () => {
+    // A round the roll gate sent back is saved without the gate's re-prompt,
+    // so an earlier turn can hold prose followed directly by a tool call.
+    // Only the current turn's prefill is dropped.
+    const body = await streamedBody({
+      messages: [
+        { role: "system", content: "sys" },
+        { role: "user", content: "> earlier attack" },
+        { role: "assistant", content: "The goblin circles you, blade low." },
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [{ id: "call_0", type: "function", function: { name: "formula_roll", arguments: "{}" } }],
+        },
+        { role: "tool", content: "rolled 9", tool_call_id: "call_0" },
+        { role: "assistant", content: "Your swing goes wide." },
+        { role: "user", content: "> I attack again" },
+      ],
+      tools: TOOLS,
+      model: "Claude Sonnet 5.5",
+      openRouterKey: "test-key",
+    });
+    expect(body.messages.map((m) => m.content)).toContain("The goblin circles you, blade low.");
+    expect(body.messages).toHaveLength(7);
+  });
+
+  it("raises a small max_tokens to the Claude floor and leaves larger caps alone", async () => {
+    const small = await streamedBody({
+      messages: [{ role: "user", content: "verdict?" }],
+      model: "Claude Haiku 5.5",
+      openRouterKey: "test-key",
+      maxTokens: 200,
+    });
+    expect(small.max_tokens).toBe(4096);
+
+    const large = await streamedBody({
+      messages: [{ role: "user", content: "narrate" }],
+      model: "Claude Haiku 5.5",
+      openRouterKey: "test-key",
+      maxTokens: 8000,
+    });
+    expect(large.max_tokens).toBe(8000);
+
+    const fetchMock = stubProviderFetch();
+    await generateNonStreaming({
+      messages: [{ role: "user", content: "verdict?" }],
+      model: "Claude Haiku 5.5",
+      openRouterKey: "test-key",
+      maxTokens: 10,
+    });
+    expect(sentBody(fetchMock).max_tokens).toBe(4096);
+
+    const glm = await streamedBody({
+      messages: [{ role: "user", content: "verdict?" }],
+      model: "GLM 5.2",
+      openRouterKey: "test-key",
+      maxTokens: 200,
+    });
+    expect(glm.max_tokens).toBe(200);
+  });
+
   it("maps effort none to low, and keeps the other levels", async () => {
     const none = await streamedBody({
       messages: [{ role: "user", content: "hi" }],
@@ -495,5 +556,105 @@ describe("Claude prompt caching on the GM stage (A3)", () => {
       openRouterKey: "test-key",
     });
     expect(JSON.stringify(sent)).not.toContain("cache_control");
+  });
+});
+
+describe("Claude's billed cost", () => {
+  function stubJsonUsage(usage: Record<string, unknown>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({ ...SIMPLE_RESPONSE, usage }),
+        text: async () => "",
+      })),
+    );
+  }
+
+  const CACHED_ROUND_USAGE = {
+    prompt_tokens: 36000,
+    completion_tokens: 400,
+    total_tokens: 36400,
+    prompt_tokens_details: { cached_tokens: 35000, cache_write_tokens: 0 },
+    cost: 0.0095,
+  };
+
+  it("reports OpenRouter's billed cost for Claude, which prices the cache", async () => {
+    stubJsonUsage(CACHED_ROUND_USAGE);
+    const result = await generateNonStreaming({
+      messages: [{ role: "user", content: "hi" }],
+      model: "Claude Sonnet 5.5",
+      openRouterKey: "test-key",
+    });
+    if ("error" in result) throw new Error(result.error);
+    expect(result.meta.estimatedCost).toBe(0.0095);
+  });
+
+  it("adds the provider's charge to OpenRouter's fee under OpenRouter BYOK", async () => {
+    stubJsonUsage({
+      ...CACHED_ROUND_USAGE,
+      cost: 0.0005,
+      is_byok: true,
+      cost_details: { upstream_inference_cost: 0.009 },
+    });
+    const result = await generateNonStreaming({
+      messages: [{ role: "user", content: "hi" }],
+      model: "Claude Sonnet 5.5",
+      openRouterKey: "test-key",
+    });
+    if ("error" in result) throw new Error(result.error);
+    expect(result.meta.estimatedCost).toBeCloseTo(0.0095, 10);
+  });
+
+  it("carries the billed cost on the streaming path's done frame", async () => {
+    const encoder = new TextEncoder();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        text: async () => "",
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ choices: [{ delta: { content: "The lock clicks." } }] })}\n\n` +
+                  `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: null }], usage: CACHED_ROUND_USAGE })}\n\n` +
+                  "data: [DONE]\n\n",
+              ),
+            );
+            controller.close();
+          },
+        }),
+      })),
+    );
+    const frames = await drain(
+      generateStream({
+        messages: [{ role: "user", content: "hi" }],
+        model: "Claude Sonnet 5.5",
+        openRouterKey: "test-key",
+      }),
+    );
+    const done = frames
+      .split("\n\n")
+      .map((f) => f.replace(/^data: /, ""))
+      .filter((f) => f.startsWith("{"))
+      .map((f) => JSON.parse(f))
+      .find((e) => e.type === "done");
+    expect(done.meta.estimatedCost).toBe(0.0095);
+  });
+
+  it("leaves other OpenRouter models on list-price arithmetic", async () => {
+    stubJsonUsage(CACHED_ROUND_USAGE);
+    const result = await generateNonStreaming({
+      messages: [{ role: "user", content: "hi" }],
+      model: "GLM 5.2",
+      openRouterKey: "test-key",
+    });
+    if ("error" in result) throw new Error(result.error);
+    expect(result.meta.estimatedCost).toBeUndefined();
   });
 });

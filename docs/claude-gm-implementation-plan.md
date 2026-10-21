@@ -329,9 +329,14 @@ work of its own here.
    round 2 on, that prefill sits between the player's action and round 1's
    assistant message; the two merge into one assistant turn, and a turn that
    continues a tool loop must open with its thinking block, not text. For
-   Claude, a plain assistant message (no tool calls, no reasoning) directly
-   followed by an assistant message carrying tool calls or reasoning is
-   dropped (`dropClaudeMidHistoryPrefills`).
+   Claude, within the current turn only (after the last user message), a
+   plain assistant message (no tool calls, no reasoning) directly followed
+   by an assistant message carrying tool calls or reasoning is dropped
+   (`dropClaudeMidHistoryPrefills`). The first version ran over the whole
+   history; the engine review caught that it then dropped prose the player
+   read from earlier turns. A round the roll gate sent back is saved
+   without the gate's re-prompt, so an older turn can hold prose followed
+   directly by a tool call.
 3. **Thinking replay for Claude is scoped to the current turn, and plain-text
    `reasoning` is never sent.** Design §3.3 flagged the edited-history check
    as the first thing to watch. The GM's state message (`messages[1]`)
@@ -355,19 +360,44 @@ work of its own here.
    stage reuses the same base messages without tools, and since the tool
    list starts Claude's cached prefix it could only pay the write premium,
    never read the GM's entry.
-5. **The cache counts are logged, not priced.** OpenRouter's
-   `prompt_tokens_details.cached_tokens` / `cache_write_tokens` now appear on
-   the "AI generation complete" Debug Log lines, which is where the live
-   check reads them. The turn cost ledger still prices every prompt token
-   at list price, so it overstates cached rounds; forwarding OpenRouter's
-   `usage.cost` would fix that for every OpenRouter model but changes what
-   the panel shows for all of them (and OpenRouter's own BYOK mode reports
-   only its fee there), so it is a follow-up, not part of this slice.
-6. **Effort `none` on a Claude slot still reads "None" in Settings**, though
-   Claude runs it at `low`, and the cost estimate assumes no reasoning for
-   it. Left for the same follow-up as the cost ledger.
+5. **A Claude call is billed at OpenRouter's own figure.** List-price
+   arithmetic on `prompt_tokens` would bill a cached GM round about 20 times
+   over, against CLAUDE.md's "real dollar estimates". OpenRouter returns
+   `usage.cost` on every response, so for Claude `providerCall` passes it as
+   `meta.estimatedCost`, which the ledger already prefers over its own
+   arithmetic. Under OpenRouter's BYOK, `cost` is only OpenRouter's fee, so
+   `cost_details.upstream_inference_cost` is added. Other OpenRouter models
+   stay on list prices: switching them too changes the panel for every
+   default tier and is a separate call. The cache counts also appear on the
+   "AI generation complete" Debug Log lines, where the live check reads
+   them.
+6. **Two estimates stay at list price.** The "Cost per turn" estimate above
+   the tiers prices Claude without the cache. And an effort-`none` Claude
+   slot reads "None" in Settings and is estimated without reasoning,
+   though Claude runs it at `low`. Both are estimates, not the ledger, so
+   they are left as a follow-up.
 7. **Custom OpenRouter models with an `anthropic/` id get the Claude branch**
    (`isAnthropicViaOpenRouter` keys on the model id), so Fable 5.1 added as a
    custom model (decision 15) works the same way.
 8. **`generation.ts` is untouched**, which also keeps clear of the open
    session editing it.
+9. **Claude's `max_tokens` has a 4,096 floor.** Claude 5.5 always thinks,
+   and thinking counts against `max_tokens`. So the 200–300 token caps the
+   side agents use for a verdict, and the classifier's 10, could be spent
+   before any text arrives, and the call would come back empty without a
+   warning (the silent side-call family). OpenRouter also documents turning
+   `reasoning.effort` into a thinking budget of at least 1,024 tokens that
+   must stay below `max_tokens`, which a small Response Length on the GM
+   stage would break. The floor is a cap, not a charge. Found by the engine
+   review.
+10. **The PDF importer's OCR call drops `temperature` for Claude.** Its
+    model picker lists every catalog model, and `callProviderAI`
+    (`ocrSummarizeCall.ts`) builds its own request outside `providerCall`
+    with `temperature: 0.3`. Found by the engine review.
+11. **Hazards left for the live check, not coded around.** The engine
+    review named five API behaviours that unit tests cannot settle:
+    escalating into a Claude tier mid-tool-loop; the story stage sending
+    tool history without `tools`; the Designer's trailing system message;
+    side agents on Claude; the signature merge from the stream. Each is a
+    check with its failure written down in `pending_tests.md`. Building
+    around behaviour nobody has seen fail would be guessing.

@@ -378,7 +378,11 @@ things every other provider is sent: no sampling parameters (not even
 `temperature`), no assistant prefill (trailing or mid-history), `tool_choice`
 always `auto` (the gates' own user message does the forcing), effort `none`
 sent as `low`, and only the current turn's signed `reasoning_details`
-replayed. The GM stage marks the player's action `cacheBreakpoint`, and a
+replayed. `max_tokens` never goes below 4,096, because Claude's thinking
+counts against it, and a Claude call is billed at OpenRouter's own
+`usage.cost`. A request built outside `providerCall` (the OCR importer's
+`callProviderAI`) needs the same care. The GM stage marks the player's
+action `cacheBreakpoint`, and a
 Claude request with tools gets prompt-cache breakpoints there and on the
 system message. A change to the GM prompt's message layout must keep the
 base messages byte-identical across a turn's rounds, or that cache stops

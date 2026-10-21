@@ -17,6 +17,7 @@ import {
   buildContinuationPrompt,
 } from "@/app/misc/jsonRepair";
 import { getProviderFetch } from "@/app/misc/platformFetch";
+import { isAnthropicViaOpenRouter } from "@/app/misc/providerCall";
 
 export type AIProvider = "openrouter" | "deepseek" | "mistral" | "google" | "deepinfra";
 
@@ -259,8 +260,11 @@ export async function callProviderAI(
         { role: "user", content: userPrompt },
       ],
       max_tokens: maxTokens,
-      temperature: 0.3,
     };
+    // Claude 5.5 (through OpenRouter) rejects any non-default temperature.
+    if (!isAnthropicViaOpenRouter({ provider, model })) {
+      requestBody.temperature = 0.3;
+    }
     // Only Mistral/DeepSeek were asked for strict JSON mode in the original
     // per-provider implementations - OpenRouter/Google/DeepInfra weren't.
     // `jsonMode: false` opts out for calls whose expected output isn't a

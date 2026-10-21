@@ -245,6 +245,32 @@ export function isAnthropicViaOpenRouter(
 }
 
 /**
+ * The smallest `max_tokens` a Claude request goes out with. Claude 5.5 always
+ * thinks and its thinking counts against `max_tokens`, so the 200-300 token
+ * caps the side agents use for a short verdict can be spent before any text
+ * arrives; and OpenRouter documents turning `reasoning.effort` into a
+ * thinking budget of at least 1,024 tokens that must stay below `max_tokens`.
+ * A cap, not a charge: the reply is as short as the prompt asks for.
+ */
+const CLAUDE_MIN_MAX_TOKENS = 4096;
+
+/**
+ * Claude only: OpenRouter's own billed figure for the call, which prices the
+ * prompt cache (reads at a tenth of the input price); list-price arithmetic
+ * on `prompt_tokens` would bill a cached GM round about 20 times over. With
+ * OpenRouter's BYOK the provider's charge is reported separately from
+ * OpenRouter's fee.
+ */
+function openRouterBilledUsd(usage: unknown): number | undefined {
+  const u = usage as
+    | { cost?: number; is_byok?: boolean; cost_details?: { upstream_inference_cost?: number } }
+    | undefined;
+  if (typeof u?.cost !== "number") return undefined;
+  const upstream = u.is_byok ? (u.cost_details?.upstream_inference_cost ?? 0) : 0;
+  return u.cost + upstream;
+}
+
+/**
  * Best-effort reasoning-effort translation per provider. Never throws - if a
  * provider/model has no lever for it, the field is simply omitted. Real
  * protection against a bad interaction is the reasoning-tier router's
@@ -437,15 +463,21 @@ function buildHeaders(provider: Provider, apiKey: string): Record<string, string
 }
 
 /**
- * Claude only: drop a plain assistant message (no tool calls, no reasoning)
- * that sits directly before another assistant message carrying tool calls or
- * reasoning. In practice that is the GM stage's `<thinking>` prefill once a
- * round has been appended after it: consecutive assistant messages merge into
- * one turn, and a turn that continues a tool loop must open with its thinking
- * block, not with the prefill's text.
+ * Claude only: within the current turn (after the last user message), drop a
+ * plain assistant message (no tool calls, no reasoning) that sits directly
+ * before another assistant message carrying tool calls or reasoning. In
+ * practice that is the GM stage's `<thinking>` prefill once a round has been
+ * appended after it: consecutive assistant messages merge into one turn, and
+ * the turn that continues a tool loop must open with its thinking block, not
+ * with the prefill's text. Earlier turns are left alone - there a plain
+ * assistant message is prose the player read (a round the roll gate sent
+ * back, whose re-prompt is not saved), and only the final turn has to open
+ * with thinking.
  */
 function dropClaudeMidHistoryPrefills(messages: ChatMessage[]): ChatMessage[] {
+  const lastUserIndex = messages.map((m) => m.role).lastIndexOf("user");
   return messages.filter((m, i) => {
+    if (i <= lastUserIndex) return true;
     const next = messages[i + 1];
     const isPlainAssistant =
       m.role === "assistant" && !m.tool_calls?.length && !m.reasoning_details?.length;
@@ -706,7 +738,7 @@ export async function generateNonStreaming(
     const requestBody: any = {
       model: config.model,
       messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
-      max_tokens: maxTokens,
+      max_tokens: isClaude ? Math.max(maxTokens, CLAUDE_MIN_MAX_TOKENS) : maxTokens,
     };
     // Claude 5.5 rejects any non-default sampling value.
     if (!isClaude) requestBody.temperature = temperature;
@@ -766,6 +798,9 @@ export async function generateNonStreaming(
       completion_tokens: 0,
       total_tokens: 0,
     };
+    const reportedCost = isClaude
+      ? openRouterBilledUsd(aiResponse.usage)
+      : usage.estimated_cost;
 
     logger.action("AI generation complete", {
       model: config.model,
@@ -791,9 +826,7 @@ export async function generateNonStreaming(
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,
         },
-        ...(usage.estimated_cost !== undefined && {
-          estimatedCost: usage.estimated_cost,
-        }),
+        ...(reportedCost !== undefined && { estimatedCost: reportedCost }),
       },
     };
   } catch (error: any) {
@@ -882,7 +915,7 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
         const requestBody: any = {
           model: config.model,
           messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
-          max_tokens: maxTokens,
+          max_tokens: isClaude ? Math.max(maxTokens, CLAUDE_MIN_MAX_TOKENS) : maxTokens,
           stream: true,
           stream_options: { include_usage: true },
         };
@@ -1026,9 +1059,10 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
           if (parsed.usage) {
             promptTokens = parsed.usage.prompt_tokens || 0;
             completionTokens = parsed.usage.completion_tokens || 0;
-            if (parsed.usage.estimated_cost !== undefined) {
-              estimatedCost = parsed.usage.estimated_cost;
-            }
+            const reported = isClaude
+              ? openRouterBilledUsd(parsed.usage)
+              : parsed.usage.estimated_cost;
+            if (reported !== undefined) estimatedCost = reported;
             cachedTokens = parsed.usage.prompt_tokens_details?.cached_tokens;
             cacheWriteTokens = parsed.usage.prompt_tokens_details?.cache_write_tokens;
           }
