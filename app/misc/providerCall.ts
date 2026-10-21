@@ -530,11 +530,60 @@ function resolveProviderAndKey(
 }
 
 // ============================================================
+// Cancellation
+// ============================================================
+
+/**
+ * What an aborted call rejects with. In the standalone build the signal is
+ * the Stop button's (or the Observer's speculative rewrite's), and the fetch
+ * underneath (platformFetch.ts) does not report an abort the way a browser
+ * does: Tauri's plugin-http cancels the request but rejects with
+ * `Error("Request cancelled")`, or errors the body with that bare string, and
+ * Capacitor's patched fetch ignores the signal altogether. Callers recognise
+ * a cancellation by `name === "AbortError"` (callSideModel re-throws it, the
+ * Designer treats it as control flow), so every abort here surfaces as one.
+ */
+export function abortErrorFor(signal: AbortSignal | undefined): Error {
+  const reason: unknown = signal?.reason;
+  if (reason instanceof Error && reason.name === "AbortError") return reason;
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+// ============================================================
 // Non-streaming
 // ============================================================
 
-export async function generateNonStreaming(
+/**
+ * With a signal, rejects with an AbortError the moment it fires - even when
+ * the fetch underneath ignores it (Capacitor), whose request then runs to
+ * completion unread.
+ */
+export function generateNonStreaming(
   body: GenerateRequestBody,
+  signal?: AbortSignal,
+): Promise<GenerateSuccess | GenerateError> {
+  if (!signal) return requestNonStreaming(body);
+  if (signal.aborted) return Promise.reject(abortErrorFor(signal));
+  return new Promise((resolve, reject) => {
+    // The fetch gets a signal of its own, linked to the caller's only while
+    // this request runs: Tauri's plugin-http never removes its abort
+    // listeners, so on the turn's long-lived signal they would fire for every
+    // already-finished request when Stop is pressed.
+    const requestAbort = new AbortController();
+    const onAbort = () => {
+      reject(abortErrorFor(signal));
+      requestAbort.abort();
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    requestNonStreaming(body, requestAbort.signal)
+      .then(resolve, reject)
+      .finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
+
+async function requestNonStreaming(
+  body: GenerateRequestBody,
+  signal?: AbortSignal,
 ): Promise<GenerateSuccess | GenerateError> {
   try {
     const { messages, tools, toolChoice, maxTokens = 4000, temperature = 0.7 } = body;
@@ -576,6 +625,7 @@ export async function generateNonStreaming(
       method: "POST",
       headers,
       body: JSON.stringify(requestBody),
+      signal,
     });
 
     if (!response.ok) {
@@ -647,6 +697,7 @@ export async function generateNonStreaming(
       },
     };
   } catch (error: any) {
+    if (signal?.aborted) throw abortErrorFor(signal);
     logger.error("Generation API error", { error: error.message });
     return { error: error.message || "Internal server error", status: 500 };
   }
@@ -694,7 +745,16 @@ function extractContentParts(content: unknown): { text: string; thinking: string
   return { text: "", thinking: "" };
 }
 
-export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8Array> {
+/**
+ * With a signal, the returned stream errors with an AbortError the moment it
+ * fires, so whoever is reading it stops at once - even when the fetch
+ * underneath ignores the signal (Capacitor). That fetch also gets a signal
+ * linked to it, which lets Tauri's cancel the provider request itself.
+ */
+export function generateStream(
+  body: GenerateRequestBody,
+  signal?: AbortSignal,
+): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
 
   return new ReadableStream({
@@ -702,6 +762,19 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
       const emit = (data: unknown) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       };
+
+      // The fetch's own signal, linked to the caller's only until this stream
+      // ends - see generateNonStreaming for why.
+      const requestAbort = signal ? new AbortController() : undefined;
+      const onAbort = () => {
+        controller.error(abortErrorFor(signal));
+        requestAbort?.abort();
+      };
+      if (signal?.aborted) {
+        onAbort();
+        return;
+      }
+      signal?.addEventListener("abort", onAbort, { once: true });
 
       try {
         const { messages, tools, toolChoice, maxTokens = 4000, temperature = 0.7, samplingSettings, stop } = body;
@@ -785,6 +858,7 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
           method: "POST",
           headers,
           body: JSON.stringify(requestBody),
+          signal: requestAbort?.signal,
         });
 
         if (!response.ok) {
@@ -883,6 +957,12 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
 
         while (true) {
           const { done, value } = await reader.read();
+          if (signal?.aborted) {
+            // Only reachable when the fetch ignored the signal - the reader
+            // already has its AbortError, so stop reading the provider too.
+            await reader.cancel().catch(() => {});
+            return;
+          }
           if (done || streamComplete) break;
 
           buffer += decoder.decode(value, { stream: true });
@@ -999,9 +1079,14 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
 
         controller.close();
       } catch (error: any) {
+        // Already errored with an AbortError by onAbort; whatever the fetch
+        // threw on the way out ("Request cancelled" from Tauri) is not news.
+        if (signal?.aborted) return;
         logger.error("Generation stream error", { error: error.message });
         emit({ type: "error", error: error.message || "Internal server error" });
         controller.close();
+      } finally {
+        signal?.removeEventListener("abort", onAbort);
       }
     },
   });
