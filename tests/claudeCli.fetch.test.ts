@@ -12,6 +12,7 @@ vi.mock("@tauri-apps/api/core", async () => (await import("./helpers/fakeClaudeC
 
 import { fakeCli, CliScript } from "./helpers/fakeClaudeCli";
 import { claudeCliFetch } from "@/app/misc/claudeCli";
+import { logger } from "@/app/misc/logger";
 import {
   getClaudeCliStatus,
   resetClaudeCliStatusCache,
@@ -353,5 +354,300 @@ describe("online play (decision 29)", () => {
     const events = await frames(await claudeCliFetch("/api/generate-stream", gmRound()));
     expect(events[0]).toEqual({ type: "content", content: "ok" });
     expect(fakeCli.runs).toHaveLength(1);
+  });
+});
+
+describe("the first round of a fresh conversation", () => {
+  const OOC =
+    "(OOC: my dice and note tools aren't responding on my end, so I haven't set up your character sheet.) The bridge sways.";
+
+  /** A fresh conversation: no tool call and no tool result anywhere in it. */
+  const fresh = (over: Partial<GenerateRequestBody> = {}) => gmRound(over);
+
+  /** The same turn one round on: a tool call and its result are now in the transcript. */
+  const laterRound = (over: Partial<GenerateRequestBody> = {}) =>
+    gmRound({
+      messages: [
+        { role: "system", content: "You ARE the Game Master." },
+        { role: "user", content: "> I attack the goblin", cacheBreakpoint: true },
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [{ id: "c0", type: "function", function: { name: "calculate", arguments: '{"expression":"1+1"}' } }],
+        },
+        { role: "tool", content: "2", tool_call_id: "c0" },
+      ],
+      ...over,
+    });
+
+  it("retries once, forced, when it makes no call and claims its tools are down", async () => {
+    let call = 0;
+    fakeCli.respond = () => {
+      call++;
+      return call === 1
+        ? { lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) }
+        : {
+            lines: fakeCli.structured({
+              narration: "",
+              tool_calls: [{ name: "calculate", arguments: { expression: "14+3 >= 15" } }],
+            }),
+          };
+    };
+
+    const events = await frames(await claudeCliFetch("/api/generate-stream", fresh()));
+
+    expect(fakeCli.runs).toHaveLength(2);
+    const schema = (i: number) => JSON.parse((fakeCli.runs[i].mode as { schema: string }).schema);
+    expect(schema(0).properties.tool_calls.minItems).toBeUndefined();
+    expect(schema(1).properties.tool_calls.minItems).toBe(1);
+    // The retry says the tools work, and the failed reply is not in its prompt.
+    expect(fakeCli.runs[1].prompt).toContain("[System note]\nYour tools are available");
+    expect(fakeCli.runs[1].prompt).not.toContain("aren't responding");
+    // The player gets the retried answer only.
+    expect(events.map((e) => e.type)).toEqual(["tool_calls", "done"]);
+    expect(JSON.stringify(events)).not.toContain("OOC");
+  });
+
+  it("counts both runs in the usage it reports", async () => {
+    let call = 0;
+    fakeCli.respond = () => {
+      call++;
+      return call === 1
+        ? { lines: fakeCli.structured({ narration: OOC, tool_calls: [] }, { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 }) }
+        : { lines: fakeCli.structured({ narration: "", tool_calls: [{ name: "calculate", arguments: {} }] }, { input_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 7 }) };
+    };
+    const done = (await frames(await claudeCliFetch("/api/generate-stream", fresh()))).find((e) => e.type === "done");
+    expect(done?.meta).toMatchObject({ usage: { promptTokens: 30, completionTokens: 12, totalTokens: 42 } });
+  });
+
+  it("never retries more than once, even if the retry makes no call either", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) });
+    const events = await frames(await claudeCliFetch("/api/generate-stream", fresh()));
+    expect(fakeCli.runs).toHaveLength(2);
+    expect(events[events.length - 1].type).toBe("done");
+  });
+
+  it("does not retry a tool-less first round that is an ordinary reply", async () => {
+    // A fresh story's GM may ask a vague player a question first.
+    fakeCli.respond = () => ({
+      lines: fakeCli.structured({ narration: "Welcome! What kind of story are you in the mood for?", tool_calls: [] }),
+    });
+    const events = await frames(await claudeCliFetch("/api/generate-stream", fresh()));
+    expect(fakeCli.runs).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "content" });
+  });
+
+  it("does not retry a tool-less round later in the turn, whatever it says", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) });
+    const events = await frames(await claudeCliFetch("/api/generate-stream", laterRound()));
+    expect(fakeCli.runs).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "content" });
+  });
+
+  it("does not retry a round the roll gate already forced", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) });
+    await frames(await claudeCliFetch("/api/generate-stream", fresh({ toolChoice: "required" })));
+    expect(fakeCli.runs).toHaveLength(1);
+  });
+
+  it("applies to a side call that offers tools too, through /api/generate", async () => {
+    let call = 0;
+    fakeCli.respond = () => {
+      call++;
+      return call === 1
+        ? { lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) }
+        : { lines: fakeCli.structured({ narration: "ok", tool_calls: [{ name: "calculate", arguments: {} }] }) };
+    };
+    const data = await (await claudeCliFetch("/api/generate", fresh())).json();
+    expect(fakeCli.runs).toHaveLength(2);
+    expect(data.toolCalls).toHaveLength(1);
+  });
+
+  // The Designer's real shape: its prompt, the chat so far, then a trailing
+  // state message. Its first reply to a new draft is usually a question, and
+  // "write any notes down" is its ordinary phrasing (engine review).
+  const designerRound = (over: Partial<GenerateRequestBody> = {}): GenerateRequestBody => ({
+    messages: [
+      { role: "system", content: "You are the Game Designer." },
+      { role: "user", content: "I want a heist that's already going wrong. What do you think it needs?" },
+      { role: "system", content: "## Current adventure state\n(empty)" },
+    ],
+    tools: [
+      { type: "function", function: { name: "set_premise", description: "Set it.", parameters: { type: "object" } } },
+      { type: "function", function: { name: "write_note", description: "Write.", parameters: { type: "object" } } },
+    ],
+    model: "Claude Sonnet (subscription)",
+    reasoningEffort: "high",
+    ...over,
+  });
+
+  it("leaves the Designer's talk-first question alone, and never writes into the draft for it", async () => {
+    fakeCli.respond = () => ({
+      lines: fakeCli.structured({
+        narration: "Love it. Before I write any notes down, one question: is the crew professional or desperate?",
+        tool_calls: [],
+      }),
+    });
+    const data = await (await claudeCliFetch("/api/generate", designerRound())).json();
+    expect(fakeCli.runs).toHaveLength(1);
+    expect(data.toolCalls ?? []).toHaveLength(0);
+    expect(data.content).toContain("professional or desperate");
+  });
+
+  it("retries the Designer's first round when it does claim its tools are down", async () => {
+    let call = 0;
+    fakeCli.respond = () => {
+      call++;
+      return call === 1
+        ? { lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) }
+        : { lines: fakeCli.structured({ narration: "", tool_calls: [{ name: "set_premise", arguments: { premise: "A heist gone wrong." } }] }) };
+    };
+    const data = await (await claudeCliFetch("/api/generate", designerRound())).json();
+    expect(fakeCli.runs).toHaveLength(2);
+    expect(data.toolCalls.map((c: { function: { name: string } }) => c.function.name)).toEqual(["set_premise"]);
+    // The retry note goes after the state message, the system prompt is untouched.
+    expect(fakeCli.runs[1].systemPrompt).toBe(fakeCli.runs[0].systemPrompt);
+    expect(fakeCli.runs[1].prompt).toContain("[System note]\nYour tools are available");
+  });
+
+  it("fails the round, with the CLI's code, when the retry itself fails; the first answer is not kept", async () => {
+    let call = 0;
+    fakeCli.respond = () => {
+      call++;
+      return call === 1
+        ? { lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) }
+        : { lines: fakeCli.failed("You've hit your session limit") };
+    };
+    const events = await frames(await claudeCliFetch("/api/generate-stream", fresh()));
+    expect(fakeCli.runs).toHaveLength(2);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "error", code: "CLI_USAGE_LIMIT" });
+  });
+
+  it("launches no retry when the player stops the turn after the first run", async () => {
+    const controller = new AbortController();
+    fakeCli.respond = () => {
+      queueMicrotask(() => controller.abort());
+      return { lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) };
+    };
+    await expect(claudeCliFetch("/api/generate", fresh(), controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    expect(fakeCli.runs).toHaveLength(1);
+  });
+
+  it("does not retry on a claim written only in the model's own thinking", async () => {
+    fakeCli.respond = () => ({
+      lines: fakeCli.structured({
+        narration: "<thinking>I don't call any tools this round; I ask first.</thinking>Which tone do you want?",
+        tool_calls: [],
+      }),
+    });
+    await frames(await claudeCliFetch("/api/generate-stream", fresh()));
+    expect(fakeCli.runs).toHaveLength(1);
+  });
+
+  it("marks the retry in the Debug Logs, so it is told apart from a gate's forced re-prompt", async () => {
+    const action = vi.spyOn(logger, "action").mockImplementation(() => {});
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    let call = 0;
+    fakeCli.respond = () => {
+      call++;
+      return call === 1
+        ? { lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) }
+        : { lines: fakeCli.structured({ narration: "", tool_calls: [{ name: "calculate", arguments: {} }] }) };
+    };
+    await frames(await claudeCliFetch("/api/generate-stream", fresh()));
+    const runs = action.mock.calls.filter((c) => c[0] === "Claude CLI run").map((c) => c[1] as Record<string, unknown>);
+    expect(runs).toHaveLength(2);
+    expect(runs[0]).toMatchObject({ round: 1, forced: false, firstRoundRetry: false });
+    expect(runs[1]).toMatchObject({ round: 1, forced: true, firstRoundRetry: true });
+    expect(warn.mock.calls.some((c) => String(c[0]).includes("retrying once"))).toBe(true);
+    action.mockRestore();
+    warn.mockRestore();
+  });
+});
+
+describe("per-run diagnostics in the Debug Logs", () => {
+  it("logs model, effort, round, timings, the tool calls that came back and the subtype", async () => {
+    const action = vi.spyOn(logger, "action").mockImplementation(() => {});
+    fakeCli.respond = () => ({
+      lines: [
+        { type: "system", subtype: "init", apiKeySource: "none" },
+        {
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          duration_ms: 8123,
+          duration_api_ms: 7601,
+          num_turns: 2,
+          stop_reason: "tool_use",
+          structured_output: { narration: "You lunge.", tool_calls: [{ name: "formula_roll", arguments: { formulas: ["1d20"] } }] },
+          usage: { input_tokens: 4, cache_creation_input_tokens: 100, cache_read_input_tokens: 50, output_tokens: 20 },
+        },
+      ],
+    });
+    await frames(await claudeCliFetch("/api/generate-stream", gmRound()));
+
+    const entry = action.mock.calls.find((c) => c[0] === "Claude CLI run");
+    expect(entry).toBeDefined();
+    expect(entry![1]).toMatchObject({
+      model: "claude-sonnet-5-5",
+      effort: "high",
+      mode: "structured",
+      round: 1,
+      forced: false,
+      firstRoundRetry: false,
+      cliMs: 8123,
+      modelMs: 7601,
+      numTurns: 2,
+      subtype: "success",
+      isError: false,
+      stopReason: "tool_use",
+      toolCalls: 1,
+      toolNames: ["formula_roll"],
+      narrationChars: 10,
+      usage: { promptTokens: 154, completionTokens: 20, totalTokens: 174 },
+    });
+    expect(typeof (entry![1] as { wallMs: number }).wallMs).toBe("number");
+    action.mockRestore();
+  });
+
+  it("counts the round from the transcript", async () => {
+    const action = vi.spyOn(logger, "action").mockImplementation(() => {});
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: "Done.", tool_calls: [] }) });
+    await frames(
+      await claudeCliFetch(
+        "/api/generate-stream",
+        gmRound({
+          messages: [
+            { role: "system", content: "sys" },
+            { role: "user", content: "> act" },
+            { role: "assistant", content: "", tool_calls: [{ id: "a", type: "function", function: { name: "calculate", arguments: "{}" } }] },
+            { role: "tool", content: "1", tool_call_id: "a" },
+            { role: "assistant", content: "", tool_calls: [{ id: "b", type: "function", function: { name: "calculate", arguments: "{}" } }] },
+            { role: "tool", content: "2", tool_call_id: "b" },
+          ],
+        }),
+      ),
+    );
+    expect(action.mock.calls.find((c) => c[0] === "Claude CLI run")![1]).toMatchObject({ round: 3 });
+    action.mockRestore();
+  });
+
+  it("logs a failed run with its subtype and the stderr tail", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    fakeCli.respond = () => ({ lines: [], code: 1, stderrTail: "unknown option '--safe-mode'" });
+    await frames(await claudeCliFetch("/api/generate-stream", gmRound()));
+    const entry = warn.mock.calls.find((c) => c[0] === "Claude CLI run failed");
+    expect(entry![1]).toMatchObject({ error: "CLI_FAILED", exitCode: 1, stderrTail: "unknown option '--safe-mode'", mode: "structured" });
+    warn.mockRestore();
+  });
+
+  it("logs a usage-limit failure with the CLI's subtype", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    fakeCli.respond = () => ({ lines: fakeCli.failed("You've hit your session limit") });
+    await frames(await claudeCliFetch("/api/generate-stream", gmRound()));
+    const entry = warn.mock.calls.find((c) => c[0] === "Claude CLI run failed");
+    expect(entry![1]).toMatchObject({ error: "CLI_USAGE_LIMIT", subtype: "success", isError: true });
+    warn.mockRestore();
   });
 });

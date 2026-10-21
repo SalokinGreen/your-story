@@ -18,14 +18,29 @@ stage in stream mode, the cost label, side agents staying off the
 subscription, and online play blocking it. The results, with numbers, are in
 `claude-gm-implementation-plan.md` → "First live run". What is left:
 
-- **The first round of a fresh conversation sometimes makes no tool call.**
-  In the live run 2 of 2 fresh conversations did it once: the GM's first turn
-  answered "my dice and note tools aren't responding" with no tool calls, and
-  the Designer's first run wrote nothing before retrying; every later round
-  (20 or so) called tools correctly. Watch for it when playing: start a few
-  new stories on "Claude Sonnet (subscription)" and note how often the very
-  first turn comes back without a character sheet or a `start_game`. A Retry
-  recovers it. The plan lists a proposed fix; none is built.
+- **Re-check the first-round fix on the subscription (needs the author's
+  go: it draws on the plan).** Built but not yet tried live: the answer
+  protocol now says the tools are run for the model and shows an example call,
+  the Debug Logs gain a "Claude CLI run" line per run, and a first round that
+  makes no call *and* claims its tools are down is retried once with a call
+  required. Start five or so new stories on "Claude Sonnet (subscription)",
+  give each a clear opening message ("gritty fantasy, start with a goblin
+  ambush"), and note whether the very first turn comes back with a character
+  sheet, mechanics and plan notes and a `start_game`. Before the fix it did
+  not about half the time (1 of 2). In Settings → Debug Logs, each run has a
+  "Claude CLI run" entry (model, effort, round, wall and model time, the tool
+  calls that came back, `subtype`); a fired guard shows as "the first round of
+  a fresh conversation claimed its tools were unavailable … retrying once",
+  and its second run is the entry with `firstRoundRetry: true` (`round` also
+  reads 1 after a gate's re-prompt, so use that flag, not `round`, to find a
+  retry).
+  *Failure looks like:* a first turn with no calls and no retry line (the
+  model worded the claim in a way the detector does not know, or made no claim
+  at all, so the guard stayed out of the way: tell the author the wording);
+  the retry line followed by a second miss (the CLI is not honouring
+  `minItems`); a gratuitous `formula_roll` for "Strike the goblin" in the
+  first turn of a story that gave no fight (the protocol's example was copied
+  too literally).
 - **The story stage on the subscription.** The GM wrote its own prose in every
   turn so far, so the separate story stage (the one that cuts the text at the
   `[STOP]` markers) never ran. Stream mode itself is confirmed (the choices
