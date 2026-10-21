@@ -14,8 +14,13 @@ export default function SiteHeader() {
 
   // Hidden on the full-viewport workspaces. Both the story player and the
   // creator carry their own compact header and lay themselves out against the
-  // full viewport height, so the sticky site chrome would overlap them.
-  if (pathname?.startsWith("/story") || pathname?.startsWith("/creator")) {
+  // full viewport height, so the sticky site chrome would overlap them. The
+  // party mode phone controller is a full-screen page of its own too.
+  if (
+    pathname?.startsWith("/story") ||
+    pathname?.startsWith("/creator") ||
+    pathname?.startsWith("/party")
+  ) {
     return null;
   }
 
