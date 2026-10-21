@@ -473,8 +473,10 @@ of about 1,600 Vitest tests. What it lacked was the loop.
 - **The audit.** [`status-report-2026-10-20.md`](status-report-2026-10-20.md)
   is the state of the project as of 2026-10-20, with dated update notes
   where something it lists has since been fixed.
-- **The tooling.** `.claude/` — the agents (`code-explorer`,
-  `engine-review`, `fable-escalation`), the skills (`verify`,
+- **The tooling.** `.claude/` — the agents, each pinned to the model §3
+  allocates (`implementer` on Sonnet; `code-explorer`, `researcher` and
+  `docs-writer` on Haiku; `engine-review` on Opus; `fable-escalation` on
+  Fable), the skills (`verify`,
   `empty-playtest`), the SessionStart hook and the permissions, plus
   `.claude/launch.json` for the browser preview.
 - **This file, `CLAUDE.md`, [`decisions.md`](decisions.md) and
