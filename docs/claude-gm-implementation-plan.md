@@ -314,6 +314,44 @@ text, no remaining-usage display. The Designer works on a subscription model
 only because `providerFetch` serves it like any other caller; it gets no
 work of its own here.
 
+## 7. Addendum — PR C: GLM through Z.ai and OpenRouter (decision 18)
+
+**Order:** after PR A, before PR B (B waits on the Stop fix anyway). Touches
+the same files as PR A, so it follows it rather than running beside it.
+
+### C1. The Z.ai provider
+
+| file | change |
+|---|---|
+| `app/misc/providerCall.ts` | `Provider` gains `"zai"`; `PROVIDER_NAMES` gains `"Z.ai"`; base URL `https://api.z.ai/api/paas/v4/chat/completions` (OpenAI-compatible, `Authorization: Bearer`); `applyReasoningEffort`: `none`/`low` → `low`, `normal`/`high` → `high`, `xhigh` → `max`, always with `thinking: {type: "enabled"}` (disabling is rejected). Strip a trailing assistant prefill when tools are present, as for the other OpenAI-style providers. **Check at build:** whether GLM-5.3 needs its `reasoning_content` handed back inside a tool loop the way DeepSeek does (`providerCall.ts:~475-495`); if so, extend that branch to `zai`. |
+| `app/misc/ai_prices.ts` | `"GLM 5.3 (Z.ai)"` → `glm-5.3`, `"GLM 5.3 Flash (Z.ai)"` → the Flash id from Z.ai's model list (verify; likely `glm-5.3-flash`), provider `zai`, 1M / 128k, prices from Z.ai's pricing page; `PROVIDER_KEY_FIELD` gains `zai: "zaiKey"`. |
+| `app/misc/APIKeysContext.tsx` and the API key modal | a `zaiKey` field and its input, labelled "Z.ai API key (pay-as-you-go, not the Coding Plan)". |
+| `app/misc/sideModelCall.ts` (`pickProviderKeys`) and every caller that lists the provider keys (`ProviderKeys`, `GenerateRequestBody`, `generation.ts`, `menu.tsx`, the Designer) | forward `zaiKey` alongside the other five. |
+| `src-tauri/capabilities/default.json` | allow `https://api.z.ai/api/paas/*` only. |
+| `app/misc/syncableSettingsKeys.ts` | check how the other keys are synced, and treat `zaiKey` the same way. |
+
+### C2. GLM 5.3 through OpenRouter
+
+Add `"GLM 5.3"` (`z-ai/glm-5.3`) and `"GLM 5.3 Flash"` (`z-ai/glm-5.3-flash`) next
+to `"GLM 5.2"` in `ai_prices.ts`. **Read prices live** from OpenRouter's
+`/api/v1/models` at build time — on 2026-10-21 it listed GLM 5.3 at an
+implausible $0.08 in, and the existing GLM 5.2 entry's prices ($0.65 / $2.10)
+no longer match what it lists; fix GLM 5.2's prices in the same change.
+
+### C3. Tests
+
+- `tests/providerCall.zai.test.ts` (in the style of
+  `providerCall.reasoning.test.ts`): the URL is the general endpoint, never
+  `/coding/`; the effort mapping; `thinking.type` is always `enabled`; the
+  prefill is stripped with tools.
+- Update `tests/sideModelCall.test.ts` ("all five keys forwarded and nothing
+  else" becomes six) and `tests/generation.sideCallKeys.test.ts`.
+- `aiStaged.gmStageBudget` covers the new catalog keys automatically.
+
+**PR C done when:** suite, `tsc` and the standalone build pass,
+`engine-review` has reviewed the diff, and the PR is open. A played turn on
+the author's Z.ai key is a live check that needs the author's go.
+
 ## Decisions made during implementation
 
 ### 2026-10-21 — Route A (PR A)
@@ -401,3 +439,69 @@ work of its own here.
     side agents on Claude; the signature merge from the stream. Each is a
     check with its failure written down in `pending_tests.md`. Building
     around behaviour nobody has seen fail would be guessing.
+
+### 2026-10-21 — PR C, GLM through Z.ai and OpenRouter
+
+Approved as decision 20 ("Okay go on"). Built on PR A's branch with the
+addendum (`f4fe2cd`) merged in.
+
+1. **Z.ai accepts only `tool_choice: "auto"`** (its chat-completions
+   reference: "only auto is supported"), which the addendum did not list.
+   `zai` joins Claude in `resolveToolChoice`, so a gate's forced round
+   relies on the gate's own re-prompt.
+2. **`temperature` is clamped to [0, 1] for `zai`**, Z.ai's documented
+   range. The GM sends 0.4 plus the Chaos Factor nudge, and the story stage
+   sends the player's sampling temperature, which may be above 1.
+3. **A call with no effort of its own runs at `low`.** Z.ai's default
+   `reasoning_effort` is `max`, which would make every side agent pointed
+   at GLM-5.3 slow and expensive. The tier mapping is as planned (`none` and
+   `low` → `low`, `normal` and `high` → `high`, `xhigh` → `max`), always
+   with `thinking: {type: "enabled"}`.
+4. **GLM-5.3 gets Claude's 4,096 `max_tokens` floor** (renamed
+   `ALWAYS_THINKING_MIN_MAX_TOKENS`), for the same reason: it always thinks,
+   and thinking counts against the cap.
+5. **`reasoning_content` goes back inside a tool loop** (the build-time check
+   the addendum asked for). Z.ai's thinking guide says thinking blocks
+   "should be explicitly preserved and returned together with the tool
+   results"; leaving them out degrades the answer rather than failing, so
+   there is no empty-string fallback as there is for DeepSeek. Z.ai streams
+   `delta.reasoning_content`, which `providerCall` already reads.
+6. **The trailing prefill is stripped only when tools are offered**, as the
+   addendum says. Z.ai's reference says nothing about a trailing assistant
+   message without tools.
+7. **The Flash model's id is `glm-5.3-flash`.** Z.ai lists it under vision
+   models, but its model page lists function calling, a 1M context and 128K
+   output.
+8. **OpenRouter prices.** OpenRouter prices GLM per provider endpoint. On
+   2026-10-21 GLM 5.2 ran from $0.03 to $2.31 per M input across 34
+   endpoints, and the model listing shows whichever endpoint sorts first:
+   $0.034 in / $7.00 out for GLM 5.2, $0.079 / $1.40 for GLM 5.3. The three
+   OpenRouter GLM entries use the model maker's own price on OpenRouter (the
+   Z.ai endpoint), which 11 of GLM 5.2's endpoints charge and which sits near
+   the median: GLM 5.2 and 5.3 at $1.40 / $4.40, GLM 5.3 Flash at
+   $0.15 / $0.50. GLM 5.2 was $0.65 / $2.10. The GLM 5.2 description now
+   calls it the previous flagship.
+9. **The Z.ai key stays on the device**, like every provider key:
+   `syncableSettingsKeys.ts` deliberately syncs no API keys, so it needs no
+   change.
+10. **The guardrail is tested twice**: the allowlist test checks that
+    `https://api.z.ai/api/paas/*` is the only Z.ai entry, and a source scan
+    fails if any file under `app/` names a Coding Plan URL.
+11. **After the engine review** (its findings, triaged):
+    - The OpenRouter GLM 5.3 entries are the same model and also always
+      think, but were handled like ordinary models. A model-level
+      `alwaysThinks()` (Claude, `zai`, OpenRouter `z-ai/glm-5.3…`) now gives
+      them the 4,096 floor, `low` for effort `none` or unset, and the
+      mid-history prefill drop.
+    - Z.ai has long taken a single stop word, and the story stage sends
+      three. `zai` now gets the first only; the client strips all three
+      markers anyway.
+    - The GM's `<thinking>` prefill sat mid-history from round 2 on for
+      `zai` too; the drop that Claude had now covers every always-thinking
+      model.
+    - `reasoning_content` went back for every earlier turn's tool rounds,
+      unbudgeted; it now goes back for the current turn only.
+    - **Not changed:** the cost ledger prices Z.ai and the OpenRouter GLM
+      entries at list price, ignoring Z.ai's cached-input rate and
+      OpenRouter's routing spread. That is the same follow-up as Route A's
+      decision 5, for every non-Claude model.

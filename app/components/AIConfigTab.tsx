@@ -38,6 +38,7 @@ const PROVIDER_KEY_FIELD: Record<string, keyof APIKeys | undefined> = {
   google: "googleKey",
   mistral: "mistralKey",
   deepinfra: "deepinfraKey",
+  zai: "zaiKey",
 };
 
 const REASONING_EFFORTS: ReasoningEffort[] = [
