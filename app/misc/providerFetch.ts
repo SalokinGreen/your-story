@@ -39,12 +39,14 @@ export async function providerFetch(
     });
   }
 
+  // An abort rejects with an AbortError, as the web branch's fetch does - for
+  // the stream, out of the body's reader.
   if (path === "/api/generate-stream") {
-    const stream = generateStream(body);
+    const stream = generateStream(body, signal);
     return new Response(stream, { headers: SSE_HEADERS });
   }
 
-  const result = await generateNonStreaming(body);
+  const result = await generateNonStreaming(body, signal);
   if ("error" in result) {
     return new Response(JSON.stringify(result), {
       status: result.status,
