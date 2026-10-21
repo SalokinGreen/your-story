@@ -62,6 +62,30 @@ credit, so it waits for the author's go (`claude-gm-implementation-plan.md`
   cap. *Failure looks like:* no memories and no warnings, which means the
   output was used up by thinking.
 
+## 2026-10-21 — Stop cancels the provider call in the native apps
+
+The unit tests (`tests/providerFetch.abort.test.ts`) mock the platform fetch;
+these need a live key, so they wait for the author's go.
+
+- **Stop mid-turn in the desktop app.** With a key saved, start a turn on a
+  model that thinks visibly and press Stop while the GM's reasoning is still
+  streaming. The stream should stop within a second, no further GM round or
+  story stage should start, and the scene should revert to before the turn.
+  On OpenRouter, the Activity page should show that generation cut short
+  (far fewer output tokens than a finished turn). Expect a failure toast
+  reading "Error: signal is aborted without reason", possibly twice. The web
+  build shows the same toast on Stop, so it is not part of this fix; before
+  the fix, the desktop app showed "Generation cancelled by user" once the
+  round had run out. *Failure looks like:* the
+  reasoning keeps streaming after Stop and the turn runs to its end (the
+  signal is not reaching Tauri's fetch), or a "Request cancelled" error
+  instead of the ordinary cancellation (the AbortError normalisation in
+  `providerCall.ts`).
+- **Stop mid-turn on Android or iOS**, once a mobile build exists. The UI
+  should stop at once, as on the desktop. The provider request itself runs to
+  completion and is billed in full: Capacitor's patched `fetch` ignores the
+  abort signal, so this is expected, not a failure.
+
 ## 2026-10-21 — the native fixes merged after the health check
 
 None of these could run here: they need the author's own API keys (spending
