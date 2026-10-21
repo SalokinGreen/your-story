@@ -517,7 +517,7 @@ generate the icons (`generate-icons.sh` exists at the repo root).
 > (`getModelConfig()` only knows `AI_MODELS` keys), so it fell back to
 > DeepSeek V4 Flash, and a player without a DeepSeek key got `NO_API_KEY` from
 > every one of them. Unpinned side agents, compaction and reflection now all
-> run on the narration model, override included (decision 10);
+> run on the narration model, override included (decision 19);
 > `tests/generation.sideCallModel.test.ts` covers it.
 
 ### 6.14 Google tool filter is stale — session zero can't end on Gemini

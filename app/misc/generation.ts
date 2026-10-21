@@ -199,7 +199,7 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
 export interface GenerationOptions {
   // Not read by generateStoryTurn: the reasoning-tier router picks the GM's
   // model, and narration, choices and every side call run on the narration
-  // model (getEffectiveNarrationModelKey, decision 10). Kept so existing
+  // model (getEffectiveNarrationModelKey, decision 19). Kept so existing
   // callers type-check.
   storyModel: string;
   toolsModel: string;
@@ -943,7 +943,7 @@ export async function generateStoryTurn(
 
     // Shared by the observer and the memory agent below - both are
     // best-effort side calls for the turn that just completed, run on the
-    // narration model (decision 10) unless the user pinned a specific
+    // narration model (decision 19) unless the user pinned a specific
     // model/effort for that stage in Settings > Architecture
     // (layerSettings.ts). It has to be an AI_MODELS key (or a custom model's
     // UUID): GenerationMeta.model is the provider's own id, which the proxy
@@ -2121,7 +2121,7 @@ async function generateStoryTurnOnce(
             storyData,
             gmHistoryBudget,
             {
-              // The narration model, like every other side call (decision 10).
+              // The narration model, like every other side call (decision 19).
               model: narrationModel,
               token,
               // All five, not just the ones this model "usually" needs: the

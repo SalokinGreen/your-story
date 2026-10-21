@@ -32,7 +32,7 @@ function notifyChanged(): void {
 // PER-STAGE MODEL/EFFORT OVERRIDES
 // ============================================================
 // null (default) means "run on the narration model"
-// (getEffectiveNarrationModelKey, decision 10) - generation.ts passes it in
+// (getEffectiveNarrationModelKey, decision 19) - generation.ts passes it in
 // as resolveSideCallModel's fallback.
 
 export interface ModelEffortOverride {

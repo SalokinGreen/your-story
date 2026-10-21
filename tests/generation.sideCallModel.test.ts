@@ -1,7 +1,7 @@
 /**
  * The side agents a turn kicks off - the Observer's judges, the Memory
  * Keeper, the Story Progress Observer - run on the narration model unless
- * the player pinned one in Settings > Architecture (decision 10,
+ * the player pinned one in Settings > Architecture (decision 19,
  * layerSettings.ts).
  *
  * They used to take their model from the turn's GenerationMeta.model, which

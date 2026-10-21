@@ -172,7 +172,7 @@ function Toggle({
 /**
  * A model + reasoning-effort override for one AI side-call stage (Observer,
  * Memory Keeper, Reflection). Off by default - the stage runs on the
- * narration model (decision 10).
+ * narration model (decision 19).
  */
 function StageOverrideCard({
   icon,

@@ -95,7 +95,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 // Helper function to get models for generation options. They are no longer
 // read from presets: generateStoryTurn ignores all three (the reasoning-tier
 // router picks the GM's model, and narration, choices and every side call run
-// on the narration model, decision 10), and only choicesModel is used, by
+// on the narration model, decision 19), and only choicesModel is used, by
 // generateChoicesOnly. They stay on GenerationOptions for type compatibility,
 // filled with the narration model so the player's override reaches
 // generateChoicesOnly too.

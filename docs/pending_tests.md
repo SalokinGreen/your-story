@@ -10,7 +10,7 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
-## 2026-10-21 — side agents on the narration model (PR #204, decision 10)
+## 2026-10-21 — side agents on the narration model (PR #204, decision 19)
 
 A played turn needs the author's keys, so it waits for their go.
 

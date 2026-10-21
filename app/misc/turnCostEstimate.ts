@@ -333,7 +333,7 @@ export function estimateTurnCost(
   const narrationModel = String(getEffectiveNarrationModelKey());
 
   // Side calls run on the narration model unless the user pinned one in
-  // Settings > Architecture (decision 10) - exactly what generation.ts does
+  // Settings > Architecture (decision 19) - exactly what generation.ts does
   // at runtime.
   const sideCallFallback = narrationModel;
   const observerCall = resolveSideCallModel(
