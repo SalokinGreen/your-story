@@ -193,3 +193,56 @@ describe("a turn on the Claude subscription", () => {
     expect(httpCalls.filter((c) => c.body.tools)).toHaveLength(0);
   });
 });
+
+describe("the first round of a fresh story (a miss and its retry)", () => {
+  const OOC = "(OOC: my dice and note tools aren't responding on my end, so I haven't set up your character sheet.)";
+
+  it("retries the round once, forced, and the story is the retried turn - not the apology", async () => {
+    let round = 0;
+    fakeCli.respond = () => {
+      round++;
+      if (round === 1) return { lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) };
+      if (round === 2) {
+        return { lines: fakeCli.structured({ narration: "", tool_calls: [{ name: "calculate", arguments: { expression: "14+3 >= 15" } }] }) };
+      }
+      return { lines: fakeCli.structured({ narration: "The goblin falls from the bridge.", tool_calls: [] }) };
+    };
+
+    const result = await generateStoryTurn(createStory(), "I attack the goblin", OPTIONS, {});
+
+    expect(result.success).toBe(true);
+    const runs = structuredRuns();
+    expect(runs).toHaveLength(3);
+    expect(schemaOf(runs[0]).properties.tool_calls.minItems).toBeUndefined();
+    expect(schemaOf(runs[1]).properties.tool_calls.minItems).toBe(1);
+    expect(schemaOf(runs[2]).properties.tool_calls.minItems).toBeUndefined();
+    expect(result.content).toContain("The goblin falls from the bridge.");
+    expect(result.content).not.toContain("OOC");
+    // The engine executed the retried call.
+    expect(runs[2].prompt).toMatch(/\[Tool result · calculate · cli\w+_0\]\n\S/);
+  });
+
+  it("does not retry a tool-less round later in the turn, even one that claims its tools are down", async () => {
+    let round = 0;
+    fakeCli.respond = () => {
+      round++;
+      return round === 1
+        ? { lines: fakeCli.structured({ narration: "", tool_calls: [{ name: "calculate", arguments: { expression: "1+1" } }] }) }
+        : { lines: fakeCli.structured({ narration: `${OOC} The bridge sways.`, tool_calls: [] }) };
+    };
+
+    const result = await generateStoryTurn(createStory(), "I attack the goblin", OPTIONS, {});
+
+    expect(result.success).toBe(true);
+    expect(structuredRuns()).toHaveLength(2);
+  });
+
+  it("does not retry an ordinary tool-less first reply", async () => {
+    fakeCli.respond = () => ({
+      lines: fakeCli.structured({ narration: "Welcome, Tester! What kind of story are you in the mood for?", tool_calls: [] }),
+    });
+    const result = await generateStoryTurn(createStory(), "Hello", OPTIONS, {});
+    expect(result.success).toBe(true);
+    expect(structuredRuns()).toHaveLength(1);
+  });
+});

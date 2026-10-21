@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildRoundSchema,
+  claimsToolsUnavailable,
   mapEffort,
   readStructuredAnswer,
   renderCliPrompt,
@@ -77,7 +78,10 @@ describe("renderCliPrompt", () => {
     expect(systemPrompt).toContain("## The session so far");
     expect(systemPrompt).toContain("A goblin blocks the bridge.");
     expect(systemPrompt).toContain("The bridge sways in the wind.");
-    expect(systemPrompt.trimEnd().endsWith("The engine runs the tools and shows you their results in the next round.")).toBe(true);
+    // The protocol closes the system prompt, and ends with a worked example.
+    expect(systemPrompt.trimEnd().endsWith(
+      '{"narration":"","tool_calls":[{"name":"formula_roll","arguments":{"formulas":["1d20+3"],"reason":"Strike the goblin"}}]}',
+    )).toBe(true);
     // The tools come in the order they were offered.
     expect(systemPrompt.indexOf("### formula_roll")).toBeLessThan(systemPrompt.indexOf("### calculate"));
     // The prompt starts at the marked message: this turn's action.
@@ -286,5 +290,94 @@ describe("classifyCliFailure", () => {
 
   it("tells the player the turn did not move to a paid provider", () => {
     expect(classifyCliFailure("session limit").message).toContain("not switched to a paid provider");
+  });
+});
+
+describe("the answer protocol", () => {
+  it("says the tools are run for the model and shows a call", () => {
+    const { systemPrompt } = renderCliPrompt(BASE, TOOLS);
+    expect(systemPrompt).toContain("never say that a tool is unavailable or not responding");
+    expect(systemPrompt).toContain('the only way to use one is to put it in "tool_calls"');
+    expect(systemPrompt).toContain("Example of a round that asks for one roll");
+  });
+
+  it("uses a shape example, not a roll, when formula_roll is not offered", () => {
+    const { systemPrompt } = renderCliPrompt(BASE, [TOOLS[1]]);
+    expect(systemPrompt).toContain('"name":"<a tool listed above>"');
+    expect(systemPrompt).not.toContain("Strike the goblin");
+  });
+
+  it("is the same bytes in every round of a turn, so the system prompt stays cacheable", () => {
+    const round1 = renderCliPrompt(BASE, TOOLS).systemPrompt;
+    const round2 = renderCliPrompt([...BASE, ROUND_1_REPLY, ROUND_1_RESULT], TOOLS).systemPrompt;
+    expect(round2).toBe(round1);
+  });
+
+  it("is not added to a request without tools", () => {
+    const { systemPrompt } = renderCliPrompt([
+      { role: "system", content: "You summarise." },
+      { role: "user", content: "Summarise this." },
+    ]);
+    expect(systemPrompt).not.toContain("Example of a round");
+  });
+});
+
+describe("claimsToolsUnavailable", () => {
+  it.each([
+    "(OOC: my dice and note tools aren't responding on my end, so I haven't set up your character sheet.)",
+    "My tools are down right now, so I'll narrate and you can roll yourself.",
+    "The note tool is unavailable at the moment.",
+    "I don't have access to my tools, sorry.",
+    "The dice tool isn't working, roll a d20 for me.",
+    "My function calls aren't going through.",
+    "My tool calls failed, so nothing was saved.",
+    "The tools aren't connected on my end.",
+    "I can't use my tools in this conversation.",
+    "I'm unable to call any tools right now.",
+    "The tools seem to be unresponsive.",
+  ])("recognises a claim that the tools are down: %s", (text) => {
+    expect(claimsToolsUnavailable(text)).toBe(true);
+  });
+
+  it.each([
+    "Welcome! What kind of story are you in the mood for - fantasy, horror, something else?",
+    "You swing; roll a d20 and add your Might. I'll call it once I know the total.",
+    "The dice are not rolled until you commit to the swing.",
+    "I won't narrate the whole scene yet. Tell me about your character first.",
+    "Notes about the bridge: it sways, and the ropes are frayed.",
+    "No tools are needed for this: you simply walk across.",
+    "",
+  ])("leaves an ordinary reply alone: %s", (text) => {
+    expect(claimsToolsUnavailable(text)).toBe(false);
+  });
+
+  // The words an outage claim uses are everyday words. A Designer's question
+  // or a GM's scene must not be thrown away for them (engine review).
+  it.each([
+    "Before I write any notes down, a few questions about tone:",
+    "Are we rolling the dice on dark fantasy, or should I tone it down?",
+    "What tools does your character carry - a lockpick, a broken lantern, a map?",
+    "The dice clatter down the tavern table before anyone speaks.",
+    "A low note echoes down the corridor.",
+    "The boulder comes rolling down the slope toward the cart.",
+    "The smith's tools lie broken on the anvil.",
+    "The ward's function is failing; the glyphs gutter one by one.",
+    "The dice pool breaks down into three tiers, and nothing that bogs play down.",
+    "The miners' tools are down in the shaft, rusting.",
+  ])("leaves everyday prose that shares the words alone: %s", (text) => {
+    expect(claimsToolsUnavailable(text)).toBe(false);
+  });
+
+  it.each([
+    "<thinking>I don't call any tools this round; I ask first.</thinking>Which tone do you want?",
+    "<thinking>I do not call tools until the player answers. I can't use dice before there's a mechanics note.</thinking>Welcome!",
+    "<thinking>Tools are always available, so I never say a tool is unavailable.</thinking>What is your character's name?",
+    "<thinking>I don't have the notes I need yet, and the tools aren't needed for a question.",
+  ])("ignores the model's own <thinking>: %s", (text) => {
+    expect(claimsToolsUnavailable(text)).toBe(false);
+  });
+
+  it("still reads a claim made after the thinking", () => {
+    expect(claimsToolsUnavailable("<thinking>Plan: set up the sheet.</thinking>(OOC: my tools aren't responding.)")).toBe(true);
   });
 });

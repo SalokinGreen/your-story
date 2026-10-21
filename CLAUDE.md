@@ -430,7 +430,10 @@ Rust command in `src-tauri/src/claude_cli.rs` (`claude_cli_status`,
 `claude_cli_run`, `claude_cli_cancel`). A round that offers tools runs in
 structured mode (a JSON schema for `{narration, tool_calls}`, the CLI's own
 tools off) and the app executes the calls itself; a request without tools
-streams text. Off the desktop a synced subscription choice falls back to the
+streams text. The first round of a fresh conversation that makes no call and
+claims its tools are down is retried once with a call required (`runRound`,
+`claimsToolsUnavailable`); every CLI run writes a "Claude CLI run" line to the
+Debug Logs. Off the desktop a synced subscription choice falls back to the
 slot's default (`reasoningTiers.ts`, decision 16), and the side agents reach
 the subscription only when a layer is pointed there (`resolveSideCallModel`,
 decision 12). A usage limit or a missing sign-in stops the turn with its
