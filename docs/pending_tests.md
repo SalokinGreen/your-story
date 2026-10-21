@@ -10,6 +10,89 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-21 — The model catalog refresh (`claude/catalog-refresh`)
+
+The catalog was checked against OpenRouter's live list and each vendor's
+pricing page, and the fallback for removed models is covered by tests. What
+no session could do is call the new models: each needs a provider key and
+spends the author's money, so each waits for the author's go. One short
+request per item is enough.
+
+- **Does `deepseek-v4-pro` still serve V4 Pro?** DeepSeek's release post says
+  it would route to V4.1 Flash from 2026-09-14; its changelog and pricing page
+  say it continues at its own price. Send one tiny request on "DeepSeek V4 Pro"
+  with a DeepSeek key and look at the reply's `model` field in the Debug Logs.
+  *Failure looks like:* a model name containing "flash", or a bill near
+  $0.15 / $0.60 per M instead of $0.66 / $1.98 (off-peak). Then relabel or
+  remove the entry.
+- **Does a forced tool call work on Qwen 3.8?** The app sends `tool_choice`
+  `auto` to `qwen/qwen3.8…` because a gateway documents a 400 for a forced call
+  with thinking on, while OpenRouter lists the parameter as supported. In a
+  combat scene on "Qwen 3.8 Max", check that a gated round still produces a
+  roll (the gate's message does the forcing). To test the premise itself, send
+  `tool_choice: "required"` by hand once; if it works, the safeguard
+  (`modelRejectsForcedToolChoice`) can go.
+- **Do the new direct ids work on their providers?** One short chat each:
+  "Google Gemini 4 Argon" and "Google Gemini 3.8 Flash" (the `models/` prefix
+  on Google's OpenAI-compatible endpoint), and "Mistral Large 4" (`mistral-large-4`,
+  in public preview). *Failure looks like:* a 404 or "model not found". Also
+  note what Google AI Studio bills for the `gemini-flash-latest` alias, which
+  the two renamed "latest alias" entries still price from an older model.
+- **A GM turn with tools on "DeepSeek V4.1 Flash"** (`deepseek-flash`): a roll
+  and a second round, to see the `reasoning_content` replay work on the new
+  name. *Failure looks like:* a 400 mentioning `reasoning_content`.
+- **A GM turn on "GPT-6.1 Sol" or "GPT-6 Luna"** through OpenRouter. OpenRouter
+  lists no `temperature` for them; check the call is not rejected for the
+  sampling settings the app sends.
+- **The lore image generator with a saved removed model.** The Settings
+  fallback was checked in the preview (a tier, the narration voice and the
+  Observer each saved as a removed model showed and ran their defaults). The
+  image pickers were checked only as a function: with `loreImageGen_provider`
+  `openrouter` and `loreImageGen_model` `Flux 2 Flex` saved in localStorage,
+  opening a lore entry's image generator should show Nano Banana, not a blank
+  or mismatched picker.
+
+**The Balanced defaults (decisions 50 and 51).** The default ladder and the
+side agents' own default changed in this same branch. Every item here plays
+real turns on the author's OpenRouter key, so it waits for the author's go.
+
+- **A fresh profile, one OpenRouter key, four turns.** Clear the saved
+  overrides (Settings → AI Config → "Reset all to defaults", and every
+  Architecture toggle off), save only an OpenRouter key, and play one banter
+  turn, one ordinary check, one combat turn against two enemies (tier 2) and
+  one against a single enemy (tier 3, which counts as a boss). *Expected:*
+  tiers 0 and 1 run on Claude Haiku 5.5, tier 2 on GLM 5.3, tier 3 on Claude
+  Sonnet 5.5, narration on GLM 5.3, and the Observer's judges and the Memory
+  Keeper on Claude Haiku 5.5, all visible in the turn cost panel or the Debug
+  Logs. *Failure looks like:* a 400 from Claude naming `tool_choice` or a
+  forced tool use on a gated round, or naming thinking blocks when the GM
+  climbs from Haiku to Sonnet mid-turn; a side-agent line in the Debug Logs
+  naming DeepSeek V4 Flash or `Model key … not found`, which means a side
+  call still reaches `getModelConfig()` with a key it does not know (a missed
+  fallback path); a GLM 5.3 reply that comes back empty because its thinking
+  used the whole token cap.
+- **Haiku's thinking on the side calls.** An unpinned side agent sends no
+  reasoning effort, and Claude 5.5's thinking cannot be turned off, so
+  `applyReasoningEffort` sends a Claude call with no effort as `low`, as its
+  GLM branch already did. After the four turns above, read the Observer and
+  Memory Keeper lines in the turn cost panel. *Failure looks like:* a side
+  call costing several times a tenth of a cent, or taking several seconds,
+  which would mean OpenRouter is not honouring `reasoning.effort: low` for
+  Haiku.
+- **The Observer's rewrite on Haiku.** The rewrite writes the prose the
+  player reads, and it now runs on Claude Haiku 5.5 unless the Observer is
+  pinned. In a story with violence or mature themes, let the Observer flag a
+  turn (a player-agency or outcome mismatch is the easiest to provoke).
+  *Failure looks like:* a refusal or a softened rewrite replacing the scene,
+  or "Observer rewrite call failed, falling back to full-turn reset" in the
+  Debug Logs every time. Then pin the Observer to GLM 5.3, or keep the rewrite
+  on the narration model.
+- **An existing profile with only a Mistral or DeepSeek key.** Its saved
+  overrides still apply, but a slot with none now defaults to an OpenRouter
+  model. *Expected:* a turn that stops with a message naming the missing
+  OpenRouter key, and the Settings tier cards showing "No key"; saving an
+  OpenRouter key (or picking models on the key it has) fixes it.
+
 ## 2026-10-21 — Claude on the subscription (Route B of the Claude GM plan)
 
 The author gave the go on 2026-10-21 and the checks were run in the built
@@ -141,6 +224,14 @@ credit, so it waits for the author's go (`claude-gm-implementation-plan.md`
 ## 2026-10-21 — side agents on the narration model (PR #204, decision 19)
 
 A played turn needs the author's keys, so it waits for their go.
+
+*Superseded in part by decision 51 (2026-10-21):* an unpinned side agent no
+longer follows the narration model, it runs on Claude Haiku 5.5. Read
+"Mistral Small 3.2" in the checks below as "the model the layer is pinned to":
+pin the layers (Settings → Architecture) to a Mistral model to run them. The
+failure they guard against, a side call naming `mistral-small-2506` and
+falling back to DeepSeek V4 Flash, is still the thing to look for, and the
+new default is checked under the catalog refresh above.
 
 - **Side agents with only a Mistral key.** Save only a Mistral key, leave
   every Settings → Architecture override off, and play a few turns. The

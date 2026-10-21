@@ -198,8 +198,9 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
 
 export interface GenerationOptions {
   // Not read by generateStoryTurn: the reasoning-tier router picks the GM's
-  // model, and narration, choices and every side call run on the narration
-  // model (getEffectiveNarrationModelKey, decision 19). Kept so existing
+  // model, narration and choices run on the narration model
+  // (getEffectiveNarrationModelKey), and the side agents run on their own
+  // default (SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51). Kept so existing
   // callers type-check.
   storyModel: string;
   toolsModel: string;
@@ -945,12 +946,16 @@ export async function generateStoryTurn(
     result.meta.costTurnId = costTurnId;
 
     // Shared by the observer and the memory agent below - both are
-    // best-effort side calls for the turn that just completed, run on the
-    // narration model (decision 19) unless the user pinned a specific
-    // model/effort for that stage in Settings > Architecture
-    // (layerSettings.ts). It has to be an AI_MODELS key (or a custom model's
-    // UUID): GenerationMeta.model is the provider's own id, which the proxy
-    // can't resolve and silently swaps for DeepSeek V4 Flash.
+    // best-effort side calls for the turn that just completed. The keys, the
+    // cost-turn id and the abort signal are common to all of them; the model
+    // is not: each side agent takes its own through resolveSideCallModel
+    // (the player's pin from Settings > Architecture, else
+    // SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51), which overrides the
+    // `model` here. This `model` is the narration model, and only the choices
+    // re-derivation after an Observer rewrite uses it. It has to be an
+    // AI_MODELS key (or a custom model's UUID): GenerationMeta.model is the
+    // provider's own id, which the proxy can't resolve and silently swaps for
+    // DeepSeek V4 Flash.
     const sideCallApiOptions = {
       model: getEffectiveNarrationModelKey(),
       token: null,
@@ -973,7 +978,7 @@ export async function generateStoryTurn(
     const observerModelOverride = getObserverModelOverride();
     const observerApiOptions = {
       ...sideCallApiOptions,
-      ...resolveSideCallModel(observerModelOverride, sideCallApiOptions.model),
+      ...resolveSideCallModel(observerModelOverride),
     };
 
     // Choices are parsed from the narration, so a rewrite invalidates them -
@@ -1379,9 +1384,10 @@ export async function generateStoryTurn(
               // the deliberate parts of the draft intact.
               narrationThoughts: result.narrationThoughts,
               // Same model/effort the Observer was just judged with (the
-              // Architecture tab's override, if the user pinned one) - not
-              // sideCallApiOptions, or the rewrite would silently skip that
-              // override and run on the plain narration model.
+              // Architecture tab's override, if the user pinned one, else the
+              // side-agent default) - not sideCallApiOptions, or the rewrite
+              // would silently skip that override and run on the narration
+              // model.
               apiOptions: observerApiOptions,
             });
           } catch (rewriteError) {
@@ -1724,10 +1730,7 @@ export async function generateStoryTurn(
       try {
         const memoryKeeperApiOptions = {
           ...sideCallApiOptions,
-          ...resolveSideCallModel(
-            getMemoryKeeperModelOverride(),
-            sideCallApiOptions.model,
-          ),
+          ...resolveSideCallModel(getMemoryKeeperModelOverride()),
         };
         await runMemoryAgent(
           storyData,
@@ -1753,10 +1756,7 @@ export async function generateStoryTurn(
         try {
           const directorAssistantApiOptions = {
             ...sideCallApiOptions,
-            ...resolveSideCallModel(
-              getDirectorAssistantModelOverride(),
-              sideCallApiOptions.model,
-            ),
+            ...resolveSideCallModel(getDirectorAssistantModelOverride()),
           };
           await runDirectorAssistant(
             storyData,
@@ -1789,10 +1789,7 @@ export async function generateStoryTurn(
       try {
         const storyProgressApiOptions = {
           ...sideCallApiOptions,
-          ...resolveSideCallModel(
-            getStoryProgressObserverModelOverride(),
-            sideCallApiOptions.model,
-          ),
+          ...resolveSideCallModel(getStoryProgressObserverModelOverride()),
         };
         const progressResult = await runStoryProgressObserver(
           storyData,
@@ -2127,15 +2124,15 @@ async function generateStoryTurnOnce(
             storyData,
             gmHistoryBudget,
             {
-              // The narration model, like every other side call (decision 19)
-              // - through resolveSideCallModel, which keeps a subscription
-              // narration voice off compaction (decision 12).
-              ...resolveSideCallModel(null, narrationModel),
+              // The side-agent default, like every other unpinned side call
+              // (decision 51) - through resolveSideCallModel, which can never
+              // hand compaction a subscription model (decision 12).
+              ...resolveSideCallModel(null),
               token,
-              // All five, not just the ones this model "usually" needs: the
-              // default narration model is a Mistral model, and leaving a
-              // provider out here is how compaction silently never ran
-              // (status report §6.13).
+              // All six, not just the ones this model "usually" needs:
+              // leaving a provider out here is how compaction silently never
+              // ran, back when the default model was a Mistral one (status
+              // report §6.13).
               ...pickProviderKeys(options),
               abortSignal: options.abortSignal,
             },
@@ -2169,7 +2166,7 @@ async function generateStoryTurnOnce(
         try {
           const reflectionModelOverride = getReflectionModelOverride();
           const reflectionApiOptions = {
-            ...resolveSideCallModel(reflectionModelOverride, narrationModel),
+            ...resolveSideCallModel(reflectionModelOverride),
             token,
             ...pickProviderKeys(options),
             abortSignal: options.abortSignal,

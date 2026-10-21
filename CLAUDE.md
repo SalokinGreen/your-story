@@ -385,7 +385,7 @@ always runs **before** the story stage:
    prose (no tool call that round), that content *is* the story. Otherwise the
    same conversation is continued with `buildStoryContinuationPrompt()`,
    streamed — but on the **narration model** (`getEffectiveNarrationModelKey()`,
-   default Mistral Small 3.2), not the GM's tier model.
+   default GLM 5.3 through OpenRouter, decision 50), not the GM's tier model.
 3. **The choices stage** — a separate call on the narration model
    (`generateChoicesWithRetry` → `parseChoices`), only when
    `storyData.autoGenerateChoices` is on. It is off by default.
@@ -406,10 +406,13 @@ keyed on `isAnthropicViaOpenRouter()`, because Claude 5.5 returns a 400 for
 things every other provider is sent: no sampling parameters (not even
 `temperature`), no assistant prefill (trailing or mid-history), `tool_choice`
 always `auto` (the gates' own user message does the forcing), effort `none`
-sent as `low`, and only the current turn's signed `reasoning_details`
+or no effort at all (an unpinned side agent) sent as `low`, and only the current turn's signed `reasoning_details`
 replayed. `max_tokens` never goes below 4,096, because Claude's thinking
 counts against it, and a Claude call is billed at OpenRouter's own
-`usage.cost`. A request built outside `providerCall` (the OCR importer's
+`usage.cost`. Qwen 3.8 (`qwen/qwen3.8…`) gets `tool_choice` `auto` too
+(`modelRejectsForcedToolChoice`): it thinks by default and is reported to
+reject a forced tool call, though OpenRouter lists the parameter as
+supported. A request built outside `providerCall` (the OCR importer's
 `callProviderAI`) needs the same care. The GM stage marks the player's
 action `cacheBreakpoint`, and a
 Claude request with tools gets prompt-cache breakpoints there and on the
@@ -455,13 +458,29 @@ cost, and logs failures to the Debug Logs instead of swallowing them.
 (`reasoningTierOverrides`), the narration model (`narrationModelOverride`)
 and each side agent (`layerSettings.ts`) can be overridden in Settings, and
 the GM can raise its own tier with `set_reasoning_tier`, capped by
-`MAX_TIER3_CALLS_PER_SCENE`. The heavy tiers are Grok 4.5 (combat) and Kimi
-K3 (boss fights). An unpinned side agent (the Observer, Memory Keeper,
-Director Assistant, Story Progress Observer, compaction and reflection) runs
-on the narration model (decision 19). A model handed to a call must be an
+`MAX_TIER3_CALLS_PER_SCENE`. The default ladder (`REASONING_TIERS`, decision
+50) is Claude Haiku 5.5 for tiers 0 and 1 (effort `none`, which Claude gets as
+`low`), GLM 5.3 for tier 2 (combat and rules, `high`) and Claude Sonnet 5.5
+for tier 3 (boss fights and campaign-shaping calls, `xhigh`), with narration
+on GLM 5.3; all of them are OpenRouter models, so one OpenRouter key runs the
+lot (a Z.ai-only player picks "GLM 5.3 (Z.ai)" in Settings). An unpinned
+side agent (the Observer and its judges, Memory Keeper, Director Assistant,
+Story Progress Observer, compaction and reflection) runs on
+`SIDE_AGENT_DEFAULT_MODEL_KEY` in `layerSettings.ts`, Claude Haiku 5.5,
+whatever the narration voice is (decision 51, which revised decision 19);
+`resolveSideCallModel(override)` takes no fallback model, so a side agent can
+never inherit the narration or GM model, or a subscription one. The choices
+call, including the one re-run after an Observer rewrite, stays on the
+narration model. A model handed to a call must be an
 `AI_MODELS` key or a custom model's UUID, never `GenerationMeta.model` (the
 provider's own id), which `getModelConfig()` silently swaps for DeepSeek V4
-Flash.
+Flash. A saved choice (a tier, the narration voice, a side agent, a lore image
+model) naming a key the catalog has dropped reads as unset and uses the slot's
+default (`isKnownModelKey()`, `resolveImageModelKey()` in `ai_prices.ts`), so
+removing a catalog entry is safe for saved and synced settings. The catalog was
+checked against OpenRouter and each vendor on 2026-10-21 (see the dated note in
+`docs/research/gm-models-2026-10-21.md` §6); `DeepSeek V4 Flash` is kept as a
+key only for the fallback and saved settings, and calls `deepseek-flash`.
 
 ## The GM is tool-calling, not a fixed dice system
 

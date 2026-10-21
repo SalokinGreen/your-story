@@ -11,7 +11,8 @@
  * (Settings UI) and generation.ts (actually applying the overrides).
  */
 
-import { AnyModelKey, NARRATION_MODEL_KEY, ReasoningEffort } from "./reasoningTiers";
+import { AnyModelKey, ReasoningEffort } from "./reasoningTiers";
+import { AIModelKey, isKnownModelKey } from "./ai_prices";
 import { canRunClaudeCliModel, claudeCliBlockReason, isClaudeCliModel } from "./claudeCliModels";
 import {
   ObserverSettings,
@@ -32,20 +33,37 @@ function notifyChanged(): void {
 // ============================================================
 // PER-STAGE MODEL/EFFORT OVERRIDES
 // ============================================================
-// null (default) means "run on the narration model"
-// (getEffectiveNarrationModelKey, decision 19) - generation.ts passes it in
-// as resolveSideCallModel's fallback.
+// null (default) means "run on SIDE_AGENT_DEFAULT_MODEL_KEY" (decision 51,
+// which revised decision 19: the side agents used to follow the narration
+// model). resolveSideCallModel is the one place that turns a null into it.
+
+/**
+ * The model an unpinned side agent runs on (decision 51): the Observer and
+ * its judges, the Memory Keeper, the Director Assistant, the Story Progress
+ * Observer, compaction and reflection. Claude Haiku 5.5 through OpenRouter,
+ * the same key the default tiers need - not "Claude Haiku (subscription)":
+ * a side agent reaches the Claude subscription only when the player pins a
+ * layer there (decision 12). Independent of the narration voice, so changing
+ * the narrator does not move the side agents.
+ */
+export const SIDE_AGENT_DEFAULT_MODEL_KEY: AIModelKey = "Claude Haiku 5.5";
 
 export interface ModelEffortOverride {
   modelKey: AnyModelKey;
   reasoningEffort: ReasoningEffort;
 }
 
+// A saved override whose model the catalog no longer has (one its provider
+// shut down, or a key synced from a newer build) reads as null, so the layer
+// runs on its default (SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51) rather than
+// reaching getModelConfig, which would swap in DeepSeek V4 Flash.
 function getOverride(key: string): ModelEffortOverride | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as ModelEffortOverride) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ModelEffortOverride | null;
+    return parsed && isKnownModelKey(parsed.modelKey) ? parsed : null;
   } catch {
     return null;
   }
@@ -105,8 +123,8 @@ export const setStoryProgressObserverModelOverride = (
 /**
  * Decisions 16 and 29 for the side agents: the layers whose Claude
  * subscription override cannot run here and now, for Settings' notice. They
- * run on the narration model instead (resolveSideCallModel). Empty on the
- * desktop app outside an online session.
+ * run on SIDE_AGENT_DEFAULT_MODEL_KEY instead (resolveSideCallModel). Empty on
+ * the desktop app outside an online session.
  */
 export function getLayerSubscriptionFallbacks(): {
   slot: string;
@@ -167,27 +185,23 @@ export function setStoryProgressCheckInterval(turns: number): void {
 }
 
 /**
- * Resolves a stage's { model, reasoningEffort } for its API call: the
- * override if one is set, otherwise the fallback model (the narration
- * model, which must be an AI_MODELS key or a custom model's UUID) with no
- * reasoningEffort field at all - preserving the exact fetch body these
- * stages sent before overrides existed.
+ * Resolves a side agent's { model, reasoningEffort } for its API call: the
+ * player's pin if there is one, otherwise SIDE_AGENT_DEFAULT_MODEL_KEY (an
+ * AI_MODELS key) with no reasoningEffort field at all. It takes no fallback
+ * model on purpose: an unpinned side agent no longer inherits the narration
+ * model or the GM's tier model (decision 51), so there is nothing for a
+ * caller to pass, and none that could carry a Claude subscription model in
+ * (decision 12: the side agents run on the subscription only when the
+ * player points a layer there).
  */
 export function resolveSideCallModel(
   override: ModelEffortOverride | null,
-  fallbackModel: string,
 ): { model: string; reasoningEffort?: string } {
-  // Decision 12: the side agents run on the Claude subscription only when the
-  // player points one there. A subscription model reaching them as the
-  // fallback (the narration or GM model) is swapped for the default
-  // narration model, so a subscription narration voice does not quietly add
-  // a CLI launch for every side call.
-  const fallback = isClaudeCliModel(fallbackModel) ? NARRATION_MODEL_KEY : fallbackModel;
-  if (!override) return { model: fallback };
+  if (!override) return { model: SIDE_AGENT_DEFAULT_MODEL_KEY };
   // Decisions 16 and 29: a subscription override this device cannot run (a
   // synced choice off the desktop) or may not run (online play is active).
   if (isClaudeCliModel(override.modelKey) && !canRunClaudeCliModel()) {
-    return { model: fallback };
+    return { model: SIDE_AGENT_DEFAULT_MODEL_KEY };
   }
   return { model: override.modelKey, reasoningEffort: override.reasoningEffort };
 }

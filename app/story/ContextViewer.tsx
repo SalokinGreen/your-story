@@ -28,6 +28,9 @@ import {
   getEffectiveNarrationModelKey,
   getEffectiveTiers,
   MAX_TIER3_CALLS_PER_SCENE,
+  NARRATION_MODEL_KEY,
+  REASONING_TIERS,
+  SCENE_BASELINE_TIER,
 } from "../misc/reasoningTiers";
 
 interface ContextViewerProps {
@@ -312,10 +315,10 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [choicesMessages, setChoicesMessages] = useState<ChatMessage[]>([]);
   const [estimatedTokens, setEstimatedTokens] = useState(0);
   const [gmModelConfig, setGmModelConfig] = useState(
-    getModelConfig("Mistral Small 3.2"),
+    getModelConfig(REASONING_TIERS[SCENE_BASELINE_TIER].modelKey),
   );
-  const [narrationModelKey, setNarrationModelKey] = useState(
-    "Mistral Small 3.2",
+  const [narrationModelKey, setNarrationModelKey] = useState<string>(
+    NARRATION_MODEL_KEY,
   );
   const [tierPreview, setTierPreview] = useState<{
     tier: number;

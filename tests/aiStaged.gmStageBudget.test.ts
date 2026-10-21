@@ -5,10 +5,13 @@
  *
  * Regression: the budget used to be `min(Memory Size, window) - the model's
  * declared maxOutputTokens`. With the default 36k Memory Size that went
- * negative on every model declaring 36k+ output - including the default
- * Grok 4.5 (-38,400 history) and Kimi K3 (-55,200) tiers, which run combat
+ * negative on every model declaring 36k+ output - including the Grok 4.5
+ * (-38,400 history) and Kimi K3 (-55,200) tiers, then the defaults for combat
  * and boss fights - and getPartsWithinTokenBudget then included no story
- * history at all.
+ * history at all. The defaults are Claude and GLM models now (decision 50),
+ * which declare 128k output, so the first block below runs over whatever
+ * REASONING_TIERS holds and the literal models after it keep the old heavy
+ * tiers covered.
  */
 import { describe, it, expect } from "vitest";
 import {

@@ -335,25 +335,14 @@ export function estimateTurnCost(
   const gmModel = String(gmTier.modelKey);
   const narrationModel = String(getEffectiveNarrationModelKey());
 
-  // Side calls run on the narration model unless the user pinned one in
-  // Settings > Architecture (decision 19) - exactly what generation.ts does
+  // Side calls run on SIDE_AGENT_DEFAULT_MODEL_KEY unless the user pinned one
+  // in Settings > Architecture (decision 51) - exactly what generation.ts does
   // at runtime.
-  const sideCallFallback = narrationModel;
-  const observerCall = resolveSideCallModel(
-    getObserverModelOverride(),
-    sideCallFallback,
-  );
-  const memoryCall = resolveSideCallModel(
-    getMemoryKeeperModelOverride(),
-    sideCallFallback,
-  );
-  const directorCall = resolveSideCallModel(
-    getDirectorAssistantModelOverride(),
-    sideCallFallback,
-  );
+  const observerCall = resolveSideCallModel(getObserverModelOverride());
+  const memoryCall = resolveSideCallModel(getMemoryKeeperModelOverride());
+  const directorCall = resolveSideCallModel(getDirectorAssistantModelOverride());
   const progressCall = resolveSideCallModel(
     getStoryProgressObserverModelOverride(),
-    sideCallFallback,
   );
 
   // --- Context budget the GM stage will be filled to ------------------

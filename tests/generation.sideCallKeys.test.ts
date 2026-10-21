@@ -5,12 +5,15 @@
  * with NO_API_KEY whenever the model lives on a provider it left out.
  *
  * Compaction and reflection forwarded only openRouterKey/deepseekKey/
- * googleKey while running on `storyModel`, which defaults to the narration
- * model (NARRATION_MODEL_KEY, a Mistral model). The proxy refused every one
+ * googleKey while running on `storyModel`, which then defaulted to the
+ * narration model (a Mistral model at the time). The proxy refused every one
  * of those calls and the failure was swallowed, so with default settings a
  * long campaign never got a scene summary or a reflection insight (status
  * report §6.13). This drives a real turn with nothing but a Mistral key, on a
- * story that is due for both, and checks the key reached every call.
+ * story that is due for both, and checks the key reached every call. The
+ * defaults have moved to OpenRouter models since (decisions 50 and 51); the
+ * mock accepts any model, so what is checked is the forwarding of all six
+ * keys, which is independent of which provider a call's model lives on.
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
@@ -104,7 +107,7 @@ afterEach(() => {
 });
 
 describe("side calls forward every provider key", () => {
-  it("compacts and reflects with only a Mistral key saved and the default narration model", async () => {
+  it("compacts and reflects, forwarding a Mistral key that is the only one saved", async () => {
     const { fetchMock, calls } = createFetchMock();
     global.fetch = fetchMock as unknown as typeof fetch;
 

@@ -8,6 +8,10 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 
+// A model whose provider these tests hold the key for - not the default narration
+// model, which moves with the catalog (decision 50).
+const MISTRAL_MODEL = "Mistral Small 3.2";
+
 const mockPlatformFetch = vi.fn();
 vi.mock("@/app/misc/platformFetch", () => ({
   getProviderFetch: () => mockPlatformFetch,
@@ -15,7 +19,6 @@ vi.mock("@/app/misc/platformFetch", () => ({
 
 import { callSideModel, pickProviderKeys } from "@/app/misc/sideModelCall";
 import { logger } from "@/app/misc/logger";
-import { NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
 
 const ALL_KEYS = {
   openRouterKey: "or-key",
@@ -69,7 +72,7 @@ describe("callSideModel - web build", () => {
     const result = await callSideModel({
       stage: "observer",
       label: "test judge",
-      model: NARRATION_MODEL_KEY,
+      model: MISTRAL_MODEL,
       messages: MESSAGES,
       keys: { ...ALL_KEYS, cartesiaKey: "cartesia" } as typeof ALL_KEYS,
       maxTokens: 200,
@@ -84,7 +87,7 @@ describe("callSideModel - web build", () => {
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({
       messages: MESSAGES,
-      model: NARRATION_MODEL_KEY,
+      model: MISTRAL_MODEL,
       maxTokens: 200,
       temperature: 0,
       reasoningEffort: "low",
@@ -107,7 +110,7 @@ describe("callSideModel - web build", () => {
     const result = await callSideModel({
       stage: "compaction",
       label: "History summarization",
-      model: NARRATION_MODEL_KEY,
+      model: MISTRAL_MODEL,
       messages: MESSAGES,
       keys: {},
     });
@@ -122,7 +125,7 @@ describe("callSideModel - web build", () => {
       "Side call failed: History summarization",
       expect.objectContaining({
         stage: "compaction",
-        model: NARRATION_MODEL_KEY,
+        model: MISTRAL_MODEL,
         status: 400,
         code: "NO_API_KEY",
       }),
@@ -137,7 +140,7 @@ describe("callSideModel - web build", () => {
 
     const result = await callSideModel({
       label: "Memory Keeper",
-      model: NARRATION_MODEL_KEY,
+      model: MISTRAL_MODEL,
       messages: MESSAGES,
       keys: ALL_KEYS,
     });
@@ -155,7 +158,7 @@ describe("callSideModel - web build", () => {
     await expect(
       callSideModel({
         label: "Game Designer",
-        model: NARRATION_MODEL_KEY,
+        model: MISTRAL_MODEL,
         messages: MESSAGES,
         keys: ALL_KEYS,
       }),
@@ -181,7 +184,7 @@ describe("callSideModel - standalone (Tauri/Capacitor) build", () => {
     const result = await callSideModel({
       stage: "compaction",
       label: "History summarization",
-      model: NARRATION_MODEL_KEY,
+      model: MISTRAL_MODEL,
       messages: MESSAGES,
       keys: { mistralKey: "mistral-key" },
     });

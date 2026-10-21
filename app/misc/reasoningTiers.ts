@@ -15,7 +15,12 @@
  * references AI_MODELS keys, never raw provider model strings.
  */
 
-import { AI_MODELS, AIModelKey, getModelConfig } from "@/app/misc/ai_prices";
+import {
+  AI_MODELS,
+  AIModelKey,
+  getModelConfig,
+  isKnownModelKey,
+} from "@/app/misc/ai_prices";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 import {
   canRunClaudeCliModel,
@@ -39,13 +44,21 @@ export interface ReasoningTier {
  * The tier ladder. Every provider is BYOK now (app/misc/APIKeysContext.tsx —
  * there's no server-side key for any provider), so tiers are free to mix
  * providers per-tier rather than being constrained to a single "guaranteed
- * available" one. This ladder deliberately spans two providers as an
- * example of that: Mistral for the cheap/default tiers, OpenRouter for the
- * heavier ones. Swap any `modelKey` to any AI_MODELS entry to reconfigure —
- * whichever providers end up in use, the corresponding key (mistralKey,
- * openRouterKey, deepseekKey, googleKey, deepinfraKey) must be configured
- * in Settings for that tier to actually dispatch; a missing key fails over
- * to the next-lower tier (see fallbackTier below) rather than crashing.
+ * available" one. Swap any `modelKey` to any AI_MODELS entry to reconfigure —
+ * whichever providers end up in use, the corresponding key (openRouterKey,
+ * deepseekKey, googleKey, mistralKey, deepinfraKey, zaiKey) must be
+ * configured in Settings for that tier to actually dispatch; a missing key
+ * fails over to the next-lower tier (see fallbackTier below) rather than
+ * crashing.
+ *
+ * The defaults (decision 50, "Balanced") are Claude Haiku 5.5 for the two
+ * light tiers, GLM 5.3 for combat and rules, and Claude Sonnet 5.5 for boss
+ * fights and campaign-shaping calls: all three are OpenRouter models, so one
+ * OpenRouter key runs the whole ladder. The efforts are unchanged from the
+ * Mistral/Grok/Kimi ladder these replaced, and providerCall.ts already
+ * translates each for its model: Claude's "none" is sent as "low" (its
+ * thinking cannot be turned off), GLM 5.3 always thinks and takes "high" as
+ * "high", and Sonnet's "xhigh" goes out as OpenRouter's "xhigh".
  *
  * All entries have supportsToolCalling: true in AI_MODELS — required since
  * GM adjudication calls dice/state tools mid-turn (DeepSeek R1 variants
@@ -54,29 +67,34 @@ export interface ReasoningTier {
  */
 export const REASONING_TIERS: ReasoningTier[] = [
   {
-    modelKey: "Mistral Nemo",
+    modelKey: "Claude Haiku 5.5",
     reasoningEffort: "none",
     note: "banter, descriptions, NPC chatter",
   },
   {
-    modelKey: "Mistral Small 3.2",
+    modelKey: "Claude Haiku 5.5",
     reasoningEffort: "none",
-    note: "default GM narration / skill checks",
+    note: "ordinary skill checks and everyday GM calls",
   },
   {
-    modelKey: "Grok 4.5",
+    modelKey: "GLM 5.3",
     reasoningEffort: "high",
     note: "rules adjudication, combat",
   },
   {
-    modelKey: "Kimi K3",
+    modelKey: "Claude Sonnet 5.5",
     reasoningEffort: "xhigh",
     note: "boss fights, campaign-shaping calls",
   },
 ];
 
-/** Fixed narration voice — always tier 1, regardless of adjudication tier. */
-export const NARRATION_MODEL_KEY: AIModelKey = "Mistral Small 3.2";
+/**
+ * The narration voice (decision 50): the model the story-continuation call
+ * and the choices call run on, regardless of adjudication tier. When the GM's
+ * own final round already wrote the prose, that round's tier model wrote it
+ * instead (generation.ts, gmFinalStoryContent).
+ */
+export const NARRATION_MODEL_KEY: AIModelKey = "GLM 5.3";
 
 export const SCENE_BASELINE_TIER = 1;
 export const MAX_TIER3_CALLS_PER_SCENE = 3;
@@ -124,13 +142,22 @@ function notifyConfigChanged() {
   }
 }
 
-/** Raw overrides array, one slot per REASONING_TIERS index (null = use default). */
+/**
+ * The saved overrides, one slot per REASONING_TIERS index (null = use
+ * default). A slot whose saved model the catalog no longer has (a model its
+ * provider shut down, or a key synced from a newer build) reads as null, so it
+ * uses its default instead of reaching getModelConfig, which would swap in
+ * DeepSeek V4 Flash. The stored value is left alone; the next write drops it.
+ */
 export function getTierOverrides(): (TierOverride | null)[] {
   if (typeof window === "undefined") return REASONING_TIERS.map(() => null);
   try {
     const raw = localStorage.getItem(TIER_OVERRIDES_KEY);
     const parsed: (TierOverride | null)[] = raw ? JSON.parse(raw) : [];
-    return REASONING_TIERS.map((_, i) => parsed[i] ?? null);
+    return REASONING_TIERS.map((_, i) => {
+      const o = parsed[i];
+      return o && isKnownModelKey(o.modelKey) ? o : null;
+    });
   } catch {
     return REASONING_TIERS.map(() => null);
   }
@@ -184,9 +211,11 @@ export function getEffectiveTiers(): ReasoningTier[] {
   });
 }
 
+/** The saved narration voice; null when none, or when the catalog dropped it. */
 export function getNarrationModelOverride(): AnyModelKey | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(NARRATION_OVERRIDE_KEY) || null;
+  const stored = localStorage.getItem(NARRATION_OVERRIDE_KEY);
+  return isKnownModelKey(stored) ? stored : null;
 }
 
 export function setNarrationModelOverride(modelKey: AnyModelKey | null): void {

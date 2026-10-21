@@ -251,6 +251,25 @@ export function isAnthropicViaOpenRouter(
 }
 
 /**
+ * OpenRouter models that cannot be sent a forced tool choice
+ * (`tool_choice: "required"`): the Qwen 3.8 family, which thinks by default
+ * and is reported to answer a forced tool call made with thinking on with a
+ * 400 (APIYI's Qwen3.8-Max reference, and the 2026-10-21 model research).
+ * OpenRouter itself lists `tool_choice` among Qwen 3.8's supported
+ * parameters, so this is a safeguard for an upstream limit it does not
+ * advertise. They get "auto" like Claude: the roll and plan gates' own user
+ * message does the forcing.
+ */
+export function modelRejectsForcedToolChoice(
+  config: Pick<AIModelConfig, "provider" | "model">,
+): boolean {
+  return (
+    config.provider === "openrouter" &&
+    config.model.toLowerCase().startsWith("qwen/qwen3.8")
+  );
+}
+
+/**
  * Models whose thinking cannot be turned off: Claude 5.5 through OpenRouter,
  * and GLM-5.3 whether straight from Z.ai or through OpenRouter
  * (`z-ai/glm-5.3…`). They get the max_tokens floor below, never effort
@@ -318,8 +337,11 @@ function applyReasoningEffort(
   thinksAlways = false,
 ): void {
   // Claude 5.5's thinking cannot be disabled ("none" is a 400), so a tier
-  // set to "none" runs at the lowest effort Claude has instead.
-  if (isClaude && reasoningEffort === "none") {
+  // set to "none" runs at the lowest effort Claude has instead. A call with
+  // no effort of its own (an unpinned side agent, which runs on Claude Haiku
+  // 5.5 by default - decision 51) runs at low too, not at Claude's own
+  // default effort, which would make every side call slower and dearer.
+  if (isClaude && (!reasoningEffort || reasoningEffort === "none")) {
     requestBody.reasoning = { effort: "low" };
     return;
   }
@@ -487,16 +509,17 @@ function resolveModelConfig(
 /**
  * `tool_choice` for a request that offers tools. Google always gets
  * "required"; a caller-forced round (the roll and plan gates) gets
- * "required" - except on Claude, where forced tool use is a 400, and on
- * Z.ai, which accepts only "auto". There the gate's own user message, which
- * already says a tool call is required, does the forcing.
+ * "required" - except on Claude, where forced tool use is a 400, on Qwen 3.8
+ * (modelRejectsForcedToolChoice), and on Z.ai, which accepts only "auto".
+ * There the gate's own user message, which already says a tool call is
+ * required, does the forcing. `autoOnly` is true for the first two.
  */
 function resolveToolChoice(
   provider: Provider,
   toolChoice: GenerateRequestBody["toolChoice"],
-  isClaude: boolean,
+  autoOnly: boolean,
 ): "required" | "auto" {
-  if (isClaude || provider === "zai") return "auto";
+  if (autoOnly || provider === "zai") return "auto";
   return toolChoice === "required" || provider === "google" ? "required" : "auto";
 }
 
@@ -887,7 +910,7 @@ async function requestNonStreaming(
     if (hasTools) {
       const toolsToUse = provider === "google" ? filterToolsForGoogle(tools!) : tools;
       requestBody.tools = toolsToUse;
-      requestBody.tool_choice = resolveToolChoice(provider, toolChoice, isClaude);
+      requestBody.tool_choice = resolveToolChoice(provider, toolChoice, isClaude || modelRejectsForcedToolChoice(config));
     }
 
     applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude, thinksAlways);
@@ -1123,7 +1146,7 @@ export function generateStream(
         if (hasTools) {
           const toolsToUse = provider === "google" ? filterToolsForGoogle(tools!) : tools;
           requestBody.tools = toolsToUse;
-          requestBody.tool_choice = resolveToolChoice(provider, toolChoice, isClaude);
+          requestBody.tool_choice = resolveToolChoice(provider, toolChoice, isClaude || modelRejectsForcedToolChoice(config));
         }
 
         applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude, thinksAlways);

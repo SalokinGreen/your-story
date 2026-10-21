@@ -20,6 +20,7 @@ import {
 } from "@/app/misc/reasoningTiers";
 import {
   LAYER_SETTINGS_CHANGED_EVENT,
+  SIDE_AGENT_DEFAULT_MODEL_KEY,
   getLayerSubscriptionFallbacks,
 } from "@/app/misc/layerSettings";
 
@@ -29,7 +30,7 @@ function allFallbacks(): SubscriptionFallback[] {
     ...getSubscriptionFallbacks(),
     ...getLayerSubscriptionFallbacks().map((layer) => ({
       ...layer,
-      fallbackModelKey: "the narration model",
+      fallbackModelKey: SIDE_AGENT_DEFAULT_MODEL_KEY,
     })),
   ];
 }

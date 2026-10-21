@@ -23,23 +23,77 @@ export const AI_MODELS = {
     finetunes: [],
   },
 
+  // xAI's docs and OpenRouter agree: $2 / $6 per M, doubling for a prompt of
+  // 200k tokens or more, 500k context. Cached input is $0.50 (Grok 4.5: $0.30).
+  "Grok 4.7": {
+    name: "Grok 4.7",
+    original_model: "Grok 4.7",
+    model: "x-ai/grok-4.7",
+    maxTokens: 500000,
+    maxOutputTokens: 128000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    strengths: ["logic", "reasoning", "tool calling"],
+    weaknesses: ["price above 200k tokens"],
+    description:
+      "xAI's newer Grok, at the same price as Grok 4.5 (Artificial Analysis intelligence index 46). 500k context; a prompt of 200k tokens or more bills at double.",
+    bannerUrl: undefined,
+    inputPrice: 2,
+    outputPrice: 6,
+    finetunes: [],
+  },
+
+  // The DeepSeek entries use DeepSeek's own docs (api-docs.deepseek.com,
+  // Models & Pricing, 2026-10-21), not OpenRouter's headline price, which is a
+  // single cheap endpoint's. DeepSeek bills peak (01:00-04:00 and 06:00-10:00
+  // UTC, Monday to Friday) at double the off-peak rate; the figures here are
+  // the off-peak ones. Cached input per M: Flash $0.003, Pro $0.022 off-peak.
+  //
+  // "DeepSeek V4 Flash" stays as a key because saved settings and
+  // getModelConfig's unknown-key fallback name it. DeepSeek retired V4 Flash
+  // on 2026-09-10: the old API name `deepseek-v4-flash` is still accepted but
+  // is "temporarily routed" to V4.1 Flash at the Flash price, so this entry
+  // calls the documented current name instead of the alias that may go.
   "DeepSeek V4 Flash": {
-    name: "DeepSeek V4 Flash",
+    name: "DeepSeek V4 Flash (now V4.1)",
     original_model: "DeepSeek V4 Flash",
-    model: "deepseek-v4-flash",
+    model: "deepseek-flash",
     maxTokens: 1000000,
     maxOutputTokens: 65000,
     provider: "deepseek",
     supportsToolCalling: true,
-    inputPrice: 0.14,
-    outputPrice: 0.28,
+    inputPrice: 0.15,
+    outputPrice: 0.6,
     finetunes: [],
     strengths: ["creativity", "nsfw"],
-    weaknesses: ["price"],
+    weaknesses: ["old name"],
     description:
-      "DeepSeek's fast successor to DeepSeek Chat, known for its creativity and ability to handle long-form content, making it suitable for detailed storytelling and complex narratives.",
+      "The old name for DeepSeek's Flash model, kept so saved settings and the app's fallback keep working. DeepSeek retired V4 Flash on 2026-09-10; this entry now calls V4.1 Flash at V4.1 Flash's price. Pick DeepSeek V4.1 Flash instead.",
     bannerUrl: undefined,
   },
+  "DeepSeek V4.1 Flash": {
+    name: "DeepSeek V4.1 Flash",
+    original_model: "DeepSeek V4.1 Flash",
+    model: "deepseek-flash",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    provider: "deepseek",
+    supportsToolCalling: true,
+    inputPrice: 0.15,
+    outputPrice: 0.6,
+    finetunes: [],
+    strengths: ["cost-effective", "fast", "tool calling", "long context", "latest"],
+    weaknesses: ["peak-hour price doubles"],
+    description:
+      "DeepSeek's current Flash model (V4.1-Flash-1017) on your own DeepSeek key. 1M context, thinking on by default, about 206 tokens/s and one of the cheapest options for the light tiers and side agents. Weekday peak hours (01:00-04:00 and 06:00-10:00 UTC) bill at double the price shown.",
+    bannerUrl: undefined,
+  },
+  // DeepSeek's 2026-09-10 release post says every deepseek-v4-pro request
+  // routes to V4.1 Flash at Flash rates from 2026-09-14; its changelog says V4
+  // Pro API service continues past that date at unchanged billing, and its
+  // Models & Pricing page lists deepseek-v4-pro (DeepSeek-V4-Pro-0813) at its
+  // own price. The catalog follows the pricing page. Not confirmed with a
+  // live call (no DeepSeek key here).
   "DeepSeek V4 Pro": {
     name: "DeepSeek V4 Pro",
     original_model: "DeepSeek V4 Pro",
@@ -48,13 +102,13 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "deepseek",
     supportsToolCalling: true,
-    inputPrice: 0.435,
-    outputPrice: 0.87,
+    inputPrice: 0.66,
+    outputPrice: 1.98,
     finetunes: [],
     strengths: ["creativity", "smarts", "nsfw"],
-    weaknesses: ["price"],
+    weaknesses: ["price", "may be retired"],
     description:
-      "DeepSeek's higher-quality flagship model with deeper reasoning, ideal for complex narratives that need stronger consistency.",
+      "DeepSeek's larger model (V4-Pro-0813). DeepSeek's release post says this name will be routed to V4.1 Flash, but its changelog and pricing page keep it as a separate model at the price shown, and its own announcement says V4.1 Flash beats it. If a call ever bills at Flash prices, DeepSeek has made the switch.",
     bannerUrl: undefined,
   },
   "Gemini 3.1 Flash Lite": {
@@ -75,9 +129,22 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  // Google AI Studio (BYOK) - Direct access via Google's OpenAI-compatible API
+  // Google AI Studio (BYOK) - Direct access via Google's OpenAI-compatible API.
+  // Checked against ai.google.dev/gemini-api/docs/models, /deprecations and
+  // /pricing on 2026-10-21. The 2.5 models are not deprecated, but Google now
+  // limits access to them to keys that have used them before. The direct
+  // Google route sends a filtered tool list (providerCall.ts
+  // GOOGLE_ESSENTIAL_TOOLS, status report 6.14), which still lacks
+  // start_game and the Designer's tools; the OpenRouter Gemini entry above
+  // does not have that limit.
+
+  // `gemini-flash-latest` is Google's alias for its newest Flash model, which
+  // Google re-points with two weeks' notice. It was Gemini 2.5 Flash when this
+  // entry was written; the price below is from then (Google now charges
+  // $0.30 / $2.50 for the pinned 2.5 Flash and $0.75 / $3.75 for 3.8 Flash)
+  // and what the alias bills today could not be checked without a Google key.
   "Google Gemini 2.5 Flash": {
-    name: "Google Gemini 2.5 Flash (BYOK)",
+    name: "Google Gemini Flash, latest alias (BYOK)",
     original_model: "models/gemini-flash-latest",
     model: "models/gemini-flash-latest",
     maxTokens: 1000000,
@@ -87,15 +154,16 @@ export const AI_MODELS = {
     inputPrice: 0.15,
     outputPrice: 0.6,
     finetunes: [],
-    strengths: ["creativity", "long context", "tool calling"],
-    weaknesses: [],
+    strengths: ["long context", "tool calling"],
+    weaknesses: ["alias moves", "price may be out of date"],
     description:
-      "Google's Gemini 2.5 Flash via AI Studio. Requires your own Google API key (BYOK). Free tier available with rate limits.",
+      "Google's gemini-flash-latest alias on your own Google key: whichever Flash model Google currently points it at, so the model and its price can change without notice. The price shown dates from when it pointed at Gemini 2.5 Flash; pick Google Gemini 3.8 Flash for a pinned model with a current price.",
     bannerUrl: undefined,
   },
 
+  // Same alias story for the Flash Lite line.
   "Google Gemini 2.5 Flash Lite": {
-    name: "Google Gemini 2.5 Flash Lite (BYOK)",
+    name: "Google Gemini Flash Lite, latest alias (BYOK)",
     original_model: "models/gemini-flash-lite-latest",
     model: "models/gemini-flash-lite-latest",
     maxTokens: 1000000,
@@ -106,9 +174,9 @@ export const AI_MODELS = {
     outputPrice: 0.3,
     finetunes: [],
     strengths: ["cost-effective", "long context"],
-    weaknesses: ["preview model"],
+    weaknesses: ["alias moves", "price may be out of date"],
     description:
-      "Google's lightweight Gemini model via AI Studio. Requires your own Google API key (BYOK). Very cost-effective.",
+      "Google's gemini-flash-lite-latest alias on your own Google key: whichever Flash Lite model Google currently points it at, so the model and its price can change without notice. The price shown dates from an earlier model (Google now charges $0.10 / $0.40 for the pinned Gemini 2.5 Flash Lite).",
     bannerUrl: undefined,
   },
 
@@ -124,31 +192,21 @@ export const AI_MODELS = {
     outputPrice: 10.0,
     finetunes: [],
     strengths: ["creativity", "reasoning", "long context", "quality"],
-    weaknesses: ["price"],
+    weaknesses: ["price", "legacy"],
     description:
-      "Google's most capable Gemini 2.5 model via AI Studio. Requires your own Google API key (BYOK). Best for complex tasks.",
+      "Google's Gemini 2.5 Pro on your own Google key. Not deprecated, but Google now limits the 2.5 models to keys that have used them before, so a new key may be refused. Prompts above 200k tokens cost $2.50 / $15.",
     bannerUrl: undefined,
   },
 
-  "Google Gemini 3 Pro": {
-    name: "Google Gemini 3 Pro (BYOK)",
-    original_model: "models/gemini-3-pro-preview",
-    model: "models/gemini-3-pro-preview",
-    maxTokens: 1000000,
-    maxOutputTokens: 65000,
-    provider: "google",
-    supportsToolCalling: true,
-    inputPrice: 1.25,
-    outputPrice: 10.0,
-    finetunes: [],
-    strengths: ["creativity", "reasoning", "long context", "quality", "latest"],
-    weaknesses: ["price", "preview"],
-    description:
-      "Google's latest Gemini 3 Pro preview via AI Studio. Requires your own Google API key (BYOK). Cutting-edge capabilities.",
-    bannerUrl: undefined,
-  },
+  // gemini-3-pro-preview was shut down on 2026-03-09 (Google's models page
+  // lists it as "Shut down"; its replacement is gemini-3.1-pro-preview). The
+  // "Google Gemini 3 Pro" entry is gone: a saved choice of that key falls
+  // back to its slot's default (isKnownModelKey).
+
+  // Google calls Gemini 3 Flash Preview "our legacy Flash model" and
+  // recommends gemini-3.6-flash; it has no shutdown date.
   "Google Gemini 3 Flash": {
-    name: "Google Gemini 3 Flash (BYOK)",
+    name: "Google Gemini 3 Flash Preview (BYOK)",
     original_model: "models/gemini-3-flash-preview",
     model: "models/gemini-3-flash-preview",
     maxTokens: 1000000,
@@ -158,10 +216,53 @@ export const AI_MODELS = {
     inputPrice: 0.5,
     outputPrice: 3,
     finetunes: [],
-    strengths: ["creativity", "long context", "latest"],
-    weaknesses: ["preview"],
+    strengths: ["creativity", "long context"],
+    weaknesses: ["legacy", "preview"],
     description:
-      "Google's latest Gemini 3 Flash preview via AI Studio. Requires your own Google API key (BYOK). Great for creative tasks.",
+      "Google's Gemini 3 Flash preview on your own Google key. Google now calls it a legacy model and recommends Gemini 3.6 or 3.8 Flash; it has no shutdown date.",
+    bannerUrl: undefined,
+  },
+
+  // Gemini 4 Argon, Google's flagship ("New Stable" on its models page,
+  // 2026-10-21). Google's pricing page: $2 in / $10 out (cached $0.10) through
+  // 2026-11-30, then $4 / $20 (cached $0.20) from 2026-12-01; not on the free
+  // tier. OpenRouter lists the same $2 / $10 and the same tool support.
+  "Google Gemini 4 Argon": {
+    name: "Google Gemini 4 Argon (BYOK)",
+    original_model: "models/gemini-4-argon",
+    model: "models/gemini-4-argon",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    provider: "google",
+    supportsToolCalling: true,
+    inputPrice: 2,
+    outputPrice: 10,
+    finetunes: [],
+    strengths: ["reasoning", "long context", "tool calling", "latest"],
+    weaknesses: ["price doubles on 2026-12-01", "no free tier", "no tool-use benchmark yet"],
+    description:
+      "Google's flagship reasoning model on your own Google key, 1M context. $2 / $10 per M until 2026-11-30, then $4 / $20 from 2026-12-01. No free tier. The direct Google route currently drops some GM tools (status report 6.14).",
+    bannerUrl: undefined,
+  },
+
+  // Gemini 3.8 Flash ("New Stable"). Google's pricing page: $0.75 / $3.75
+  // (cached $0.075) through 2026-12-31, then $1.50 / $7.50 from 2027-01-01,
+  // with a free tier. Max output 65,536 per OpenRouter's listing.
+  "Google Gemini 3.8 Flash": {
+    name: "Google Gemini 3.8 Flash (BYOK)",
+    original_model: "models/gemini-3.8-flash",
+    model: "models/gemini-3.8-flash",
+    maxTokens: 1000000,
+    maxOutputTokens: 65536,
+    provider: "google",
+    supportsToolCalling: true,
+    inputPrice: 0.75,
+    outputPrice: 3.75,
+    finetunes: [],
+    strengths: ["cost-effective", "fast", "long context", "tool calling", "latest"],
+    weaknesses: ["price doubles on 2027-01-01"],
+    description:
+      "Google's current Flash model on your own Google key (Artificial Analysis intelligence 41, about 137 tokens/s). $0.75 / $3.75 per M until 2026-12-31, then $1.50 / $7.50 from 2027-01-01; free tier with rate limits. The direct Google route currently drops some GM tools (status report 6.14).",
     bannerUrl: undefined,
   },
   // OpenRouter prices GLM per provider endpoint, from $0.03 to $2.31 per M
@@ -302,23 +403,94 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  "Grok Code Fast 1": {
-    name: "Grok Code Fast 1",
-    original_model: "Grok Code Fast 1",
-    model: "x-ai/grok-code-fast-1",
-    maxTokens: 250000,
-    maxOutputTokens: 10000,
+  // "Grok Code Fast 1" (x-ai/grok-code-fast-1) was removed: OpenRouter no
+  // longer lists it (2026-10-21). A saved choice of that key falls back to its
+  // slot's default (isKnownModelKey).
+
+  // The Qwen 3.8 entries use OpenRouter's ids and Alibaba Cloud's own prices
+  // (Model Studio pricing page, international region: Max $2 / $6, Flash
+  // $0.15 / $0.47, one tier up to 1M input). Both think by default. Forced
+  // tool choice is reported to fail with thinking on, so providerCall.ts sends
+  // tool_choice "auto" to them (modelRejectsForcedToolChoice) and the gate's
+  // own user message does the forcing, as for Claude.
+  "Qwen 3.8 Max": {
+    name: "Qwen 3.8 Max",
+    original_model: "Qwen 3.8 Max",
+    model: "qwen/qwen3.8-max-0902",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
     provider: "openrouter",
     supportsToolCalling: true,
-    inputPrice: 0.2,
-    outputPrice: 1.5,
+    inputPrice: 2,
+    outputPrice: 6,
     finetunes: [],
-    strengths: ["tool calling", "logic", "reasoning"],
-    weaknesses: ["creativity", "prose"],
+    strengths: ["tool calling", "reasoning", "long context", "latest"],
+    weaknesses: ["slow (about 40 tokens/s)", "thinks by default"],
     description:
-      "A logic and reasoning-focused model that excels at understanding and generating structured content. Ideal for scenarios requiring precise logic and tool usage.",
+      "Alibaba's flagship Qwen 3.8 (the 0902 release), 1M context. Ranked first on the tau-3 Banking tool-use test and 45 on Artificial Analysis's intelligence index. It thinks by default and slowly, and the app never forces a tool call on it.",
     bannerUrl: undefined,
   },
+
+  "Qwen 3.8 Flash": {
+    name: "Qwen 3.8 Flash",
+    original_model: "Qwen 3.8 Flash",
+    model: "qwen/qwen3.8-flash",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    inputPrice: 0.15,
+    outputPrice: 0.47,
+    finetunes: [],
+    strengths: ["cost-effective", "long context", "tool calling", "latest"],
+    weaknesses: ["no independent tool-use results yet"],
+    description:
+      "Alibaba's cheap Qwen 3.8, 1M context. The research found no independent tool-use or prose results for it yet; the app never forces a tool call on it, like Qwen 3.8 Max.",
+    bannerUrl: undefined,
+  },
+
+  // The GPT-6 models are here because OpenRouter carries them; the app has no
+  // OpenAI provider. Prices are OpenAI's (developers.openai.com pricing,
+  // standard tier) and match OpenRouter's: a prompt above 272k tokens bills
+  // Sol at $4 / $15 and Luna at $0.20 / $0.75. Cached input: Sol $0.10, Luna
+  // $0.01. OpenRouter lists no temperature or top_p for either, so OpenRouter
+  // drops the sampling settings the app sends.
+  "GPT-6.1 Sol": {
+    name: "GPT-6.1 Sol",
+    original_model: "GPT-6.1 Sol",
+    model: "openai/gpt-6.1-sol",
+    maxTokens: 1050000,
+    maxOutputTokens: 128000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    inputPrice: 2,
+    outputPrice: 10,
+    finetunes: [],
+    strengths: ["long context", "tool calling", "reasoning"],
+    weaknesses: ["price", "no benchmark results gathered"],
+    description:
+      "OpenAI's GPT-6.1 Sol through your OpenRouter key, 1.05M context. A prompt above 272k tokens bills at $4 / $15. The 2026-10-21 research found no creative-writing or tool-use results for this model, so treat it as untested for this job.",
+    bannerUrl: undefined,
+  },
+
+  "GPT-6 Luna": {
+    name: "GPT-6 Luna",
+    original_model: "GPT-6 Luna",
+    model: "openai/gpt-6-luna",
+    maxTokens: 1050000,
+    maxOutputTokens: 128000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    inputPrice: 0.1,
+    outputPrice: 0.5,
+    finetunes: [],
+    strengths: ["cost-effective", "long context", "tool calling"],
+    weaknesses: ["no benchmark results gathered"],
+    description:
+      "OpenAI's small, cheap GPT-6 through your OpenRouter key, 1.05M context, at the same price as Claude Haiku 5.5. A prompt above 272k tokens bills at $0.20 / $0.75. The research found no creative-writing or tool-use results for it, so treat it as untested for this job.",
+    bannerUrl: undefined,
+  },
+
   "MiniMax M2": {
     name: "MiniMax M2",
     original_model: "MiniMax M2",
@@ -671,6 +843,27 @@ export const AI_MODELS = {
       "Mistral's flagship large model with 256k context. Excellent for creative writing and complex narratives.",
     bannerUrl: undefined,
   },
+  // Mistral's own API id is `mistral-large-4` (`mistral-large-4-0` also works);
+  // `mistral-large-latest` still points at Large 3. docs.mistral.ai lists it
+  // as v26.10, "Public Preview", 1M context, $1.36 in / $0.14 cached / $4.18
+  // out per M, with function calling. OpenRouter's price is the same.
+  "Mistral Large 4": {
+    name: "Mistral Large 4",
+    original_model: "mistral-large-4",
+    model: "mistral-large-4",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    provider: "mistral",
+    supportsToolCalling: true,
+    inputPrice: 1.36,
+    outputPrice: 4.18,
+    finetunes: [],
+    strengths: ["long context", "tool calling", "latest"],
+    weaknesses: ["public preview", "price", "little benchmark data"],
+    description:
+      "Mistral's open-weight flagship (1.05T parameters, 52B active), 1M context, on your own Mistral key. Mistral lists it as a public preview; Artificial Analysis scored the preview 38 on its intelligence index (2026-10-21).",
+    bannerUrl: undefined,
+  },
   "Ministral 14B": {
     name: "Ministral 14B",
     original_model: "ministral-14b-2512",
@@ -996,30 +1189,10 @@ export const OPENROUTER_IMAGE_MODELS = {
     outputPrice: 30, // $/1M tokens (effective for image gen)
     pricePerImage: 0.039, // ~1300 output tokens at the effective rate
   },
-  "Flux 2 Pro": {
-    name: "Flux 2 Pro",
-    model: "black-forest-labs/flux.2-pro",
-    description: "High-quality image generation with advanced features.",
-    maxTokens: 46000,
-    maxOutputTokens: 46000,
-    provider: "openrouter",
-    // Flux charges per-image flat rate, not per-token
-    inputPrice: 0,
-    outputPrice: 0,
-    pricePerImage: 0.03,
-  },
-  "Flux 2 Flex": {
-    name: "Flux 2 Flex",
-    model: "black-forest-labs/flux.2-flex",
-    description: "Flexible model for various image generation needs.",
-    maxTokens: 67000,
-    maxOutputTokens: 67000,
-    provider: "openrouter",
-    // Flux charges per-image flat rate, not per-token
-    inputPrice: 0,
-    outputPrice: 0,
-    pricePerImage: 0.015,
-  },
+  // "Flux 2 Pro" and "Flux 2 Flex" (black-forest-labs/flux.2-pro and
+  // flux.2-flex) were removed: OpenRouter no longer lists them (2026-10-21).
+  // A saved image-model choice of either falls back to the provider's default
+  // (resolveImageModelKey). DeepInfra's own FLUX 2 Pro below still exists.
   "GPT-5 Image": {
     name: "GPT-5 Image",
     model: "openai/gpt-5-image",
@@ -1241,6 +1414,44 @@ export type TTSModelKey = keyof typeof TTS_MODELS;
 
 
 
+/** UUID shape of a custom (OpenRouter BYOK) model's id. */
+const CUSTOM_MODEL_KEY_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Whether a stored model choice (a tier slot, the narration voice, a side
+ * agent, anything saved in settings or synced from another device) still names
+ * something the app can call: a key in AI_MODELS, or the UUID of a custom
+ * OpenRouter model. A key the catalog dropped (a model its provider shut down)
+ * is not, and getModelConfig would answer for it by silently swapping in
+ * DeepSeek V4 Flash, which needs a DeepSeek key and bills differently. So
+ * callers that read a saved choice check this first and use the slot's own
+ * default instead.
+ */
+export function isKnownModelKey(modelKey: unknown): modelKey is string {
+  if (typeof modelKey !== "string" || modelKey === "") return false;
+  return (
+    Object.prototype.hasOwnProperty.call(AI_MODELS, modelKey) ||
+    CUSTOM_MODEL_KEY_PATTERN.test(modelKey)
+  );
+}
+
+/**
+ * A saved image-model choice, checked against the catalog of the provider it
+ * was saved with; one the catalog dropped (OpenRouter's Flux 2 Pro and Flex)
+ * becomes that provider's default instead of reaching the provider, where
+ * the OpenRouter route would quietly run Nano Banana at a different price.
+ */
+export function resolveImageModelKey(
+  provider: "deepinfra" | "openrouter",
+  modelKey: string,
+): string {
+  const catalog: object =
+    provider === "deepinfra" ? DEEPINFRA_IMAGE_MODELS : OPENROUTER_IMAGE_MODELS;
+  if (Object.prototype.hasOwnProperty.call(catalog, modelKey)) return modelKey;
+  return provider === "deepinfra" ? "Bria 3.2" : "Nano Banana";
+}
+
 export function getModelConfig(modelKey: string): AIModelConfig {
   // Check if the key exists in AI_MODELS
   if (modelKey in AI_MODELS) {
@@ -1249,10 +1460,7 @@ export function getModelConfig(modelKey: string): AIModelConfig {
 
   // Check if this looks like a UUID (custom model)
   // UUIDs are 36 chars with format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  const isUUID =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      modelKey,
-    );
+  const isUUID = CUSTOM_MODEL_KEY_PATTERN.test(modelKey);
 
   if (isUUID) {
     // Custom models are always OpenRouter BYOK - return a generic OpenRouter config

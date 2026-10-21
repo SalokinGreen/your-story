@@ -1,34 +1,41 @@
 /**
  * The side agents a turn kicks off - the Observer's judges, the Memory
- * Keeper, the Story Progress Observer - run on the narration model unless
- * the player pinned one in Settings > Architecture (decision 19,
- * layerSettings.ts).
+ * Keeper, the Story Progress Observer, compaction and reflection - run on
+ * their own default (SIDE_AGENT_DEFAULT_MODEL_KEY, Claude Haiku 5.5, decision
+ * 51) unless the player pinned one in Settings > Architecture
+ * (layerSettings.ts). Decision 19 had them follow the narration model; they no
+ * longer do, so neither the narration voice nor the GM's tier model moves them.
  *
  * They used to take their model from the turn's GenerationMeta.model, which
- * is the provider's own model id ("mistral-small-2506"), not the AI_MODELS
- * key ("Mistral Small 3.2") the proxy resolves a request by. No key equals
- * its provider id, so getModelConfig() missed on every side call and fell
- * back to DeepSeek V4 Flash - which needs a DeepSeek key, so a player
- * without one got NO_API_KEY from every side agent.
+ * is the provider's own model id ("z-ai/glm-5.3"), not the AI_MODELS key
+ * ("GLM 5.3") the proxy resolves a request by. No key equals its provider id,
+ * so getModelConfig() missed on every side call and fell back to DeepSeek V4
+ * Flash - which needs a DeepSeek key, so a player without one got NO_API_KEY
+ * from every side agent.
  *
  * This drives real turns and checks the model each side call actually sends.
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
+import { SIDE_AGENT_DEFAULT_MODEL_KEY } from "@/app/misc/layerSettings";
 import { createMockGMFetch, sseStreamResponse } from "./helpers/mockGMFetch";
 import type { StoryData } from "@/app/misc/structs";
 
 const NARRATION = "The lock clicks open. The corridor beyond is dark.";
 
 // The GM round and the narration call report models that differ from each
-// other and from the narration model's key, so a side call that inherits
-// either of them shows up.
-const GM_META = { model: "x-ai/grok-4.5", modelName: "Grok 4.5", provider: "openrouter" };
+// other and from the side-agent default, so a side call that inherits either
+// of them shows up.
+const GM_META = {
+  model: "anthropic/claude-sonnet-5.5",
+  modelName: "Claude Sonnet 5.5",
+  provider: "openrouter",
+};
 const NARRATION_META = {
-  model: "mistral-small-2506",
+  model: "z-ai/glm-5.3",
   modelName: NARRATION_MODEL_KEY,
-  provider: "mistral",
+  provider: "openrouter",
 };
 
 function minimalStory(): StoryData {
@@ -91,7 +98,11 @@ function createFetchMock(gmRoundContent: string) {
     return (gm.fetchMock as unknown as typeof fetch)(url as RequestInfo, init);
   });
 
-  return { fetchMock, sideCalls: () => calls.filter((c) => c.url === "/api/generate") };
+  return {
+    fetchMock,
+    calls,
+    sideCalls: () => calls.filter((c) => c.url === "/api/generate"),
+  };
 }
 
 function memoryStorage(entries: Record<string, string> = {}) {
@@ -128,12 +139,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Every request the last runTurn made, side calls and the narration stream alike. */
+let lastTurnCalls: Call[] = [];
+
 async function runTurn(
   gmRoundContent: string,
   storyData: StoryData = minimalStory(),
   extraOptions: Partial<GenerationOptions> = {},
 ): Promise<Call[]> {
-  const { fetchMock, sideCalls } = createFetchMock(gmRoundContent);
+  const { fetchMock, calls: allCalls, sideCalls } = createFetchMock(gmRoundContent);
+  lastTurnCalls = allCalls;
   global.fetch = fetchMock as unknown as typeof fetch;
   vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -183,20 +198,31 @@ function storyDueForCompactionAndReflection(): StoryData {
 
 const modelsOf = (calls: Call[]) => [...new Set(calls.map((c) => c.body.model))];
 
-describe("side calls default to the narration model", () => {
+describe("side calls default to Claude Haiku 5.5, not the narration model (decision 51)", () => {
+  it("is not the narration default, so the two cannot be confused below", () => {
+    expect(SIDE_AGENT_DEFAULT_MODEL_KEY).toBe("Claude Haiku 5.5");
+    expect(SIDE_AGENT_DEFAULT_MODEL_KEY).not.toBe(NARRATION_MODEL_KEY);
+  });
+
   it("when the GM's own round wrote the prose", async () => {
     const calls = await runTurn(NARRATION);
     expect(calls.some(isStoryProgress)).toBe(true);
-    expect(modelsOf(calls)).toEqual([NARRATION_MODEL_KEY]);
+    expect(modelsOf(calls)).toEqual([SIDE_AGENT_DEFAULT_MODEL_KEY]);
   });
 
-  it("when a separate narration call wrote the prose", async () => {
+  it("when a separate narration call wrote the prose, which stays on the narration model", async () => {
     const calls = await runTurn("");
     expect(calls.some(isStoryProgress)).toBe(true);
-    expect(modelsOf(calls)).toEqual([NARRATION_MODEL_KEY]);
+    expect(modelsOf(calls)).toEqual([SIDE_AGENT_DEFAULT_MODEL_KEY]);
+
+    const narrationCalls = lastTurnCalls.filter(
+      (c) => c.url === "/api/generate-stream" && !c.body.tools,
+    );
+    expect(narrationCalls.length).toBeGreaterThan(0);
+    expect(modelsOf(narrationCalls)).toEqual([NARRATION_MODEL_KEY]);
   });
 
-  it("follow the player's narration override, and a pinned stage override beats it", async () => {
+  it("ignore the player's narration override, and a pinned stage override beats the default", async () => {
     stubBrowserStorage({
       narrationModelOverride: "Mistral Nemo",
       memoryKeeperModelOverride: JSON.stringify({
@@ -208,16 +234,20 @@ describe("side calls default to the narration model", () => {
     const calls = await runTurn(NARRATION);
     expect(calls.some(isStoryProgress)).toBe(true);
     expect(modelsOf(calls.filter(isMemoryKeeper))).toEqual(["Mistral Medium 3.1"]);
-    expect(modelsOf(calls.filter((c) => !isMemoryKeeper(c)))).toEqual(["Mistral Nemo"]);
+    expect(modelsOf(calls.filter((c) => !isMemoryKeeper(c)))).toEqual([
+      SIDE_AGENT_DEFAULT_MODEL_KEY,
+    ]);
   });
 
-  it("compaction and reflection follow the narration override too", async () => {
+  it("compaction and reflection ignore the narration override too", async () => {
     stubBrowserStorage({ narrationModelOverride: "Mistral Nemo" });
 
     const calls = await runTurn(NARRATION, storyDueForCompactionAndReflection(), {
       customMaxContext: 8000,
     });
-    expect(modelsOf(calls.filter(isCompaction))).toEqual(["Mistral Nemo"]);
-    expect(modelsOf(calls.filter(isReflection))).toEqual(["Mistral Nemo"]);
+    expect(calls.filter(isCompaction).length).toBeGreaterThan(0);
+    expect(calls.filter(isReflection).length).toBeGreaterThan(0);
+    expect(modelsOf(calls.filter(isCompaction))).toEqual([SIDE_AGENT_DEFAULT_MODEL_KEY]);
+    expect(modelsOf(calls.filter(isReflection))).toEqual([SIDE_AGENT_DEFAULT_MODEL_KEY]);
   });
 });

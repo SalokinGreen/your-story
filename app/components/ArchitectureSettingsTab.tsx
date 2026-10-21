@@ -10,6 +10,7 @@ import { ObserverFlagType } from "@/app/misc/structs";
 import { ObserverCheckSettings } from "@/app/misc/observer";
 import {
   ModelEffortOverride,
+  SIDE_AGENT_DEFAULT_MODEL_KEY,
   getObserverModelOverride,
   setObserverModelOverride,
   getMemoryKeeperModelOverride,
@@ -35,7 +36,8 @@ const REASONING_EFFORTS: ReasoningEffort[] = [
   "xhigh",
 ];
 
-const DEFAULT_OVERRIDE_MODEL: AnyModelKey = "Mistral Small 3.2";
+// What turning a pin on starts from: the model the stage is running on already.
+const DEFAULT_OVERRIDE_MODEL: AnyModelKey = SIDE_AGENT_DEFAULT_MODEL_KEY;
 
 interface LayerInfo {
   title: string;
@@ -171,8 +173,8 @@ function Toggle({
 
 /**
  * A model + reasoning-effort override for one AI side-call stage (Observer,
- * Memory Keeper, Reflection). Off by default - the stage runs on the
- * narration model (decision 19).
+ * Memory Keeper, Reflection). Off by default - the stage runs on
+ * SIDE_AGENT_DEFAULT_MODEL_KEY (decision 51).
  */
 function StageOverrideCard({
   icon,
@@ -235,7 +237,7 @@ function StageOverrideCard({
         </div>
       ) : (
         <p className="text-xs text-blue-300/40 italic">
-          Off - uses the narration model.
+          Off - runs on {SIDE_AGENT_DEFAULT_MODEL_KEY}.
         </p>
       )}
     </div>
