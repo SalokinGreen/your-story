@@ -371,6 +371,19 @@ standalone build has no API routes**: `providerFetch()` calls the provider
 in-process when `isStandalone()`. Google gets a filtered tool list
 (`GOOGLE_ESSENTIAL_TOOLS`), which is stale (§6.14).
 
+**Claude reaches the app through OpenRouter** (Haiku, Sonnet and Opus 5.5,
+`anthropic/…` ids; decision 10) and has its own branch in `providerCall.ts`,
+keyed on `isAnthropicViaOpenRouter()`, because Claude 5.5 returns a 400 for
+things every other provider is sent: no sampling parameters (not even
+`temperature`), no assistant prefill (trailing or mid-history), `tool_choice`
+always `auto` (the gates' own user message does the forcing), effort `none`
+sent as `low`, and only the current turn's signed `reasoning_details`
+replayed. The GM stage marks the player's action `cacheBreakpoint`, and a
+Claude request with tools gets prompt-cache breakpoints there and on the
+system message. A change to the GM prompt's message layout must keep the
+base messages byte-identical across a turn's rounds, or that cache stops
+hitting.
+
 **Every AI side call goes through `callSideModel()`** (`sideModelCall.ts`):
 it uses `providerFetch`, forwards all five provider keys, records the turn
 cost, and logs failures to the Debug Logs instead of swallowing them.

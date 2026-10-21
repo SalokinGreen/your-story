@@ -313,3 +313,61 @@ Restated from design §6: no long-lived CLI process, no streamed GM-round
 text, no remaining-usage display. The Designer works on a subscription model
 only because `providerFetch` serves it like any other caller; it gets no
 work of its own here.
+
+## Decisions made during implementation
+
+### 2026-10-21 — Route A (PR A)
+
+1. **`temperature` is omitted too, not only the story stage's sampling
+   settings.** Both request builders set a base `temperature` (0.7 by
+   default; the GM sends 0.4 plus the Chaos Factor nudge). Opus 5.5 rejects
+   any temperature and Sonnet/Haiku 5.5 reject non-default values, and
+   OpenRouter lists no sampling parameters for these models at all. Claude
+   gets none of them on either path.
+2. **A mid-history prefill is dropped as well as a trailing one.** On a tier
+   with effort `none` the GM prompt ends in the `<thinking>` prefill. From
+   round 2 on, that prefill sits between the player's action and round 1's
+   assistant message; the two merge into one assistant turn, and a turn that
+   continues a tool loop must open with its thinking block, not text. For
+   Claude, a plain assistant message (no tool calls, no reasoning) directly
+   followed by an assistant message carrying tool calls or reasoning is
+   dropped (`dropClaudeMidHistoryPrefills`).
+3. **Thinking replay for Claude is scoped to the current turn, and plain-text
+   `reasoning` is never sent.** Design §3.3 flagged the edited-history check
+   as the first thing to watch. The GM's state message (`messages[1]`)
+   changes every turn, so the previous turn's thinking blocks would always
+   sit in edited history. Only `reasoning_details` (signed) on assistant
+   messages after the last user message go back; that is what a tool loop
+   needs. A gate's re-prompt is a user message, so blocks before it are
+   dropped too, which Claude accepts.
+4. **Where the cache breakpoints go.** The plan names the system and state
+   messages; the history between the state message and the player's action
+   is also identical in every round of a turn and is the larger part (60% of
+   the GM budget), so the breakpoint goes on the player's action instead.
+   The provider cannot find that message by role (past turns replay `tool`
+   messages), so `buildGMStagePrompt` marks it: `ChatMessage.cacheBreakpoint`
+   (optional, in both `chatMessage.ts` and `providerCall.ts`; every other
+   provider's message builder drops it). `providerCall` puts two breakpoints
+   on a Claude request: the system message, which hits across turns while
+   the system prompt's per-turn notes are unchanged and costs nothing extra
+   in a turn's first round because the whole base is written then anyway,
+   and the marked message. Only on requests that carry tools: the story
+   stage reuses the same base messages without tools, and since the tool
+   list starts Claude's cached prefix it could only pay the write premium,
+   never read the GM's entry.
+5. **The cache counts are logged, not priced.** OpenRouter's
+   `prompt_tokens_details.cached_tokens` / `cache_write_tokens` now appear on
+   the "AI generation complete" Debug Log lines, which is where the live
+   check reads them. The turn cost ledger still prices every prompt token
+   at list price, so it overstates cached rounds; forwarding OpenRouter's
+   `usage.cost` would fix that for every OpenRouter model but changes what
+   the panel shows for all of them (and OpenRouter's own BYOK mode reports
+   only its fee there), so it is a follow-up, not part of this slice.
+6. **Effort `none` on a Claude slot still reads "None" in Settings**, though
+   Claude runs it at `low`, and the cost estimate assumes no reasoning for
+   it. Left for the same follow-up as the cost ledger.
+7. **Custom OpenRouter models with an `anthropic/` id get the Claude branch**
+   (`isAnthropicViaOpenRouter` keys on the model id), so Fable 5.1 added as a
+   custom model (decision 15) works the same way.
+8. **`generation.ts` is untouched**, which also keeps clear of the open
+   session editing it.

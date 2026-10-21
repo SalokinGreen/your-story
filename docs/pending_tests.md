@@ -10,6 +10,32 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-21 — Claude through OpenRouter (Route A of the Claude GM plan)
+
+Request shaping is unit-tested (`tests/providerCall.anthropic.test.ts`), but
+no request has reached Claude: a played turn spends the author's OpenRouter
+credit, so it waits for the author's go (`claude-gm-implementation-plan.md`
+§5).
+
+- **One played turn on Claude Sonnet 5.5.** With an OpenRouter key saved,
+  set the tier-1 slot (Settings → AI Config) to "Claude Sonnet 5.5", leave
+  its effort at `none`, and play a turn that needs a roll (an attack in a
+  combat scene). The GM should call `formula_roll`, then narrate. Then open
+  Settings → Debug Logs and read the "AI generation (stream) complete"
+  lines: round 1 should show `cacheWriteTokens` in the thousands, round 2
+  `cachedTokens` about the same size. *Failure looks like:* a 400 naming
+  `budget_tokens` or `thinking` (OpenRouter turning `reasoning.effort` into a
+  thinking budget for this model: the effort branch in `applyReasoningEffort`
+  needs another shape); a 400 about a thinking block or edited history in
+  round 2 (the replay rule in `buildRequestMessages` keeps a block Claude
+  will not take); `cachedTokens` 0 in round 2 (the breakpoint is not
+  reaching Anthropic, or the prefix before it changed between rounds).
+- **The turn cost panel on that turn overstates the cached rounds.** It
+  prices every prompt token at list price ($2/M on Sonnet) and does not read
+  OpenRouter's cache counts or its own `usage.cost`. Compare the panel with
+  the turn's cost on openrouter.ai/activity; the gap is the cache discount.
+  Known, not a failure of this change.
+
 ## 2026-10-21 — the native fixes merged after the health check
 
 None of these could run here: they need the author's own API keys (spending

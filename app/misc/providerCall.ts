@@ -43,6 +43,13 @@ export interface ChatMessage {
   reasoning_details?: any[];
   tool_calls?: any[];
   tool_call_id?: string;
+  /**
+   * The last message of a prefix the caller keeps byte-identical across the
+   * requests that follow (the GM stage's base messages, reused every round
+   * of a turn). Providers with explicit prompt caching (Claude) put a cache
+   * breakpoint here; everyone else ignores it. See buildRequestMessages.
+   */
+  cacheBreakpoint?: boolean;
 }
 
 export interface GenerateRequestBody {
@@ -93,6 +100,9 @@ interface AIResponse {
     completion_tokens: number;
     total_tokens: number;
     estimated_cost?: number; // DeepInfra provides this in dollars
+    // OpenRouter: tokens read from / written to the prompt cache (Claude
+    // only writes when the request marks a breakpoint). Logged, not priced.
+    prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
   };
 }
 
@@ -218,6 +228,23 @@ function normalizeMistralToolCallIds(messages: ChatMessage[]): ChatMessage[] {
 }
 
 /**
+ * OpenRouter routes this model to Anthropic's Claude: an `anthropic/…` model
+ * id, whether from the catalog or a custom model the player added. Claude 5.5
+ * returns a 400 for four things this app sends other providers - sampling
+ * parameters, a trailing assistant prefill, a forced `tool_choice`, and
+ * reasoning effort "none" (its thinking cannot be turned off) - so each of
+ * those sites branches on this (docs/claude-gm-design.md §3.2).
+ */
+export function isAnthropicViaOpenRouter(
+  config: Pick<AIModelConfig, "provider" | "model">,
+): boolean {
+  return (
+    config.provider === "openrouter" &&
+    config.model.toLowerCase().startsWith("anthropic/")
+  );
+}
+
+/**
  * Best-effort reasoning-effort translation per provider. Never throws - if a
  * provider/model has no lever for it, the field is simply omitted. Real
  * protection against a bad interaction is the reasoning-tier router's
@@ -227,7 +254,15 @@ function applyReasoningEffort(
   requestBody: any,
   provider: Provider,
   reasoningEffort?: string,
+  isClaude = false,
 ): void {
+  // Claude 5.5's thinking cannot be disabled ("none" is a 400), so a tier
+  // set to "none" runs at the lowest effort Claude has instead.
+  if (isClaude && reasoningEffort === "none") {
+    requestBody.reasoning = { effort: "low" };
+    return;
+  }
+
   // DeepSeek V4's thinking mode is an explicit toggle (`thinking.type`) that
   // DEFAULTS to enabled server-side, so it must be handled before the early
   // return below - including the "none"/undefined case, where we explicitly
@@ -356,6 +391,22 @@ function resolveModelConfig(
   return { config, actualModelId: config.model };
 }
 
+/**
+ * `tool_choice` for a request that offers tools. Google always gets
+ * "required"; a caller-forced round (the roll and plan gates) gets
+ * "required" - except on Claude, where forced tool use is a 400. There the
+ * gate's own user message, which already says a tool call is required, does
+ * the forcing.
+ */
+function resolveToolChoice(
+  provider: Provider,
+  toolChoice: GenerateRequestBody["toolChoice"],
+  isClaude: boolean,
+): "required" | "auto" {
+  if (isClaude) return "auto";
+  return toolChoice === "required" || provider === "google" ? "required" : "auto";
+}
+
 function buildEndpoint(provider: Provider, hasPrefill: boolean, hasTools: boolean): string {
   if (provider === "deepseek") {
     // Use beta endpoint for prefill support (prefix: true requires beta API)
@@ -385,29 +436,116 @@ function buildHeaders(provider: Provider, apiKey: string): Record<string, string
   return headers;
 }
 
+/**
+ * Claude only: drop a plain assistant message (no tool calls, no reasoning)
+ * that sits directly before another assistant message carrying tool calls or
+ * reasoning. In practice that is the GM stage's `<thinking>` prefill once a
+ * round has been appended after it: consecutive assistant messages merge into
+ * one turn, and a turn that continues a tool loop must open with its thinking
+ * block, not with the prefill's text.
+ */
+function dropClaudeMidHistoryPrefills(messages: ChatMessage[]): ChatMessage[] {
+  return messages.filter((m, i) => {
+    const next = messages[i + 1];
+    const isPlainAssistant =
+      m.role === "assistant" && !m.tool_calls?.length && !m.reasoning_details?.length;
+    const nextLeadsWithReasoningOrTools =
+      next?.role === "assistant" &&
+      (!!next.tool_calls?.length || !!next.reasoning_details?.length);
+    return !(isPlainAssistant && nextLeadsWithReasoningOrTools);
+  });
+}
+
+/**
+ * Claude only: content-part form with a 5-minute cache breakpoint. OpenRouter
+ * forwards `cache_control` on a text part to Anthropic; without a breakpoint
+ * Claude caches nothing and every GM round pays full input price.
+ */
+function withCacheBreakpoint(content: string): CachedTextPart[] {
+  return [{ type: "text", text: content, cache_control: { type: "ephemeral" } }];
+}
+
+interface CachedTextPart {
+  type: "text";
+  text: string;
+  cache_control: { type: "ephemeral" };
+}
+
 /** Shared message-transform logic (prefill stripping, ID normalization, per-message shaping). */
 function buildRequestMessages(
   messages: ChatMessage[],
   provider: Provider,
   hasTools: boolean,
   hasPrefill: boolean,
+  config: Pick<AIModelConfig, "provider" | "model">,
 ): any[] {
-  // For DeepSeek/DeepInfra/Mistral/Google with tools: strip the prefill since these providers don't handle prefill well with function calling
+  const isClaude = isAnthropicViaOpenRouter(config);
+
+  // For DeepSeek/DeepInfra/Mistral/Google with tools: strip the prefill since
+  // these providers don't handle prefill well with function calling. Claude
+  // 5.5 rejects a trailing prefill outright, with or without tools.
   let processedMessages = messages;
   if (
-    (provider === "deepseek" ||
-      provider === "deepinfra" ||
-      provider === "mistral" ||
-      provider === "google") &&
-    hasTools &&
-    hasPrefill
+    hasPrefill &&
+    (isClaude ||
+      ((provider === "deepseek" ||
+        provider === "deepinfra" ||
+        provider === "mistral" ||
+        provider === "google") &&
+        hasTools))
   ) {
     processedMessages = messages.slice(0, -1);
+  }
+
+  if (isClaude) {
+    processedMessages = dropClaudeMidHistoryPrefills(processedMessages);
   }
 
   // For Mistral: normalize tool call IDs to match their strict format requirement
   if (provider === "mistral") {
     processedMessages = normalizeMistralToolCallIds(processedMessages);
+  }
+
+  // Claude's prompt cache (design §3.3): breakpoints only when the caller
+  // marked the end of a stable prefix - the GM stage marks its base messages,
+  // which stay byte-identical every round of a turn. Two breakpoints: the
+  // system message (reused across turns while the system prompt is
+  // unchanged) and the marked message (reused by every later round of this
+  // turn). Never on an empty text, which Anthropic rejects. Tool-calling
+  // requests only: the tool list is the start of Claude's cached prefix, so
+  // the story stage (same base messages, no tools) could never read the GM's
+  // entry and would only pay the cache-write premium for one of its own.
+  let cacheMarkIndex = -1;
+  if (isClaude && hasTools) {
+    for (let i = processedMessages.length - 1; i >= 0; i--) {
+      if (processedMessages[i].cacheBreakpoint && processedMessages[i].content) {
+        cacheMarkIndex = i;
+        break;
+      }
+    }
+  }
+  const cacheSystemIndex =
+    cacheMarkIndex >= 0 &&
+    processedMessages[0]?.role === "system" &&
+    processedMessages[0].content
+      ? 0
+      : -1;
+
+  // Gemini's thought-signature quirk below keys on the model, not the
+  // provider: an OpenRouter reply from any other model (Claude's signed
+  // thinking included) must not have its reasoning turned into one.
+  const isGemini =
+    provider === "google" ||
+    (provider === "openrouter" && config.model.toLowerCase().startsWith("google/"));
+
+  // Claude's current turn starts after the last user message; tool results
+  // are role "tool" here, so a tool loop stays inside one turn.
+  let lastUserIndex = -1;
+  for (let i = processedMessages.length - 1; i >= 0; i--) {
+    if (processedMessages[i].role === "user") {
+      lastUserIndex = i;
+      break;
+    }
   }
 
   return processedMessages.map((m, index) => {
@@ -416,8 +554,17 @@ function buildRequestMessages(
       content: m.content !== undefined ? m.content : "",
     };
 
-    // Restore reasoning/thinking details for models that require them (Gemini 3 on OpenRouter)
-    if (provider === "openrouter" || provider === "google") {
+    if (isClaude) {
+      // Only the current turn's signed thinking blocks go back. Claude needs
+      // them to continue a tool loop, and checks that a replayed block sits
+      // in history it has not seen edited - the GM's state message changes
+      // every turn, so an earlier turn's blocks would fail that check.
+      // Plain-text `reasoning` carries no signature and is never replayed.
+      if (m.reasoning_details && index > lastUserIndex) {
+        msg.reasoning_details = m.reasoning_details;
+      }
+    } else if (provider === "openrouter" || provider === "google") {
+      // Restore reasoning/thinking details for models that require them (Gemini 3 on OpenRouter)
       if (m.reasoning) msg.reasoning = m.reasoning;
       if (m.reasoning_details) msg.reasoning_details = m.reasoning_details;
     }
@@ -444,11 +591,7 @@ function buildRequestMessages(
           ) {
             mapped.extra_content = tc.extra_content;
           }
-          if (
-            !mapped.extra_content &&
-            m.reasoning_details &&
-            (provider === "google" || provider === "openrouter")
-          ) {
+          if (!mapped.extra_content && m.reasoning_details && isGemini) {
             const details = m.reasoning_details;
             const matchingDetail = details.find(
               (d: any) =>
@@ -506,6 +649,10 @@ function buildRequestMessages(
       // describes thinking that never happened.
       delete msg.reasoning_content;
     }
+
+    if (index === cacheMarkIndex || index === cacheSystemIndex) {
+      msg.content = withCacheBreakpoint(msg.content);
+    }
     return msg;
   });
 }
@@ -554,22 +701,23 @@ export async function generateNonStreaming(
 
     const endpoint = buildEndpoint(provider, hasPrefill, hasTools);
     const headers = buildHeaders(provider, apiKey);
+    const isClaude = isAnthropicViaOpenRouter(config);
 
     const requestBody: any = {
       model: config.model,
-      messages: buildRequestMessages(messages, provider, hasTools, hasPrefill),
-      temperature,
+      messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
       max_tokens: maxTokens,
     };
+    // Claude 5.5 rejects any non-default sampling value.
+    if (!isClaude) requestBody.temperature = temperature;
 
     if (hasTools) {
       const toolsToUse = provider === "google" ? filterToolsForGoogle(tools!) : tools;
       requestBody.tools = toolsToUse;
-      requestBody.tool_choice =
-        toolChoice === "required" || provider === "google" ? "required" : "auto";
+      requestBody.tool_choice = resolveToolChoice(provider, toolChoice, isClaude);
     }
 
-    applyReasoningEffort(requestBody, provider, body.reasoningEffort);
+    applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude);
 
     const providerFetch = getProviderFetch();
     const response = await providerFetch(endpoint, {
@@ -624,6 +772,8 @@ export async function generateNonStreaming(
       provider,
       promptTokens: usage.prompt_tokens,
       completionTokens: usage.completion_tokens,
+      cachedTokens: usage.prompt_tokens_details?.cached_tokens,
+      cacheWriteTokens: usage.prompt_tokens_details?.cache_write_tokens,
       hasToolCalls: !!toolCalls,
     });
 
@@ -727,18 +877,22 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
 
         const endpoint = buildEndpoint(provider, hasPrefill, hasTools);
         const headers = buildHeaders(provider, apiKey);
+        const isClaude = isAnthropicViaOpenRouter(config);
 
         const requestBody: any = {
           model: config.model,
-          messages: buildRequestMessages(messages, provider, hasTools, hasPrefill),
-          temperature,
+          messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
           max_tokens: maxTokens,
           stream: true,
           stream_options: { include_usage: true },
         };
+        // Claude 5.5 rejects any non-default sampling value, so it gets
+        // neither the base temperature nor the story stage's settings.
+        if (!isClaude) requestBody.temperature = temperature;
 
         if (
           samplingSettings &&
+          !isClaude &&
           (provider === "mistral" || provider === "deepinfra" || provider === "openrouter")
         ) {
           const filteredSettings = filterSettingsForProvider(samplingSettings, provider);
@@ -770,11 +924,10 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
         if (hasTools) {
           const toolsToUse = provider === "google" ? filterToolsForGoogle(tools!) : tools;
           requestBody.tools = toolsToUse;
-          requestBody.tool_choice =
-            toolChoice === "required" || provider === "google" ? "required" : "auto";
+          requestBody.tool_choice = resolveToolChoice(provider, toolChoice, isClaude);
         }
 
-        applyReasoningEffort(requestBody, provider, body.reasoningEffort);
+        applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude);
 
         if (stop && stop.length > 0) {
           requestBody.stop = stop;
@@ -815,6 +968,8 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
         // identical once JSON.parse fails on both.
         let lastFinishReason: string | undefined;
         let estimatedCost: number | undefined;
+        let cachedTokens: number | undefined;
+        let cacheWriteTokens: number | undefined;
         let streamComplete = false;
 
         const processChunk = (parsed: any) => {
@@ -874,6 +1029,8 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
             if (parsed.usage.estimated_cost !== undefined) {
               estimatedCost = parsed.usage.estimated_cost;
             }
+            cachedTokens = parsed.usage.prompt_tokens_details?.cached_tokens;
+            cacheWriteTokens = parsed.usage.prompt_tokens_details?.cache_write_tokens;
           }
 
           if (finishReason === "stop" || finishReason === "end_turn" || finishReason === "length") {
@@ -971,6 +1128,8 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
           provider,
           promptTokens,
           completionTokens,
+          cachedTokens,
+          cacheWriteTokens,
           hasToolCalls: parsedToolCalls.length > 0,
           finishReason: lastFinishReason,
           estimatedCost,
