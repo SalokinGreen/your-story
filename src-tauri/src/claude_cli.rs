@@ -123,6 +123,18 @@ pub struct CliStatus {
     pub logged_in: bool,
     pub auth_method: Option<String>,
     pub subscription_type: Option<String>,
+    /// "firstParty" on the claude.ai sign-in; another value when the CLI's
+    /// own settings send it to Bedrock, Vertex or similar instead.
+    pub api_provider: Option<String>,
+}
+
+/// The fields read out of `claude auth status`. Nothing else is.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct AuthFields {
+    pub logged_in: bool,
+    pub auth_method: Option<String>,
+    pub subscription_type: Option<String>,
+    pub api_provider: Option<String>,
 }
 
 /// Running CLI processes by the app's request id; sending on the channel
@@ -280,18 +292,19 @@ pub fn parse_version(stdout: &str) -> Option<String> {
     stdout.split_whitespace().next().map(str::to_string)
 }
 
-/// Reads only `loggedIn`, `authMethod` and `subscriptionType` out of
-/// `claude auth status`'s JSON.
-pub fn parse_auth_status(stdout: &str) -> (bool, Option<String>, Option<String>) {
+/// Reads only `loggedIn`, `authMethod`, `subscriptionType` and
+/// `apiProvider` out of `claude auth status`'s JSON.
+pub fn parse_auth_status(stdout: &str) -> AuthFields {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(stdout.trim()) else {
-        return (false, None, None);
+        return AuthFields::default();
     };
     let text = |key: &str| value.get(key).and_then(|v| v.as_str()).map(str::to_string);
-    (
-        value.get("loggedIn").and_then(|v| v.as_bool()).unwrap_or(false),
-        text("authMethod"),
-        text("subscriptionType"),
-    )
+    AuthFields {
+        logged_in: value.get("loggedIn").and_then(|v| v.as_bool()).unwrap_or(false),
+        auth_method: text("authMethod"),
+        subscription_type: text("subscriptionType"),
+        api_provider: text("apiProvider"),
+    }
 }
 
 /// Runs `claude <args>` with the cleared environment and returns its stdout,
@@ -335,16 +348,17 @@ pub async fn claude_cli_status() -> Result<CliStatus, String> {
     let version = capture(&binary, &["--version"])
         .await
         .and_then(|out| parse_version(&out));
-    let (logged_in, auth_method, subscription_type) = capture(&binary, &["auth", "status", "--json"])
+    let auth = capture(&binary, &["auth", "status", "--json"])
         .await
         .map(|out| parse_auth_status(&out))
-        .unwrap_or((false, None, None));
+        .unwrap_or_default();
     Ok(CliStatus {
         installed: true,
         version,
-        logged_in,
-        auth_method,
-        subscription_type,
+        logged_in: auth.logged_in,
+        auth_method: auth.auth_method,
+        subscription_type: auth.subscription_type,
+        api_provider: auth.api_provider,
     })
 }
 
@@ -362,6 +376,22 @@ pub async fn claude_cli_run(
     if let CliMode::Structured { schema } = &req.mode {
         validate_schema(schema)?;
     }
+
+    // Registered before anything slow (the PATH scan, the folders, the
+    // prompt file, the spawn), so a Stop pressed in that window is not lost.
+    let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
+    state.0.lock().await.insert(req.request_id.clone(), cancel_tx);
+    let result = prepare_and_run(&app, &req, cancel_rx, &on_event).await;
+    state.0.lock().await.remove(&req.request_id);
+    result
+}
+
+async fn prepare_and_run(
+    app: &AppHandle,
+    req: &CliRequest,
+    cancel_rx: oneshot::Receiver<()>,
+    on_event: &Channel<CliEvent>,
+) -> Result<(), String> {
     let binary = resolve_claude().ok_or_else(|| {
         coded(
             "CLI_NOT_FOUND",
@@ -390,7 +420,7 @@ pub async fn claude_cli_run(
         .await
         .map_err(|e| coded("CLI_FAILED", format!("cannot write the system prompt: {e}")))?;
 
-    let result = run_process(&binary, &req, &system_file, &workdir, &on_event, &state).await;
+    let result = run_process(&binary, req, &system_file, &workdir, on_event, cancel_rx).await;
     let _ = tokio::fs::remove_file(&system_file).await;
     result
 }
@@ -401,8 +431,17 @@ async fn run_process(
     system_file: &Path,
     workdir: &Path,
     on_event: &Channel<CliEvent>,
-    state: &State<'_, CliProcesses>,
+    mut cancel_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
+    // Stopped before the process ever started.
+    if cancel_rx.try_recv().is_ok() {
+        let _ = on_event.send(CliEvent::Exit {
+            code: None,
+            stderr_tail: String::new(),
+        });
+        return Ok(());
+    }
+
     let args = build_args(req.model, req.effort, &req.mode, system_file);
     let mut cmd = base_command(binary, &args, workdir);
     cmd.stdin(Stdio::piped());
@@ -413,9 +452,6 @@ async fn run_process(
             coded("CLI_FAILED", format!("could not start claude: {e}"))
         }
     })?;
-
-    let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
-    state.0.lock().await.insert(req.request_id.clone(), cancel_tx);
 
     // The prompt goes in on stdin, which is then closed: `claude -p` reads
     // its prompt until EOF. Written from a task so a large prompt cannot
@@ -452,7 +488,7 @@ async fn run_process(
     let code = tokio::select! {
         status = child.wait() => status.ok().and_then(|s| s.code()),
         _ = cancel_rx => {
-            let _ = child.kill().await;
+            kill_tree(&mut child).await;
             None
         }
     };
@@ -470,9 +506,28 @@ async fn run_process(
             String::new()
         }
     };
-    state.0.lock().await.remove(&req.request_id);
     let _ = on_event.send(CliEvent::Exit { code, stderr_tail });
     Ok(())
+}
+
+/// Kills the run. On Windows an npm-installed CLI is `claude.cmd`, which runs
+/// `node.exe` under `cmd.exe`: killing the child alone would leave the model
+/// call running, so the whole process tree goes (`taskkill /T`).
+async fn kill_tree(child: &mut tokio::process::Child) {
+    #[cfg(windows)]
+    if let Some(pid) = child.id() {
+        let taskkill = std::env::var_os("SYSTEMROOT")
+            .map(|root| PathBuf::from(root).join("System32").join("taskkill.exe"))
+            .unwrap_or_else(|| PathBuf::from("taskkill.exe"));
+        let mut cmd = Command::new(taskkill);
+        cmd.args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW);
+        let _ = tokio::time::timeout(Duration::from_secs(5), cmd.status()).await;
+    }
+    let _ = child.kill().await;
 }
 
 /// Stop: kills the run with this id, if it is still going.
@@ -591,17 +646,19 @@ mod tests {
     fn auth_status_keeps_no_account_details() {
         let out = r#"{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty",
             "email":"someone@example.com","orgId":"org-1","orgName":"Someone's Org","subscriptionType":"max"}"#;
-        let (logged_in, method, plan) = parse_auth_status(out);
-        assert!(logged_in);
-        assert_eq!(method.as_deref(), Some("claude.ai"));
-        assert_eq!(plan.as_deref(), Some("max"));
+        let auth = parse_auth_status(out);
+        assert!(auth.logged_in);
+        assert_eq!(auth.auth_method.as_deref(), Some("claude.ai"));
+        assert_eq!(auth.subscription_type.as_deref(), Some("max"));
+        assert_eq!(auth.api_provider.as_deref(), Some("firstParty"));
 
         let status = CliStatus {
             installed: true,
             version: parse_version("2.1.306 (Claude Code)\n"),
-            logged_in,
-            auth_method: method,
-            subscription_type: plan,
+            logged_in: auth.logged_in,
+            auth_method: auth.auth_method,
+            subscription_type: auth.subscription_type,
+            api_provider: auth.api_provider,
         };
         let json = serde_json::to_string(&status).unwrap();
         assert!(!json.contains("example.com"));
@@ -611,8 +668,8 @@ mod tests {
 
     #[test]
     fn auth_status_reads_signed_out_and_garbage_as_signed_out() {
-        assert_eq!(parse_auth_status(r#"{"loggedIn":false}"#), (false, None, None));
-        assert_eq!(parse_auth_status("Not logged in"), (false, None, None));
+        assert_eq!(parse_auth_status(r#"{"loggedIn":false}"#), AuthFields::default());
+        assert_eq!(parse_auth_status("Not logged in"), AuthFields::default());
     }
 
     #[test]

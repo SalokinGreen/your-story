@@ -10,6 +10,7 @@
  */
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { logger } from "./logger";
 
 export type ClaudeCliModelKey =
   | "Claude Opus (subscription)"
@@ -48,6 +49,8 @@ export interface ClaudeCliStatus {
   loggedIn: boolean;
   authMethod: string | null;
   subscriptionType: string | null;
+  /** "firstParty" on the claude.ai sign-in; "bedrock", "vertex"… when the CLI's own settings send it elsewhere. */
+  apiProvider: string | null;
 }
 
 const NOT_INSTALLED: ClaudeCliStatus = {
@@ -56,6 +59,7 @@ const NOT_INSTALLED: ClaudeCliStatus = {
   loggedIn: false,
   authMethod: null,
   subscriptionType: null,
+  apiProvider: null,
 };
 
 /** Fired on window whenever a fresh status arrives, for anything showing it. */
@@ -85,7 +89,9 @@ export async function getClaudeCliStatus(force = false): Promise<ClaudeCliStatus
     let status: ClaudeCliStatus;
     try {
       status = await invoke<ClaudeCliStatus>("claude_cli_status");
-    } catch {
+    } catch (error) {
+      // A permission or command error, not a missing CLI - say so in the logs.
+      logger.warn("Could not read the claude CLI's status", { error: String(error) });
       status = NOT_INSTALLED;
     }
     cachedStatus = { status, at: Date.now() };
@@ -106,6 +112,9 @@ export function describeClaudeCliStatus(status: ClaudeCliStatus | null): string 
   if (!status) return "Checking…";
   if (!status.installed) return "CLI not found";
   if (!status.loggedIn) return "Not signed in";
+  if (status.apiProvider && status.apiProvider !== "firstParty") {
+    return `Uses ${status.apiProvider}, not your subscription`;
+  }
   const plan = status.subscriptionType
     ? status.subscriptionType.charAt(0).toUpperCase() + status.subscriptionType.slice(1)
     : null;

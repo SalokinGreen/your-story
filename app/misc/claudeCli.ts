@@ -118,10 +118,14 @@ function parseArguments(raw: unknown): unknown {
 }
 
 /**
- * Prefills the CLI cannot take: a trailing assistant message, and inside the
- * current turn (after the last user message) a plain assistant message
- * directly before one that carries tool calls - the GM's `<thinking>`
- * prefill once a round has been appended after it.
+ * Prefills the CLI cannot take: a trailing assistant message, and the GM's
+ * `<thinking>` prefill once a round has been appended after it. That prefill
+ * is the plain assistant message directly after the message marked
+ * `cacheBreakpoint` (the player's action, buildGMStagePrompt), followed by
+ * another assistant message - the round's reply, whether it called tools,
+ * wrote prose a gate then sent back, or led into the story stage. Also, in
+ * the current turn (after the last user message), any plain assistant
+ * message directly before one that carries tool calls.
  */
 function dropPrefills(messages: ChatMessage[]): ChatMessage[] {
   let end = messages.length;
@@ -131,22 +135,35 @@ function dropPrefills(messages: ChatMessage[]): ChatMessage[] {
   const kept = messages.slice(0, end);
   const lastUser = kept.map((m) => m.role).lastIndexOf("user");
   return kept.filter((m, i) => {
-    if (i <= lastUser || m.role !== "assistant" || m.tool_calls?.length) return true;
+    if (m.role !== "assistant" || m.tool_calls?.length) return true;
     const next = kept[i + 1];
+    if (kept[i - 1]?.cacheBreakpoint && next?.role === "assistant") return false;
+    if (i <= lastUser) return true;
     return !(next?.role === "assistant" && next.tool_calls?.length);
   });
 }
 
+/**
+ * The transcript is flat text, so a line inside a message that looks like a
+ * block header - a player's action, a guest's, an imported note - must not
+ * pass for one. Escaped with a backslash; the same input always renders the
+ * same bytes.
+ */
+function escapeHeaders(text: string): string {
+  return text.replace(/^\[(User|You|Tool result|System note)\b/gm, "\\[$1");
+}
+
 function renderBlock(message: ChatMessage, toolNameById: Map<string, string>): string {
-  if (message.role === "user") return `[User]\n${message.content}`;
-  if (message.role === "system") return `[System note]\n${message.content}`;
+  const content = escapeHeaders(message.content ?? "");
+  if (message.role === "user") return `[User]\n${content}`;
+  if (message.role === "system") return `[System note]\n${content}`;
   if (message.role === "tool") {
     const id = message.tool_call_id ?? "";
     const name = toolNameById.get(id);
-    return `[Tool result${name ? ` · ${name}` : ""}${id ? ` · ${id}` : ""}]\n${message.content}`;
+    return `[Tool result${name ? ` · ${name}` : ""}${id ? ` · ${id}` : ""}]\n${content}`;
   }
   const parts: string[] = ["[You]"];
-  if (message.content) parts.push(message.content);
+  if (content) parts.push(content);
   const calls = (message.tool_calls ?? [])
     .filter((tc) => tc?.function?.name)
     .map((tc) => ({
@@ -402,7 +419,9 @@ function startRun(
 ): CliRunHandle {
   const requestId = `cli_${Date.now().toString(36)}_${runCounter++}`;
   const cancel = () => {
-    invoke("claude_cli_cancel", { requestId }).catch(() => {});
+    invoke("claude_cli_cancel", { requestId }).catch((error: unknown) => {
+      logger.warn("Could not stop the claude CLI run", { requestId, error: String(error) });
+    });
   };
 
   const done = new Promise<{ code: number | null; stderrTail: string }>((resolve, reject) => {
@@ -459,13 +478,17 @@ function usageOf(line: CliLine | null) {
  * Guards against a CLI that is not using the subscription - an API key in
  * its own configuration would bill the API instead. The start-up event's
  * `apiKeySource` is "none" when the CLI runs on the claude.ai sign-in.
+ * Fails closed: a start-up event without the field (a CLI update that
+ * renamed it) stops the run too, rather than risk billing an API.
  */
 function notOnSubscription(line: CliLine): ClaudeCliError | null {
-  if (line.type !== "system" || line.subtype !== "init" || !line.apiKeySource) return null;
+  if (line.type !== "system" || line.subtype !== "init") return null;
   if (line.apiKeySource === "none") return null;
   return new ClaudeCliError(
     "CLI_FAILED",
-    `The claude CLI is set up to use an API key (${line.apiKeySource}), not your Claude subscription, so the run was stopped. Remove the key from the CLI's configuration and sign in with /login.`,
+    line.apiKeySource
+      ? `The claude CLI is set up to use an API key (${line.apiKeySource}), not your Claude subscription, so the run was stopped. Remove the key from the CLI's configuration and sign in with /login.`
+      : "The claude CLI did not confirm it is running on your Claude subscription (its start-up event has no apiKeySource), so the run was stopped. The installed CLI version may have changed its output.",
   );
 }
 
@@ -517,6 +540,9 @@ async function runToEnd(
   let result: CliLine | null = null;
   let failure: ClaudeCliError | null = null;
   let streamedText = "";
+  // Whether any text delta arrived - not whether any text was emitted yet,
+  // which the stop-sequence hold-back can delay past the end of a short reply.
+  let sawDelta = false;
 
   const run = startRun(
     {
@@ -547,6 +573,7 @@ async function runToEnd(
         line.event.delta?.type === "text_delta" &&
         line.event.delta.text
       ) {
+        sawDelta = true;
         const out = cutter.push(line.event.delta.text);
         if (out) {
           streamedText += out;
@@ -586,8 +613,8 @@ async function runToEnd(
     return { answer, text: "", usage: usageOf(final) };
   }
 
-  // No partial events (or none before the result): the result carries the text.
-  if (!streamedText && final.result) {
+  // No partial events at all: the result carries the text.
+  if (!sawDelta && final.result) {
     const out = cutter.push(final.result);
     streamedText += out;
     if (out) onText(out);
@@ -649,8 +676,12 @@ export async function claudeCliFetch(
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
-        const emit = (data: unknown) =>
+        // A late line can still arrive after an abort errored the stream.
+        let open = true;
+        const emit = (data: unknown) => {
+          if (!open) return;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
         try {
           const outcome = await runToEnd(
             body,
@@ -666,9 +697,11 @@ export async function claudeCliFetch(
             if (toolCalls.length > 0) emit({ type: "tool_calls", toolCalls });
           }
           emit({ type: "done", meta: metaFor(body, outcome.usage) });
+          open = false;
           controller.close();
         } catch (error) {
           if (signal?.aborted) {
+            open = false;
             controller.error(abortErrorFor(signal));
             return;
           }
@@ -676,6 +709,7 @@ export async function claudeCliFetch(
             error instanceof ClaudeCliError ? error : classifyCliFailure(String(error));
           logger.error("Claude CLI run failed", { code: cliError.code, error: cliError.message });
           emit({ type: "error", error: cliError.message, code: cliError.code });
+          open = false;
           controller.close();
         }
       },

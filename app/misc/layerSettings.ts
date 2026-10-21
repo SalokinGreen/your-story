@@ -102,6 +102,26 @@ export const setStoryProgressObserverModelOverride = (
   override: ModelEffortOverride | null,
 ): void => setOverride(STORY_PROGRESS_OBSERVER_MODEL_KEY, override);
 
+/**
+ * Decision 16 for the side agents: the layers whose synced Claude
+ * subscription override this device cannot run, for Settings' notice. They
+ * run on the narration model here (resolveSideCallModel). Empty on the
+ * desktop app.
+ */
+export function getLayerSubscriptionFallbacks(): { slot: string; modelKey: string }[] {
+  if (isClaudeCliAvailablePlatform()) return [];
+  const layers: [string, ModelEffortOverride | null][] = [
+    ["Observer", getObserverModelOverride()],
+    ["Memory Keeper", getMemoryKeeperModelOverride()],
+    ["Reflection", getReflectionModelOverride()],
+    ["Director Assistant", getDirectorAssistantModelOverride()],
+    ["Story Progress Observer", getStoryProgressObserverModelOverride()],
+  ];
+  return layers
+    .filter(([, o]) => o && isClaudeCliModel(o.modelKey))
+    .map(([slot, o]) => ({ slot, modelKey: o!.modelKey }));
+}
+
 // ============================================================
 // STORY PROGRESS OBSERVER CADENCE
 // ============================================================

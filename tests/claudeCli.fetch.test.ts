@@ -126,6 +126,17 @@ describe("narration (stream mode)", () => {
     expect(events[events.length - 1].type).toBe("done");
   });
 
+  it("emits a reply shorter than the longest stop sequence once, not twice", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.streamed(["The door ", "opens."]) });
+    const events = await frames(
+      await claudeCliFetch(
+        "/api/generate-stream",
+        gmRound({ tools: undefined, stop: ["[GAME MASTER State Update]", "[STOP]"] }),
+      ),
+    );
+    expect(events.filter((e) => e.type === "content").map((e) => e.content).join("")).toBe("The door opens.");
+  });
+
   it("cuts the text at a stop sequence and stops the process", async () => {
     fakeCli.respond = () => ({
       lines: fakeCli.streamed(["The door opens.", " [GAME MASTER State Update] hp: 3"]),
@@ -202,6 +213,19 @@ describe("errors", () => {
     const e = await errorFrame({ lines: [], code: 1, stderrTail: "unknown option '--safe-mode'" });
     expect(e.code).toBe("CLI_FAILED");
     expect(e.error).toContain("unknown option '--safe-mode'");
+  });
+
+  it("stops a run whose start-up event cannot confirm the subscription", async () => {
+    fakeCli.respond = () => ({
+      lines: [
+        { type: "system", subtype: "init" },
+        { type: "result", subtype: "success", is_error: false, structured_output: { narration: "x", tool_calls: [] } },
+      ],
+    });
+    const events = await frames(await claudeCliFetch("/api/generate-stream", gmRound()));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "error", code: "CLI_FAILED" });
+    expect(events[0].error).toContain("did not confirm");
   });
 
   it("stops a run that is not on the subscription", async () => {

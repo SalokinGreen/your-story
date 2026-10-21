@@ -20,7 +20,7 @@ import {
   getEffectiveNarrationModelKey,
   getSubscriptionFallbacks,
 } from "@/app/misc/reasoningTiers";
-import { resolveSideCallModel } from "@/app/misc/layerSettings";
+import { resolveSideCallModel, getLayerSubscriptionFallbacks } from "@/app/misc/layerSettings";
 import { getAvailableModelKeys } from "@/app/misc/ai_prices";
 import { getClaudeCliStatus, resetClaudeCliStatusCache } from "@/app/misc/claudeCliModels";
 import { generateNonStreaming } from "@/app/misc/providerCall";
@@ -82,6 +82,14 @@ describe("on a phone or the web build", () => {
     ]);
   });
 
+  it("lists a side agent's synced subscription override for the Settings notice", () => {
+    localStorage.setItem(
+      "memoryKeeperModelOverride",
+      JSON.stringify({ modelKey: SONNET, reasoningEffort: "low" }),
+    );
+    expect(getLayerSubscriptionFallbacks()).toEqual([{ slot: "Memory Keeper", modelKey: SONNET }]);
+  });
+
   it("swaps a side agent's synced subscription override for its fallback", () => {
     expect(
       resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" }, "Mistral Nemo"),
@@ -104,6 +112,14 @@ describe("on a phone or the web build", () => {
 });
 
 describe("in the desktop app", () => {
+  it("lists no layer fallbacks", () => {
+    localStorage.setItem(
+      "memoryKeeperModelOverride",
+      JSON.stringify({ modelKey: SONNET, reasoningEffort: "low" }),
+    );
+    expect(getLayerSubscriptionFallbacks()).toEqual([]);
+  });
+
   it("keeps the subscription choices, with no fallback notice", () => {
     expect(getEffectiveTiers()[2]).toMatchObject({ modelKey: SONNET, reasoningEffort: "high" });
     expect(getEffectiveNarrationModelKey()).toBe(SONNET);

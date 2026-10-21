@@ -18,6 +18,7 @@ import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { getAvailableModels } from "@/app/misc/ai_prices";
 import { useClaudeCliStatus } from "@/app/components/ClaudeSubscriptionPanel";
+import { isClaudeCliAvailablePlatform, isClaudeCliModel } from "@/app/misc/claudeCliModels";
 import { CustomModel, getCustomModels } from "@/app/misc/user_settings";
 import { LibraryNote } from "@/app/misc/localNotesLibraryManager";
 import { startAdventureLocally } from "@/app/misc/localStoryManager";
@@ -87,11 +88,22 @@ function CreatorPage() {
     if (apiKeys.openRouterKey) {
       customModels.forEach((m) => entries.push([m.id, `⭐ ${m.name}`]));
     }
+    // A stored subscription model stays chosen on the desktop while the CLI's
+    // status is unknown or signed out, rather than quietly giving way to a
+    // model the author pays for; the Designer's own error then says why.
+    if (
+      model &&
+      isClaudeCliModel(model) &&
+      isClaudeCliAvailablePlatform() &&
+      !entries.some(([key]) => key === model)
+    ) {
+      entries.push([model, model]);
+    }
     return entries;
     // cliStatus is not read here, but getAvailableModels reads the cached
     // copy of it, so a fresh status has to recompute the list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKeys, customModels, cliStatus]);
+  }, [apiKeys, customModels, cliStatus, model]);
 
   const hasAnyKey = availableModels.length > 0;
   // Fall back to the first usable model when nothing is stored, or when the

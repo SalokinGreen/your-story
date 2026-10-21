@@ -15,6 +15,21 @@ import {
   SubscriptionFallback,
   getSubscriptionFallbacks,
 } from "@/app/misc/reasoningTiers";
+import {
+  LAYER_SETTINGS_CHANGED_EVENT,
+  getLayerSubscriptionFallbacks,
+} from "@/app/misc/layerSettings";
+
+/** Every slot that names a subscription model this device cannot run. */
+function allFallbacks(): SubscriptionFallback[] {
+  return [
+    ...getSubscriptionFallbacks(),
+    ...getLayerSubscriptionFallbacks().map((layer) => ({
+      ...layer,
+      fallbackModelKey: "the narration model",
+    })),
+  ];
+}
 
 /**
  * The `claude` CLI's status on this computer, checked once on mount (cached
@@ -49,14 +64,18 @@ export default function ClaudeSubscriptionPanel() {
   const status = useClaudeCliStatus();
   const [refreshing, setRefreshing] = useState(false);
   const [fallbacks, setFallbacks] = useState<SubscriptionFallback[]>(() =>
-    getSubscriptionFallbacks(),
+    allFallbacks(),
   );
   const onDesktop = isClaudeCliAvailablePlatform();
 
   useEffect(() => {
-    const update = () => setFallbacks(getSubscriptionFallbacks());
+    const update = () => setFallbacks(allFallbacks());
     window.addEventListener(REASONING_CONFIG_CHANGED_EVENT, update);
-    return () => window.removeEventListener(REASONING_CONFIG_CHANGED_EVENT, update);
+    window.addEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
+    return () => {
+      window.removeEventListener(REASONING_CONFIG_CHANGED_EVENT, update);
+      window.removeEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
+    };
   }, []);
 
   if (!onDesktop && fallbacks.length === 0) return null;

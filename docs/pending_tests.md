@@ -32,8 +32,10 @@ calls were spent on the checks before building (plan, "B0").
 - **Stop during a GM round kills the CLI.** Start a turn on a subscription
   tier and press Stop while it is thinking. The turn should revert at once,
   and Task Manager should show no `claude.exe` left from the app within a
-  second. *Failure looks like:* a `claude.exe` still running after the turn
-  reverted (the cancel never reached `claude_cli_cancel`).
+  second (with an npm-installed CLI, no `node.exe` running `claude` either:
+  Stop kills the process tree). *Failure looks like:* a `claude.exe` or
+  `node.exe` still running after the turn reverted (the cancel never reached
+  `claude_cli_cancel`, or the tree kill did not run).
 - **Narration on the subscription.** Set the narration voice to "Claude
   Haiku (subscription)" and play a turn where the GM rolls, so the story
   stage runs separately. The prose should stream in a few words at a time.

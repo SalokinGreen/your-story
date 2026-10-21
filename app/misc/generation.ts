@@ -2121,8 +2121,10 @@ async function generateStoryTurnOnce(
             storyData,
             gmHistoryBudget,
             {
-              // The narration model, like every other side call (decision 19).
-              model: narrationModel,
+              // The narration model, like every other side call (decision 19)
+              // - through resolveSideCallModel, which keeps a subscription
+              // narration voice off compaction (decision 12).
+              ...resolveSideCallModel(null, narrationModel),
               token,
               // All five, not just the ones this model "usually" needs: the
               // default narration model is a Mistral model, and leaving a

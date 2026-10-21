@@ -538,3 +538,46 @@ Built on PR A's branch, because PR A was still unmerged when the Stop fix
     message.
 15. **macOS and Linux** pass `PATH`, `HOME`, `TMPDIR`, `USER`, `LOGNAME` and
     `LANG` to the child. They are untested: only Windows was built and run.
+16. **After the engine review** (the review's findings, triaged; all fixed
+    except the last):
+    - With #204 merged, compaction took the narration model directly, past
+      `resolveSideCallModel`, so a subscription narration voice would have
+      put compaction on the CLI against decision 12. It now goes through
+      `resolveSideCallModel(null, narrationModel)`. The choices re-derived
+      after an Observer rewrite stay on the narration model, like the main
+      choices stage.
+    - A narration shorter than the longest stop sequence was emitted twice
+      (the hold-back left `streamedText` empty, so the result text was added
+      again). The check is now whether any text delta arrived.
+    - A Stop pressed while the Rust command was still finding the binary or
+      writing the prompt file was lost, because the cancel channel was
+      registered only after `spawn`. It is now registered first, and a run
+      cancelled before it starts never spawns. The stream also ignores lines
+      that arrive after an abort errored it.
+    - An npm-installed CLI is `claude.cmd`, so killing the child killed only
+      `cmd.exe` and left `node.exe` running the model call. On Windows, Stop
+      now kills the process tree (`taskkill /T /F`).
+    - The subscription check failed open when the start-up event had no
+      `apiKeySource` field (a CLI update could rename it). It now fails
+      closed. `claude_cli_status` also returns `apiProvider`, and Settings
+      reads "Uses bedrock, not your subscription" (or another provider)
+      when it is not `firstParty`.
+    - Settings' decision-16 notice now also lists the side-agent layer
+      overrides that fall back off the desktop.
+    - The creator page kept a stored subscription Designer model only while
+      the CLI was signed in, so for the first seconds and whenever it was
+      signed out it quietly switched to a model the author pays for. On the
+      desktop it now keeps the stored model, and the Designer's own error
+      says why it cannot run.
+    - The GM's `<thinking>` prefill survived into the transcript when a gate
+      sent a prose round back, and in the story stage. It is now dropped
+      wherever it sits right after the marked action and before another
+      assistant message.
+    - A failed status read and a failed cancel are logged instead of
+      swallowed.
+    - The transcript is flat text, so a line inside a message (a player's,
+      a guest's, an imported note's) that starts like a block header is
+      escaped with a backslash.
+    - **Open:** in an online multiplayer game, guests' input reaches the
+      host's turn and so the host's CLI. Whether to allow that is the
+      author's call (asked 2026-10-21).
