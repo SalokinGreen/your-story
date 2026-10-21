@@ -1098,6 +1098,12 @@ also restores observer rewrites.
 
 ## 12. Documentation drift
 
+> **Update 2026-10-21:** `CLAUDE.md` was rewritten against §12.1 and §12.2,
+> along with the working loop that came over from Beat Them Right
+> (decision 9). `README.md`, `docs/getting-started.md`,
+> `docs/api-reference.md` and `.github/copilot-instructions.md` are still
+> stale.
+
 `CLAUDE.md` was last edited in `c1bc751` (PR #186, 2026-07-29), but most of
 its stale claims were already false then: auth, tokens and coins went in
 `cfc64be` "New Leafe" (2026-07-18), the Supabase routes in PR #64 (`3348a4a`,
