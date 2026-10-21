@@ -6,7 +6,9 @@
  *    (tier 2) and Claude Sonnet 5.5 (tier 3), with the narration voice on
  *    GLM 5.3, all through OpenRouter;
  *  - an unpinned side agent runs on its own default, Claude Haiku 5.5, no
- *    matter what the narration voice or the GM's tier model is.
+ *    matter what the narration voice or the GM's tier model is - unless the
+ *    player has no key for that default's provider, when it runs on the
+ *    narration voice instead (added after the engine review of 2026-10-21).
  *
  * What these pin is the part that can quietly go wrong: that a default is a
  * real catalog key (an unknown one is swapped for DeepSeek V4 Flash, which
@@ -19,7 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("@tauri-apps/api/core", async () => (await import("./helpers/fakeClaudeCli")).fakeTauriCore);
 
 import { fakeCli } from "./helpers/fakeClaudeCli";
-import { AI_MODELS, getModelConfig, isKnownModelKey } from "@/app/misc/ai_prices";
+import { AI_MODELS, getModelConfig, hasKeyForModel, isKnownModelKey } from "@/app/misc/ai_prices";
 import {
   REASONING_TIERS,
   NARRATION_MODEL_KEY,
@@ -414,5 +416,128 @@ describe("the Observer's rewrite follows the narration voice, not the judges (de
       JSON.stringify({ modelKey: "Grok Code Fast 1", reasoningEffort: "low" }),
     );
     expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3")).toEqual({ model: "GLM 5.3" });
+  });
+});
+
+describe("a side agent without a key for the default falls to the narration voice (decision 51)", () => {
+  const OPENROUTER = { openRouterKey: "or-key" };
+  const MISTRAL_ONLY = { mistralKey: "mistral-key" };
+  const MISTRAL_NARRATOR = "Mistral Small 3.2";
+  const CUSTOM_MODEL_UUID = "123e4567-e89b-42d3-a456-426614174000";
+
+  const pin = (storageKey: string, modelKey: string) =>
+    localStorage.setItem(storageKey, JSON.stringify({ modelKey, reasoningEffort: "low" }));
+
+  it("hasKeyForModel maps a model to its provider's key, a custom UUID to OpenRouter, and the subscription to none", () => {
+    expect(hasKeyForModel("Claude Haiku 5.5", OPENROUTER)).toBe(true);
+    expect(hasKeyForModel("Claude Haiku 5.5", MISTRAL_ONLY)).toBe(false);
+    expect(hasKeyForModel(MISTRAL_NARRATOR, MISTRAL_ONLY)).toBe(true);
+    expect(hasKeyForModel(MISTRAL_NARRATOR, OPENROUTER)).toBe(false);
+    expect(hasKeyForModel("GLM 5.3 (Z.ai)", { zaiKey: "z" })).toBe(true);
+    expect(hasKeyForModel("GLM 5.3", { zaiKey: "z" })).toBe(false);
+    expect(hasKeyForModel(CUSTOM_MODEL_UUID, OPENROUTER)).toBe(true);
+    expect(hasKeyForModel(CUSTOM_MODEL_UUID, MISTRAL_ONLY)).toBe(false);
+    expect(hasKeyForModel(SONNET_SUBSCRIPTION, { ...OPENROUTER, ...MISTRAL_ONLY })).toBe(false);
+    expect(hasKeyForModel("Grok Code Fast 1", { ...OPENROUTER, ...MISTRAL_ONLY })).toBe(false);
+    expect(hasKeyForModel("Claude Haiku 5.5", { openRouterKey: "" })).toBe(false);
+  });
+
+  it("keeps Haiku when the player has an OpenRouter key, whatever the narration voice is", () => {
+    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    expect(resolveSideCallModel(null, OPENROUTER)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null, { ...OPENROUTER, ...MISTRAL_ONLY })).toEqual({
+      model: "Claude Haiku 5.5",
+    });
+  });
+
+  it("runs on the narration voice when the Mistral key is the only one and the voice is a Mistral model", () => {
+    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: MISTRAL_NARRATOR });
+  });
+
+  it("follows a Z.ai key to the Z.ai entry of GLM, but not to the OpenRouter entry the voice defaults to", () => {
+    // Fresh profile: the voice is "GLM 5.3" (OpenRouter), which a Z.ai key cannot call.
+    expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "Claude Haiku 5.5" });
+    localStorage.setItem("narrationModelOverride", "GLM 5.3 (Z.ai)");
+    expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "GLM 5.3 (Z.ai)" });
+  });
+
+  it("never falls to a Claude subscription narration voice", () => {
+    localStorage.setItem("narrationModelOverride", SONNET_SUBSCRIPTION);
+    expect(isClaudeCliModel(String(getEffectiveNarrationModelKey()))).toBe(true);
+    for (const keys of [MISTRAL_ONLY, {}, { mistralKey: "m", zaiKey: "z" }]) {
+      const resolved = resolveSideCallModel(null, keys);
+      expect(resolved).toEqual({ model: "Claude Haiku 5.5" });
+      expect(isClaudeCliModel(resolved.model)).toBe(false);
+    }
+  });
+
+  it("stays on Haiku, to fail visibly, when the voice is one the player has no key for either", () => {
+    // Only a Mistral key, voice on the default GLM 5.3 (OpenRouter).
+    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
+    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5" });
+    // A custom model's UUID is an OpenRouter model, which this player cannot call.
+    localStorage.setItem("narrationModelOverride", CUSTOM_MODEL_UUID);
+    expect(getEffectiveNarrationModelKey()).toBe(CUSTOM_MODEL_UUID);
+    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5" });
+  });
+
+  it("stays on Haiku with no keys at all", () => {
+    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    expect(resolveSideCallModel(null, {})).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null, { openRouterKey: "", mistralKey: undefined })).toEqual({
+      model: "Claude Haiku 5.5",
+    });
+  });
+
+  it("is the same answer as before when the keys argument is left out", () => {
+    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null, undefined)).toEqual({ model: "Claude Haiku 5.5" });
+  });
+
+  it("keeps a pinned layer on its pin, key or no key", () => {
+    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    // A pin on a provider the player has no key for is still the player's choice.
+    pin("memoryKeeperModelOverride", "Claude Sonnet 5.5");
+    expect(resolveSideCallModel(getMemoryKeeperModelOverride(), MISTRAL_ONLY)).toEqual({
+      model: "Claude Sonnet 5.5",
+      reasoningEffort: "low",
+    });
+    pin("observerModelOverride", "Mistral Medium 3.1");
+    expect(resolveSideCallModel(getObserverModelOverride(), OPENROUTER)).toEqual({
+      model: "Mistral Medium 3.1",
+      reasoningEffort: "low",
+    });
+    expect(resolveSideCallModel(getObserverModelOverride(), {})).toEqual({
+      model: "Mistral Medium 3.1",
+      reasoningEffort: "low",
+    });
+  });
+
+  it("keeps a subscription pin the desktop can run, and falls one it cannot the same way as an unpinned layer", () => {
+    pin("observerModelOverride", SONNET_SUBSCRIPTION);
+    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    expect(resolveSideCallModel(getObserverModelOverride(), MISTRAL_ONLY)).toEqual({
+      model: SONNET_SUBSCRIPTION,
+      reasoningEffort: "low",
+    });
+
+    // Decision 16: a synced choice on a device without the CLI.
+    fakeCli.platform = false;
+    expect(resolveSideCallModel(getObserverModelOverride(), MISTRAL_ONLY)).toEqual({
+      model: MISTRAL_NARRATOR,
+    });
+    expect(resolveSideCallModel(getObserverModelOverride(), OPENROUTER)).toEqual({
+      model: "Claude Haiku 5.5",
+    });
+    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5" });
+
+    // Decision 29: online play.
+    fakeCli.platform = true;
+    setOnlineSessionActive(true);
+    expect(resolveSideCallModel(getObserverModelOverride(), MISTRAL_ONLY)).toEqual({
+      model: MISTRAL_NARRATOR,
+    });
   });
 });

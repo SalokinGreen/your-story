@@ -1367,6 +1367,26 @@ export function isModelAvailable(
   return !!keys[requiredKey];
 }
 
+/**
+ * Whether the keys the player has saved (the key strings themselves, as
+ * ProviderKeys in sideModelCall.ts carries them) unlock this model's
+ * provider. Same answer as isModelAvailable, which wants flags rather than
+ * strings, plus the two cases it cannot answer: a custom model's UUID is an
+ * OpenRouter model, and the Claude subscription (provider `claude-cli`) has no
+ * key at all, so it is never "unlocked" by one.
+ */
+export function hasKeyForModel(
+  modelKey: string,
+  keys: { [K in keyof APIKeysAvailable]?: string | null },
+): boolean {
+  const field = Object.prototype.hasOwnProperty.call(AI_MODELS, modelKey)
+    ? getRequiredKeyForModel(modelKey)
+    : isKnownModelKey(modelKey)
+      ? "openRouterKey"
+      : null;
+  return field ? !!keys[field] : false;
+}
+
 export interface AIModelConfig {
   name: string;
   original_model: string;
@@ -1421,12 +1441,13 @@ const CUSTOM_MODEL_KEY_PATTERN =
 /**
  * Whether a stored model choice (a tier slot, the narration voice, a side
  * agent, anything saved in settings or synced from another device) still names
- * something the app can call: a key in AI_MODELS, or the UUID of a custom
- * OpenRouter model. A key the catalog dropped (a model its provider shut down)
- * is not, and getModelConfig would answer for it by silently swapping in
- * DeepSeek V4 Flash, which needs a DeepSeek key and bills differently. So
- * callers that read a saved choice check this first and use the slot's own
- * default instead.
+ * something the app can call: a key in AI_MODELS, or anything shaped like the
+ * UUID of a custom OpenRouter model (only the shape is checked, so the id of a
+ * custom model the player has since deleted passes too). A key the catalog
+ * dropped (a model its provider shut down) is not, and getModelConfig would
+ * answer for it by silently swapping in DeepSeek V4 Flash, which needs a
+ * DeepSeek key and bills differently. So callers that read a saved choice
+ * check this first and use the slot's own default instead.
  */
 export function isKnownModelKey(modelKey: unknown): modelKey is string {
   if (typeof modelKey !== "string" || modelKey === "") return false;

@@ -11,9 +11,14 @@
  * (Settings UI) and generation.ts (actually applying the overrides).
  */
 
-import { AnyModelKey, ReasoningEffort } from "./reasoningTiers";
-import { AIModelKey, isKnownModelKey } from "./ai_prices";
+import {
+  AnyModelKey,
+  ReasoningEffort,
+  getEffectiveNarrationModelKey,
+} from "./reasoningTiers";
+import { AIModelKey, hasKeyForModel, isKnownModelKey } from "./ai_prices";
 import { canRunClaudeCliModel, claudeCliBlockReason, isClaudeCliModel } from "./claudeCliModels";
+import type { ProviderKeys } from "./sideModelCall";
 import {
   ObserverSettings,
   ObserverCheckSettings,
@@ -35,7 +40,8 @@ function notifyChanged(): void {
 // ============================================================
 // null (default) means "run on SIDE_AGENT_DEFAULT_MODEL_KEY" (decision 51,
 // which revised decision 19: the side agents used to follow the narration
-// model). resolveSideCallModel is the one place that turns a null into it.
+// model). resolveSideCallModel is the one place that turns a null into it
+// (or, for a player with no key for its provider, into the narration voice).
 
 /**
  * The model an unpinned side agent runs on (decision 51): the Observer and
@@ -44,7 +50,11 @@ function notifyChanged(): void {
  * the same key the default tiers need - not "Claude Haiku (subscription)":
  * a side agent reaches the Claude subscription only when the player pins a
  * layer there (decision 12). Independent of the narration voice, so changing
- * the narrator does not move the side agents.
+ * the narrator does not move the side agents - except for a player with no
+ * key for this model's provider: resolveSideCallModel, given the player's
+ * keys, runs an unpinned side agent on the narration voice instead, so a
+ * player without an OpenRouter key keeps compaction, the Memory Keeper and the
+ * rest. Without that fallback they would all fail with NO_API_KEY.
  */
 export const SIDE_AGENT_DEFAULT_MODEL_KEY: AIModelKey = "Claude Haiku 5.5";
 
@@ -123,8 +133,9 @@ export const setStoryProgressObserverModelOverride = (
 /**
  * Decisions 16 and 29 for the side agents: the layers whose Claude
  * subscription override cannot run here and now, for Settings' notice. They
- * run on SIDE_AGENT_DEFAULT_MODEL_KEY instead (resolveSideCallModel). Empty on
- * the desktop app outside an online session.
+ * run on SIDE_AGENT_DEFAULT_MODEL_KEY instead (resolveSideCallModel; the
+ * narration voice for a player with no key for its provider). Empty on the
+ * desktop app outside an online session.
  */
 export function getLayerSubscriptionFallbacks(): {
   slot: string;
@@ -185,6 +196,29 @@ export function setStoryProgressCheckInterval(turns: number): void {
 }
 
 /**
+ * What an unpinned side agent runs on (and what a pin this device cannot run
+ * falls to): SIDE_AGENT_DEFAULT_MODEL_KEY, with no reasoningEffort field at
+ * all. Given the player's keys (decision 51, amended after the engine review
+ * of 2026-10-21), a player with no key for that model's provider - one with
+ * only a Mistral or Z.ai key, say - gets the effective narration voice
+ * instead, as long as it is not a Claude subscription model (decision 12: an
+ * unpinned side agent never reaches the subscription) and they have a key for
+ * its provider. When neither is runnable the default stays, and the call
+ * fails visibly in the Debug Logs rather than quietly running somewhere the
+ * player did not choose. Without `keys` the default is always returned.
+ */
+function unpinnedSideAgentModel(keys: ProviderKeys | undefined): string {
+  if (!keys || hasKeyForModel(SIDE_AGENT_DEFAULT_MODEL_KEY, keys)) {
+    return SIDE_AGENT_DEFAULT_MODEL_KEY;
+  }
+  const narration = String(getEffectiveNarrationModelKey());
+  if (!isClaudeCliModel(narration) && hasKeyForModel(narration, keys)) {
+    return narration;
+  }
+  return SIDE_AGENT_DEFAULT_MODEL_KEY;
+}
+
+/**
  * Resolves a side agent's { model, reasoningEffort } for its API call: the
  * player's pin if there is one, otherwise SIDE_AGENT_DEFAULT_MODEL_KEY (an
  * AI_MODELS key) with no reasoningEffort field at all. It takes no fallback
@@ -193,15 +227,25 @@ export function setStoryProgressCheckInterval(turns: number): void {
  * caller to pass, and none that could carry a Claude subscription model in
  * (decision 12: the side agents run on the subscription only when the
  * player points a layer there).
+ *
+ * `keys` are the provider keys the call will carry (the six
+ * generation.ts's `sideCallApiOptions` holds). With them, an unpinned side
+ * agent - or one whose subscription pin this device cannot run, decisions 16
+ * and 29 - falls from the default to the narration voice when the player has
+ * no key for the default's provider (see unpinnedSideAgentModel), so a player
+ * without an OpenRouter key keeps their side agents. A pin this device can run
+ * is kept whatever the keys say. Omit `keys` and the answer is the default,
+ * as before.
  */
 export function resolveSideCallModel(
   override: ModelEffortOverride | null,
+  keys?: ProviderKeys,
 ): { model: string; reasoningEffort?: string } {
-  if (!override) return { model: SIDE_AGENT_DEFAULT_MODEL_KEY };
+  if (!override) return { model: unpinnedSideAgentModel(keys) };
   // Decisions 16 and 29: a subscription override this device cannot run (a
   // synced choice off the desktop) or may not run (online play is active).
   if (isClaudeCliModel(override.modelKey) && !canRunClaudeCliModel()) {
-    return { model: SIDE_AGENT_DEFAULT_MODEL_KEY };
+    return { model: unpinnedSideAgentModel(keys) };
   }
   return { model: override.modelKey, reasoningEffort: override.reasoningEffort };
 }

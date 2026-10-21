@@ -47,9 +47,14 @@ export interface ReasoningTier {
  * available" one. Swap any `modelKey` to any AI_MODELS entry to reconfigure —
  * whichever providers end up in use, the corresponding key (openRouterKey,
  * deepseekKey, googleKey, mistralKey, deepinfraKey, zaiKey) must be
- * configured in Settings for that tier to actually dispatch; a missing key
- * fails over to the next-lower tier (see fallbackTier below) rather than
- * crashing.
+ * configured in Settings for that tier to actually dispatch. A missing key
+ * does NOT fail over to the next-lower tier: GM rounds are streamed, so the
+ * proxy (and providerFetch in the native apps) answers 200 with an in-stream
+ * `error` event rather than a failed status, generation.ts throws that
+ * event, and its `!gmResponse.ok` -> fallbackTier branch never fires. The turn
+ * stops with an error toast naming the provider whose key is missing. (The
+ * same holds for a provider's HTTP error on a streamed round; only a non-200
+ * from the proxy itself, or the subscription bridge's 502, takes fallbackTier.)
  *
  * The defaults (decision 50, "Balanced") are Claude Haiku 5.5 for the two
  * light tiers, GLM 5.3 for combat and rules, and Claude Sonnet 5.5 for boss

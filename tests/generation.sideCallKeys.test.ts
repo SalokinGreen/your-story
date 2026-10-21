@@ -10,19 +10,27 @@
  * of those calls and the failure was swallowed, so with default settings a
  * long campaign never got a scene summary or a reflection insight (status
  * report §6.13). This drives a real turn with nothing but a Mistral key, on a
- * story that is due for both, and checks the key reached every call. The
- * defaults have moved to OpenRouter models since (decisions 50 and 51); the
- * mock accepts any model, so what is checked is the forwarding of all six
- * keys, which is independent of which provider a call's model lives on.
+ * story that is due for both, and checks the key reached every call.
+ *
+ * The defaults are OpenRouter models now (decisions 50 and 51), so a player
+ * with only a Mistral key has pointed the narration voice at a Mistral model
+ * in Settings, and the unpinned side agents - which would otherwise run on
+ * Claude Haiku 5.5 and fail with NO_API_KEY - must follow it (decision 51's
+ * fallback for a player with no key for the side-agent default's provider).
+ * The mock answers any model, so the test reads the model each call names and
+ * checks it is that Mistral model, not just that the key rode along.
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import { NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import type { MemoryEntry, StoryData } from "@/app/misc/structs";
 
 const MISTRAL_KEY = "mistral-test-key";
 const ZAI_KEY = "zai-test-key";
+/** The narration voice a Mistral-only player picks in Settings. */
+const MISTRAL_NARRATION_MODEL = "Mistral Small 3.2";
 const NARRATION = "The lock clicks open. The corridor beyond is dark.";
 
 /** ~1,500 tokens apiece - several of these age well past a small history budget. */
@@ -59,6 +67,9 @@ function storyDueForCompactionAndReflection(): StoryData {
     ],
     npcs: [],
     sessionZeroActive: false,
+    // Due for a Story Progress Observer check-in too, so one more side agent
+    // runs on whatever model the others do.
+    turnsSinceStoryProgressCheck: 100,
   } as unknown as StoryData;
 }
 
@@ -71,6 +82,14 @@ const isCompaction = (call: SideCall) =>
   call.body.messages[0]?.content?.includes("running summary") ?? false;
 const isReflection = (call: SideCall) =>
   call.body.messages[0]?.content?.includes("memory-reflection layer") ?? false;
+const isMemoryKeeper = (call: SideCall) =>
+  call.body.messages[0]?.content?.includes("memory-curation layer") ?? false;
+const isStoryProgress = (call: SideCall) =>
+  call.body.messages[0]?.content?.includes("story-progress reviewer") ?? false;
+const isDirectorAssistant = (call: SideCall) =>
+  call.body.messages[0]?.content?.includes("spotlight-tracking layer") ?? false;
+const isObserverJudge = (call: SideCall) =>
+  call.body.messages[0]?.content?.includes("non-negotiable rule") ?? false;
 
 /**
  * Non-streaming /api/generate side calls get canned answers keyed on their
@@ -78,8 +97,8 @@ const isReflection = (call: SideCall) =>
  * on the exact URL because "/api/generate" is a substring of
  * "/api/generate-stream".
  */
-function createFetchMock() {
-  const gm = createMockGMFetch([{ content: NARRATION }]);
+function createFetchMock(gmRounds: Parameters<typeof createMockGMFetch>[0] = [{ content: NARRATION }]) {
+  const gm = createMockGMFetch(gmRounds);
   const calls: SideCall[] = [];
 
   const fetchMock = vi.fn(async (url: unknown, init?: RequestInit) => {
@@ -103,11 +122,35 @@ const originalFetch = global.fetch;
 
 afterEach(() => {
   global.fetch = originalFetch;
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
+/**
+ * layerSettings.ts and reasoningTiers.ts read the player's settings through
+ * `typeof window` guards, and the logger then wants sessionStorage too.
+ */
+function stubBrowserStorage(entries: Record<string, string>) {
+  const map = new Map(Object.entries(entries));
+  const storage = {
+    getItem: (key: string) => map.get(key) ?? null,
+    setItem: (key: string, value: string) => void map.set(key, String(value)),
+    removeItem: (key: string) => void map.delete(key),
+    clear: () => map.clear(),
+  };
+  vi.stubGlobal("localStorage", storage);
+  vi.stubGlobal("sessionStorage", { ...storage, clear: () => {} });
+  vi.stubGlobal("window", {
+    localStorage: storage,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  });
+}
+
 describe("side calls forward every provider key", () => {
-  it("compacts and reflects, forwarding a Mistral key that is the only one saved", async () => {
+  it("compacts and reflects with only a Mistral key saved and the narration voice on a Mistral model", async () => {
+    stubBrowserStorage({ narrationModelOverride: MISTRAL_NARRATION_MODEL });
     const { fetchMock, calls } = createFetchMock();
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -135,6 +178,19 @@ describe("side calls forward every provider key", () => {
       .map((call) => `${call.url}: ${call.body.messages[0]?.content?.slice(0, 60)}`);
     expect(missingKey).toEqual([]);
 
+    // The model each call names is the Mistral narration voice, the one model
+    // this player's only key can call - not Claude Haiku 5.5 on OpenRouter,
+    // which the real proxy would refuse with NO_API_KEY.
+    const modelsNamed = (list: SideCall[]) => [...new Set(list.map((c) => c.body.model))];
+    expect(modelsNamed(calls.filter(isCompaction))).toEqual([MISTRAL_NARRATION_MODEL]);
+    expect(modelsNamed(calls.filter(isReflection))).toEqual([MISTRAL_NARRATION_MODEL]);
+    expect(modelsNamed(calls.filter(isMemoryKeeper))).toEqual([MISTRAL_NARRATION_MODEL]);
+    expect(modelsNamed(calls.filter(isStoryProgress))).toEqual([MISTRAL_NARRATION_MODEL]);
+    const sideCalls = calls.filter((call) => call.url === "/api/generate");
+    expect(modelsNamed(sideCalls)).toEqual([MISTRAL_NARRATION_MODEL]);
+    expect(getModelConfig(MISTRAL_NARRATION_MODEL).provider).toBe("mistral");
+    expect(getModelConfig(MISTRAL_NARRATION_MODEL).model).not.toBe("anthropic/claude-haiku-5.5");
+
     // And the results actually landed - the point of the fix.
     expect(storyData.scene.summary).toContain("flooded ruins");
     expect(
@@ -142,6 +198,62 @@ describe("side calls forward every provider key", () => {
         (m) => typeof m !== "string" && m.isReflection === true,
       ),
     ).toBe(true);
+  });
+
+  it("runs the Observer's judges and the Director Assistant on that voice too", async () => {
+    stubBrowserStorage({ narrationModelOverride: MISTRAL_NARRATION_MODEL });
+    // An increment_scene call makes the Director Assistant due; an active
+    // thread gives it something to judge; the character sheet keeps the
+    // Observer from suspending itself.
+    const { fetchMock, calls } = createFetchMock([
+      { toolCalls: [{ name: "increment_scene", arguments: {} }] },
+      { content: NARRATION },
+    ]);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const storyData = storyDueForCompactionAndReflection();
+    storyData.lore = [
+      {
+        title: "Character Sheet",
+        content: "Test Player, a thief. Nimble 3, Tough 1.",
+        type: "character_sheet",
+        enabled: true,
+      },
+    ] as unknown as StoryData["lore"];
+    storyData.threads = [
+      {
+        id: "thread-1",
+        title: "The flooded ruins",
+        description: "What drowned the old keep?",
+        status: "active",
+        createdAt: 0,
+      },
+    ];
+
+    await generateStoryTurn(
+      storyData,
+      "I pick the lock",
+      {
+        storyModel: NARRATION_MODEL_KEY,
+        toolsModel: NARRATION_MODEL_KEY,
+        choicesModel: NARRATION_MODEL_KEY,
+        enableTools: true,
+        skipChoices: true,
+        replyLength: "medium",
+        customMaxContext: 8000,
+        mistralKey: MISTRAL_KEY,
+      },
+      {},
+    );
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+
+    const modelsNamed = (list: SideCall[]) => [...new Set(list.map((c) => c.body.model))];
+    expect(calls.filter(isObserverJudge).length).toBeGreaterThan(0);
+    expect(calls.filter(isDirectorAssistant).length).toBeGreaterThan(0);
+    expect(modelsNamed(calls.filter(isObserverJudge))).toEqual([MISTRAL_NARRATION_MODEL]);
+    expect(modelsNamed(calls.filter(isDirectorAssistant))).toEqual([MISTRAL_NARRATION_MODEL]);
+    const sideCalls = calls.filter((call) => call.url === "/api/generate");
+    expect(modelsNamed(sideCalls)).toEqual([MISTRAL_NARRATION_MODEL]);
   });
 
   it("forwards a Z.ai key to every call, the sixth provider (decision 18)", async () => {

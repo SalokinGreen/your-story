@@ -71,6 +71,33 @@ real turns on the author's OpenRouter key, so it waits for the author's go.
   call still reaches `getModelConfig()` with a key it does not know (a missed
   fallback path); a GLM 5.3 reply that comes back empty because its thinking
   used the whole token cap.
+- **A climb to tier 3 in the middle of a turn, from GLM 5.3 and from Haiku.**
+  In a combat scene against two enemies (tier 2, GLM 5.3), make the GM raise
+  the tier mid-turn: a `formula_roll` with `stakes: "deadly"` raises it
+  through `applyStakesEscalation`, so the next round runs on Claude Sonnet
+  5.5. Then do the same from an ordinary scene (tier 1, Haiku). *Expected:*
+  the Sonnet round succeeds, with the GM's earlier rounds in its history.
+  *Failure looks like:* a 400 from Anthropic or OpenRouter naming
+  `reasoning_details`, thinking blocks or a signature. That would mean the
+  earlier model's reasoning must not be replayed to Claude when the model
+  changes inside a turn. The turn then errors out instead of falling back,
+  because the tier fallback does not fire for streamed rounds (a provider
+  error arrives as an in-stream `error` event; see the `REASONING_TIERS`
+  comment in `reasoningTiers.ts`).
+- **A gated combat round on GLM 5.3.** In the same two-enemy combat, provoke
+  the roll gate (M2) or the plan gate, so that round is forced to
+  `tool_choice: "required"` and goes out through OpenRouter to GLM 5.3.
+  *Expected:* the gated round calls a tool (a roll). *Failure looks like:* a
+  400 naming `tool_choice`, or the model answering in prose again so the gate
+  fires a second time.
+- **The cap on a tier 3 turn.** Against a single enemy (tier 3, Claude Sonnet
+  5.5 at `xhigh`), with the default Response Length of 8,000, read the final
+  story round in the Debug Logs. Thinking counts against `max_tokens` on
+  Claude, so `xhigh` can use up the cap. *Expected:* the round's finish
+  diagnostic shows `truncatedAtCap: false` and the scene arrives whole.
+  *Failure looks like:* `truncatedAtCap: true`, an empty final story round,
+  or a scene that stops mid-sentence; then tier 3's effort or the 4,096
+  `max_tokens` floor needs another look.
 - **Haiku's thinking on the side calls.** An unpinned side agent sends no
   reasoning effort, and Claude 5.5's thinking cannot be turned off, so
   `applyReasoningEffort` sends a Claude call with no effort as `low`, as its
@@ -94,6 +121,18 @@ real turns on the author's OpenRouter key, so it waits for the author's go.
   model. *Expected:* a turn that stops with a message naming the missing
   OpenRouter key, and the Settings tier cards showing "No key"; saving an
   OpenRouter key (or picking models on the key it has) fixes it.
+- **An OpenRouter-less profile keeps its side agents.** Clear every saved
+  override and every key, save only a Mistral key, set the four tiers and the
+  narration voice to Mistral models in Settings → AI Config, and play until
+  compaction runs (a long story, or a small Memory Size). *Expected:* the turn
+  plays, and the Memory Keeper, the Observer and compaction lines in the Debug
+  Logs name the Mistral narration model (the side agents fall to the
+  narration voice when there is no key for Claude Haiku 5.5's provider), with
+  a scene summary appearing once compaction has run. *Failure looks like:* a
+  side-agent line naming Claude Haiku 5.5 followed by "No API key configured
+  for OpenRouter", or a story whose old history drops out with no summary
+  (compaction never ran). The "Compact Story" button in the story menu should
+  work on the same profile, on the same model.
 
 ## 2026-10-21 — Claude on the subscription (Route B of the Claude GM plan)
 

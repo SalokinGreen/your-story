@@ -951,7 +951,8 @@ export async function generateStoryTurn(
     // cost-turn id and the abort signal are common to all of them; the model
     // is not: each side agent takes its own through resolveSideCallModel
     // (the player's pin from Settings > Architecture, else
-    // SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51), which overrides the
+    // SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51, or the narration voice when
+    // the player has no key for that default's provider), which overrides the
     // `model` here. This `model` is the narration model, which the choices
     // re-derivation after an Observer rewrite uses, and the rewrite itself
     // when the Observer is unpinned (decision 52). It has to be an
@@ -980,7 +981,7 @@ export async function generateStoryTurn(
     const observerModelOverride = getObserverModelOverride();
     const observerApiOptions = {
       ...sideCallApiOptions,
-      ...resolveSideCallModel(observerModelOverride),
+      ...resolveSideCallModel(observerModelOverride, sideCallApiOptions),
     };
     // The rewrite writes the prose the player reads, so an unpinned Observer
     // rewrites on the narration voice, not the side-agent default its judges
@@ -1740,7 +1741,10 @@ export async function generateStoryTurn(
       try {
         const memoryKeeperApiOptions = {
           ...sideCallApiOptions,
-          ...resolveSideCallModel(getMemoryKeeperModelOverride()),
+          ...resolveSideCallModel(
+            getMemoryKeeperModelOverride(),
+            sideCallApiOptions,
+          ),
         };
         await runMemoryAgent(
           storyData,
@@ -1766,7 +1770,10 @@ export async function generateStoryTurn(
         try {
           const directorAssistantApiOptions = {
             ...sideCallApiOptions,
-            ...resolveSideCallModel(getDirectorAssistantModelOverride()),
+            ...resolveSideCallModel(
+              getDirectorAssistantModelOverride(),
+              sideCallApiOptions,
+            ),
           };
           await runDirectorAssistant(
             storyData,
@@ -1799,7 +1806,10 @@ export async function generateStoryTurn(
       try {
         const storyProgressApiOptions = {
           ...sideCallApiOptions,
-          ...resolveSideCallModel(getStoryProgressObserverModelOverride()),
+          ...resolveSideCallModel(
+            getStoryProgressObserverModelOverride(),
+            sideCallApiOptions,
+          ),
         };
         const progressResult = await runStoryProgressObserver(
           storyData,
@@ -2136,8 +2146,11 @@ async function generateStoryTurnOnce(
             {
               // The side-agent default, like every other unpinned side call
               // (decision 51) - through resolveSideCallModel, which can never
-              // hand compaction a subscription model (decision 12).
-              ...resolveSideCallModel(null),
+              // hand compaction a subscription model (decision 12), and which
+              // runs it on the narration voice when the player has no key
+              // for the default's provider (so compaction still runs for a
+              // player with, say, only a Mistral key).
+              ...resolveSideCallModel(null, pickProviderKeys(options)),
               token,
               // All six, not just the ones this model "usually" needs:
               // leaving a provider out here is how compaction silently never
@@ -2176,7 +2189,10 @@ async function generateStoryTurnOnce(
         try {
           const reflectionModelOverride = getReflectionModelOverride();
           const reflectionApiOptions = {
-            ...resolveSideCallModel(reflectionModelOverride),
+            ...resolveSideCallModel(
+              reflectionModelOverride,
+              pickProviderKeys(options),
+            ),
             token,
             ...pickProviderKeys(options),
             abortSignal: options.abortSignal,
