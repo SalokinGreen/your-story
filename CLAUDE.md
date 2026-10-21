@@ -600,6 +600,30 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   The host broadcasts the whole `StoryData` to guests, GM secrets included,
   and `ask_question` is not relayed to guests (§6.12). In the native apps,
   "Copy invite link" copies a text invite with the room code (decision 7).
+- **Party mode** (desktop app only; `docs/party-mode-design.md`, decisions
+  21–28): the desktop is the **table** and every player plays from their own
+  phone on the home Wi-Fi. `src-tauri/src/party_server.rs` runs only while the
+  table is open: it serves the phone page (`/party`, `app/party/`, a page of
+  the static export) and a WebSocket, and **only relays text; Rust never
+  parses a message or makes a game decision** (the four `party_*` commands are
+  granted to the `main` window alone, through an app manifest in `build.rs`).
+  The game stays in TypeScript, `app/misc/party/`: `partyHost.ts` is a pure
+  state machine (spotlight on `floorControl` with party mode's own 15 s
+  cooldown, a queue, Go, seats), `partyRuntime.ts` runs its effects against the
+  server (`partyBridge.ts` is the one place that calls Rust), and
+  `app/story/usePartyHost.ts` is the hook on the story page. **`buildPlayerView`
+  is the only thing that builds what a phone receives, and it is the redaction
+  boundary:** an explicit field list, never a spread of `StoryData`, with no
+  secrets, `gm_plan` or `dm_instructions` notes, notes that aren't
+  `always_reveal`, other players' sheets or keys; `tests/party.redaction.test.ts`
+  proves it, so extend that test with anything new a phone is shown. A phone
+  needs the spotlight to add any line (decision 26); rolls and questions the GM
+  addresses by name go to that player's phone. The server needs the QR token,
+  a private-range peer and the exact Origin, serves only `/party`, the favicon
+  and `/_next/static/*`, and a phone on plain HTTP has no `crypto.subtle`,
+  `crypto.randomUUID` or clipboard. Couch mode is untouched: its 4 s cooldown
+  and PlayerBubbles' Generate payload (now `turnText.ts`) are byte-identical.
+  The Android app joining and voice from phones are PR P2.
 - **Environment**: the only env vars are `NEXT_PUBLIC_SITE_URL` (the
   OpenRouter HTTP-Referer), `NEXT_PUBLIC_STANDALONE` and
   `NEXT_PUBLIC_SYNC_API_URL`. Node ≥ 20.9.
@@ -636,11 +660,14 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 - `app/components/` — shared UI: the dice tray (`DiceThrowModal.tsx`,
   `ManualRollModal.tsx`), the character sheet renderer, TTS/STT controls, the
   API key modal, `PDFImporter.tsx`, the Settings tabs.
-- `src-tauri/`, `android/`, `ios/` — the native shells. `sync-worker/` — the
+- `app/misc/party/` and `app/party/` — party mode: the protocol, the pure host
+  state machine, the runtime and Tauri bridge, and the phone controller page.
+- `src-tauri/`, `android/`, `ios/` — the native shells (`src-tauri/src/party_server.rs`
+  is party mode's LAN server). `sync-worker/` — the
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, about 1,600 tests, largely against `app/misc/`.
+- `tests/` — Vitest, about 1,700 tests, largely against `app/misc/`.
   Deterministic tests seed `Math.random`; follow that for new dice and oracle
   tests.
 - `docs/` — mixed freshness (see the top of this file). The `*.sql` files are

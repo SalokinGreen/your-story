@@ -511,7 +511,9 @@ describe("party host: the desktop's roster", () => {
   });
 
   it("removes a player on purpose: phone sent away, spotlight, queue and requests cleared", () => {
-    let { state, mara, tom } = twoPlayers();
+    const setup = twoPlayers();
+    const { mara, tom } = setup;
+    let state = setup.state;
     state = send(state, "c1", { type: "spotlight_take" }).state;
     state = send(state, "c1", { type: "line", text: "I wait.", kind: "typed" }).state;
     state = addRequest(state, {
