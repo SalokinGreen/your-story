@@ -126,12 +126,30 @@ over). The agents live in `.claude/agents/`.
 
 | delegate to | for |
 |---|---|
-| `code-explorer` (Sonnet) or `Explore` | tracing a subsystem, hunting call sites, auditing docs against code — read-only, and cheap enough to read widely |
-| a `general-purpose` subagent, or a fresh session | implementing a change that has *already been planned* — specified work is Sonnet work (`workflow.md` §3) |
+| `code-explorer` (Haiku) | tracing a subsystem, hunting call sites, auditing docs against code: read-only, and cheap enough to read widely |
+| `researcher` (Haiku) | web research (docs, APIs, prices, terms of service), as sourced facts with links |
+| `implementer` (Sonnet), or a fresh session started with `model: "claude-sonnet-5-5"` | building a change that has *already been planned*, one slice or one PR at a time; specified work is Sonnet work (`workflow.md` §3) |
+| `docs-writer` (Haiku) | writing or updating docs for work that already exists |
 | `engine-review` (Opus) | reviewing any change to the engine in `app/misc/` before it merges, against the bug families this codebase keeps producing |
 | the `/code-review` skill | a correctness review of the current diff in a fresh context |
 | the `codex-review` skill | a second opinion from a different model family on a plan or a diff, when the author asks for one |
 | `fable-escalation` (Fable) | a problem you have genuinely tried and failed to solve — attempted, verified to fail, not merely tedious. Not a first resort |
+
+**Every delegation names its model.** A session started with
+`start_session`, and a `general-purpose` or `Explore` subagent, inherit the
+caller's model unless they are given one. Here that means Opus, the most
+expensive one. So pass the model explicitly every time, or use an agent from
+the table above, which has its model pinned:
+
+- **Sonnet** (`claude-sonnet-5-5`) for building and fixing from a clear brief.
+- **Haiku** (`claude-haiku-5-5`) for docs, research, exploration and
+  mechanical edits.
+- **Opus** only for planning, design and reviews.
+
+If a running session is on the wrong model, switch it with
+`set_session_model`. (On 2026-10-21 every session and research agent
+inherited Opus, and the author caught it: "I think you're only using
+yourselves, opus, which costs a lot.")
 
 **Keep, and do not delegate:** the implementation plan itself, and the
 before-and-after baseline. The plan is where being wrong is most expensive,
