@@ -338,34 +338,43 @@ These go to `docs/pending_tests.md`:
 Auto-voice; an iOS app path; play from outside the home network; players
 at the desktop itself; voice in the browser client.
 
-## 7. S0 status (2026-10-21)
+## 7. S0 findings (2026-10-21)
 
-**Not run yet: the author had no phone to hand.** The spike is built and
-waiting. By decision 31, S2 went ahead first; nothing from S1 onward is
-built until S0 passes.
+**Passed: a phone reaches the PC.** The author ran the spike, a throwaway
+axum binary, on this PC. It served the static export, a `/party` echo page
+and `/ws` (with the token, Origin and private-range checks), and logged
+every request with its peer address. The author then scanned a QR code with
+an Android 10 phone running Chrome 155. The spike was built first, but run
+only after S2 had been written (decision 31).
 
-- **The spike:** a throwaway axum binary. It serves a static export, a
-  `/party` echo page and `/ws` (token, Origin and private-range checks), and
-  logs every request with its peer address to `spike.log` beside the exe.
-  Source: the session notes folder, `party-spike-src/`. Built exe:
-  `%LOCALAPPDATA%\Temp\pspike\party-spike.exe`. Build it with
-  `CARGO_TARGET_DIR` set to a short path: under the session scratchpad,
-  `link.exe` fails with LNK1104 because the path passes 260 characters.
-- **The session can't start it.** The permission classifier refuses to open
-  a LAN port ("Expose Local Services"), so the author runs it:
-  `party-spike.exe <an out/ dir> 8787 spike`, then opens
-  `http://192.168.0.85:8787/party?t=spike` on a phone on the same Wi-Fi.
-- **What this PC looks like, checked beforehand:**
-  - The wired "Ethernet" adapter is `192.168.0.85/24`, gateway
-    `192.168.0.1`, and Windows marks it **Private**.
-  - "Ethernet 2" has a default route to `25.0.0.1` (a VPN-style adapter),
-    is marked Public and carries no traffic.
-  - Tailscale is `100.122.14.19`; the Bluetooth PAN is `169.254.39.80`.
-  - So the interface picker matters: `local_ip()` has to pick
-    `192.168.0.85`, not the 25.x or Tailscale addresses.
-  - All three firewall profiles are on with NotifyOnListen, so a prompt is
-    expected.
-  - Port 8787 is outside the reserved TCP ranges (1036, 5357, 50000–50059).
+- **Reach.** The phone (Wi-Fi, `192.168.0.253`) loaded `/party` from the
+  PC (wired, `192.168.0.85`). No client isolation on this network.
+- **The WebSocket.** It upgraded with `Origin: http://192.168.0.85:8787`,
+  exactly the `http://<ip>:<port>` the check expects. The hello and two taps
+  were echoed. The first socket closed when the page was reloaded, so
+  reconnecting matters (S4).
+- **Choosing the interface.** `local_ip()` picked `192.168.0.85`. The PC
+  also has Tailscale (`100.122.14.19`), a Bluetooth PAN (`169.254.39.80`)
+  and an IPv4-less adapter with a default route to `25.0.0.1`. The
+  default-route choice was right here, and the picker stays for other PCs.
+- **Windows Firewall.** The first listen raised the prompt. The rules it
+  created allow inbound TCP and UDP for that exe on **Private and Public**,
+  so the lobby must say "tick Private networks only". The rules are tied to
+  the exe's path, so the installed `app.exe` will get its own prompt.
+- **Serving the export from the root (S5).** With `/<path>` mapped to
+  `<path>.html`, `/` and `/library` loaded with every `/_next/static/...`
+  chunk, font and stylesheet returning 200. No `basePath` is needed.
+- **One harmless 404.** Next's client-side prefetch asked for
+  `HEAD /creator` and `/creator/__next._tree.txt` (200), then
+  `/creator/__next.creator.__PAGE__.txt` (404, a segment file the export
+  doesn't write). The phone page links nowhere, so the real server serves
+  only `/party`, `/_next/...` and the favicon.
+- **Running it.** The permission classifier won't let a session open a LAN
+  port ("Expose Local Services"), so the author starts the server.
+  `.cmd`/PowerShell quoting tripped up the first attempt; a launcher with no
+  spaces in its path worked. Build with `CARGO_TARGET_DIR` set to a short
+  path: under the session scratchpad, `link.exe` fails with LNK1104 once
+  the path passes 260 characters.
 
 ## 8. Decisions made during implementation
 
