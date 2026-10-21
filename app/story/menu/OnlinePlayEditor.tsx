@@ -6,6 +6,8 @@ import { useNotification } from "../../misc/NotificationContext";
 import type { GuestJoinedInfo, NetSessionInfo } from "../../misc/multiplayer/session";
 import { MP_BACKEND_OPTIONS, type MPBackend } from "../../misc/multiplayer/types";
 import { isValidRoomCode, ROOM_CODE_LENGTH } from "../../misc/multiplayer/transports";
+import { buildInviteLink, buildTextInvite } from "../../misc/multiplayer/invite";
+import { isStandalone } from "../../misc/standalone";
 import { PALETTE } from "./CouchPlayersEditor";
 
 const BACKEND_OPTIONS = MP_BACKEND_OPTIONS;
@@ -131,22 +133,28 @@ export default function OnlinePlayEditor({
     }
   }
 
-  function buildInviteLink(): string {
-    if (!netSession || typeof window === "undefined") return "";
-    const url = new URL(window.location.origin);
-    url.searchParams.set("join", netSession.roomId);
-    url.searchParams.set("provider", netSession.backend);
-    return url.toString();
-  }
+  // The native builds have no public URL to link to (see buildTextInvite),
+  // so they share the code and connection as text instead.
+  const textInvite = isStandalone();
 
-  async function copyInviteLink() {
-    const link = buildInviteLink();
-    if (!link) return;
+  async function copyInvite() {
+    if (!netSession || typeof window === "undefined") return;
+    const invite = textInvite
+      ? buildTextInvite(netSession.roomId, netSession.backend)
+      : buildInviteLink(window.location.origin, netSession.roomId, netSession.backend);
     try {
-      await navigator.clipboard.writeText(link);
-      addNotification("Invite link copied - anyone can join from it", "success");
+      await navigator.clipboard.writeText(invite);
+      addNotification(
+        textInvite
+          ? "Invite copied - paste it to your players"
+          : "Invite link copied - anyone can join from it",
+        "success",
+      );
     } catch {
-      addNotification("Couldn't copy the link", "failure");
+      addNotification(
+        textInvite ? "Couldn't copy the invite" : "Couldn't copy the link",
+        "failure",
+      );
     }
   }
 
@@ -185,12 +193,16 @@ export default function OnlinePlayEditor({
 
         <button
           type="button"
-          onClick={copyInviteLink}
+          onClick={copyInvite}
           className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all bg-white/5 hover:bg-white/10 text-blue-100 border border-white/10 flex items-center justify-center gap-2"
-          title="Copy a link that opens straight to the join screen (code + connection built in)"
+          title={
+            textInvite
+              ? "Copy an invite with the room code and connection, to paste to your players"
+              : "Copy a link that opens straight to the join screen (code + connection built in)"
+          }
         >
-          <DynamicIcon name="Link" className="w-4 h-4" />
-          Copy invite link
+          <DynamicIcon name={textInvite ? "Copy" : "Link"} className="w-4 h-4" />
+          {textInvite ? "Copy invite" : "Copy invite link"}
         </button>
 
         {netSession.role === "host" ? (
