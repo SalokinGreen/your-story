@@ -18,6 +18,8 @@ import {
   handlePhoneMessage,
   nextLockoutExpiry,
   pruneExpired,
+  removeSeat,
+  rosterMissingFrom,
   rosterOf,
   setTurnState,
   syncRoster,
@@ -472,22 +474,62 @@ describe("party host: rolls and questions on the phone", () => {
 });
 
 describe("party host: the desktop's roster", () => {
-  it("follows renames and sends a removed player's phone away", () => {
-    const setup = twoPlayers();
-    let state = setup.state;
-    const { mara, tom } = setup;
-    state = send(state, "c1", { type: "spotlight_take" }).state;
-    const step = syncRoster(state, [{ id: tom, name: "Thomas", color: "#3b82f6" }]);
-    expect(step.state.players.map((p) => p.name)).toEqual(["Thomas"]);
-    expect(step.effects).toContainEqual({ kind: "kick", clientId: "c1", reason: "removed by the host" });
-    expect(step.state.floor.holderId).toBeNull();
-    expect(step.state.clients.c1).toBeUndefined();
-    expect(mara).not.toBe(tom);
+  it("follows renames in the story's roster", () => {
+    const { state, mara, tom } = twoPlayers();
+    const step = syncRoster(state, [
+      { id: mara, name: "Marina", color: "#22c55e" },
+      { id: tom, name: "Thomas", color: "#3b82f6" },
+    ]);
+    expect(step.state.players.map((p) => p.name)).toEqual(["Marina", "Thomas"]);
+    expect(step.effects).toEqual([{ kind: "broadcast" }]);
+  });
+
+  it("keeps a seat a phone claimed when the story's roster loses it, and says what to write back", () => {
+    // An undo restored a StoryData from before Mara joined.
+    const { state, mara, tom } = twoPlayers();
+    const roster = [{ id: tom, name: "Tom", color: "#3b82f6" }];
+    const step = syncRoster(state, roster);
+    expect(step.state.players.map((p) => p.id)).toEqual([mara, tom]);
+    expect(step.effects).toEqual([]);
+    expect(rosterMissingFrom(step.state, roster).map((p) => p.id)).toEqual([mara]);
+  });
+
+  it("adds and drops unclaimed seats with the story's roster", () => {
+    let s = host([{ id: "couch_1", name: "Ada", color: "#ec4899" }]);
+    s = syncRoster(s, [
+      { id: "couch_1", name: "Ada", color: "#ec4899" },
+      { id: "couch_2", name: "Bo", color: "#3b82f6" },
+    ]).state;
+    expect(s.players.map((p) => p.id)).toEqual(["couch_1", "couch_2"]);
+    s = syncRoster(s, [{ id: "couch_2", name: "Bo", color: "#3b82f6" }]).state;
+    expect(s.players.map((p) => p.id)).toEqual(["couch_2"]);
   });
 
   it("is a no-op when nothing changed", () => {
     const { state } = twoPlayers();
     expect(syncRoster(state, rosterOf(state)).effects).toEqual([]);
+  });
+
+  it("removes a player on purpose: phone sent away, spotlight, queue and requests cleared", () => {
+    let { state, mara, tom } = twoPlayers();
+    state = send(state, "c1", { type: "spotlight_take" }).state;
+    state = send(state, "c1", { type: "line", text: "I wait.", kind: "typed" }).state;
+    state = addRequest(state, {
+      requestId: "r1",
+      playerId: mara,
+      kind: "roll",
+      request: { title: "Climb", description: "" },
+    }).state;
+    const step = removeSeat(state, mara);
+    expect(step.state.players.map((p) => p.id)).toEqual([tom]);
+    expect(step.effects).toContainEqual({ kind: "kick", clientId: "c1", reason: "removed by the host" });
+    expect(step.effects).toContainEqual({ kind: "roster_changed", removedIds: [mara] });
+    expect(step.state.floor.holderId).toBeNull();
+    expect(step.state.queue).toEqual([]);
+    expect(step.state.requests).toEqual([]);
+    expect(step.state.clients.c1).toBeUndefined();
+    // The kicked socket closing afterwards changes nothing.
+    expect(handleDisconnect(step.state, "c1").state.players.map((p) => p.id)).toEqual([tom]);
   });
 });
 

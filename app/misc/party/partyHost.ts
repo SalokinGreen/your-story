@@ -114,8 +114,9 @@ export type PartyEffect =
   // value null: the player asked the desktop to roll for them.
   | { kind: "resolve_roll"; requestId: string; value: string | null }
   | { kind: "resolve_question"; requestId: string; answer: AskQuestionAnswer }
-  // A seat was added or claimed: write the roster back into the story.
-  | { kind: "roster_changed" };
+  // A seat was added, claimed or removed: write the roster into the story.
+  // removedIds are seats to take out of it; everything else is merged in.
+  | { kind: "roster_changed"; removedIds?: string[] };
 
 export interface PartyStep {
   state: PartyHostState;
@@ -632,21 +633,24 @@ export function cancelRequest(s: PartyHostState, requestId: string): PartyStep {
   };
 }
 
-// The story's roster changed at the desktop (renamed or removed in the Menu).
-// Names and colours follow it; a removed seat's phone is sent away.
+// The story's roster changed at the desktop (a rename in the Menu, an undo
+// that restored an older StoryData). A seat follows the story's names and
+// colours, and unclaimed seats follow it in being added or removed. But a
+// seat a phone has claimed this session belongs to the party: the story's
+// roster dropping it (an undo from before the player joined) must not kick
+// their phone, so such seats stay, and rosterMissingFrom says what to write
+// back. Removing a player on purpose is removeSeat.
 export function syncRoster(s: PartyHostState, roster: CouchPlayer[]): PartyStep {
   const byId = new Map(roster.map((p) => [p.id, p]));
-  const effects: PartyEffect[] = [];
-  const clients = { ...s.clients };
   const players: PartyPlayer[] = [];
   let changed = false;
   for (const p of s.players) {
     const r = byId.get(p.id);
     if (!r) {
-      changed = true;
-      if (p.clientId) {
-        effects.push({ kind: "kick", clientId: p.clientId, reason: "removed by the host" });
-        delete clients[p.clientId];
+      if (p.seatKey !== null) {
+        players.push(p);
+      } else {
+        changed = true;
       }
       continue;
     }
@@ -669,10 +673,43 @@ export function syncRoster(s: PartyHostState, roster: CouchPlayer[]): PartyStep 
     }
   }
   if (!changed) return { state: s, effects: [] };
+  return { state: { ...s, players }, effects: [{ kind: "broadcast" }] };
+}
+
+// Seats the party holds that the story's roster has lost, to write back.
+export function rosterMissingFrom(s: PartyHostState, roster: CouchPlayer[]): CouchPlayer[] {
+  const present = new Set(roster.map((p) => p.id));
+  return rosterOf(s).filter((p) => !present.has(p.id));
+}
+
+// The host removes a player: their phone is sent away and the seat is gone.
+export function removeSeat(s: PartyHostState, playerId: string): PartyStep {
+  const seat = s.players.find((p) => p.id === playerId);
+  if (!seat) return { state: s, effects: [] };
+  const effects: PartyEffect[] = [];
+  const clients = { ...s.clients };
+  if (seat.clientId) {
+    effects.push({ kind: "kick", clientId: seat.clientId, reason: "removed by the host" });
+    delete clients[seat.clientId];
+  }
   const floor = cloneFloor(s.floor);
-  if (floor.holderId && !players.some((p) => p.id === floor.holderId)) floor.holderId = null;
-  effects.push({ kind: "broadcast" });
-  return { state: { ...s, players, clients, floor }, effects };
+  if (floor.holderId === playerId) floor.holderId = null;
+  floor.lockouts.delete(playerId);
+  const takes = { ...s.takes };
+  delete takes[playerId];
+  effects.push({ kind: "broadcast" }, { kind: "roster_changed", removedIds: [playerId] });
+  return {
+    state: {
+      ...s,
+      players: s.players.filter((p) => p.id !== playerId),
+      clients,
+      floor,
+      takes,
+      queue: s.queue.filter((l) => l.playerId !== playerId),
+      requests: s.requests.filter((r) => r.playerId !== playerId),
+    },
+    effects,
+  };
 }
 
 // The roster as CouchPlayer entries, for writing into StoryData.multiplayer.
