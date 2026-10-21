@@ -1,6 +1,6 @@
 # Claude as the game master — design
 
-**Status:** draft for the author's review, 2026-10-21. Not approved to build.
+**Status:** approved to build, 2026-10-21 (decision 17).
 Decisions 10–14 in [`decisions.md`](decisions.md). The implementation plan is
 [`claude-gm-implementation-plan.md`](claude-gm-implementation-plan.md).
 
@@ -42,8 +42,8 @@ There is no Anthropic API key route for now (decision 10).
 
 All three have a 1M context window and 128k output, and support tool calling
 and reasoning effort. Prices are from OpenRouter's model list on 2026-10-21.
-Claude Fable 5.1 (`anthropic/claude-fable-5.1`, $10 / $50) is left out by
-default because of its price; adding it is one more entry (open question 1).
+Claude Fable 5.1 (`anthropic/claude-fable-5.1`, $10 / $50) is left out
+(decision 15).
 
 ### 3.2 What current Claude models reject, and what the app sends today
 
@@ -168,7 +168,7 @@ happens in Anthropic's own flow; the app never reads or stores credentials.
   devices, so a desktop tier set to a subscription model would reach the
   phone, which cannot run the CLI. On a device without the CLI, a
   subscription model falls back to that slot's default model, with a notice
-  in Settings (open question 2).
+  in Settings (decision 16).
 
 ### 4.6 Latency
 
@@ -237,10 +237,8 @@ be re-read before any public release.
 - Showing the plan's remaining usage (the CLI emits a `rate_limit_event`;
   reading it is a later nicety).
 
-## 7. Open questions for the author
+## 7. Answered questions
 
-1. **Claude Fable 5.1 through OpenRouter** — add it to the catalog
-   ($10 / $50 per million tokens), or leave it out?
+1. **Claude Fable 5.1 through OpenRouter** — left out (decision 15).
 2. **The phone and synced subscription models** — fall back to the slot's
-   default model with a notice (the design's default), or stop syncing tier
-   choices between devices?
+   default model with a notice (decision 16).

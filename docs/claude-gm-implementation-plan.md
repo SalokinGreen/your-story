@@ -1,6 +1,6 @@
 # Claude as the game master — implementation plan
 
-**Status:** draft for the author's review, 2026-10-21. Not approved to build.
+**Status:** approved to build, 2026-10-21 (decision 17).
 Design: [`claude-gm-design.md`](claude-gm-design.md). Decisions 10–14 in
 [`decisions.md`](decisions.md). File references are from a code map of
 master at `772c608`; line numbers are approximate (`~`) and must be
@@ -44,8 +44,7 @@ Add three entries, fields as in `AIModelConfig` (~`:973-994`):
 | `"Claude Opus 5.5"` | `anthropic/claude-opus-5.5` | `openrouter` | 1000000 | 128000 | 4.00 | 20.00 | true |
 
 Fill `strengths`, `weaknesses` and `description` in the style of the
-neighbouring entries. (Fable 5.1 only if the author says yes — design open
-question 1.)
+neighbouring entries. Fable 5.1 is left out (decision 15).
 
 **Check:** `tests/aiStaged.gmStageBudget.test.ts` iterates every catalog key
 and must still pass, so each new entry has to give a positive history
@@ -253,7 +252,7 @@ export async function claudeCliFetch(path: "/api/generate" | "/api/generate-stre
 | `app/misc/providerFetch.ts` (~`:28-58`) | first line: `if (isClaudeCliAvailablePlatform() && isClaudeCliModel(body.model)) return claudeCliFetch(path, body, signal)`. It must come **before** the `isStandalone()` check, because `tauri dev` is not standalone. |
 | `app/misc/providerCall.ts` | `Provider` union (~`:32`) gains `"claude-cli"`; `PROVIDER_NAMES` (~`:304`) gains `"Claude (subscription)"`; `getApiKey` (~`:290`) returns no key for it; `resolveProviderAndKey` (~`:513-530`) throws a clear error if a `claude-cli` model ever reaches it (it should not: B3's providerFetch line catches it first). |
 | `app/misc/ai_prices.ts` | three `claude-cli` entries (`model` = pinned id, 1M / 128k, prices 0, tool calling true); `PROVIDER_KEY_FIELD` (~`:891-900`) becomes `Partial` or gains a "no key" sentinel; `getAvailableModels` offers `claude-cli` models only when `isClaudeCliAvailablePlatform()` and the cached status is signed in. |
-| `app/misc/reasoningTiers.ts` (~`:107-184`) | when a tier or narration override names a `claude-cli` model on a device without the CLI, resolve to that slot's default model and record a notice (design §4.5). |
+| `app/misc/reasoningTiers.ts` (~`:107-184`) | when a tier or narration override names a `claude-cli` model on a device without the CLI, resolve to that slot's default model and record a notice (design §4.5, decision 16). |
 | `app/components/AIConfigTab.tsx` (~`:35-42`, ~`:432`) | the "No key" badge for `claude-cli` becomes the CLI status ("Signed in (Max)" / "Not signed in" / "CLI not found"). |
 | `app/creator/page.tsx` (~`:71-86`), `app/creator/useDesignerSession.ts` (~`:251-262`) | handle the new provider in their provider switches (no key needed). |
 
@@ -270,7 +269,7 @@ export async function claudeCliFetch(path: "/api/generate" | "/api/generate-stre
 - `CLAUDE.md` Architecture: the provider list, the CLI route and its
   guardrails (design §5.2) as rules.
 - `docs/pending_tests.md`: the live checks below.
-- `docs/decisions.md`: the answers to the design's open questions.
+- `docs/decisions.md`: any new decisions made while building.
 - This file: a dated "Decisions made during implementation" section.
 
 ## 3. Tests for PR B
