@@ -798,3 +798,104 @@ session's party-mode app (a stray empty story was created there; that session
 was told), and a profile folder under the long scratchpad path made IndexedDB
 fail. `CLAUDE.md` now says to give a driven app its own `--remote-debugging-port`
 and a short `WEBVIEW2_USER_DATA_FOLDER`, and to check who owns the port first.
+
+### 2026-10-21 — The first-round miss (the author: "Yes fix it")
+
+Approved after the first live run. Three changes, all in
+`app/misc/claudeCli.ts`; `generation.ts` is untouched. No `decisions.md` entry:
+the approval is the author's go on a fix, and the calls below are
+implementation calls.
+
+1. **The answer protocol says it outright and shows a call.** The
+   structured-answer paragraph now states that the model has no tool of its
+   own, that the engine runs the tools it lists, that `tool_calls` is the only
+   way to use one, that they are always available and it must never say one is
+   unavailable, and that an empty `tool_calls` is right when it only needs to
+   ask the player something. It ends with an example answer: `formula_roll`'s
+   when that tool is offered, a shape with placeholders otherwise (the
+   Designer's tools differ). The text depends only on the offered tool names,
+   so it is the same bytes in every round of a turn and the system prompt
+   stays cacheable (a test asserts it). Risk: a model could copy the example
+   (a roll "Strike the goblin") into a story that has no fight; the live
+   re-check watches for it.
+2. **One Debug Logs line per CLI run** ("Claude CLI run", or "Claude CLI run
+   failed" as a warning): model, effort, mode, the round as the transcript
+   shows it (one more than the assistant messages that called tools since the
+   last user message), whether the round was forced, wall time, the CLI's own
+   `duration_ms` and `duration_api_ms` (the model time), `num_turns`,
+   `subtype`, `is_error`, `stop_reason`, the usage, how many tool calls came
+   back and their names, the narration length, and on failure the error code,
+   exit code and stderr tail. The CLI's own events were not kept anywhere, so
+   a miss could not be read back.
+3. **The guard is narrower than proposed, and here is why.** The proposal
+   was to retry any tool-less first round of a fresh conversation with the
+   schema forced. In the code that would break a path the GM prompt itself
+   asks for: for a brand-new story whose first message is too vague, the
+   fresh-story block tells the GM to **ask one to three questions and not call
+   tools yet** (`ai_staged.ts`, `freshStorySetupBlock`). Forcing
+   `minItems: 1` on that reply would make the model invent a pointless tool
+   call to answer a legitimate question, and every clarifying question would
+   cost a second CLI run. What the miss actually looked like is a reply that
+   *claims its tools are down*. So the retry fires only when all of these
+   hold: a structured round (tools offered), no tool call came back, the
+   transcript has no tool call or tool result in it yet (a fresh
+   conversation), the round was not already forced, and the narration claims
+   the tools are unavailable (`claimsToolsUnavailable`: "my dice and note
+   tools aren't responding", "the tool is unavailable", "tool calls failed",
+   "I can't use my tools", "I don't have access to my tools" and a few more
+   wordings; not exhaustive, since the protocol is the main fix and this only
+   recognises the observed claim - see "After the engine review" below for
+   how narrow it is on purpose). Then the same
+   request runs again with the schema forced and a note saying the tools work.
+   The failed reply is discarded (not in the story, not in the transcript);
+   both runs' usage is counted; the retry is itself forced, so it is never
+   retried: **at most one retry, with no loop**. It lives in the bridge, not
+   in the GM loop, because the cause lives there and the bridge can see the
+   transcript. It applies to any request that offers tools, the Designer's
+   included, but the Designer's observed miss was silent (it wrote nothing and
+   claimed nothing), so only the answer protocol, not this guard, can help
+   with that one. A tool-less round later in a turn, a tool-less first reply
+   that is an ordinary question, and a round the roll gate already forced are
+   all left alone (tested). The retry adds one more CLI run (up to ~35 s) to a
+   turn that missed.
+
+#### After the engine review (same day)
+
+`engine-review` (Opus) found one real problem and some smaller ones. Recorded
+as implementation calls, with no `decisions.md` entry:
+
+- **The first detector matched ordinary prose, and a false positive is
+  expensive.** It accepted bare "notes", "dice", "rolling" or "functions"
+  with up to 60 characters and then "down", "broken" or "failing", and it ran
+  over the model's `<thinking>` too. "Before I write any notes down, a few
+  questions", "the dice clatter down the table" and "I don't call any tools
+  this round" all fired it. On the Designer's first reply (it is told to talk
+  first) or a GM session-zero question that discarded a good reply and forced
+  a call nobody asked for: an invented premise in the draft, or the interview
+  skipped. Now: `<thinking>` is removed before testing; the tool noun must be
+  "tool(s)", "tool call(s)" or "function call(s)" (optionally with "my",
+  "dice and note" in front) and **straight beside** an outage word
+  ("aren't responding", "is unavailable", "failed", "not connected", "down"
+  only when it ends the clause or is followed by "right now"/"at the
+  moment"/"on my end"); or the model says it cannot use, call or reach those
+  tools, or does not have access to them. Bare "dice", "notes", "rolling" and
+  "functions" no longer count, nor do "broken" and a free-floating "down".
+  Tests now hold the review's false-positive sentences, the thinking echoes
+  and the Designer's talk-first question (no retry).
+- **A claim worded unlike any of these is not caught.** The review also listed
+  misses ("I can't seem to roll dice right now", "there was an error with the
+  tool"). Accepted: a miss falls back to the pre-fix behaviour (the player
+  presses Retry), and the live re-check asks for the wording.
+- **A failed retry fails the round.** If the forced run errors (a usage limit,
+  or the CLI cannot satisfy `minItems`), the first answer is already discarded
+  and the player sees the error where they used to see the outage claim. They
+  press Retry either way; not changed, tested.
+- **`round` restarts at 1 after a gate's re-prompt.** Both gates push a user
+  message, so the next round logs `round: 1, forced: true`, which looks like
+  the retry. The "Claude CLI run" line now carries `firstRoundRetry: true` on
+  the retry run only.
+- **Test gaps filled:** the Designer's real request shape (system prompt,
+  history, trailing state message), a failed retry, a stop between the two
+  runs (one run, then an AbortError), and the thinking-only claim.
+
+Not verified live: it needs the author's go (a played turn on the plan).

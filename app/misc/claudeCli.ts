@@ -202,16 +202,38 @@ const TRANSCRIPT_GUIDE =
   "the tool calls you asked for. [Tool result] blocks are what the engine returned for a call. " +
   "[System note] blocks are instructions from the app. The blocks in the message continue the ones above.";
 
-const STRUCTURED_PROTOCOL = [
-  "## How to answer",
-  "",
-  TRANSCRIPT_GUIDE,
-  "",
-  "Write only your next reply, as the JSON object the response format asks for:",
-  '- "narration": your reply\'s text, exactly as you would write it, including any <thinking> notes the instructions above ask for. It may be empty when this round only asks for tools.',
-  '- "tool_calls": the tools the engine should run now, each as {"name": …, "arguments": {…}}, with arguments that match that tool\'s parameters. Leave it empty when you need no tool.',
-  "The engine runs the tools and shows you their results in the next round.",
-].join("\n");
+/**
+ * The answer-protocol paragraph for a request that offers tools. With the
+ * CLI's own tools off, the model sees only its structured-answer channel, and
+ * can read the GM prompt's "call the tool" as unfulfillable: in the first live
+ * run (docs/claude-gm-implementation-plan.md, "First live run") the first
+ * round of a fresh conversation twice made no call, once answering that its
+ * "dice and note tools aren't responding". Later rounds, with a call already
+ * in the transcript, were fine. So the paragraph says outright that the tools
+ * are run for the model and that `tool_calls` is the only way to use one, and
+ * shows a call: `formula_roll`'s when it is offered, a shape otherwise. It
+ * depends only on the offered tool names, so it renders to the same bytes in
+ * every round of a turn and the system prompt stays cacheable.
+ */
+function structuredProtocol(toolNames: string[]): string {
+  const example = toolNames.includes("formula_roll")
+    ? '{"narration":"","tool_calls":[{"name":"formula_roll","arguments":{"formulas":["1d20+3"],"reason":"Strike the goblin"}}]}'
+    : '{"narration":"<your text, or empty>","tool_calls":[{"name":"<a tool listed above>","arguments":{<that tool\'s parameters>}}]}';
+  return [
+    "## How to answer",
+    "",
+    TRANSCRIPT_GUIDE,
+    "",
+    "Write only your next reply, as the JSON object the response format asks for:",
+    '- "narration": your reply\'s text, exactly as you would write it, including any <thinking> notes the instructions above ask for. It may be empty when this round only asks for tools.',
+    '- "tool_calls": the tools the engine should run now, each as {"name": …, "arguments": {…}}, with arguments that match that tool\'s parameters.',
+    "",
+    'You have no tool of your own to call. The tools listed above are run for you by the engine, and the only way to use one is to put it in "tool_calls". They are always available: never say that a tool is unavailable or not responding. When the instructions above tell you to call a tool (a roll, a note, a change to the game state), add the call. When you only need to ask the player something, or have nothing to run, leave "tool_calls" empty.',
+    "",
+    "Example of a round that asks for one roll; the engine runs it and shows you the result in the next round:",
+    example,
+  ].join("\n");
+}
 
 const PLAIN_PROTOCOL = [
   "## How to answer",
@@ -263,7 +285,7 @@ export function renderCliPrompt(
       ["## The session so far", "", ...stable.map((m) => renderBlock(m, toolNameById))].join("\n\n"),
     );
   }
-  sections.push(hasTools ? STRUCTURED_PROTOCOL : PLAIN_PROTOCOL);
+  sections.push(hasTools ? structuredProtocol(toolNamesOf(tools!)) : PLAIN_PROTOCOL);
 
   return {
     systemPrompt: sections.join("\n\n"),
@@ -391,6 +413,11 @@ interface CliLine {
   is_error?: boolean;
   result?: string;
   structured_output?: unknown;
+  /** Whole run, and the part spent waiting on the model, in ms. */
+  duration_ms?: number;
+  duration_api_ms?: number;
+  num_turns?: number;
+  stop_reason?: string;
   usage?: {
     input_tokens?: number;
     cache_creation_input_tokens?: number;
@@ -528,6 +555,16 @@ interface RunOutcome {
 }
 
 /**
+ * Which round of the turn a request is, as far as the transcript shows: one
+ * more than the assistant messages that made tool calls since the last user
+ * message (the player's action, or a gate's re-prompt).
+ */
+function roundInTranscript(messages: ChatMessage[]): number {
+  const lastUser = messages.map((m) => m.role).lastIndexOf("user");
+  return 1 + messages.slice(lastUser + 1).filter((m) => m.role === "assistant" && m.tool_calls?.length).length;
+}
+
+/**
  * Runs one request to its end. `onText` receives streamed text as it
  * arrives (stream mode only). Throws ClaudeCliError, or an AbortError on
  * abort.
@@ -537,11 +574,40 @@ async function runToEnd(
   toolNames: string[],
   onText: (text: string) => void,
   signal?: AbortSignal,
+  firstRoundRetry = false,
 ): Promise<RunOutcome> {
   const structured = toolNames.length > 0;
   const { systemPrompt, prompt } = renderCliPrompt(body.messages, structured ? body.tools : undefined);
   const family = CLAUDE_CLI_MODELS[body.model as keyof typeof CLAUDE_CLI_MODELS].family;
   const cutter = new StopCutter(body.stop ?? []);
+  const startedAt = Date.now();
+
+  // One Debug Logs line per run, so a miss or a slow round can be read back
+  // afterwards: the CLI's own events are not kept anywhere else.
+  const report = (final: CliLine | null, extra: Record<string, unknown>, failed = false) => {
+    const data = {
+      model: CLAUDE_CLI_MODELS[body.model as keyof typeof CLAUDE_CLI_MODELS].pinnedId,
+      effort: mapEffort(body.reasoningEffort),
+      mode: structured ? "structured" : "stream",
+      round: roundInTranscript(body.messages),
+      forced: body.toolChoice === "required",
+      // The one forced retry of a first-round miss; a gate's re-prompt also
+      // restarts `round` at 1 and is told apart by this flag.
+      firstRoundRetry,
+      wallMs: Date.now() - startedAt,
+      // The CLI's own timing: the whole run, and the part spent on the model.
+      cliMs: final?.duration_ms,
+      modelMs: final?.duration_api_ms,
+      numTurns: final?.num_turns,
+      subtype: final?.subtype,
+      isError: final?.is_error,
+      stopReason: final?.stop_reason,
+      usage: usageOf(final),
+      ...extra,
+    };
+    if (failed) logger.warn("Claude CLI run failed", data);
+    else logger.action("Claude CLI run", data);
+  };
 
   let result: CliLine | null = null;
   let failure: ClaudeCliError | null = null;
@@ -594,28 +660,42 @@ async function runToEnd(
   const exit = await run.done;
   // Assigned from the line callback, which control-flow analysis cannot see.
   const failed = failure as ClaudeCliError | null;
-  if (failed) throw failed;
+  if (failed) {
+    report(null, { error: failed.code, stderrTail: exit.stderrTail }, true);
+    throw failed;
+  }
 
   if (!structured && cutter.isStopped) {
+    report(result as CliLine | null, { stoppedAtMarker: true, textChars: streamedText.length });
     return { answer: null, text: streamedText, usage: usageOf(result) };
   }
 
   const final = result as CliLine | null;
   if (!final) {
-    throw classifyCliFailure(exit.stderrTail || `exit code ${exit.code ?? "unknown"}`);
+    const error = classifyCliFailure(exit.stderrTail || `exit code ${exit.code ?? "unknown"}`);
+    report(null, { error: error.code, exitCode: exit.code, stderrTail: exit.stderrTail }, true);
+    throw error;
   }
   if (final.is_error || final.subtype !== "success") {
-    throw classifyCliFailure(final.result || exit.stderrTail || final.subtype || "");
+    const error = classifyCliFailure(final.result || exit.stderrTail || final.subtype || "");
+    report(final, { error: error.code, exitCode: exit.code, stderrTail: exit.stderrTail }, true);
+    throw error;
   }
 
   if (structured) {
     const answer = readStructuredAnswer(final.structured_output, toolNames);
     if (!answer) {
+      report(final, { error: "CLI_FAILED", reason: "answer did not match the response format", stderrTail: exit.stderrTail }, true);
       throw new ClaudeCliError(
         "CLI_FAILED",
         "The claude CLI's answer did not match the response format (narration and tool calls).",
       );
     }
+    report(final, {
+      toolCalls: answer.toolCalls.length,
+      toolNames: answer.toolCalls.map((c) => c.name),
+      narrationChars: answer.narration.length,
+    });
     return { answer, text: "", usage: usageOf(final) };
   }
 
@@ -630,7 +710,114 @@ async function runToEnd(
     streamedText += rest;
     onText(rest);
   }
+  report(final, { textChars: streamedText.length });
   return { answer: null, text: streamedText, usage: usageOf(final) };
+}
+
+// ============================================================
+// The first round of a fresh conversation
+// ============================================================
+
+/**
+ * Whether prose claims the model's tools are down. The signature of the
+ * first-round miss (see structuredProtocol): "(OOC: my dice and note tools
+ * aren't responding on my end ...)". Not exhaustive and not meant to be: the
+ * protocol paragraph is the main fix, and this only recognises the claim so
+ * the engine can ask once more. A tool-less first reply is otherwise a
+ * legitimate answer (a fresh story's GM is told to ask a vague player a
+ * question first, and the Designer talks before it builds), so the absence of
+ * calls alone must not trigger a retry - and neither may everyday words
+ * ("write any notes down", "a broken lantern", "rolling the dice").
+ *
+ * What it takes is the tool noun itself ("tool(s)", "tool call(s)",
+ * "function call(s)") straight beside an outage verb, or the model saying it
+ * cannot use or does not have those tools. The reasoning in `<thinking>` is
+ * left out: it talks about tools all the time ("I don't call any tools this
+ * round") and is not the reply.
+ */
+const TOOL_NOUN = String.raw`(?:tools?|tool calls?|function calls?)`;
+const TOOL_NOUN_PHRASE = String.raw`(?:(?:my|the|these|those|our|all|any)\s+)?(?:(?:dice|note|roll|game|state|lore|npc)(?:\s*(?:,|and|or|&)\s*(?:dice|note|roll|game|state|lore|npc))*\s+)?${TOOL_NOUN}`;
+const OUTAGE_STATE = String.raw`(?:unavailable|offline|unresponsive|failing|failed|down(?=\s*(?:[,.;:!?)]|$)|\s+(?:right\s+now|at\s+the\s+moment|for\s+now|currently|on\s+my\s+end))|not\s+(?:responding|working|available|loading|connecting|connected|reachable|accessible|functioning|going\s+through))`;
+const OUTAGE_NEGATED = String.raw`(?:aren['’]?t|isn['’]?t|won['’]?t|can['’]?t|cannot|are\s+not|is\s+not|do\s+not|don['’]?t|did\s+not|didn['’]?t|does\s+not|doesn['’]?t)\s+(?:be\s+)?(?:responding|respond|working|work|available|loading|load|connecting|connected|reachable|accessible|functioning|going\s+through)`;
+const TOOL_OUTAGE = new RegExp(
+  [
+    // "my dice and note tools aren't responding", "the tool is unavailable", "tool calls failed"
+    String.raw`\b${TOOL_NOUN_PHRASE}\s+(?:(?:are|is|seem\s+to\s+be|appear\s+to\s+be|keep|still|currently|just|have|had)\s+)*(?:${OUTAGE_STATE}|${OUTAGE_NEGATED})\b`,
+    // "I can't use my tools", "unable to call any tool"
+    String.raw`\b(?:can['’]?t|cannot|(?:am|i['’]?m)\s+(?:not\s+able|unable)\s+to|unable\s+to)\s+(?:seem\s+to\s+)?(?:use|call|run|make|reach|access)\s+(?:any\s+|my\s+|the\s+)?(?:(?:dice|note)\s+)?${TOOL_NOUN}\b`,
+    // "I don't have access to my tools"
+    String.raw`\b(?:don['’]?t|do\s+not)\s+have\s+(?:any\s+|access\s+to\s+)(?:(?:the|my|any)\s+)?(?:(?:dice|note)\s+)?${TOOL_NOUN}\b`,
+  ].join("|"),
+  "i",
+);
+
+/** Narration with the model's own `<thinking>` removed (closed or cut off). */
+function withoutThinking(text: string): string {
+  return text.replace(/<thinking>[\s\S]*?(?:<\/thinking>|$)/gi, "");
+}
+
+export function claimsToolsUnavailable(narration: string): boolean {
+  return TOOL_OUTAGE.test(withoutThinking(narration));
+}
+
+/** No tool call and no tool result anywhere in the transcript yet. */
+function isFreshTranscript(messages: ChatMessage[]): boolean {
+  return !messages.some((m) => m.role === "tool" || (m.role === "assistant" && (m.tool_calls?.length ?? 0) > 0));
+}
+
+const FORCED_RETRY_NOTE =
+  "Your tools are available: the engine runs every call you put in tool_calls. Answer again, this time with at least one tool call that does what the instructions above ask for.";
+
+function sumUsage(a: RunOutcome["usage"], b: RunOutcome["usage"]): RunOutcome["usage"] {
+  return {
+    promptTokens: a.promptTokens + b.promptTokens,
+    completionTokens: a.completionTokens + b.completionTokens,
+    totalTokens: a.totalTokens + b.totalTokens,
+  };
+}
+
+/**
+ * One request to its end. A request that offers tools runs in structured
+ * mode, and its first round of a fresh conversation gets one forced retry
+ * when it makes no call and claims its tools are down: the same request
+ * again with the schema forced (`minItems: 1`, the way the roll gate forces a
+ * round) and a note saying the tools work. The failed reply is discarded, not
+ * kept in the story or the transcript. At most one retry: the retry is itself
+ * forced, so it is never retried, and both runs' usage is counted.
+ */
+async function runRound(
+  body: GenerateRequestBody,
+  toolNames: string[],
+  onText: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<RunOutcome> {
+  const first = await runToEnd(body, toolNames, onText, signal);
+  const answer = first.answer;
+  if (
+    !answer ||
+    toolNames.length === 0 ||
+    answer.toolCalls.length > 0 ||
+    body.toolChoice === "required" ||
+    !isFreshTranscript(body.messages) ||
+    !claimsToolsUnavailable(answer.narration)
+  ) {
+    return first;
+  }
+  logger.warn("Claude CLI: the first round of a fresh conversation claimed its tools were unavailable and made no call - retrying once with a tool call required", {
+    narrationPreview: answer.narration.slice(0, 160),
+  });
+  const retry = await runToEnd(
+    {
+      ...body,
+      toolChoice: "required",
+      messages: [...body.messages, { role: "system", content: FORCED_RETRY_NOTE }],
+    },
+    toolNames,
+    onText,
+    signal,
+    true,
+  );
+  return { ...retry, usage: sumUsage(first.usage, retry.usage) };
 }
 
 function metaFor(body: GenerateRequestBody, usage: RunOutcome["usage"]) {
@@ -705,7 +892,7 @@ export async function claudeCliFetch(
         };
         try {
           if (blocked) throw blocked;
-          const outcome = await runToEnd(
+          const outcome = await runRound(
             body,
             toolNames,
             (text) => emit({ type: "content", content: text }),
@@ -741,7 +928,7 @@ export async function claudeCliFetch(
 
   try {
     if (blocked) throw blocked;
-    const outcome = await runToEnd(body, toolNames, () => {}, signal);
+    const outcome = await runRound(body, toolNames, () => {}, signal);
     const success: GenerateSuccess = {
       content: outcome.answer ? outcome.answer.narration : outcome.text,
       reasoning: "",
