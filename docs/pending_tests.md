@@ -74,9 +74,17 @@ then `src-tauri/target/release/app.exe`.
   the builder; this proves nothing else sends around it.
 - **A guest Wi-Fi.** Put the phone on a guest network with client isolation:
   the page should simply fail to load, and the lobby's help names that case.
-- **The table closes with the story.** Open the table, go to the library, and
-  confirm the phone says it can't reach the table, and that `netstat -ano |
-  findstr 8787` shows nothing listening.
+- **The table closes with the story, and with a reload.** Open the table, go
+  to the library, and confirm the phone says it can't reach the table and that
+  `netstat -ano | findstr 8787` shows nothing listening. Then open it again and
+  reload the app window (Ctrl+R): the same should hold, and the Menu should show
+  the table as closed. *Failure looks like:* a listener still on the port after
+  a reload (the `on_page_load` hook in `src-tauri/src/lib.rs`).
+- **Removing a player mid-prompt.** In manual dice mode, have the GM ask a
+  player on a phone for a roll, then remove that player from the strip. The
+  roll prompt should open on the desktop, and answering it should continue the
+  turn. The removed phone should say "You were removed from the table" and
+  offer "Join again" without reconnecting by itself. Needs a key.
 - **Not built yet (PR P2):** the Android app's scanner and "Open in app",
   voice from a phone, and the native WebSocket. A phone cannot speak a line in
   PR P1; the transcription path is wired and tested but has no client.

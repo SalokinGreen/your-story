@@ -519,3 +519,51 @@ only after S2 had been written (decision 31).
   page's load time, so a player who had never been interrupted was shown "You
   were interrupted. You can take it back in 1 s". Fixed before the first
   commit that included the page.
+
+### 2026-10-21, the `engine-review` pass
+
+The agent read the diff against the bug families this codebase keeps
+producing. Triaged against correctness and the stated requirements; fixed in
+`a49416f` unless noted.
+
+- **Fixed: a removed player's pending roll or question hung the turn,** and
+  closing the table answered such prompts as "skipped" without telling anyone.
+  Both now hand the prompt back to the desktop's own modal, on the same
+  promise (`onReturnRequest`); only leaving the story page, where there is
+  nowhere to show it, still answers as skipped.
+- **Fixed: the turn lock opened mid-turn.** The page's loading flag drops
+  between a turn's stages when suggested choices are on, so a phone could Go
+  into a turn still being observed. The host now stays "generating" until the
+  submitted turn's promise settles, as well as while the page says so.
+- **Fixed: undo on a solo story** (no roster at all) lost the party's seats
+  from the GM's player list; the roster sync now treats "no roster" as empty
+  and writes the claimed seats back.
+- **Fixed: removing a player during a turn** was undone by the turn's own
+  save, so the button is disabled while the GM works.
+- **Fixed: two screens holding one seat kicked each other forever.** The
+  desktop now sends `kicked`, and a phone that receives it does not
+  reconnect until the player taps "Join again".
+- **Fixed: the Party Table note** said to use `player_name` for
+  `ask_for_roll`, a tool that exists only in manual dice mode; it now says so.
+  Separately, on Gemini neither `ask_for_roll` nor `ask_question` is in
+  `GOOGLE_ESSENTIAL_TOOLS`, so no prompt ever reaches a phone there; that adds
+  to status report §6.14 and is not fixed here.
+- **Fixed: a name could carry `:` or `>`** and fake another speaker inside
+  its own turn line.
+- **Fixed: a close that lands while the server is opening** left a table
+  with no server. `start()` now claims its epoch first and takes a late server
+  down.
+- **Fixed: the server outlived a webview reload.** `Channel::send` still
+  succeeds after a reload, so nothing told Rust the table was gone. The shell
+  now stops the server on any full page load (`on_page_load`), which is the
+  one event a client-side route change does not raise.
+- **Fixed (nit): a phone that stops reading** could hold its connection
+  open; sends now time out after 5 s.
+- **Not changed: a sheet is found by its title** (`Character: <name>`), so a
+  phone that joins under a name with no current seat receives that unowned
+  sheet. Sheets are `always_reveal` and already shown to every player in the
+  notes UI, so nothing secret is exposed; joining under a removed player's
+  name getting their sheet back is the useful side of it.
+- **Not changed (nits):** the 16-client cap is counted after the upgrade, so
+  a burst of token holders can pass it; and the Party Table note stays in the
+  story after the table closes (the author can delete it under Notes).
