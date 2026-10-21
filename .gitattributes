@@ -1,0 +1,2 @@
+# Shell scripts run under bash (the SessionStart hook among them); CRLF breaks them.
+*.sh text eol=lf
