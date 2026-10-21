@@ -197,6 +197,10 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
  */
 
 export interface GenerationOptions {
+  // Not read by generateStoryTurn: the reasoning-tier router picks the GM's
+  // model, and narration, choices and every side call run on the narration
+  // model (getEffectiveNarrationModelKey, decision 19). Kept so existing
+  // callers type-check.
   storyModel: string;
   toolsModel: string;
   choicesModel: string;
@@ -941,15 +945,14 @@ export async function generateStoryTurn(
     result.meta.costTurnId = costTurnId;
 
     // Shared by the observer and the memory agent below - both are
-    // best-effort side calls for the turn that just completed, using
-    // whatever model actually generated it, unless the user pinned a
-    // specific model/effort for that stage in Settings > Architecture
-    // (layerSettings.ts).
+    // best-effort side calls for the turn that just completed, run on the
+    // narration model (decision 19) unless the user pinned a specific
+    // model/effort for that stage in Settings > Architecture
+    // (layerSettings.ts). It has to be an AI_MODELS key (or a custom model's
+    // UUID): GenerationMeta.model is the provider's own id, which the proxy
+    // can't resolve and silently swaps for DeepSeek V4 Flash.
     const sideCallApiOptions = {
-      model:
-        result.meta.storyMeta?.model ||
-        result.meta.gmMeta?.model ||
-        options.storyModel,
+      model: getEffectiveNarrationModelKey(),
       token: null,
       // Bill every side call to THIS turn even when it lands after the
       // player has already started the next one (see runBackgroundLayers).
@@ -1377,8 +1380,8 @@ export async function generateStoryTurn(
               narrationThoughts: result.narrationThoughts,
               // Same model/effort the Observer was just judged with (the
               // Architecture tab's override, if the user pinned one) - not
-              // sideCallApiOptions, or the rewrite would silently fall back
-              // to whichever model generated the flagged turn.
+              // sideCallApiOptions, or the rewrite would silently skip that
+              // override and run on the plain narration model.
               apiOptions: observerApiOptions,
             });
           } catch (rewriteError) {
@@ -2124,12 +2127,13 @@ async function generateStoryTurnOnce(
             storyData,
             gmHistoryBudget,
             {
-              model: options.storyModel || gmModel,
+              // The narration model, like every other side call (decision 19).
+              model: narrationModel,
               token,
               // All five, not just the ones this model "usually" needs: the
-              // default storyModel is the Mistral narration model, and
-              // leaving a provider out here is how compaction silently never
-              // ran (status report §6.13).
+              // default narration model is a Mistral model, and leaving a
+              // provider out here is how compaction silently never ran
+              // (status report §6.13).
               ...pickProviderKeys(options),
               abortSignal: options.abortSignal,
             },
@@ -2163,10 +2167,7 @@ async function generateStoryTurnOnce(
         try {
           const reflectionModelOverride = getReflectionModelOverride();
           const reflectionApiOptions = {
-            ...resolveSideCallModel(
-              reflectionModelOverride,
-              options.storyModel || gmModel,
-            ),
+            ...resolveSideCallModel(reflectionModelOverride, narrationModel),
             token,
             ...pickProviderKeys(options),
             abortSignal: options.abortSignal,
