@@ -18,7 +18,8 @@
 import { AI_MODELS, AIModelKey, getModelConfig } from "@/app/misc/ai_prices";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 import {
-  isClaudeCliAvailablePlatform,
+  canRunClaudeCliModel,
+  claudeCliBlockReason,
   isClaudeCliModel,
 } from "@/app/misc/claudeCliModels";
 import { StoryData, CombatState, ReasoningTierState } from "@/app/misc/structs";
@@ -153,13 +154,14 @@ export function resetTierOverrides(): void {
 }
 
 /**
- * Whether this device can run a model at all. A Claude subscription model
+ * Whether this device can run a model right now. A Claude subscription model
  * runs only through the desktop app's `claude` CLI, but tier and narration
  * choices sync between devices (syncableSettingsKeys.ts), so one can arrive
- * on a phone or the web build (decision 16).
+ * on a phone or the web build (decision 16); and during an online session it
+ * is blocked on the desktop too (decision 29).
  */
 function runsOnThisDevice(modelKey: string): boolean {
-  return !isClaudeCliModel(modelKey) || isClaudeCliAvailablePlatform();
+  return !isClaudeCliModel(modelKey) || canRunClaudeCliModel();
 }
 
 /**
@@ -210,6 +212,8 @@ export function getEffectiveNarrationModelKey(): AnyModelKey {
 export interface SubscriptionFallback {
   /** "Tier 2" or "Narration". */
   slot: string;
+  /** Why it falls back: this device cannot run the CLI, or an online session is active. */
+  reason: "device" | "online";
   /** The subscription model the synced setting names. */
   modelKey: string;
   /** What this device uses instead. */
@@ -217,9 +221,11 @@ export interface SubscriptionFallback {
 }
 
 /**
- * Decision 16: the slots whose synced Claude subscription model this device
- * cannot run, and the default each uses here instead - for Settings' notice.
- * Empty on the desktop app.
+ * Decisions 16 and 29: the slots whose Claude subscription model cannot run
+ * here and now (a synced choice on a device without the CLI, or any
+ * subscription choice during an online session), and the default each uses
+ * instead - for Settings' notice and the in-game one. Empty on the desktop
+ * app outside an online session.
  */
 export function getSubscriptionFallbacks(): SubscriptionFallback[] {
   const fallbacks: SubscriptionFallback[] = [];
@@ -227,6 +233,7 @@ export function getSubscriptionFallbacks(): SubscriptionFallback[] {
     if (o && !runsOnThisDevice(o.modelKey)) {
       fallbacks.push({
         slot: `Tier ${i}`,
+        reason: claudeCliBlockReason() ?? "device",
         modelKey: o.modelKey,
         fallbackModelKey: REASONING_TIERS[i].modelKey,
       });
@@ -236,6 +243,7 @@ export function getSubscriptionFallbacks(): SubscriptionFallback[] {
   if (narration && !runsOnThisDevice(narration)) {
     fallbacks.push({
       slot: "Narration",
+      reason: claudeCliBlockReason() ?? "device",
       modelKey: narration,
       fallbackModelKey: NARRATION_MODEL_KEY,
     });

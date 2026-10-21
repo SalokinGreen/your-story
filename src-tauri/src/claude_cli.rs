@@ -433,8 +433,10 @@ async fn run_process(
     on_event: &Channel<CliEvent>,
     mut cancel_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
-    // Stopped before the process ever started.
-    if cancel_rx.try_recv().is_ok() {
+    // Stopped before the process ever started. A sender dropped without
+    // sending counts as stopped too: polling the receiver again after it
+    // reported `Closed` would panic.
+    if !matches!(cancel_rx.try_recv(), Err(oneshot::error::TryRecvError::Empty)) {
         let _ = on_event.send(CliEvent::Exit {
             code: None,
             stderr_tail: String::new(),

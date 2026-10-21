@@ -12,7 +12,7 @@
  */
 
 import { AnyModelKey, NARRATION_MODEL_KEY, ReasoningEffort } from "./reasoningTiers";
-import { isClaudeCliAvailablePlatform, isClaudeCliModel } from "./claudeCliModels";
+import { canRunClaudeCliModel, claudeCliBlockReason, isClaudeCliModel } from "./claudeCliModels";
 import {
   ObserverSettings,
   ObserverCheckSettings,
@@ -103,13 +103,18 @@ export const setStoryProgressObserverModelOverride = (
 ): void => setOverride(STORY_PROGRESS_OBSERVER_MODEL_KEY, override);
 
 /**
- * Decision 16 for the side agents: the layers whose synced Claude
- * subscription override this device cannot run, for Settings' notice. They
- * run on the narration model here (resolveSideCallModel). Empty on the
- * desktop app.
+ * Decisions 16 and 29 for the side agents: the layers whose Claude
+ * subscription override cannot run here and now, for Settings' notice. They
+ * run on the narration model instead (resolveSideCallModel). Empty on the
+ * desktop app outside an online session.
  */
-export function getLayerSubscriptionFallbacks(): { slot: string; modelKey: string }[] {
-  if (isClaudeCliAvailablePlatform()) return [];
+export function getLayerSubscriptionFallbacks(): {
+  slot: string;
+  modelKey: string;
+  reason: "device" | "online";
+}[] {
+  const reason = claudeCliBlockReason();
+  if (!reason) return [];
   const layers: [string, ModelEffortOverride | null][] = [
     ["Observer", getObserverModelOverride()],
     ["Memory Keeper", getMemoryKeeperModelOverride()],
@@ -119,7 +124,7 @@ export function getLayerSubscriptionFallbacks(): { slot: string; modelKey: strin
   ];
   return layers
     .filter(([, o]) => o && isClaudeCliModel(o.modelKey))
-    .map(([slot, o]) => ({ slot, modelKey: o!.modelKey }));
+    .map(([slot, o]) => ({ slot, modelKey: o!.modelKey, reason }));
 }
 
 // ============================================================
@@ -179,8 +184,9 @@ export function resolveSideCallModel(
   // a CLI launch for every side call.
   const fallback = isClaudeCliModel(fallbackModel) ? NARRATION_MODEL_KEY : fallbackModel;
   if (!override) return { model: fallback };
-  // Decision 16: a synced subscription override this device cannot run.
-  if (isClaudeCliModel(override.modelKey) && !isClaudeCliAvailablePlatform()) {
+  // Decisions 16 and 29: a subscription override this device cannot run (a
+  // synced choice off the desktop) or may not run (online play is active).
+  if (isClaudeCliModel(override.modelKey) && !canRunClaudeCliModel()) {
     return { model: fallback };
   }
   return { model: override.modelKey, reasoningEffort: override.reasoningEffort };

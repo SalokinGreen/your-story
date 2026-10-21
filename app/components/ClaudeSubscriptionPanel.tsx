@@ -5,10 +5,13 @@ import { DynamicIcon } from "./DynamicIcon";
 import {
   CLAUDE_CLI_STATUS_EVENT,
   ClaudeCliStatus,
+  ONLINE_SESSION_EVENT,
   describeClaudeCliStatus,
   getCachedClaudeCliStatus,
   getClaudeCliStatus,
   isClaudeCliAvailablePlatform,
+  isClaudeCliUsable,
+  isOnlineSessionActive,
 } from "@/app/misc/claudeCliModels";
 import {
   REASONING_CONFIG_CHANGED_EVENT,
@@ -29,6 +32,18 @@ function allFallbacks(): SubscriptionFallback[] {
       fallbackModelKey: "the narration model",
     })),
   ];
+}
+
+/** Whether an online multiplayer session is active (decision 29), live. */
+export function useOnlineSessionActive(): boolean {
+  const [active, setActive] = useState(() => isOnlineSessionActive());
+  useEffect(() => {
+    const update = () => setActive(isOnlineSessionActive());
+    window.addEventListener(ONLINE_SESSION_EVENT, update);
+    update();
+    return () => window.removeEventListener(ONLINE_SESSION_EVENT, update);
+  }, []);
+  return active;
 }
 
 /**
@@ -58,10 +73,12 @@ export function useClaudeCliStatus(): ClaudeCliStatus | null {
  *
  * Off the desktop the row appears only when a synced setting names a
  * subscription model, to say which slots use their default here instead
- * (decision 16).
+ * (decision 16). On the desktop it also lists the slots that use their
+ * default while an online session is active (decision 29).
  */
 export default function ClaudeSubscriptionPanel() {
   const status = useClaudeCliStatus();
+  const online = useOnlineSessionActive();
   const [refreshing, setRefreshing] = useState(false);
   const [fallbacks, setFallbacks] = useState<SubscriptionFallback[]>(() =>
     allFallbacks(),
@@ -72,9 +89,11 @@ export default function ClaudeSubscriptionPanel() {
     const update = () => setFallbacks(allFallbacks());
     window.addEventListener(REASONING_CONFIG_CHANGED_EVENT, update);
     window.addEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
+    window.addEventListener(ONLINE_SESSION_EVENT, update);
     return () => {
       window.removeEventListener(REASONING_CONFIG_CHANGED_EVENT, update);
       window.removeEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
+      window.removeEventListener(ONLINE_SESSION_EVENT, update);
     };
   }, []);
 
@@ -89,7 +108,7 @@ export default function ClaudeSubscriptionPanel() {
     }
   };
 
-  const signedIn = !!status?.loggedIn;
+  const signedIn = isClaudeCliUsable(status);
 
   return (
     <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
@@ -151,6 +170,25 @@ export default function ClaudeSubscriptionPanel() {
             plan&rsquo;s usage limit stops with a message; it is never moved to
             a paid provider.
           </p>
+          {online && (
+            <div className="space-y-1">
+              <p className="text-xs text-amber-300">
+                An online game is active, so subscription models are not used:
+                other players&rsquo; input would run on your plan. Solo play and
+                couch co-op on this computer are not affected.
+              </p>
+              {fallbacks.length > 0 && (
+                <ul className="text-xs text-blue-300/70 list-disc pl-4 space-y-0.5">
+                  {fallbacks.map((f) => (
+                    <li key={f.slot}>
+                      {f.slot} uses {f.fallbackModelKey} instead of {f.modelKey}{" "}
+                      until you leave.
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <div className="space-y-1.5">

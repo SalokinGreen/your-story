@@ -42,6 +42,50 @@ export function isClaudeCliAvailablePlatform(): boolean {
   return isTauri();
 }
 
+// ============================================================
+// Online play (decisions 29 and 30)
+// ============================================================
+// In an online multiplayer game (host or guest, NetSession) other people's
+// devices feed the host's turns, and design §5.2 forbids relaying another
+// device's requests through the player's subscription. So while a session is
+// active a subscription model is treated as one this device cannot run: each
+// slot uses its default and Settings says why (decision 29). Solo play and
+// couch co-op on one device are unaffected, and so is party mode (friends'
+// phones as controllers for the host's own game), which counts like couch
+// co-op (decision 30) - nothing here looks at it.
+
+/** Fired on window when the online session starts or ends. */
+export const ONLINE_SESSION_EVENT = "claude-cli-online-session-changed";
+
+let onlineSessionActive = false;
+
+/** Called by useNetSession whenever its session starts or ends. */
+export function setOnlineSessionActive(active: boolean): void {
+  if (onlineSessionActive === active) return;
+  onlineSessionActive = active;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(ONLINE_SESSION_EVENT));
+  }
+}
+
+export function isOnlineSessionActive(): boolean {
+  return onlineSessionActive;
+}
+
+/**
+ * Whether a subscription model can run right now: on the desktop app, and
+ * not during an online session. The one question every fallback asks.
+ */
+export function canRunClaudeCliModel(): boolean {
+  return isClaudeCliAvailablePlatform() && !onlineSessionActive;
+}
+
+/** Why a subscription model cannot run, for the notice; null when it can. */
+export function claudeCliBlockReason(): "device" | "online" | null {
+  if (!isClaudeCliAvailablePlatform()) return "device";
+  return onlineSessionActive ? "online" : null;
+}
+
 /** Mirrors the Rust command's CliStatus. Never carries the account's e-mail. */
 export interface ClaudeCliStatus {
   installed: boolean;
@@ -107,6 +151,16 @@ export async function getClaudeCliStatus(force = false): Promise<ClaudeCliStatus
   }
 }
 
+/**
+ * Whether the CLI can be used for the subscription: signed in, and not sent
+ * to another API provider (Bedrock, Vertex…) by its own settings, which
+ * would bill a cloud account instead of the plan (design §4.4).
+ */
+export function isClaudeCliUsable(status: ClaudeCliStatus | null | undefined): boolean {
+  if (!status?.installed || !status.loggedIn) return false;
+  return !status.apiProvider || status.apiProvider === "firstParty";
+}
+
 /** Settings' wording: "Signed in (Max)", "Not signed in", "CLI not found". */
 export function describeClaudeCliStatus(status: ClaudeCliStatus | null): string {
   if (!status) return "Checking…";
@@ -121,8 +175,9 @@ export function describeClaudeCliStatus(status: ClaudeCliStatus | null): string 
   return plan ? `Signed in (${plan})` : "Signed in";
 }
 
-/** For tests: forget the cached status. */
+/** For tests: forget the cached status and the online flag. */
 export function resetClaudeCliStatusCache(): void {
   cachedStatus = null;
   pendingStatus = null;
+  onlineSessionActive = false;
 }

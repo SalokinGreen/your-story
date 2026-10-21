@@ -616,9 +616,17 @@ Built on PR A's branch, because PR A was still unmerged when the Stop fix
     - The transcript is flat text, so a line inside a message (a player's,
       a guest's, an imported note's) that starts like a block header is
       escaped with a backslash.
-    - **Open:** in an online multiplayer game, guests' input reaches the
-      host's turn and so the host's CLI. Whether to allow that is the
-      author's call (asked 2026-10-21).
+    - In an online multiplayer game, guests' input reaches the host's turn
+      and so the host's CLI. The author's answer, **decisions 29 and 30**:
+      block subscription models during online play, allow them in party mode
+      and couch co-op. Built as a flag, `setOnlineSessionActive`, that
+      `useNetSession` sets while its session exists (either role), and
+      `canRunClaudeCliModel()` (desktop and not online) is the one question
+      every fallback now asks: the tier and narration resolution, the
+      side-agent layers (`resolveSideCallModel`), the Settings notices, and
+      the guard at the top of `claudeCliFetch` (`CLI_BLOCKED_ONLINE`) for a
+      request built before the session began. The in-game notice fires once
+      per room. Party mode is not on master, and nothing here looks at it.
 
 ### 2026-10-21 — PR C, GLM through Z.ai and OpenRouter
 
@@ -685,3 +693,19 @@ addendum (`f4fe2cd`) merged in.
       entries at list price, ignoring Z.ai's cached-input rate and
       OpenRouter's routing spread. That is the same follow-up as Route A's
       decision 5, for every non-Claude model.
+17. **A second review, of the fix commit itself**, found nothing blocking and
+    three small things, fixed:
+    - A CLI whose own settings send it to another API provider (Bedrock,
+      Vertex) is not "signed in" for the subscription: Settings shows it in
+      amber, the models are not offered (`isClaudeCliUsable`), and a run
+      refuses when the last known status names another provider.
+    - The GM's `<thinking>` prefill survived when the story stage ran on a
+      story with no GM history yet (`[action, prefill, story prompt]`). It
+      is now matched exactly (`GM_STAGE_AFFIRMATION`) as well as by position,
+      so a real prose reply is never mistaken for it.
+    - In Rust, a cancel channel that reported `Closed` would have panicked
+      when polled again; anything but an empty channel now counts as
+      stopped.
+    Left as they are: the fail-closed check still passes a CLI that stops
+    emitting `system/init` altogether, and a cancel invoke can still beat the
+    run's map insert by microseconds.

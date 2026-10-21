@@ -1,6 +1,7 @@
 import {
   getCachedClaudeCliStatus,
   isClaudeCliAvailablePlatform,
+  isClaudeCliUsable,
 } from "@/app/misc/claudeCliModels";
 
 export const AI_MODELS = {
@@ -1138,7 +1139,7 @@ export function getAvailableModels(
     if (options.requireToolCalling && !config.supportsToolCalling) return false;
     if (config.provider === "claude-cli") {
       return (
-        isClaudeCliAvailablePlatform() && !!getCachedClaudeCliStatus()?.loggedIn
+        isClaudeCliAvailablePlatform() && isClaudeCliUsable(getCachedClaudeCliStatus())
       );
     }
     const field = PROVIDER_KEY_FIELD[config.provider];

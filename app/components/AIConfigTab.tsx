@@ -28,11 +28,15 @@ import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
 import ModelSelect from "./ModelSelect";
 import TurnCostPanel from "./TurnCostPanel";
-import ClaudeSubscriptionPanel, { useClaudeCliStatus } from "./ClaudeSubscriptionPanel";
+import ClaudeSubscriptionPanel, {
+  useClaudeCliStatus,
+  useOnlineSessionActive,
+} from "./ClaudeSubscriptionPanel";
 import { notifyTurnCostInputsChanged } from "@/app/misc/turnCost";
 import {
   describeClaudeCliStatus,
   isClaudeCliAvailablePlatform,
+  isClaudeCliUsable,
 } from "@/app/misc/claudeCliModels";
 
 // Maps an AI_MODELS provider string to the APIKeys field that must be
@@ -57,6 +61,7 @@ const REASONING_EFFORTS: ReasoningEffort[] = [
 export default function AIConfigTab() {
   const { hasKey } = useAPIKeys();
   const cliStatus = useClaudeCliStatus();
+  const onlineSession = useOnlineSessionActive();
 
   // Reasoning-tier + narration model overrides, and user-added custom
   // (OpenRouter BYOK) models. All persisted to localStorage - see
@@ -445,9 +450,11 @@ export default function AIConfigTab() {
               ? null
               : !isClaudeCliAvailablePlatform()
                 ? "Desktop only"
-                : cliStatus?.loggedIn
-                  ? null
-                  : describeClaudeCliStatus(cliStatus);
+                : onlineSession
+                  ? "Not used online"
+                  : isClaudeCliUsable(cliStatus)
+                    ? null
+                    : describeClaudeCliStatus(cliStatus);
             return (
               <div
                 key={index}

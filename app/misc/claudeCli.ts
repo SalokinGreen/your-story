@@ -27,8 +27,11 @@ import {
 import {
   CLAUDE_CLI_MODELS,
   ClaudeCliFamily,
+  getCachedClaudeCliStatus,
   isClaudeCliModel,
+  isOnlineSessionActive,
 } from "./claudeCliModels";
+import { GM_STAGE_AFFIRMATION } from "./ai_staged";
 import { logger } from "./logger";
 
 export {
@@ -137,7 +140,9 @@ function dropPrefills(messages: ChatMessage[]): ChatMessage[] {
   return kept.filter((m, i) => {
     if (m.role !== "assistant" || m.tool_calls?.length) return true;
     const next = kept[i + 1];
-    if (kept[i - 1]?.cacheBreakpoint && next?.role === "assistant") return false;
+    if (kept[i - 1]?.cacheBreakpoint && (next?.role === "assistant" || m.content === GM_STAGE_AFFIRMATION)) {
+      return false;
+    }
     if (i <= lastUser) return true;
     return !(next?.role === "assistant" && next.tool_calls?.length);
   });
@@ -323,6 +328,7 @@ export type ClaudeCliErrorCode =
   | "CLI_NOT_FOUND"
   | "CLI_NOT_SIGNED_IN"
   | "CLI_USAGE_LIMIT"
+  | "CLI_BLOCKED_ONLINE"
   | "CLI_FAILED";
 
 export class ClaudeCliError extends Error {
@@ -668,6 +674,21 @@ export async function claudeCliFetch(
     throw new Error(`claudeCliFetch called for a non-subscription model: ${body.model}`);
   }
   const toolNames = toolNamesOf(body.tools ?? []);
+  // Decision 29: never launch the CLI for an online session's turns. The
+  // tier, narration and layer fallbacks already swap the model; this stops
+  // a request that was built before the session began.
+  const cached = getCachedClaudeCliStatus();
+  const blocked = isOnlineSessionActive()
+    ? new ClaudeCliError(
+        "CLI_BLOCKED_ONLINE",
+        "Claude subscription models are not used during online play, because other players' input would run on your plan. Pick another model, or leave the online session.",
+      )
+    : cached?.apiProvider && cached.apiProvider !== "firstParty"
+      ? new ClaudeCliError(
+          "CLI_FAILED",
+          `The claude CLI is set up to use ${cached.apiProvider}, not your Claude subscription, so the run was stopped. Check the CLI's own settings.`,
+        )
+      : null;
   // Unique within the app's lifetime, so tool-call ids never repeat across
   // rounds of a turn (a later round may run on another provider).
   const runTag = `cli${Date.now().toString(36)}${callCounter++}`;
@@ -683,6 +704,7 @@ export async function claudeCliFetch(
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         };
         try {
+          if (blocked) throw blocked;
           const outcome = await runToEnd(
             body,
             toolNames,
@@ -718,6 +740,7 @@ export async function claudeCliFetch(
   }
 
   try {
+    if (blocked) throw blocked;
     const outcome = await runToEnd(body, toolNames, () => {}, signal);
     const success: GenerateSuccess = {
       content: outcome.answer ? outcome.answer.narration : outcome.text,

@@ -58,6 +58,7 @@ export const fakeCli = {
     loggedIn: true,
     authMethod: "claude.ai",
     subscriptionType: "max",
+    apiProvider: "firstParty",
   },
   runs: [] as CliRunRequest[],
   cancels: [] as string[],
@@ -74,6 +75,7 @@ export const fakeCli = {
       loggedIn: true,
       authMethod: "claude.ai",
       subscriptionType: "max",
+      apiProvider: "firstParty",
     };
     this.runs = [];
     this.cancels = [];

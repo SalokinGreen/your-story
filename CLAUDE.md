@@ -402,7 +402,11 @@ streams text. Off the desktop a synced subscription choice falls back to the
 slot's default (`reasoningTiers.ts`, decision 16), and the side agents reach
 the subscription only when a layer is pointed there (`resolveSideCallModel`,
 decision 12). A usage limit or a missing sign-in stops the turn with its
-message; it never moves to a paid provider. **The guardrails are rules,
+message; it never moves to a paid provider. **During an online multiplayer
+session (host or guest) subscription models are not used at all** and every
+slot runs its default (`claudeCliModels.ts` `setOnlineSessionActive`, set by
+`useNetSession`; decision 29); party mode and couch co-op are allowed
+(decision 30). **The guardrails are rules,
 because Anthropic's terms forbid apps routing requests through subscription
 credentials:** never read `~/.claude/.credentials.json`, the keychain or any
 token; never bundle, patch or modify the binary; never relay a request from

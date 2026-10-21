@@ -12,6 +12,12 @@ vi.mock("@tauri-apps/api/core", async () => (await import("./helpers/fakeClaudeC
 
 import { fakeCli, CliScript } from "./helpers/fakeClaudeCli";
 import { claudeCliFetch } from "@/app/misc/claudeCli";
+import {
+  getClaudeCliStatus,
+  resetClaudeCliStatusCache,
+  setOnlineSessionActive,
+} from "@/app/misc/claudeCliModels";
+import { getAvailableModelKeys } from "@/app/misc/ai_prices";
 import { providerFetch } from "@/app/misc/providerFetch";
 import type { GenerateRequestBody } from "@/app/misc/providerCall";
 
@@ -57,6 +63,8 @@ async function frames(response: Response): Promise<Frame[]> {
 
 beforeEach(() => {
   fakeCli.reset();
+  resetClaudeCliStatusCache();
+  setOnlineSessionActive(false);
 });
 
 describe("a GM round (structured mode)", () => {
@@ -296,5 +304,54 @@ describe("providerFetch routing", () => {
     expect(fakeCli.runs).toHaveLength(0);
     expect(fetchSpy).toHaveBeenCalledWith("/api/generate", expect.anything());
     vi.unstubAllGlobals();
+  });
+});
+
+describe("a CLI pointed at another API provider", () => {
+  it("is not usable for the subscription, in the catalog or for a run", async () => {
+    resetClaudeCliStatusCache();
+    fakeCli.status = { ...fakeCli.status, apiProvider: "bedrock" };
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: "ok", tool_calls: [] }) });
+    await getClaudeCliStatus(true);
+
+    expect(getAvailableModelKeys({})).not.toContain("Claude Sonnet (subscription)");
+    const events = await frames(await claudeCliFetch("/api/generate-stream", gmRound()));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "error", code: "CLI_FAILED" });
+    expect(events[0].error).toContain("bedrock");
+    expect(fakeCli.runs).toHaveLength(0);
+  });
+
+  it("is usable when it reports firstParty", async () => {
+    resetClaudeCliStatusCache();
+    await getClaudeCliStatus(true);
+    expect(getAvailableModelKeys({})).toContain("Claude Sonnet (subscription)");
+  });
+});
+
+describe("online play (decision 29)", () => {
+  it("never launches the CLI for a request that arrives during an online session", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: "ok", tool_calls: [] }) });
+    setOnlineSessionActive(true);
+
+    const events = await frames(await claudeCliFetch("/api/generate-stream", gmRound()));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "error", code: "CLI_BLOCKED_ONLINE" });
+    expect(events[0].error).toContain("online play");
+
+    const side = await claudeCliFetch("/api/generate", gmRound({ tools: undefined }));
+    expect(side.ok).toBe(false);
+    expect(await side.json()).toMatchObject({ code: "CLI_BLOCKED_ONLINE" });
+
+    expect(fakeCli.runs).toHaveLength(0);
+  });
+
+  it("runs again once the session ends", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: "ok", tool_calls: [] }) });
+    setOnlineSessionActive(true);
+    setOnlineSessionActive(false);
+    const events = await frames(await claudeCliFetch("/api/generate-stream", gmRound()));
+    expect(events[0]).toEqual({ type: "content", content: "ok" });
+    expect(fakeCli.runs).toHaveLength(1);
   });
 });

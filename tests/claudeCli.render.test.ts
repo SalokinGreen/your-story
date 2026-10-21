@@ -15,6 +15,7 @@ import {
   classifyCliFailure,
 } from "@/app/misc/claudeCli";
 import type { ChatMessage } from "@/app/misc/providerCall";
+import { GM_STAGE_AFFIRMATION } from "@/app/misc/ai_staged";
 
 const TOOLS = [
   {
@@ -124,6 +125,32 @@ describe("renderCliPrompt", () => {
       { role: "user", content: "Now write the story." },
     ]);
     expect(storyStage.prompt).not.toContain("<thinking>");
+  });
+
+  it("drops the GM prefill even when nothing follows it but the story prompt", () => {
+    // A story with no GM history yet: [action, prefill, story prompt].
+    const { prompt } = renderCliPrompt([
+      { role: "system", content: "sys" },
+      { role: "user", content: "> I look around", cacheBreakpoint: true },
+      { role: "assistant", content: GM_STAGE_AFFIRMATION },
+      { role: "user", content: "Now write the story." },
+    ]);
+    expect(prompt).not.toContain("<thinking>");
+    expect(prompt).toBe("[User]\n> I look around\n\n[User]\nNow write the story.");
+  });
+
+  it("keeps a plain prose reply right after the action, the gate's re-prompt following", () => {
+    // No prefill on a native-reasoning tier: this assistant message is real prose.
+    const { prompt } = renderCliPrompt(
+      [
+        { role: "system", content: "sys" },
+        { role: "user", content: "> act", cacheBreakpoint: true },
+        { role: "assistant", content: "The goblin lunges." },
+        { role: "user", content: "This scene requires a roll." },
+      ],
+      TOOLS,
+    );
+    expect(prompt).toContain("The goblin lunges.");
   });
 
   it("escapes a line inside a message that would read as a block header", () => {

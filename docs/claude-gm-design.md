@@ -210,7 +210,12 @@ on their own machine.
 
 - Never read `~/.claude/.credentials.json`, the keychain, or any token.
 - Never modify, bundle or patch the `claude` binary.
-- Never relay a request from another device.
+- Never relay a request from another device. That includes **online
+  multiplayer**: while an online session (host or guest) is active,
+  subscription models are not used and every slot runs its default (decision
+  29). Couch co-op on one device and **party mode** (friends' phones as
+  controllers for the host's own desktop game) are the player's own use on
+  their own machine, and stay allowed (decision 30).
 - Never use the name "Claude Code" as a feature name; the models are
   "Claude … (subscription)".
 

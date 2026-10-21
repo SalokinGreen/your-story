@@ -49,6 +49,17 @@ calls were spent on the checks before building (plan, "B0").
   with a subscription tier set, then open Settings → AI Config on another
   device. A "Claude subscription" box should list the tier and say which
   default it uses there, and a turn should run on that default.
+- **Online play blocks the subscription (decision 29).** In the desktop app
+  with a subscription tier or narration voice set, host an online game
+  ("Host online"). A notice should say which slots run their default models,
+  Settings → AI Config should list them under "Claude subscription" with the
+  tier badge reading "Not used online", and a turn should run on the default
+  models with no `claude.exe` launched. Leave the session: the subscription
+  models should come back. Play solo and on a couch (several players on the
+  one device): the subscription should run as before. *Failure looks like:*
+  a `claude.exe` launching during the online game (the flag
+  `useNetSession` publishes did not reach `claudeCliModels`), or the
+  subscription staying off after leaving the room.
 - **macOS and Linux.** Only Windows was built and run; the environment list
   for the child differs there (`claude_cli.rs`, `PASSED_ENV`).
 
