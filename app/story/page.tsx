@@ -432,6 +432,7 @@ function StoryPageContent() {
     googleKey,
     mistralKey,
     deepinfraKey,
+    zaiKey,
     braveSearchKey,
   } = apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
@@ -2100,6 +2101,7 @@ function StoryPageContent() {
           googleKey,
           mistralKey,
           deepinfraKey,
+          zaiKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -2702,6 +2704,7 @@ function StoryPageContent() {
           googleKey,
           mistralKey,
           deepinfraKey,
+          zaiKey,
           storyId: storyDbId || undefined,
           abortSignal: generationAbortRef.current.signal,
           enableEmbeddings: embeddingsEnabled,
@@ -3186,6 +3189,7 @@ function StoryPageContent() {
           googleKey,
           mistralKey,
           deepinfraKey,
+          zaiKey,
         });
 
         const lastPartIndex = storyData.scene.parts.length - 1;
@@ -3795,6 +3799,7 @@ function StoryPageContent() {
           googleKey,
           mistralKey,
           deepinfraKey,
+          zaiKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -4342,6 +4347,7 @@ function StoryPageContent() {
         googleKey,
         mistralKey,
         deepinfraKey,
+        zaiKey,
       });
 
       // Update the last part with new choices

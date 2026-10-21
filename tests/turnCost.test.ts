@@ -33,7 +33,7 @@ import { AI_MODELS } from "@/app/misc/ai_prices";
 // "Mistral Nemo" is $0.15/$0.15 per 1M tokens - a model with equal input and
 // output prices keeps the hand-computed expectations below readable.
 const CHEAP_MODEL = "Mistral Nemo";
-// "GLM 5.2" is $0.65 in / $2.10 out - asymmetric, so it catches an
+// "GLM 5.2" is $1.40 in / $4.40 out - asymmetric, so it catches an
 // input/output price mix-up that a symmetric model would hide.
 const PRICEY_MODEL = "GLM 5.2";
 
@@ -145,8 +145,8 @@ describe("getModelPrice", () => {
 
 describe("priceCall", () => {
   it("bills input and output at their separate per-million rates", () => {
-    // 1M in at $0.65 + 1M out at $2.10
-    expect(priceCall(PRICEY_MODEL, 1_000_000, 1_000_000)).toBeCloseTo(2.75, 6);
+    // 1M in at $1.40 + 1M out at $4.40
+    expect(priceCall(PRICEY_MODEL, 1_000_000, 1_000_000)).toBeCloseTo(5.8, 6);
   });
 
   it("scales linearly below a million tokens", () => {

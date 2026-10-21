@@ -439,3 +439,69 @@ the author's Z.ai key is a live check that needs the author's go.
     side agents on Claude; the signature merge from the stream. Each is a
     check with its failure written down in `pending_tests.md`. Building
     around behaviour nobody has seen fail would be guessing.
+
+### 2026-10-21 — PR C, GLM through Z.ai and OpenRouter
+
+Approved as decision 20 ("Okay go on"). Built on PR A's branch with the
+addendum (`f4fe2cd`) merged in.
+
+1. **Z.ai accepts only `tool_choice: "auto"`** (its chat-completions
+   reference: "only auto is supported"), which the addendum did not list.
+   `zai` joins Claude in `resolveToolChoice`, so a gate's forced round
+   relies on the gate's own re-prompt.
+2. **`temperature` is clamped to [0, 1] for `zai`**, Z.ai's documented
+   range. The GM sends 0.4 plus the Chaos Factor nudge, and the story stage
+   sends the player's sampling temperature, which may be above 1.
+3. **A call with no effort of its own runs at `low`.** Z.ai's default
+   `reasoning_effort` is `max`, which would make every side agent pointed
+   at GLM-5.3 slow and expensive. The tier mapping is as planned (`none` and
+   `low` → `low`, `normal` and `high` → `high`, `xhigh` → `max`), always
+   with `thinking: {type: "enabled"}`.
+4. **GLM-5.3 gets Claude's 4,096 `max_tokens` floor** (renamed
+   `ALWAYS_THINKING_MIN_MAX_TOKENS`), for the same reason: it always thinks,
+   and thinking counts against the cap.
+5. **`reasoning_content` goes back inside a tool loop** (the build-time check
+   the addendum asked for). Z.ai's thinking guide says thinking blocks
+   "should be explicitly preserved and returned together with the tool
+   results"; leaving them out degrades the answer rather than failing, so
+   there is no empty-string fallback as there is for DeepSeek. Z.ai streams
+   `delta.reasoning_content`, which `providerCall` already reads.
+6. **The trailing prefill is stripped only when tools are offered**, as the
+   addendum says. Z.ai's reference says nothing about a trailing assistant
+   message without tools.
+7. **The Flash model's id is `glm-5.3-flash`.** Z.ai lists it under vision
+   models, but its model page lists function calling, a 1M context and 128K
+   output.
+8. **OpenRouter prices.** OpenRouter prices GLM per provider endpoint. On
+   2026-10-21 GLM 5.2 ran from $0.03 to $2.31 per M input across 34
+   endpoints, and the model listing shows whichever endpoint sorts first:
+   $0.034 in / $7.00 out for GLM 5.2, $0.079 / $1.40 for GLM 5.3. The three
+   OpenRouter GLM entries use the model maker's own price on OpenRouter (the
+   Z.ai endpoint), which 11 of GLM 5.2's endpoints charge and which sits near
+   the median: GLM 5.2 and 5.3 at $1.40 / $4.40, GLM 5.3 Flash at
+   $0.15 / $0.50. GLM 5.2 was $0.65 / $2.10. The GLM 5.2 description now
+   calls it the previous flagship.
+9. **The Z.ai key stays on the device**, like every provider key:
+   `syncableSettingsKeys.ts` deliberately syncs no API keys, so it needs no
+   change.
+10. **The guardrail is tested twice**: the allowlist test checks that
+    `https://api.z.ai/api/paas/*` is the only Z.ai entry, and a source scan
+    fails if any file under `app/` names a Coding Plan URL.
+11. **After the engine review** (its findings, triaged):
+    - The OpenRouter GLM 5.3 entries are the same model and also always
+      think, but were handled like ordinary models. A model-level
+      `alwaysThinks()` (Claude, `zai`, OpenRouter `z-ai/glm-5.3…`) now gives
+      them the 4,096 floor, `low` for effort `none` or unset, and the
+      mid-history prefill drop.
+    - Z.ai has long taken a single stop word, and the story stage sends
+      three. `zai` now gets the first only; the client strips all three
+      markers anyway.
+    - The GM's `<thinking>` prefill sat mid-history from round 2 on for
+      `zai` too; the drop that Claude had now covers every always-thinking
+      model.
+    - `reasoning_content` went back for every earlier turn's tool rounds,
+      unbudgeted; it now goes back for the current turn only.
+    - **Not changed:** the cost ledger prices Z.ai and the OpenRouter GLM
+      entries at list price, ignoring Z.ai's cached-input rate and
+      OpenRouter's routing spread. That is the same follow-up as Route A's
+      decision 5, for every non-Claude model.
