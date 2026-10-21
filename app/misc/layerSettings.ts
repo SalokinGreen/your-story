@@ -31,9 +31,9 @@ function notifyChanged(): void {
 // ============================================================
 // PER-STAGE MODEL/EFFORT OVERRIDES
 // ============================================================
-// null (default) means "inherit whatever model generated the turn this
-// side-call is reacting to" - today's behavior, unchanged from before these
-// overrides existed.
+// null (default) means "run on the narration model"
+// (getEffectiveNarrationModelKey, decision 10) - generation.ts passes it in
+// as resolveSideCallModel's fallback.
 
 export interface ModelEffortOverride {
   modelKey: AnyModelKey;
@@ -142,9 +142,10 @@ export function setStoryProgressCheckInterval(turns: number): void {
 
 /**
  * Resolves a stage's { model, reasoningEffort } for its API call: the
- * override if one is set, otherwise the fallback model (whatever generated
- * the turn) with no reasoningEffort field at all - preserving the exact
- * fetch body these stages sent before overrides existed.
+ * override if one is set, otherwise the fallback model (the narration
+ * model, which must be an AI_MODELS key or a custom model's UUID) with no
+ * reasoningEffort field at all - preserving the exact fetch body these
+ * stages sent before overrides existed.
  */
 export function resolveSideCallModel(
   override: ModelEffortOverride | null,

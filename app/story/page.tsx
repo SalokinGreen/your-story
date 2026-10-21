@@ -53,7 +53,7 @@ import {
   type ElementCategory,
 } from "../misc/mythic";
 import {
-  NARRATION_MODEL_KEY,
+  getEffectiveNarrationModelKey,
   type ResolvedTier,
 } from "../misc/reasoningTiers";
 import { migrateCustomTablesToNotes } from "../misc/tableNotes";
@@ -92,17 +92,19 @@ import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { useSearchParams, useRouter } from "next/navigation";
 
-// Helper function to get models for generation options.
-// storyModel/toolsModel/choicesModel are no longer read from presets or
-// localStorage - the reasoning-tier router (generation.ts) picks the actual
-// model per stage/turn internally. These fields stay on GenerationOptions
-// for type compatibility with other callers, filled with the narration
-// model as an inert default that's never actually dispatched to.
+// Helper function to get models for generation options. They are no longer
+// read from presets: generateStoryTurn ignores all three (the reasoning-tier
+// router picks the GM's model, and narration, choices and every side call run
+// on the narration model, decision 10), and only choicesModel is used, by
+// generateChoicesOnly. They stay on GenerationOptions for type compatibility,
+// filled with the narration model so the player's override reaches
+// generateChoicesOnly too.
 function getModelsFromPreset() {
+  const narrationModel = getEffectiveNarrationModelKey();
   return {
-    storyModel: NARRATION_MODEL_KEY,
-    toolsModel: NARRATION_MODEL_KEY,
-    choicesModel: NARRATION_MODEL_KEY,
+    storyModel: narrationModel,
+    toolsModel: narrationModel,
+    choicesModel: narrationModel,
   };
 }
 

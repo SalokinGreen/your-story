@@ -171,8 +171,8 @@ function Toggle({
 
 /**
  * A model + reasoning-effort override for one AI side-call stage (Observer,
- * Memory Keeper, Reflection). Off by default - the stage reuses whichever
- * model generated the turn it's reacting to, same as before this UI existed.
+ * Memory Keeper, Reflection). Off by default - the stage runs on the
+ * narration model (decision 10).
  */
 function StageOverrideCard({
   icon,
@@ -235,7 +235,7 @@ function StageOverrideCard({
         </div>
       ) : (
         <p className="text-xs text-blue-300/40 italic">
-          Off - reuses whichever model generated the turn being reviewed.
+          Off - uses the narration model.
         </p>
       )}
     </div>
