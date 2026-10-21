@@ -65,6 +65,9 @@ const systemPromptIncludes = (call: Call, text: string) =>
   call.body.messages[0]?.content?.includes(text) ?? false;
 const isMemoryKeeper = (call: Call) => systemPromptIncludes(call, "memory-curation layer");
 const isStoryProgress = (call: Call) => systemPromptIncludes(call, "story-progress reviewer");
+// Same markers generation.sideCallKeys.test.ts uses.
+const isCompaction = (call: Call) => systemPromptIncludes(call, "running summary");
+const isReflection = (call: Call) => systemPromptIncludes(call, "memory-reflection layer");
 
 /**
  * GM-stage calls (the ones carrying `tools`) go to the scripted GM round; a
@@ -125,7 +128,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function runTurn(gmRoundContent: string): Promise<Call[]> {
+async function runTurn(
+  gmRoundContent: string,
+  storyData: StoryData = minimalStory(),
+  extraOptions: Partial<GenerationOptions> = {},
+): Promise<Call[]> {
   const { fetchMock, sideCalls } = createFetchMock(gmRoundContent);
   global.fetch = fetchMock as unknown as typeof fetch;
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -139,27 +146,54 @@ async function runTurn(gmRoundContent: string): Promise<Call[]> {
     replyLength: "medium",
     openRouterKey: "openrouter-test-key",
     mistralKey: "mistral-test-key",
+    ...extraOptions,
   };
 
-  await generateStoryTurn(minimalStory(), "I pick the lock", options, {});
+  await generateStoryTurn(storyData, "I pick the lock", options, {});
   // Let the fire-and-forget background layers land before checking them too.
   for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
 
   const calls = sideCalls();
   expect(calls.some(isMemoryKeeper)).toBe(true);
-  expect(calls.some(isStoryProgress)).toBe(true);
   return calls;
+}
+
+/** ~1,500 tokens apiece - several of these age well past a small history budget. */
+const LONG_PART = "The party pressed on through the flooded ruins, arguing over the map. ".repeat(
+  90,
+);
+
+/** Due for both compaction and reflection, as in generation.sideCallKeys.test.ts. */
+function storyDueForCompactionAndReflection(): StoryData {
+  const story = minimalStory();
+  story.scene.parts = Array.from({ length: 8 }, () => ({
+    content: LONG_PART,
+    imageUrl: "",
+    user: false,
+    role: "assistant",
+  })) as StoryData["scene"]["parts"];
+  story.memory = [
+    "The player negotiated with the guard.",
+    "The player negotiated with the merchant.",
+    "The player negotiated with the bandit chief.",
+    "The player negotiated their way past the sentry.",
+  ].map((content) => ({ content, importance: 9 }));
+  return story;
 }
 
 const modelsOf = (calls: Call[]) => [...new Set(calls.map((c) => c.body.model))];
 
 describe("side calls default to the narration model", () => {
   it("when the GM's own round wrote the prose", async () => {
-    expect(modelsOf(await runTurn(NARRATION))).toEqual([NARRATION_MODEL_KEY]);
+    const calls = await runTurn(NARRATION);
+    expect(calls.some(isStoryProgress)).toBe(true);
+    expect(modelsOf(calls)).toEqual([NARRATION_MODEL_KEY]);
   });
 
   it("when a separate narration call wrote the prose", async () => {
-    expect(modelsOf(await runTurn(""))).toEqual([NARRATION_MODEL_KEY]);
+    const calls = await runTurn("");
+    expect(calls.some(isStoryProgress)).toBe(true);
+    expect(modelsOf(calls)).toEqual([NARRATION_MODEL_KEY]);
   });
 
   it("follow the player's narration override, and a pinned stage override beats it", async () => {
@@ -172,7 +206,18 @@ describe("side calls default to the narration model", () => {
     });
 
     const calls = await runTurn(NARRATION);
+    expect(calls.some(isStoryProgress)).toBe(true);
     expect(modelsOf(calls.filter(isMemoryKeeper))).toEqual(["Mistral Medium 3.1"]);
     expect(modelsOf(calls.filter((c) => !isMemoryKeeper(c)))).toEqual(["Mistral Nemo"]);
+  });
+
+  it("compaction and reflection follow the narration override too", async () => {
+    stubBrowserStorage({ narrationModelOverride: "Mistral Nemo" });
+
+    const calls = await runTurn(NARRATION, storyDueForCompactionAndReflection(), {
+      customMaxContext: 8000,
+    });
+    expect(modelsOf(calls.filter(isCompaction))).toEqual(["Mistral Nemo"]);
+    expect(modelsOf(calls.filter(isReflection))).toEqual(["Mistral Nemo"]);
   });
 });

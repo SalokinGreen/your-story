@@ -1375,8 +1375,8 @@ export async function generateStoryTurn(
               narrationThoughts: result.narrationThoughts,
               // Same model/effort the Observer was just judged with (the
               // Architecture tab's override, if the user pinned one) - not
-              // sideCallApiOptions, or the rewrite would silently fall back
-              // to whichever model generated the flagged turn.
+              // sideCallApiOptions, or the rewrite would silently skip that
+              // override and run on the plain narration model.
               apiOptions: observerApiOptions,
             });
           } catch (rewriteError) {
