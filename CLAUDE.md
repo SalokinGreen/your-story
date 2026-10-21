@@ -423,7 +423,12 @@ cost, and logs failures to the Debug Logs instead of swallowing them.
 and each side agent (`layerSettings.ts`) can be overridden in Settings, and
 the GM can raise its own tier with `set_reasoning_tier`, capped by
 `MAX_TIER3_CALLS_PER_SCENE`. The heavy tiers are Grok 4.5 (combat) and Kimi
-K3 (boss fights).
+K3 (boss fights). An unpinned side agent (the Observer, Memory Keeper,
+Director Assistant, Story Progress Observer, compaction and reflection) runs
+on the narration model (decision 19). A model handed to a call must be an
+`AI_MODELS` key or a custom model's UUID, never `GenerationMeta.model` (the
+provider's own id), which `getModelConfig()` silently swaps for DeepSeek V4
+Flash.
 
 ## The GM is tool-calling, not a fixed dice system
 
