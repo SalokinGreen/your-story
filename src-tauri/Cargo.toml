@@ -31,3 +31,16 @@ tauri-plugin-http = "2"
 # OpenRouter sign-in, and every target="_blank" link via the click handler
 # the plugin injects. Scoped to https:// in capabilities/default.json.
 tauri-plugin-opener = "2.7.2"
+# Party mode's LAN server (src/party_server.rs): serves the phone page from
+# the bundled frontend and relays WebSocket messages. Game logic stays in the
+# webview's TypeScript.
+axum = { version = "0.8", default-features = false, features = ["ws", "http1", "tokio", "query"] }
+tokio = { version = "1", features = ["net", "sync", "macros", "time"] }
+local-ip-address = "0.6"
+rand = "0.10"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+tower = { version = "0.5", features = ["util"] }
+tokio-tungstenite = "0.29"
+futures-util = "0.3"
