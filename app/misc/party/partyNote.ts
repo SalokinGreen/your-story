@@ -15,8 +15,8 @@ export const PARTY_NOTE_CONTENT =
   "(their name exactly as it appears in the player list), so it shows on their phone. " +
   'Player turns arrive as "> Name: action" lines, and several players can speak in one turn. ' +
   "Rotate the spotlight so nobody is left out. " +
-  "When you ask a player for a roll or put a question to them, name them (player_name for ask_for_roll, target_player_name for ask_question): " +
-  "the prompt then appears on that player's phone.";
+  "When you put a question to a player (ask_question), or ask them for a roll (ask_for_roll, which only exists when manual dice are on), name them " +
+  "(target_player_name, player_name): the prompt then appears on that player's phone.";
 
 export function partyTableNote(): StoryLore {
   return {

@@ -184,8 +184,10 @@ export function cleanLine(raw: string, max: number = PARTY_MAX_LINE_CHARS): stri
     .trim();
 }
 
+// A name is read by the GM as the "Name:" in "> Name: line", so it can't carry
+// the separator or the line marker and fake another speaker.
 export function cleanName(raw: string): string {
-  return cleanLine(raw, PARTY_MAX_NAME_CHARS).replace(/\s+/g, " ");
+  return cleanLine(raw.replace(/[:>]+/g, " "), PARTY_MAX_NAME_CHARS).replace(/\s+/g, " ");
 }
 
 function isHexColor(c: string): boolean {

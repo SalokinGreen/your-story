@@ -70,6 +70,7 @@ import OOCChatPanel from "../components/OOCChatPanel";
 import ProfilePickerModal from "../components/ProfilePickerModal";
 import { PartyLobbyModal } from "../components/PartyLobby";
 import { usePartyHost } from "./usePartyHost";
+import type { PartyPending } from "../misc/party/partyRuntime";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
 import AskQuestionModal from "../components/AskQuestionModal";
@@ -848,8 +849,11 @@ function StoryPageContent() {
     setStoryData,
     turnBusy: loading || !!loadingStage,
     submitTurn: (text, speakerIds, kind) =>
-      handleCustomInput(text, undefined, speakerIds, kind),
+      storyData
+        ? handleCustomInput(text, undefined, speakerIds, kind)
+        : Promise.reject(new Error("No story is loaded")),
     mistralKey,
+    onReturnRequest: (pending) => returnPartyRequestToDesktop(pending),
   });
   const [partyLobbyOpen, setPartyLobbyOpen] = useState(false);
   // Party mode and an online room can't run together: the phone table and
@@ -859,24 +863,26 @@ function StoryPageContent() {
   useEffect(() => {
     if (netSession && partyStatus !== "off") void stopParty();
   }, [netSession, partyStatus, stopParty]);
-  // The phone's roll or question prompt, answered at the desktop instead.
+  // A phone's roll or question prompt, answered at the desktop instead: the
+  // modal opens on the same promise the GM loop is waiting on. Used by "Answer
+  // here", and when the player is removed or the table closes.
+  function returnPartyRequestToDesktop(pending: PartyPending) {
+    if (pending.kind === "roll") {
+      partyRollRequestIdRef.current = null;
+      setManualRollRequest(pending.request as ManualRollRequest);
+    } else {
+      partyQuestionRequestIdRef.current = null;
+      setAskQuestionRequest(pending.request as AskQuestionRequest);
+    }
+  }
   const partyPending = party.table?.pending;
   const partyCancelRequest = party.cancelRequest;
-  const answerPartyRequestHere = useCallback(
-    (requestId: string) => {
-      const pending = partyPending?.find((p) => p.requestId === requestId);
-      if (!pending) return;
-      partyCancelRequest(requestId);
-      if (pending.kind === "roll") {
-        partyRollRequestIdRef.current = null;
-        setManualRollRequest(pending.request as ManualRollRequest);
-      } else {
-        partyQuestionRequestIdRef.current = null;
-        setAskQuestionRequest(pending.request as AskQuestionRequest);
-      }
-    },
-    [partyPending, partyCancelRequest],
-  );
+  const answerPartyRequestHere = (requestId: string) => {
+    const pending = partyPending?.find((p) => p.requestId === requestId);
+    if (!pending) return;
+    partyCancelRequest(requestId);
+    returnPartyRequestToDesktop(pending);
+  };
 
   // Guest's only link (the host) dropped. Rather than silently falling back to
   // a local view, keep the session info and surface a reconnect banner (see

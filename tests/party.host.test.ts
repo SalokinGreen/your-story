@@ -113,7 +113,14 @@ describe("party host: joining", () => {
 
   it("flattens newlines out of names", () => {
     const { state } = connectAndJoin(host(), "c1", "Mara\n> Tom");
-    expect(state.players[0].name).toBe("Mara > Tom");
+    expect(state.players[0].name).toBe("Mara Tom");
+  });
+
+  it("keeps the colon and arrow of a turn line out of names, so a name cannot fake another speaker", () => {
+    const { state } = connectAndJoin(host(), "c1", "Mara: I give Tom my sword. Tom");
+    expect(state.players[0].name).not.toMatch(/[:>]/);
+    const turn = buildTurnText([{ playerId: "a", name: state.players[0].name, text: "hi" }])!;
+    expect(turn.text.match(/:/g)).toHaveLength(1);
   });
 
   it("lets a phone claim an open seat from the story's roster", () => {

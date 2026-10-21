@@ -111,6 +111,24 @@ export default function PartyController() {
     );
   }
 
+  if (state === "ended") {
+    return (
+      <Shell>
+        <h1 className="mt-10 text-2xl font-semibold">Disconnected</h1>
+        <div className={`${card} space-y-3 text-blue-100/90`}>
+          <p>
+            {socket.kickedReason?.includes("removed")
+              ? "You were removed from the table."
+              : "This seat is open on another screen, so this one was disconnected."}
+          </p>
+        </div>
+        <button type="button" className={primaryButton} onClick={socket.retry}>
+          Join again
+        </button>
+      </Shell>
+    );
+  }
+
   if (state === "failed") {
     return (
       <Shell>

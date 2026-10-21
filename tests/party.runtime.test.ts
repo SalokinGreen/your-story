@@ -6,7 +6,7 @@
  * exercised as JSON text, exactly as Rust relays it.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PartyRuntime, type PartyTable, type RosterChange } from "@/app/misc/party/partyRuntime";
+import { PartyRuntime, type PartyPending, type PartyTable, type RosterChange } from "@/app/misc/party/partyRuntime";
 import type { PartyBridge, PartyInfo, PartyServerEvent, PartyTarget } from "@/app/misc/party/partyBridge";
 import type { DesktopMessage, PlayerView } from "@/app/misc/party/protocol";
 import type { CouchPlayer, StoryData } from "@/app/misc/structs";
@@ -109,6 +109,10 @@ interface Rig {
   clock: { now: number };
   transcribe: ReturnType<typeof vi.fn>;
   errors: { code: string; message: string }[];
+  // Prompts that went back to the desktop's own modals.
+  returned: PartyPending[];
+  // Lets a test hold a submitted turn open, then finish it.
+  submit: { release: () => void; hold: boolean };
 }
 
 function rig(): Rig {
@@ -124,6 +128,8 @@ function rig(): Rig {
     clock,
     transcribe: vi.fn(async () => "I whistle a tune"),
     errors: [],
+    returned: [],
+    submit: { release: () => {}, hold: false },
     runtime: null as unknown as PartyRuntime,
   };
   let n = 0;
@@ -133,10 +139,12 @@ function rig(): Rig {
     applyRoster: (c) => r.roster.push(c),
     submitTurn: async (text, speakerIds, kind) => {
       r.turns.push({ text, speakerIds, kind });
+      if (r.submit.hold) await new Promise<void>((resolve) => (r.submit.release = resolve));
     },
     transcribe: r.transcribe as unknown as (chunks: string[], mime: string) => Promise<string>,
     onTable: (t) => r.tables.push(t),
     onError: (e) => r.errors.push(e),
+    onReturnRequest: (p) => r.returned.push(p),
     cooldownMs: 15000,
     now: () => clock.now,
     newId: () => `id${++n}x`,
@@ -247,6 +255,8 @@ describe("PartyRuntime", () => {
     expect(r.turns).toHaveLength(1);
     expect(r.bridge.lastView("c2").queue).toEqual([]);
 
+    // The turn's promise settles a tick after Go; the page's flag drops after.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     r.runtime.setTurnBusy(false);
     expect(r.bridge.lastView("c1").turn).toBe("idle");
     r.bridge.phone("c2", { type: "line", text: "More", kind: "typed" });
@@ -432,8 +442,52 @@ describe("PartyRuntime", () => {
     r.roster.length = 0;
     r.runtime.removePlayer(mara);
     expect(r.bridge.kicked).toEqual(["c1"]);
-    expect(r.bridge.toasts("c1")).toEqual(["Disconnected: removed by the host."]);
+    // Told why, and told not to come straight back.
+    expect(r.bridge.messagesTo("c1").filter((m) => m.type === "kicked")).toEqual([
+      { type: "kicked", reason: "removed by the host" },
+    ]);
     expect(r.roster[0].removedIds).toEqual([mara]);
+  });
+
+  it("gives a removed player's pending roll back to the desktop instead of leaving the GM waiting", async () => {
+    const mara = await seat(r, "c1", "Mara", "#22c55e");
+    const answers: unknown[] = [];
+    const id = r.runtime.offerRoll({ title: "Climb", description: "", playerName: "Mara" }, (a) => answers.push(a))!;
+    r.runtime.removePlayer(mara);
+    expect(r.returned).toMatchObject([{ requestId: id, playerName: "Mara", kind: "roll" }]);
+    // Not answered as skipped: the desktop's modal answers the same promise.
+    expect(answers).toEqual([]);
+    expect(r.tables[r.tables.length - 1]?.pending).toEqual([]);
+  });
+
+  it("tells a phone whose seat opened on another screen not to reconnect", async () => {
+    await seat(r, "c1", "Mara", "#22c55e");
+    const seatKey = r.bridge.lastView("c1").me!.seatKey;
+    const mara = r.bridge.lastView("c1").me!.id;
+    r.bridge.onEvent({ kind: "connected", clientId: "c2", userAgent: "x" });
+    r.bridge.phone("c2", { type: "hello", token: TOKEN, playerId: mara, seatKey });
+    expect(r.bridge.messagesTo("c1").filter((m) => m.type === "kicked")).toEqual([
+      { type: "kicked", reason: "seat reopened elsewhere" },
+    ]);
+    expect(r.bridge.lastView("c2").me?.id).toBe(mara);
+  });
+
+  it("keeps the turn locked until the submitted turn settles, whatever the page says", async () => {
+    await seat(r, "c1", "Mara", "#22c55e");
+    r.bridge.phone("c1", { type: "spotlight_take" });
+    r.bridge.phone("c1", { type: "line", text: "Hi", kind: "typed" });
+    r.submit.hold = true;
+    r.bridge.phone("c1", { type: "go" });
+    // The page's flag drops between a turn's stages (suggested choices done,
+    // observer still running): the phone must stay locked out.
+    r.runtime.setTurnBusy(true);
+    r.runtime.setTurnBusy(false);
+    expect(r.bridge.lastView("c1").turn).toBe("generating");
+    r.bridge.phone("c1", { type: "line", text: "too early", kind: "typed" });
+    expect(r.bridge.lastView("c1").queue).toEqual([]);
+    r.submit.release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(r.bridge.lastView("c1").turn).toBe("idle");
   });
 
   it("keeps a seat across a reconnect with its seat key", async () => {
@@ -449,12 +503,42 @@ describe("PartyRuntime", () => {
   it("stops the server, hands waiting prompts back to the desktop, and clears the table", async () => {
     await seat(r, "c1", "Mara", "#22c55e");
     const answers: unknown[] = [];
-    r.runtime.offerRoll({ title: "t", description: "", playerName: "Mara" }, (a) => answers.push(a));
+    const id = r.runtime.offerRoll({ title: "t", description: "", playerName: "Mara" }, (a) => answers.push(a));
     await r.runtime.stop();
     expect(r.bridge.stopped).toBeGreaterThanOrEqual(1);
-    expect(answers).toEqual([null]);
+    // The desktop's modal takes the prompt over; the GM isn't told "skipped".
+    expect(r.returned).toMatchObject([{ requestId: id, playerName: "Mara" }]);
+    expect(answers).toEqual([]);
     expect(r.tables[r.tables.length - 1]).toBeNull();
     expect(r.runtime.running).toBe(false);
+  });
+
+  it("answers waiting prompts as skipped when the page is going away", async () => {
+    await seat(r, "c1", "Mara", "#22c55e");
+    const answers: unknown[] = [];
+    r.runtime.offerRoll({ title: "t", description: "", playerName: "Mara" }, (a) => answers.push(a));
+    await r.runtime.stop({ returnToDesktop: false });
+    expect(answers).toEqual([null]);
+    expect(r.returned).toEqual([]);
+  });
+
+  it("takes the server down again if the table was closed while it was opening", async () => {
+    const racing = rig();
+    const bridge = racing.bridge;
+    let finish: () => void = () => {};
+    bridge.start = async (_o, onEvent) => {
+      bridge.onEvent = onEvent;
+      bridge.started++;
+      await new Promise<void>((resolve) => (finish = resolve));
+      return INFO;
+    };
+    const starting = racing.runtime.start({}, []);
+    await racing.runtime.stop();
+    finish();
+    await expect(starting).rejects.toMatchObject({ code: "CANCELLED" });
+    expect(racing.runtime.running).toBe(false);
+    // The server that came up late is taken down again.
+    expect(bridge.stopped).toBeGreaterThanOrEqual(1);
   });
 
   it("reports a server that died and shuts down", async () => {

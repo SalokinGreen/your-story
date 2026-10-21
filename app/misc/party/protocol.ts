@@ -151,6 +151,9 @@ export type DesktopMessage =
   | { type: "welcome"; playerId: string | null; view: PlayerView }
   | { type: "view"; view: PlayerView }
   | { type: "toast"; text: string }
+  // The desktop ended this connection on purpose (the seat was removed, or
+  // opened on another screen). The phone must not reconnect on its own.
+  | { type: "kicked"; reason: string }
   | { type: "pong" };
 
 // ---------------------------------------------------------------- parsing

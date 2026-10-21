@@ -40,6 +40,9 @@ const MAX_CLIENTS: usize = 16;
 /// Messages queued for one phone before it counts as stuck and is dropped.
 const CLIENT_QUEUE: usize = 64;
 const USER_AGENT_MAX: usize = 200;
+/// A phone that takes longer than this to accept one message has stopped
+/// reading; it is dropped instead of holding its connection open.
+const SEND_TIMEOUT: Duration = Duration::from_secs(5);
 /// The Android app's WebView origin (Capacitor's default), for PR P2.
 const APP_ORIGINS: &[&str] = &["https://localhost"];
 
@@ -413,7 +416,8 @@ async fn run_client(s: Arc<Shared>, mut socket: WebSocket, user_agent: String) {
             },
             outgoing = rx.recv() => match outgoing {
                 Some(Outgoing::Text(text)) => {
-                    if socket.send(Message::Text(text.into())).await.is_err() {
+                    let sent = tokio::time::timeout(SEND_TIMEOUT, socket.send(Message::Text(text.into()))).await;
+                    if !matches!(sent, Ok(Ok(()))) {
                         break;
                     }
                 }
@@ -493,6 +497,17 @@ async fn stop_running(running: Running) {
     running.shared.clients.lock().unwrap().clear();
     // Connections close on the shutdown signal; don't wait forever on one.
     let _ = tokio::time::timeout(Duration::from_secs(3), running.task).await;
+}
+
+impl PartyServer {
+    /// Close the table if one is open. Also called when the webview loads a
+    /// page afresh (lib.rs): a reload ends the JavaScript that owns the table,
+    /// and the server must not outlive it.
+    pub async fn stop(&self) {
+        if let Some(running) = self.running.lock().await.take() {
+            stop_running(running).await;
+        }
+    }
 }
 
 // ---------------------------------------------------------------- commands
@@ -579,9 +594,7 @@ pub async fn party_kick(
 
 #[tauri::command]
 pub async fn party_stop(state: tauri::State<'_, PartyServer>) -> Result<(), PartyError> {
-    if let Some(r) = state.running.lock().await.take() {
-        stop_running(r).await;
-    }
+    state.stop().await;
     Ok(())
 }
 

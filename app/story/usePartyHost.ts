@@ -23,7 +23,12 @@ import {
   type PartyError,
   type PartyInfo,
 } from "../misc/party/partyBridge";
-import { PartyRuntime, type PartyTable, type RosterChange } from "../misc/party/partyRuntime";
+import {
+  PartyRuntime,
+  type PartyPending,
+  type PartyTable,
+  type RosterChange,
+} from "../misc/party/partyRuntime";
 import { withPartyNote } from "../misc/party/partyNote";
 import { loadCooldownMs, saveCooldownMs } from "../misc/party/partySettings";
 import { PARTY_MAX_TAKE_BYTES } from "../misc/party/protocol";
@@ -42,6 +47,9 @@ export interface UsePartyHostOptions {
     inputKind: "freeform" | "voice",
   ) => Promise<void>;
   mistralKey: string;
+  // A roll or question that was on a phone goes back to the desktop to be
+  // answered there (its player was removed, or the table closed).
+  onReturnRequest: (pending: PartyPending) => void;
   // Tests substitute a fake server.
   bridge?: PartyBridge;
 }
@@ -159,6 +167,7 @@ export function usePartyHost(opts: UsePartyHostOptions): PartyHostApi {
         transcribe: (chunks, mimeType) =>
           transcribeChunks(chunks, mimeType, optsRef.current.mistralKey),
         onTable: setTable,
+        onReturnRequest: (pending) => optsRef.current.onReturnRequest(pending),
         onError: (e) => {
           setError(e);
           setInfo(null);
@@ -190,7 +199,9 @@ export function usePartyHost(opts: UsePartyHostOptions): PartyHostApi {
         // Seats added or renamed while the lobby was coming up.
         runtime.setTurnBusy(optsRef.current.turnBusy);
       } catch (e) {
-        setError(toPartyError(e));
+        const error = toPartyError(e);
+        // Closed while it was opening: that was asked for, not an error.
+        if (error.code !== "CANCELLED") setError(error);
         setInfo(null);
         setStatus("off");
       }
@@ -205,9 +216,10 @@ export function usePartyHost(opts: UsePartyHostOptions): PartyHostApi {
   }, []);
 
   // The server runs only while party mode is open: leaving the story ends it.
+  // There is nowhere left to show a waiting prompt, so those are skipped.
   useEffect(() => {
     return () => {
-      void runtimeRef.current?.stop();
+      void runtimeRef.current?.stop({ returnToDesktop: false });
     };
   }, []);
 
@@ -219,8 +231,10 @@ export function usePartyHost(opts: UsePartyHostOptions): PartyHostApi {
   // Names and colours follow the story's roster (a rename in the Menu, an
   // undo); seats the party holds are written back if it loses them.
   const couchPlayers = opts.storyData?.multiplayer?.couchPlayers;
+  // A solo story has no roster at all until a player joins, so an undo to one
+  // arrives as undefined: the party's seats are written back all the same.
   useEffect(() => {
-    if (status === "on" && couchPlayers) runtimeRef.current?.syncRoster(couchPlayers);
+    if (status === "on") runtimeRef.current?.syncRoster(couchPlayers ?? []);
   }, [couchPlayers, status]);
 
   // Phones' views follow the story: the narration, choices and sheets.

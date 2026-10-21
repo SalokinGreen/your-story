@@ -81,6 +81,10 @@ export interface RuntimeDeps {
   onTable: (table: PartyTable | null) => void;
   // The server died after starting (its listener failed).
   onError?: (error: { code: string; message: string }) => void;
+  // A roll or question that was on a phone goes back to the desktop's own
+  // prompt: its player was removed, or the table closed. The GM's promise is
+  // still waiting, and the desktop now answers it.
+  onReturnRequest?: (pending: PartyPending) => void;
   cooldownMs: number;
   now?: () => number;
   newId?: () => string;
@@ -125,6 +129,13 @@ export class PartyRuntime {
   private handlers = new Map<string, (answer: unknown) => void>();
   private timer: unknown = null;
   private cooldownMs: number;
+  // Bumped by every start and stop, so a stop that lands while start() is
+  // still waiting on the server is noticed.
+  private epoch = 0;
+  // The turn is busy while the page says so, and until a submitted turn's
+  // promise settles: the page's own flag can drop between a turn's stages.
+  private pageBusy = false;
+  private submitting = 0;
 
   constructor(private deps: RuntimeDeps) {
     this.cooldownMs = deps.cooldownMs;
@@ -150,10 +161,18 @@ export class PartyRuntime {
     opts: { preferredPort?: number; interfaceIp?: string },
     roster: CouchPlayer[],
   ): Promise<PartyInfo> {
-    await this.stop();
+    // Claim this start before anything awaits, so a stop that lands at any
+    // point after it is noticed.
+    const epoch = ++this.epoch;
+    await this.teardown(true);
     this.early = [];
     try {
       const info = await this.deps.bridge.start(opts, (e) => this.onEvent(e));
+      if (epoch !== this.epoch) {
+        // Closed while the server was coming up: take it down again.
+        await this.deps.bridge.stop().catch(() => {});
+        throw { code: "CANCELLED", message: "The table was closed while it was opening" };
+      }
       this.info = info;
       this.host = createPartyHost({
         token: info.token,
@@ -172,12 +191,22 @@ export class PartyRuntime {
     }
   }
 
-  async stop(): Promise<void> {
+  // returnToDesktop: prompts waiting on a phone go back to the desktop's own
+  // modals. Without it (the page is going away, so there is nowhere to show
+  // them) they are answered as skipped.
+  async stop(opts: { returnToDesktop?: boolean } = {}): Promise<void> {
+    this.epoch++;
+    await this.teardown(opts.returnToDesktop ?? true);
+  }
+
+  private async teardown(returnToDesktop: boolean): Promise<void> {
     const wasRunning = this.host !== null || this.early !== null;
     this.clearExpiryTimer();
-    // Anything waiting on a phone goes back to the desktop's own prompts.
+    this.releaseRequests(null, returnToDesktop);
     for (const handler of this.handlers.values()) handler(null);
     this.handlers.clear();
+    this.pageBusy = false;
+    this.submitting = 0;
     this.host = null;
     this.info = null;
     this.early = null;
@@ -198,11 +227,43 @@ export class PartyRuntime {
   }
 
   removePlayer(playerId: string): void {
+    // Whatever the GM was waiting on from this player goes to the desktop.
+    this.releaseRequests(playerId, true);
     this.step((s) => removeSeat(s, playerId));
   }
 
   setTurnBusy(busy: boolean): void {
+    this.pageBusy = busy;
+    this.syncTurn();
+  }
+
+  private syncTurn(): void {
+    const busy = this.pageBusy || this.submitting > 0;
     this.step((s) => setTurnState(s, busy ? "generating" : "idle"));
+  }
+
+  // Hand a player's pending prompts back to the desktop (or answer them as
+  // skipped when there is nowhere to show them), and forget the phone's side.
+  private releaseRequests(playerId: string | null, returnToDesktop: boolean): void {
+    const s = this.host;
+    if (!s) return;
+    for (const r of s.requests) {
+      if (playerId !== null && r.playerId !== playerId) continue;
+      const handler = this.handlers.get(r.requestId);
+      this.handlers.delete(r.requestId);
+      const player = s.players.find((p) => p.id === r.playerId);
+      if (returnToDesktop && this.deps.onReturnRequest && player) {
+        this.deps.onReturnRequest({
+          requestId: r.requestId,
+          playerId: r.playerId,
+          playerName: player.name,
+          kind: r.kind,
+          request: r.request,
+        });
+      } else {
+        handler?.(null);
+      }
+    }
   }
 
   setCooldownMs(ms: number): void {
@@ -407,15 +468,27 @@ export class PartyRuntime {
           this.send(e.clientId, { type: "pong" });
           break;
         case "kick":
-          if (e.reason !== "bad token") this.send(e.clientId, { type: "toast", text: `Disconnected: ${e.reason}.` });
+          // A bad token is not told why; anyone else is, and told not to come
+          // straight back.
+          if (e.reason !== "bad token") this.send(e.clientId, { type: "kicked", reason: e.reason });
           this.deps.bridge.kick(e.clientId).catch(() => {});
           break;
-        case "submit_turn":
-          this.deps.submitTurn(e.text, e.speakerIds, e.inputKind).catch(() => {
-            // The turn never started: unlock the queue.
-            this.step((s) => setTurnState(s, "idle"));
-          });
+        case "submit_turn": {
+          this.submitting++;
+          const epoch = this.epoch;
+          this.deps
+            .submitTurn(e.text, e.speakerIds, e.inputKind)
+            .catch(() => {
+              // The turn never started.
+            })
+            .finally(() => {
+              // A table closed (or reopened) since belongs to no one now.
+              if (epoch !== this.epoch) return;
+              this.submitting = Math.max(0, this.submitting - 1);
+              this.syncTurn();
+            });
           break;
+        }
         case "transcribe":
           this.transcribe(e.playerId, e.chunks, e.mimeType);
           break;

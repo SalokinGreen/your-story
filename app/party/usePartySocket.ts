@@ -10,7 +10,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopMessage, PhoneMessage, PlayerView } from "../misc/party/protocol";
 
-export type ConnectionState = "connecting" | "open" | "reconnecting" | "failed";
+// "ended": the desktop closed this connection on purpose (see "kicked"), so it
+// does not come back on its own.
+export type ConnectionState = "connecting" | "open" | "reconnecting" | "failed" | "ended";
 
 const SEAT_STORAGE_KEY = "yourStoryPartySeat";
 const PING_EVERY_MS = 10_000;
@@ -61,6 +63,8 @@ export interface PartySocket {
   // be counted down against this phone's own clock.
   viewAt: number;
   toast: { id: number; text: string } | null;
+  // Why the desktop ended the connection, when state is "ended".
+  kickedReason: string | null;
   send: (message: PhoneMessage) => boolean;
   retry: () => void;
 }
@@ -70,12 +74,17 @@ export function usePartySocket(token: string | null): PartySocket {
   const [view, setView] = useState<PlayerView | null>(null);
   const [viewAt, setViewAt] = useState(0);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+  const [kickedReason, setKickedReason] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const retryRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!token) return;
     let stopped = false;
+    // Set when the desktop kicks this phone: no reconnecting until the player
+    // asks. Otherwise two screens holding one seat would kick each other
+    // forever.
+    let ended = false;
     let attempt = 0;
     let failedInARow = 0;
     let toastId = 0;
@@ -126,6 +135,10 @@ export function usePartySocket(token: string | null): PartySocket {
           toastId += 1;
           setToast({ id: toastId, text: msg.text });
           break;
+        case "kicked":
+          ended = true;
+          setKickedReason(msg.reason);
+          break;
         case "pong":
           if (pongTimer) clearTimeout(pongTimer);
           pongTimer = null;
@@ -166,6 +179,10 @@ export function usePartySocket(token: string | null): PartySocket {
         pingTimer = pongTimer = null;
         if (stopped || socketRef.current !== socket) return;
         socketRef.current = null;
+        if (ended) {
+          setState("ended");
+          return;
+        }
         if (!opened) failedInARow += 1;
         if (failedInARow >= MAX_FAILED_ATTEMPTS) {
           setState("failed");
@@ -187,7 +204,7 @@ export function usePartySocket(token: string | null): PartySocket {
       } else if (!socket || socket.readyState === WebSocket.CLOSED) {
         if (retryTimer) clearTimeout(retryTimer);
         retryTimer = null;
-        if (failedInARow < MAX_FAILED_ATTEMPTS) connect();
+        if (!ended && failedInARow < MAX_FAILED_ATTEMPTS) connect();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
@@ -196,6 +213,8 @@ export function usePartySocket(token: string | null): PartySocket {
       clearTimers();
       attempt = 0;
       failedInARow = 0;
+      ended = false;
+      setKickedReason(null);
       const socket = socketRef.current;
       socketRef.current = null;
       socket?.close();
@@ -222,5 +241,5 @@ export function usePartySocket(token: string | null): PartySocket {
 
   const retry = useCallback(() => retryRef.current(), []);
 
-  return { state, view, viewAt, toast, send, retry };
+  return { state, view, viewAt, toast, kickedReason, send, retry };
 }

@@ -74,10 +74,14 @@ function CantConnectHelp() {
 export default function PartyLobby({
   party,
   blocked,
+  joinOnly,
 }: {
   party: PartyHostApi;
   // Why party mode can't start right now (an online room is open), if so.
   blocked?: string;
+  // Only what a late joiner needs: the QR and link. No way to change the
+  // network or close the table, either of which would drop every phone.
+  joinOnly?: boolean;
 }) {
   const { addNotification } = useNotification();
   const [picked, setPicked] = useState<string | undefined>(undefined);
@@ -128,7 +132,7 @@ export default function PartyLobby({
                 <DynamicIcon name="Copy" className="w-4 h-4" />
               </button>
             </div>
-            {info.interfaces.length > 1 && (
+            {!joinOnly && info.interfaces.length > 1 && (
               <label className="block text-xs text-blue-200/60">
                 Network
                 <select
@@ -151,16 +155,18 @@ export default function PartyLobby({
           </div>
         </div>
         <CantConnectHelp />
-        <button
-          type="button"
-          onClick={() => {
-            setPicked(undefined);
-            void party.stop();
-          }}
-          className="px-4 py-2 text-sm font-semibold rounded-lg bg-white/5 hover:bg-red-500/20 text-blue-100 border border-white/10"
-        >
-          Close the table
-        </button>
+        {!joinOnly && (
+          <button
+            type="button"
+            onClick={() => {
+              setPicked(undefined);
+              void party.stop();
+            }}
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-white/5 hover:bg-red-500/20 text-blue-100 border border-white/10"
+          >
+            Close the table
+          </button>
+        )}
       </div>
     );
   }
@@ -233,7 +239,7 @@ export function PartyLobbyModal({
             <DynamicIcon name="X" className="w-4 h-4" />
           </button>
         </div>
-        <PartyLobby party={party} />
+        <PartyLobby party={party} joinOnly />
       </div>
     </div>
   );

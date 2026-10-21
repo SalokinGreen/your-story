@@ -29,6 +29,8 @@ describe("party table note", () => {
     expect(content).toContain('"Character: <name>"');
     expect(content).toContain("player_name");
     expect(content).toContain("target_player_name");
+    // ask_for_roll is only offered in manual dice mode; the note says so.
+    expect(content).toContain("only exists when manual dice are on");
     // The convention it states is the one findPlayerSheet reads.
     const story = {
       lore: [{ ...existing, title: "Character: Mara", content: "sheet", type: "character_sheet" }],

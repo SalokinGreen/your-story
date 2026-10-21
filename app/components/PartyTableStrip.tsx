@@ -92,8 +92,13 @@ export default function PartyTableStrip({
                   <button
                     type="button"
                     onClick={() => setRemoving(p.id)}
-                    className="p-1 text-blue-200/40 hover:text-white rounded-full"
-                    title={`Remove ${p.name} from the table`}
+                    disabled={generating}
+                    className="p-1 text-blue-200/40 hover:text-white rounded-full disabled:opacity-30 disabled:cursor-not-allowed"
+                    title={
+                      generating
+                        ? "Wait for the GM to finish this turn"
+                        : `Remove ${p.name} from the table`
+                    }
                     aria-label={`Remove ${p.name} from the table`}
                   >
                     <DynamicIcon name="X" className="w-3 h-3" />
