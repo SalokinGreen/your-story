@@ -20,6 +20,10 @@
         { "url": "https://api.elevenlabs.io/*" },
         { "url": "https://your-story-sync.*.workers.dev/*" }
       ]
+    },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://*" }]
     }
   ]
 }

@@ -7,6 +7,13 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { isStandalone } from "./standalone";
+import { openExternalUrl } from "./openExternal";
+import {
+  buildOpenRouterAuthUrl,
+  exchangeOpenRouterCode,
+  generatePKCE,
+} from "./openRouterOAuth";
 
 export interface APIKeys {
   openRouterKey: string;
@@ -32,7 +39,12 @@ export interface APIKeysContextType {
   refreshKeys: () => Promise<void>;
   // OpenRouter OAuth state
   isConnectingOpenRouter: boolean;
+  // Native builds only: the sign-in page is open in the browser and the
+  // app is waiting for the user to paste back the code it shows
+  awaitingOpenRouterCode: boolean;
   connectOpenRouter: () => void;
+  submitOpenRouterCode: (code: string) => Promise<void>;
+  cancelOpenRouterConnect: () => void;
   disconnectOpenRouter: () => void;
 }
 
@@ -66,6 +78,7 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
   const [keys, setKeys] = useState<APIKeys>(defaultKeys);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isConnectingOpenRouter, setIsConnectingOpenRouter] = useState(false);
+  const [awaitingOpenRouterCode, setAwaitingOpenRouterCode] = useState(false);
 
   // Load keys from localStorage
   const loadKeys = useCallback(async () => {
@@ -105,41 +118,15 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
       if (code && codeVerifier) {
         setIsConnectingOpenRouter(true);
         try {
-          // Exchange code for API key
-          const response = await fetch(
-            "https://openrouter.ai/api/v1/auth/keys",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                code,
-                code_verifier: codeVerifier,
-                code_challenge_method: "S256",
-              }),
-            },
+          const key = await exchangeOpenRouterCode(code, codeVerifier);
+          setKey("openRouterKey", key);
+          // Clean up URL and localStorage
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname,
           );
-
-          if (response.ok) {
-            const { key } = await response.json();
-            if (key) {
-              // Save the key
-              setKey("openRouterKey", key);
-              // Clean up URL and localStorage
-              window.history.replaceState(
-                {},
-                document.title,
-                window.location.pathname,
-              );
-              localStorage.removeItem(LOCAL_KEYS.oauthCodeVerifier);
-            }
-          } else {
-            console.error(
-              "Failed to exchange OAuth code:",
-              await response.text(),
-            );
-          }
+          localStorage.removeItem(LOCAL_KEYS.oauthCodeVerifier);
         } catch (error) {
           console.error("OAuth callback error:", error);
         } finally {
@@ -159,50 +146,61 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
     [keys],
   );
 
-  // Generate code verifier and challenge for PKCE
-  const generatePKCE = async () => {
-    // Generate random code verifier
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    const codeVerifier = Array.from(array, (byte) =>
-      byte.toString(16).padStart(2, "0"),
-    ).join("");
-
-    // Generate code challenge (SHA-256 hash)
-    const encoder = new TextEncoder();
-    const data = encoder.encode(codeVerifier);
-    const hash = await crypto.subtle.digest("SHA-256", data);
-    const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-
-    return { codeVerifier, codeChallenge };
-  };
-
   // Start OpenRouter OAuth flow
   const connectOpenRouter = useCallback(async () => {
     setIsConnectingOpenRouter(true);
     try {
       const { codeVerifier, codeChallenge } = await generatePKCE();
 
-      // Store code verifier for callback
+      // Store code verifier for the callback / pasted code
       localStorage.setItem(LOCAL_KEYS.oauthCodeVerifier, codeVerifier);
 
-      // Get callback URL (current page)
-      const callbackUrl = `${window.location.origin}${window.location.pathname}`;
+      if (isStandalone()) {
+        // Native: there's no page OpenRouter can redirect back to, so sign
+        // in in a real browser and have the user paste the code it shows
+        // (see openRouterOAuth.ts).
+        await openExternalUrl(buildOpenRouterAuthUrl({ codeChallenge }));
+        setAwaitingOpenRouterCode(true);
+        setIsConnectingOpenRouter(false);
+        return;
+      }
 
-      // Redirect to OpenRouter auth
-      const authUrl = new URL("https://openrouter.ai/auth");
-      authUrl.searchParams.set("callback_url", callbackUrl);
-      authUrl.searchParams.set("code_challenge", codeChallenge);
-      authUrl.searchParams.set("code_challenge_method", "S256");
-
-      window.location.href = authUrl.toString();
+      // Web: redirect back to the current page
+      window.location.href = buildOpenRouterAuthUrl({
+        codeChallenge,
+        callbackUrl: `${window.location.origin}${window.location.pathname}`,
+      });
     } catch (error) {
       console.error("Error starting OpenRouter OAuth:", error);
       setIsConnectingOpenRouter(false);
     }
+  }, []);
+
+  // Native flow, second half: exchange the code the user pasted back.
+  // Throws a user-facing message if OpenRouter rejects it.
+  const submitOpenRouterCode = useCallback(
+    async (code: string) => {
+      const codeVerifier = localStorage.getItem(LOCAL_KEYS.oauthCodeVerifier);
+      if (!codeVerifier) {
+        setAwaitingOpenRouterCode(false);
+        throw new Error("That sign-in was already used. Start it again.");
+      }
+      setIsConnectingOpenRouter(true);
+      try {
+        const key = await exchangeOpenRouterCode(code, codeVerifier);
+        setKey("openRouterKey", key);
+        localStorage.removeItem(LOCAL_KEYS.oauthCodeVerifier);
+        setAwaitingOpenRouterCode(false);
+      } finally {
+        setIsConnectingOpenRouter(false);
+      }
+    },
+    [setKey],
+  );
+
+  const cancelOpenRouterConnect = useCallback(() => {
+    localStorage.removeItem(LOCAL_KEYS.oauthCodeVerifier);
+    setAwaitingOpenRouterCode(false);
   }, []);
 
   // Disconnect OpenRouter (clear key)
@@ -219,7 +217,10 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
         hasKey,
         refreshKeys: loadKeys,
         isConnectingOpenRouter,
+        awaitingOpenRouterCode,
         connectOpenRouter,
+        submitOpenRouterCode,
+        cancelOpenRouterConnect,
         disconnectOpenRouter,
       }}
     >
