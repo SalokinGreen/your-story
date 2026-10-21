@@ -53,6 +53,7 @@ import {
   type ElementCategory,
 } from "../misc/mythic";
 import {
+  getEffectiveNarrationEffort,
   getEffectiveNarrationModelKey,
   type ResolvedTier,
 } from "../misc/reasoningTiers";
@@ -3213,6 +3214,7 @@ function StoryPageContent() {
         const { generateChoicesOnly } = await import("../misc/generation");
         const newChoices = await generateChoicesOnly(storyData, {
           choicesModel,
+          choicesReasoningEffort: getEffectiveNarrationEffort(),
           openRouterKey,
           deepseekKey,
           googleKey,
@@ -4371,6 +4373,7 @@ function StoryPageContent() {
 
       const newChoices = await generateChoicesOnly(storyData, {
         choicesModel,
+        choicesReasoningEffort: getEffectiveNarrationEffort(),
         openRouterKey,
         deepseekKey,
         googleKey,

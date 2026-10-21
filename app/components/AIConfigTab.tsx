@@ -6,6 +6,8 @@ import { DynamicIcon } from "./DynamicIcon";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import {
   REASONING_TIERS,
+  REASONING_EFFORTS,
+  DEFAULT_REASONING_EFFORT,
   NARRATION_MODEL_KEY,
   ReasoningEffort,
   TierOverride,
@@ -14,6 +16,9 @@ import {
   resetTierOverrides,
   getNarrationModelOverride,
   setNarrationModelOverride,
+  getNarrationEffortOverride,
+  setNarrationEffortOverride,
+  isReasoningEffort,
 } from "@/app/misc/reasoningTiers";
 import {
   getUserSettings,
@@ -50,14 +55,6 @@ const PROVIDER_KEY_FIELD: Record<string, keyof APIKeys | undefined> = {
   zai: "zaiKey",
 };
 
-const REASONING_EFFORTS: ReasoningEffort[] = [
-  "none",
-  "low",
-  "normal",
-  "high",
-  "xhigh",
-];
-
 export default function AIConfigTab() {
   const { hasKey } = useAPIKeys();
   const cliStatus = useClaudeCliStatus();
@@ -72,6 +69,10 @@ export default function AIConfigTab() {
   const [narrationOverride, setNarrationOverrideState] = useState<
     string | null
   >(() => getNarrationModelOverride());
+  // How hard the narration voice thinks (decision 53); "none" until picked.
+  const [narrationEffort, setNarrationEffortState] = useState<ReasoningEffort>(
+    () => getNarrationEffortOverride() ?? DEFAULT_REASONING_EFFORT,
+  );
   const [customModels, setCustomModelsState] = useState<CustomModel[]>(() =>
     getCustomModels(),
   );
@@ -120,6 +121,12 @@ export default function AIConfigTab() {
     const override = modelKey === NARRATION_MODEL_KEY ? null : modelKey;
     setNarrationModelOverride(override);
     setNarrationOverrideState(getNarrationModelOverride());
+  };
+
+  const handleNarrationEffortChange = (effort: string) => {
+    if (!isReasoningEffort(effort)) return;
+    setNarrationEffortOverride(effort);
+    setNarrationEffortState(effort);
   };
 
   const handleAddCustomModel = () => {
@@ -396,16 +403,33 @@ export default function AIConfigTab() {
         <span className="inline-block text-[11px] font-semibold uppercase tracking-wide bg-white/20 px-2 py-0.5 rounded-full">
           Narration Voice
         </span>
-        <ModelSelect
-          value={effectiveNarrationKey}
-          onChange={handleNarrationChange}
-          customModels={customModels}
-          className="w-full text-sm font-semibold bg-white/15 border border-white/30 rounded-md px-3 py-2 text-white [&>option]:text-gray-900"
-        />
+        <div className="flex items-center gap-2">
+          <ModelSelect
+            value={effectiveNarrationKey}
+            onChange={handleNarrationChange}
+            customModels={customModels}
+            className="flex-1 min-w-0 text-sm font-semibold bg-white/15 border border-white/30 rounded-md px-3 py-2 text-white [&>option]:text-gray-900"
+          />
+          <select
+            aria-label="Narration voice effort"
+            value={narrationEffort}
+            onChange={(e) => handleNarrationEffortChange(e.target.value)}
+            className="w-24 shrink-0 text-sm font-semibold bg-white/15 border border-white/30 rounded-md px-2 py-2 text-white capitalize [&>option]:text-gray-900"
+          >
+            {REASONING_EFFORTS.map((effort) => (
+              <option key={effort} value={effort}>
+                {effort}
+              </option>
+            ))}
+          </select>
+        </div>
         <p className="text-xs text-white/75">
           Always used for player-facing prose, no matter which reasoning tier
           handles adjudication - this is what keeps the GM&rsquo;s voice
           consistent even during a boss fight.
+        </p>
+        <p className="text-xs text-white/75">
+          {"Higher effort means slower, dearer prose. 'none' is the cheapest each model allows."}
         </p>
       </div>
 

@@ -34,6 +34,7 @@ import { APIKeys } from "@/app/misc/APIKeysContext";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 import { getRequiredKeyForModel } from "@/app/misc/ai_prices";
 import { callSideModel } from "@/app/misc/sideModelCall";
+import type { ReasoningEffort } from "@/app/misc/reasoningTiers";
 
 /** A turn can trigger several rounds of tool calls before the model settles. */
 const MAX_TOOL_ROUNDS = 5;
@@ -97,14 +98,43 @@ function newMessageId(): string {
 export interface UseDesignerSessionOptions {
   adventureId?: string;
   model: string;
+  /** How hard the Designer's model thinks (decision 53), picked beside the model. */
+  reasoningEffort: ReasoningEffort;
   maxOutputTokens: number;
   apiKeys: APIKeys;
   onError?: (message: string) => void;
 }
 
+/**
+ * The Designer's one model call per tool round, at the effort the author chose
+ * beside the model (decision 53). Not billed to a turn (there is none here),
+ * so no `stage`. Split out of the hook so a test can see the request it sends.
+ */
+export function callDesignerModel(request: {
+  model: string;
+  reasoningEffort: ReasoningEffort;
+  messages: ChatMessage[];
+  apiKeys: APIKeys;
+  maxOutputTokens: number;
+  abortSignal?: AbortSignal;
+}) {
+  return callSideModel({
+    label: "Game Designer",
+    model: request.model,
+    messages: request.messages,
+    tools: getDesignerToolsForAPI(),
+    keys: request.apiKeys,
+    maxTokens: request.maxOutputTokens,
+    temperature: 0.8,
+    reasoningEffort: request.reasoningEffort,
+    abortSignal: request.abortSignal,
+  });
+}
+
 export function useDesignerSession({
   adventureId,
   model,
+  reasoningEffort,
   maxOutputTokens,
   apiKeys,
   onError,
@@ -292,15 +322,12 @@ export function useDesignerSession({
             draft: draftRef.current,
           });
 
-          // Not billed to a turn (there is none here), so no `stage`.
-          const result = await callSideModel({
-            label: "Game Designer",
+          const result = await callDesignerModel({
             model,
+            reasoningEffort,
             messages: aiMessages,
-            tools: getDesignerToolsForAPI(),
-            keys: apiKeys,
-            maxTokens: maxOutputTokens,
-            temperature: 0.8,
+            apiKeys,
+            maxOutputTokens,
             abortSignal: controller.signal,
           });
           if (!result.ok) throw new Error(result.error);
@@ -391,7 +418,7 @@ export function useDesignerSession({
         ),
       );
     },
-    [loading, model, maxOutputTokens, apiKeys, onError],
+    [loading, model, reasoningEffort, maxOutputTokens, apiKeys, onError],
   );
 
   const save = useCallback(async (): Promise<string | undefined> => {

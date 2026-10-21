@@ -480,7 +480,18 @@ Observer's rewrite is the exception, because it writes the prose the player
 reads: an unpinned Observer rewrites on the narration voice
 (`resolveObserverRewriteModel`, decision 52) while its judges stay on Haiku.
 The choices call, including the one re-run after an Observer rewrite, stays
-on the narration model. A model handed to a call must be an
+on the narration model. **Every call carries an explicit effort** (decision
+53), chosen alongside its model and `none` by default, which is the cheapest
+effort every provider has: a tier's and a side-agent pin's had a picker
+already, and the narration voice (`narrationEffortOverride`,
+`getEffectiveNarrationEffort()`, which falls back to `none` when the voice
+does) and the Game Designer (`designerReasoningEffort`) now have one. An
+unpinned side agent runs at `SIDE_AGENT_DEFAULT_EFFORT`, the tier classifier
+at tier 0's effort, and the Observer's unpinned rewrite and the choices at the
+narration effort; `callSideModel` sends `none` for a request that names
+none, so `applyReasoningEffort`'s Claude-without-effort rule is only a
+backstop, and `tests/everyCallCarriesEffort.test.ts` fails when a new inline
+call omits `reasoningEffort`. A model handed to a call must be an
 `AI_MODELS` key or a custom model's UUID, never `GenerationMeta.model` (the
 provider's own id), which `getModelConfig()` silently swaps for DeepSeek V4
 Flash. A saved choice (a tier, the narration voice, a side agent, a lore image

@@ -34,6 +34,7 @@ import { StoryData } from "@/app/misc/structs";
 import {
   getEffectiveTiers,
   getEffectiveNarrationModelKey,
+  getEffectiveNarrationEffort,
   resolveTier,
   getTierState,
   hardRuleFloor,
@@ -335,6 +336,7 @@ export function estimateTurnCost(
   const gmTier = resolveTier(tierIndex);
   const gmModel = String(gmTier.modelKey);
   const narrationModel = String(getEffectiveNarrationModelKey());
+  const narrationEffort = getEffectiveNarrationEffort();
 
   // Side calls run on SIDE_AGENT_DEFAULT_MODEL_KEY unless the user pinned one
   // in Settings > Architecture (decision 51) - exactly what generation.ts does
@@ -346,10 +348,11 @@ export function estimateTurnCost(
     getStoryProgressObserverModelOverride(),
   );
   // The rewrite writes player-facing prose, so an unpinned Observer rewrites
-  // on the narration voice (decision 52).
+  // on the narration voice (decision 52), at its effort (decision 53).
   const rewriteCall = resolveObserverRewriteModel(
     getObserverModelOverride(),
     narrationModel,
+    narrationEffort,
   );
 
   // --- Context budget the GM stage will be filled to ------------------
@@ -406,6 +409,7 @@ export function estimateTurnCost(
     stage: "narration",
     label: "Narration call",
     modelKey: narrationModel,
+    reasoningEffort: narrationEffort,
     inputPerCall: gmInputTokens,
     outputPerCall: NARRATION_OUTPUT_TOKENS,
     expectedCalls: calibratedCalls(
@@ -423,6 +427,7 @@ export function estimateTurnCost(
     stage: "choices",
     label: "Choices",
     modelKey: narrationModel,
+    reasoningEffort: narrationEffort,
     inputPerCall: CHOICES_INPUT_TOKENS,
     outputPerCall: CHOICES_OUTPUT_TOKENS,
     expectedCalls: calibratedCalls(calibration, "choices", 1),

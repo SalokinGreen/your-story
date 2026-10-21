@@ -105,6 +105,7 @@ describe("on a phone or the web build", () => {
   it("swaps a side agent's synced subscription override for the side-agent default", () => {
     expect(resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" })).toEqual({
       model: SIDE_AGENT_DEFAULT_MODEL_KEY,
+      reasoningEffort: "none",
     });
   });
 
@@ -157,7 +158,10 @@ describe("in the desktop app", () => {
     // models here, as synced from the desktop): the side-agent default,
     // never a subscription model and never the narration voice, decision 12.
     expect(getEffectiveNarrationModelKey()).toBe(SONNET);
-    expect(resolveSideCallModel(null)).toEqual({ model: SIDE_AGENT_DEFAULT_MODEL_KEY });
+    expect(resolveSideCallModel(null)).toEqual({
+      model: SIDE_AGENT_DEFAULT_MODEL_KEY,
+      reasoningEffort: "none",
+    });
     // Pointed there explicitly: kept.
     expect(resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" })).toEqual({
       model: SONNET,
@@ -198,6 +202,7 @@ describe("during an online session (decision 29)", () => {
   it("swaps a side agent's subscription override for the side-agent default", () => {
     expect(resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" })).toEqual({
       model: SIDE_AGENT_DEFAULT_MODEL_KEY,
+      reasoningEffort: "none",
     });
   });
 

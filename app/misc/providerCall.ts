@@ -336,19 +336,20 @@ function applyReasoningEffort(
   isClaude = false,
   thinksAlways = false,
 ): void {
-  // Claude 5.5's thinking cannot be disabled ("none" is a 400), so a tier
-  // set to "none" runs at the lowest effort Claude has instead. A call with
-  // no effort of its own (an unpinned side agent, which runs on Claude Haiku
-  // 5.5 by default - decision 51) runs at low too, not at Claude's own
-  // default effort, which would make every side call slower and dearer.
+  // Claude 5.5's thinking cannot be disabled ("none" is a 400), so a slot
+  // set to "none" runs at the lowest effort Claude has instead. The missing-
+  // effort half of this check is a backstop: every caller now sends an effort
+  // (decision 53), so a call arriving without one is a bug upstream, and it
+  // runs at low rather than at Claude's own default effort, which would make
+  // the call slower and dearer.
   if (isClaude && (!reasoningEffort || reasoningEffort === "none")) {
     requestBody.reasoning = { effort: "low" };
     return;
   }
 
   // GLM-5.3 through OpenRouter: the same model as Z.ai's, so the same rule -
-  // never "none", and a call with no effort of its own (a side agent) runs
-  // at low rather than the model's own default.
+  // never "none", and a call with no effort (the same backstop) runs at low
+  // rather than the model's own default.
   if (
     thinksAlways &&
     !isClaude &&
@@ -361,8 +362,9 @@ function applyReasoningEffort(
 
   // Z.ai's GLM-5.3 always thinks and takes reasoning_effort low, high or max
   // only (docs.z.ai, chat completions), so the tier's five levels collapse
-  // onto those three and thinking is turned on explicitly. A call with no
-  // effort of its own (a side agent) runs at low: Z.ai's default is max.
+  // onto those three and thinking is turned on explicitly. "none" runs at low,
+  // and so does a call with no effort (the same backstop): Z.ai's default is
+  // max.
   if (provider === "zai") {
     requestBody.thinking = { type: "enabled" };
     requestBody.reasoning_effort =

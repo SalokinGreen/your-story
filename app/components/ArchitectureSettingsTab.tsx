@@ -5,12 +5,17 @@ import { DynamicIcon } from "./DynamicIcon";
 import ModelSelect from "./ModelSelect";
 import TurnCostPanel from "./TurnCostPanel";
 import { getCustomModels, CustomModel } from "@/app/misc/user_settings";
-import { AnyModelKey, ReasoningEffort } from "@/app/misc/reasoningTiers";
+import {
+  AnyModelKey,
+  REASONING_EFFORTS,
+  ReasoningEffort,
+} from "@/app/misc/reasoningTiers";
 import { ObserverFlagType } from "@/app/misc/structs";
 import { ObserverCheckSettings } from "@/app/misc/observer";
 import {
   ModelEffortOverride,
   SIDE_AGENT_DEFAULT_MODEL_KEY,
+  SIDE_AGENT_DEFAULT_EFFORT,
   getObserverModelOverride,
   setObserverModelOverride,
   getMemoryKeeperModelOverride,
@@ -27,14 +32,6 @@ import {
   setObserverCheckSetting,
   resetObserverSettings,
 } from "@/app/misc/layerSettings";
-
-const REASONING_EFFORTS: ReasoningEffort[] = [
-  "none",
-  "low",
-  "normal",
-  "high",
-  "xhigh",
-];
 
 // What turning a pin on starts from: the model the stage is running on already.
 const DEFAULT_OVERRIDE_MODEL: AnyModelKey = SIDE_AGENT_DEFAULT_MODEL_KEY;
@@ -198,7 +195,7 @@ function StageOverrideCard({
   const pinned = override !== null;
   const effective: ModelEffortOverride = override ?? {
     modelKey: DEFAULT_OVERRIDE_MODEL,
-    reasoningEffort: "none",
+    reasoningEffort: SIDE_AGENT_DEFAULT_EFFORT,
   };
 
   return (
@@ -241,7 +238,8 @@ function StageOverrideCard({
         </div>
       ) : (
         <p className="text-xs text-blue-300/40 italic">
-          {offNote ?? `Off - runs on ${SIDE_AGENT_DEFAULT_MODEL_KEY}.`}
+          {offNote ??
+            `Off - runs on ${SIDE_AGENT_DEFAULT_MODEL_KEY}, effort ${SIDE_AGENT_DEFAULT_EFFORT}.`}
         </p>
       )}
     </div>
@@ -473,7 +471,7 @@ export default function ArchitectureSettingsTab() {
           override={observerModelOverride}
           onChange={handleObserverModelChange}
           customModels={customModels}
-          offNote={`Off - checks run on ${SIDE_AGENT_DEFAULT_MODEL_KEY}; rewrites use the narration model.`}
+          offNote={`Off - checks run on ${SIDE_AGENT_DEFAULT_MODEL_KEY}, effort ${SIDE_AGENT_DEFAULT_EFFORT}; rewrites use the narration voice and its effort.`}
         />
 
         <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">

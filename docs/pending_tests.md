@@ -98,10 +98,10 @@ real turns on the author's OpenRouter key, so it waits for the author's go.
   *Failure looks like:* `truncatedAtCap: true`, an empty final story round,
   or a scene that stops mid-sentence; then tier 3's effort or the 4,096
   `max_tokens` floor needs another look.
-- **Haiku's thinking on the side calls.** An unpinned side agent sends no
-  reasoning effort, and Claude 5.5's thinking cannot be turned off, so
-  `applyReasoningEffort` sends a Claude call with no effort as `low`, as its
-  GLM branch already did. After the four turns above, read the Observer and
+- **Haiku's thinking on the side calls.** An unpinned side agent sends effort
+  `none` (decision 53), and Claude 5.5's thinking cannot be turned off, so
+  `applyReasoningEffort` sends Claude's `none` as `low`, as its GLM branch
+  already did. After the four turns above, read the Observer and
   Memory Keeper lines in the turn cost panel. *Failure looks like:* a side
   call costing several times a tenth of a cent, or taking several seconds,
   which would mean OpenRouter is not honouring `reasoning.effort: low` for
@@ -133,6 +133,26 @@ real turns on the author's OpenRouter key, so it waits for the author's go.
   for OpenRouter", or a story whose old history drops out with no summary
   (compaction never ran). The "Compact Story" button in the story menu should
   work on the same profile, on the same model.
+
+**Every call carries an effort (decision 53).** Built and tested against
+mocked providers only; the requests below spend the author's OpenRouter key.
+
+- **The narration voice and the Designer at a chosen effort.** In Settings →
+  AI Config set the narration voice to Claude Sonnet 5.5 and its new effort
+  picker to `high`, and play one turn that needs a separate narration call
+  (the GM's last round only calls tools) with suggested choices on. Then open
+  `/creator`, set the Designer's model to Claude Sonnet 5.5 and its Effort
+  picker to `normal`, and send one message. *Expected:* the "Story stage
+  request sent" line in the Debug Logs shows `reasoningEffort: high`; in the
+  web preview's network tab the story and choices requests carry
+  `"reasoningEffort":"high"` and the Designer's `"normal"`, while the
+  Observer's judges and the Memory Keeper carry `"none"` (OpenRouter then
+  receives `reasoning: {effort: "low"}` for them, Claude's reading of `none`,
+  and `{effort: "high"}` and `{effort: "medium"}` for the other two). A failed
+  side call's Debug Logs warning also names the effort it was sent at.
+  *Failure looks like:* every call still at `low` (the effort is not reaching
+  the request), or a 400 naming `reasoning` (a model that does not take the
+  effort the picker offered).
 
 ## 2026-10-21 — Claude on the subscription (Route B of the Claude GM plan)
 

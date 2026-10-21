@@ -117,6 +117,7 @@ import {
 } from "@/app/misc/turnCost";
 import {
   SCENE_BASELINE_TIER,
+  DEFAULT_REASONING_EFFORT,
   ReasoningEffort,
   ResolvedTier,
   resolveTier,
@@ -134,6 +135,7 @@ import {
   getTierState,
   getEffectiveTiers,
   getEffectiveNarrationModelKey,
+  getEffectiveNarrationEffort,
   applyTierEscalation,
   TOP_TIER,
 } from "@/app/misc/reasoningTiers";
@@ -592,6 +594,11 @@ async function* parseSSEStream(
 interface ChoicesFetchOptions {
   token: string | null;
   model: string;
+  /**
+   * The narration voice's effort (decision 53). Required, so a new caller of
+   * the choices stage has to say what it runs at.
+   */
+  reasoningEffort: ReasoningEffort;
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;
@@ -634,6 +641,7 @@ async function generateChoicesWithRetry(
       {
         messages: choicesPrompt.messages,
         model: fetchOptions.model,
+        reasoningEffort: fetchOptions.reasoningEffort,
         maxTokens: 1500,
         temperature: 0.7,
         openRouterKey: fetchOptions.openRouterKey,
@@ -979,6 +987,12 @@ export async function generateStoryTurn(
     // DEFAULT_OBSERVER_SETTINGS, reproducing pre-existing behavior).
     const observerSettings = options.observerSettings ?? getObserverSettings();
     const observerModelOverride = getObserverModelOverride();
+    // The narration voice's effort (decision 53), read once beside its model
+    // above. Deliberately NOT on sideCallApiOptions: that bag is spread under
+    // every side agent, and a side agent that forgot to resolve its own effort
+    // would then quietly inherit the narrator's. The choices re-run and the
+    // Observer's rewrite take it by name below.
+    const narrationEffort = getEffectiveNarrationEffort();
     const observerApiOptions = {
       ...sideCallApiOptions,
       ...resolveSideCallModel(observerModelOverride, sideCallApiOptions),
@@ -991,6 +1005,7 @@ export async function generateStoryTurn(
       ...resolveObserverRewriteModel(
         observerModelOverride,
         String(sideCallApiOptions.model),
+        narrationEffort,
       ),
     };
 
@@ -1015,6 +1030,7 @@ export async function generateStoryTurn(
             {
               token: null,
               model: sideCallApiOptions.model,
+              reasoningEffort: narrationEffort,
               openRouterKey: options.openRouterKey,
               deepseekKey: options.deepseekKey,
               googleKey: options.googleKey,
@@ -1948,6 +1964,9 @@ async function generateStoryTurnOnce(
     // Resolved once per turn so a mid-turn override change doesn't cause the
     // narration voice to shift inconsistently within a single generation.
     const narrationModel = getEffectiveNarrationModelKey();
+    // ...and its effort (decision 53), for the story continuation and the
+    // choices call below.
+    const narrationEffort = getEffectiveNarrationEffort();
 
     // Deterministic pacing nudge (Layer 3): measure how much the player has
     // had to read over recent turns and, if it's trending away from the Reply
@@ -2066,11 +2085,15 @@ async function generateStoryTurnOnce(
 
         if (isClassificationAmbiguous(storyData, gmUserChoice)) {
           try {
-            const classifierModel = getEffectiveTiers()[0].modelKey;
+            // Tier 0's model at tier 0's effort (decision 53): the classifier
+            // is tier 0's call, so it thinks as hard as the player let tier 0.
+            const classifierTier = getEffectiveTiers()[0];
+            const classifierModel = classifierTier.modelKey;
             const classifierResult = await generateSimple(
               [{ role: "user", content: buildClassifierPrompt(gmUserChoice) }],
               {
                 model: classifierModel,
+                reasoningEffort: classifierTier.reasoningEffort,
                 maxTokens: 10,
                 temperature: 0,
                 openRouterKey: options.openRouterKey,
@@ -3191,6 +3214,7 @@ async function generateStoryTurnOnce(
       const storyRequestBody: GenerateRequestBody = {
         messages: storyMessages,
         model: narrationModel,
+        reasoningEffort: narrationEffort,
         maxTokens: storyMaxOutput,
         temperature:
           (options.samplingSettings?.temperature ?? 0.7) +
@@ -3221,6 +3245,7 @@ async function generateStoryTurnOnce(
       logger.action("Story stage request sent", {
         maxTokens: storyMaxOutput,
         model: narrationModel,
+        reasoningEffort: narrationEffort,
       });
 
       if (!storyResponse.ok) {
@@ -3478,6 +3503,7 @@ async function generateStoryTurnOnce(
           {
             token,
             model: narrationModel,
+            reasoningEffort: narrationEffort,
             openRouterKey: options.openRouterKey,
             deepseekKey: options.deepseekKey,
             googleKey: options.googleKey,
@@ -3741,6 +3767,8 @@ export async function generateSimple(
     maxTokens?: number;
     temperature?: number;
     tools?: any[];
+    /** The slot's effort (decision 53); "none" when a caller omits it. */
+    reasoningEffort?: ReasoningEffort;
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
@@ -3758,6 +3786,7 @@ export async function generateSimple(
     messages,
     tools: options.tools,
     model: options.model,
+    reasoningEffort: options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
     maxTokens: options.maxTokens || 4000,
     temperature: options.temperature || 0.7,
     openRouterKey: options.openRouterKey,
@@ -3793,6 +3822,8 @@ export async function* generateSimpleStream(
     maxTokens?: number;
     temperature?: number;
     tools?: any[];
+    /** The slot's effort (decision 53); "none" when a caller omits it. */
+    reasoningEffort?: ReasoningEffort;
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
@@ -3805,6 +3836,7 @@ export async function* generateSimpleStream(
     messages,
     tools: options.tools,
     model: options.model,
+    reasoningEffort: options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
     maxTokens: options.maxTokens || 4000,
     temperature: options.temperature || 0.7,
     openRouterKey: options.openRouterKey,
@@ -3830,6 +3862,8 @@ export async function generateChoicesOnly(
   storyData: StoryData,
   options: {
     choicesModel: string;
+    /** The narration voice's effort (decision 53): the choices call is the narrator's. */
+    choicesReasoningEffort: ReasoningEffort;
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
@@ -3857,6 +3891,7 @@ export async function generateChoicesOnly(
     {
       token,
       model: options.choicesModel,
+      reasoningEffort: options.choicesReasoningEffort,
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,

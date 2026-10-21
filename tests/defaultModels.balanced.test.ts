@@ -27,6 +27,7 @@ import {
   NARRATION_MODEL_KEY,
   getEffectiveTiers,
   getEffectiveNarrationModelKey,
+  getEffectiveNarrationEffort,
   resolveTier,
 } from "@/app/misc/reasoningTiers";
 import {
@@ -236,12 +237,12 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
     expect(isClaudeCliModel(SIDE_AGENT_DEFAULT_MODEL_KEY)).toBe(false);
   });
 
-  it("resolves a layer with no pin to it, with no effort of its own", () => {
+  it("resolves a layer with no pin to it, at effort none (decision 53)", () => {
     for (const [name, , read] of SIDE_AGENT_LAYERS) {
       expect(read(), name).toBeNull();
-      expect(resolveSideCallModel(read()), name).toEqual({ model: "Claude Haiku 5.5" });
+      expect(resolveSideCallModel(read()), name).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     }
-    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("does not follow the narration voice", () => {
@@ -311,7 +312,7 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
         JSON.stringify({ modelKey: "Grok Code Fast 1", reasoningEffort: "low" }),
       );
       expect(read(), name).toBeNull();
-      expect(resolveSideCallModel(read()), name).toEqual({ model: "Claude Haiku 5.5" });
+      expect(resolveSideCallModel(read()), name).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     }
   });
 });
@@ -333,7 +334,7 @@ describe("an unpinned side agent never reaches the Claude subscription (decision
 
     for (const [name, , read] of SIDE_AGENT_LAYERS) {
       const resolved = resolveSideCallModel(read());
-      expect(resolved, name).toEqual({ model: "Claude Haiku 5.5" });
+      expect(resolved, name).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
       expect(isClaudeCliModel(resolved.model), name).toBe(false);
     }
   });
@@ -341,13 +342,13 @@ describe("an unpinned side agent never reaches the Claude subscription (decision
   it("on a phone or the web build", () => {
     fakeCli.platform = false;
     everythingOnTheSubscription();
-    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("during an online session", () => {
     everythingOnTheSubscription();
     setOnlineSessionActive(true);
-    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("falls a subscription pin this device cannot run to Haiku, not to the narration model", () => {
@@ -357,11 +358,11 @@ describe("an unpinned side agent never reaches the Claude subscription (decision
       "observerModelOverride",
       JSON.stringify({ modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "low" }),
     );
-    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
 
     fakeCli.platform = true;
     setOnlineSessionActive(true);
-    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("still lets a layer the player pointed at the subscription run there on the desktop", () => {
@@ -377,19 +378,32 @@ describe("an unpinned side agent never reaches the Claude subscription (decision
 });
 
 describe("the Observer's rewrite follows the narration voice, not the judges (decision 52)", () => {
-  it("runs an unpinned Observer's rewrite on the narration model, with no effort of its own", () => {
-    expect(resolveObserverRewriteModel(getObserverModelOverride(), String(getEffectiveNarrationModelKey()))).toEqual({
-      model: "GLM 5.3",
-    });
+  it("runs an unpinned Observer's rewrite on the narration model, at the narration effort (decision 53)", () => {
+    expect(
+      resolveObserverRewriteModel(
+        getObserverModelOverride(),
+        String(getEffectiveNarrationModelKey()),
+        getEffectiveNarrationEffort(),
+      ),
+    ).toEqual({ model: "GLM 5.3", reasoningEffort: "none" });
+    // ...and takes the effort the player set for the voice with it (decision 53).
+    localStorage.setItem("narrationEffortOverride", "high");
+    expect(
+      resolveObserverRewriteModel(
+        getObserverModelOverride(),
+        String(getEffectiveNarrationModelKey()),
+        getEffectiveNarrationEffort(),
+      ),
+    ).toEqual({ model: "GLM 5.3", reasoningEffort: "high" });
     // ...while its judges stay on the side-agent default.
-    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("follows a narration voice the player picked", () => {
     localStorage.setItem("narrationModelOverride", "Mistral Nemo");
-    expect(resolveObserverRewriteModel(null, String(getEffectiveNarrationModelKey()))).toEqual({
-      model: "Mistral Nemo",
-    });
+    expect(
+      resolveObserverRewriteModel(null, String(getEffectiveNarrationModelKey()), getEffectiveNarrationEffort()),
+    ).toEqual({ model: "Mistral Nemo", reasoningEffort: "none" });
   });
 
   it("takes a pinned Observer's model and effort with it", () => {
@@ -397,7 +411,8 @@ describe("the Observer's rewrite follows the narration voice, not the judges (de
       "observerModelOverride",
       JSON.stringify({ modelKey: "Mistral Medium 3.1", reasoningEffort: "low" }),
     );
-    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3")).toEqual({
+    // A pin keeps its own effort, whatever the narration voice is set to.
+    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3", "high")).toEqual({
       model: "Mistral Medium 3.1",
       reasoningEffort: "low",
     });
@@ -409,13 +424,19 @@ describe("the Observer's rewrite follows the narration voice, not the judges (de
       "observerModelOverride",
       JSON.stringify({ modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "low" }),
     );
-    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3")).toEqual({ model: "GLM 5.3" });
+    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3", "high")).toEqual({
+      model: "GLM 5.3",
+      reasoningEffort: "high",
+    });
 
     localStorage.setItem(
       "observerModelOverride",
       JSON.stringify({ modelKey: "Grok Code Fast 1", reasoningEffort: "low" }),
     );
-    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3")).toEqual({ model: "GLM 5.3" });
+    expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3", "high")).toEqual({
+      model: "GLM 5.3",
+      reasoningEffort: "high",
+    });
   });
 });
 
@@ -444,22 +465,23 @@ describe("a side agent without a key for the default falls to the narration voic
 
   it("keeps Haiku when the player has an OpenRouter key, whatever the narration voice is", () => {
     localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
-    expect(resolveSideCallModel(null, OPENROUTER)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null, OPENROUTER)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     expect(resolveSideCallModel(null, { ...OPENROUTER, ...MISTRAL_ONLY })).toEqual({
       model: "Claude Haiku 5.5",
+      reasoningEffort: "none",
     });
   });
 
   it("runs on the narration voice when the Mistral key is the only one and the voice is a Mistral model", () => {
     localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
-    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: MISTRAL_NARRATOR });
+    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: MISTRAL_NARRATOR, reasoningEffort: "none" });
   });
 
   it("follows a Z.ai key to the Z.ai entry of GLM, but not to the OpenRouter entry the voice defaults to", () => {
     // Fresh profile: the voice is "GLM 5.3" (OpenRouter), which a Z.ai key cannot call.
-    expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     localStorage.setItem("narrationModelOverride", "GLM 5.3 (Z.ai)");
-    expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "GLM 5.3 (Z.ai)" });
+    expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "GLM 5.3 (Z.ai)", reasoningEffort: "none" });
   });
 
   it("never falls to a Claude subscription narration voice", () => {
@@ -467,7 +489,7 @@ describe("a side agent without a key for the default falls to the narration voic
     expect(isClaudeCliModel(String(getEffectiveNarrationModelKey()))).toBe(true);
     for (const keys of [MISTRAL_ONLY, {}, { mistralKey: "m", zaiKey: "z" }]) {
       const resolved = resolveSideCallModel(null, keys);
-      expect(resolved).toEqual({ model: "Claude Haiku 5.5" });
+      expect(resolved).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
       expect(isClaudeCliModel(resolved.model)).toBe(false);
     }
   });
@@ -475,25 +497,26 @@ describe("a side agent without a key for the default falls to the narration voic
   it("stays on Haiku, to fail visibly, when the voice is one the player has no key for either", () => {
     // Only a Mistral key, voice on the default GLM 5.3 (OpenRouter).
     expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
-    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     // A custom model's UUID is an OpenRouter model, which this player cannot call.
     localStorage.setItem("narrationModelOverride", CUSTOM_MODEL_UUID);
     expect(getEffectiveNarrationModelKey()).toBe(CUSTOM_MODEL_UUID);
-    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("stays on Haiku with no keys at all", () => {
     localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
-    expect(resolveSideCallModel(null, {})).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null, {})).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     expect(resolveSideCallModel(null, { openRouterKey: "", mistralKey: undefined })).toEqual({
       model: "Claude Haiku 5.5",
+      reasoningEffort: "none",
     });
   });
 
   it("is the same answer as before when the keys argument is left out", () => {
     localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
-    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5" });
-    expect(resolveSideCallModel(null, undefined)).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
+    expect(resolveSideCallModel(null, undefined)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("keeps a pinned layer on its pin, key or no key", () => {
@@ -527,17 +550,20 @@ describe("a side agent without a key for the default falls to the narration voic
     fakeCli.platform = false;
     expect(resolveSideCallModel(getObserverModelOverride(), MISTRAL_ONLY)).toEqual({
       model: MISTRAL_NARRATOR,
+      reasoningEffort: "none",
     });
     expect(resolveSideCallModel(getObserverModelOverride(), OPENROUTER)).toEqual({
       model: "Claude Haiku 5.5",
+      reasoningEffort: "none",
     });
-    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5" });
+    expect(resolveSideCallModel(getObserverModelOverride())).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
 
     // Decision 29: online play.
     fakeCli.platform = true;
     setOnlineSessionActive(true);
     expect(resolveSideCallModel(getObserverModelOverride(), MISTRAL_ONLY)).toEqual({
       model: MISTRAL_NARRATOR,
+      reasoningEffort: "none",
     });
   });
 });

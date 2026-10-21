@@ -256,7 +256,7 @@ describe("a saved choice of a removed model uses the slot's default", () => {
     expect(getEffectiveNarrationModelKey()).toBe(CUSTOM_MODEL_UUID);
   });
 
-  it("on a side agent, which then runs on the side-agent default with no effort of its own", () => {
+  it("on a side agent, which then runs on the side-agent default at effort none (decision 53)", () => {
     localStorage.setItem(
       "observerModelOverride",
       JSON.stringify({ modelKey: "Grok Code Fast 1", reasoningEffort: "low" }),
@@ -264,6 +264,7 @@ describe("a saved choice of a removed model uses the slot's default", () => {
     expect(getObserverModelOverride()).toBeNull();
     expect(resolveSideCallModel(getObserverModelOverride())).toEqual({
       model: SIDE_AGENT_DEFAULT_MODEL_KEY,
+      reasoningEffort: "none",
     });
   });
 

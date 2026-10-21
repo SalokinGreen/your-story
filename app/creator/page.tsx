@@ -19,6 +19,16 @@ import { useNotification } from "@/app/misc/NotificationContext";
 import { getAvailableModels } from "@/app/misc/ai_prices";
 import { useClaudeCliStatus } from "@/app/components/ClaudeSubscriptionPanel";
 import { isClaudeCliAvailablePlatform, isClaudeCliModel } from "@/app/misc/claudeCliModels";
+import {
+  DEFAULT_REASONING_EFFORT,
+  REASONING_EFFORTS,
+  ReasoningEffort,
+  isReasoningEffort,
+} from "@/app/misc/reasoningTiers";
+import {
+  getDesignerReasoningEffort,
+  setDesignerReasoningEffort,
+} from "@/app/misc/designerSettings";
 import { CustomModel, getCustomModels } from "@/app/misc/user_settings";
 import { LibraryNote } from "@/app/misc/localNotesLibraryManager";
 import { startAdventureLocally } from "@/app/misc/localStoryManager";
@@ -50,6 +60,10 @@ function CreatorPage() {
   // Persisted settings are read after mount - reading localStorage while
   // rendering would make the server and client markup disagree.
   const [model, setModel] = useState("");
+  // How hard the Designer's model thinks (decision 53); "none" until picked.
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(
+    DEFAULT_REASONING_EFFORT,
+  );
   const [maxOutputTokens, setMaxOutputTokens] = useState(DEFAULT_MAX_OUTPUT);
   const [customModels, setCustomModels] = useState<CustomModel[]>([]);
 
@@ -57,6 +71,7 @@ function CreatorPage() {
     const stored = {
       customModels: getCustomModels(),
       model: localStorage.getItem("designerModel") || "",
+      reasoningEffort: getDesignerReasoningEffort(),
       maxOutput: parseInt(
         localStorage.getItem("designerMaxOutput") || "",
         10,
@@ -64,6 +79,7 @@ function CreatorPage() {
     };
     setCustomModels(stored.customModels);
     setModel(stored.model);
+    setReasoningEffort(stored.reasoningEffort);
     if (Number.isFinite(stored.maxOutput)) {
       setMaxOutputTokens(stored.maxOutput);
     }
@@ -126,6 +142,7 @@ function CreatorPage() {
   const session = useDesignerSession({
     adventureId: editId,
     model: activeModel,
+    reasoningEffort,
     maxOutputTokens,
     apiKeys,
     onError: handleError,
@@ -270,6 +287,27 @@ function CreatorPage() {
                   <option value="">No models available</option>
                 )}
               </select>
+
+              <label className="flex items-center gap-2 text-xs text-white/50">
+                Effort
+                <select
+                  value={reasoningEffort}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (!isReasoningEffort(value)) return;
+                    setReasoningEffort(value);
+                    setDesignerReasoningEffort(value);
+                  }}
+                  title="How hard the Designer's model thinks. Higher effort means slower, dearer replies; 'none' is the cheapest each model allows."
+                  className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white capitalize focus:outline-none focus:border-purple-400/50"
+                >
+                  {REASONING_EFFORTS.map((effort) => (
+                    <option key={effort} value={effort}>
+                      {effort}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <label className="flex items-center gap-2 text-xs text-white/50">
                 Response length

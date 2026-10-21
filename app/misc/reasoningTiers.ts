@@ -31,6 +31,33 @@ import { StoryData, CombatState, ReasoningTierState } from "@/app/misc/structs";
 
 export type ReasoningEffort = "none" | "low" | "normal" | "high" | "xhigh";
 
+/** Every effort, cheapest first - what each effort `<select>` in Settings lists. */
+export const REASONING_EFFORTS: ReasoningEffort[] = [
+  "none",
+  "low",
+  "normal",
+  "high",
+  "xhigh",
+];
+
+/**
+ * The effort a slot runs at until the player picks one (decision 53). "none" is
+ * the cheapest effort and is safe on every provider: providerCall.ts's
+ * applyReasoningEffort sends Claude and GLM `low` (their thinking cannot be
+ * turned off), Z.ai `low`, DeepSeek thinking disabled, and any other
+ * OpenRouter model `reasoning: {effort: "none"}`, which really turns reasoning
+ * off. Mistral gets nothing, as it has no lever.
+ */
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "none";
+
+/** True for one of the five efforts; a junk value from storage is not. */
+export function isReasoningEffort(value: unknown): value is ReasoningEffort {
+  return (
+    typeof value === "string" &&
+    (REASONING_EFFORTS as string[]).includes(value)
+  );
+}
+
 /** An AI_MODELS key, or a user-added custom (OpenRouter BYOK) model's UUID. */
 export type AnyModelKey = AIModelKey | string;
 
@@ -134,6 +161,7 @@ export function resolveTier(tier: number): ResolvedTier {
 
 const TIER_OVERRIDES_KEY = "reasoningTierOverrides";
 const NARRATION_OVERRIDE_KEY = "narrationModelOverride";
+const NARRATION_EFFORT_KEY = "narrationEffortOverride";
 export const REASONING_CONFIG_CHANGED_EVENT = "reasoning-tier-config-changed";
 
 export interface TierOverride {
@@ -241,6 +269,60 @@ export function setNarrationModelOverride(modelKey: AnyModelKey | null): void {
 export function getEffectiveNarrationModelKey(): AnyModelKey {
   const override = getNarrationModelOverride();
   return override && runsOnThisDevice(override) ? override : NARRATION_MODEL_KEY;
+}
+
+/**
+ * The saved narration effort (decision 53); null when none was saved, or when
+ * the stored value is not one of the five efforts (a hand-edited or
+ * newer-build value), so a junk value reads as the default instead of being
+ * sent to a provider.
+ */
+export function getNarrationEffortOverride(): ReasoningEffort | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(NARRATION_EFFORT_KEY);
+    return isReasoningEffort(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setNarrationEffortOverride(
+  effort: ReasoningEffort | null,
+): void {
+  if (typeof window === "undefined") return;
+  if (effort && isReasoningEffort(effort)) {
+    localStorage.setItem(NARRATION_EFFORT_KEY, effort);
+  } else {
+    localStorage.removeItem(NARRATION_EFFORT_KEY);
+  }
+  notifyConfigChanged();
+}
+
+/**
+ * How hard the narration voice thinks (decision 53): the story continuation,
+ * the choices calls and the Observer's rewrite when the Observer is unpinned.
+ * DEFAULT_REASONING_EFFORT ("none") until the player picks one in Settings.
+ *
+ * It follows the voice, not the player's last pick: when the saved narration
+ * model cannot be used here - a Claude subscription voice this device cannot
+ * run (decisions 16 and 29), or one the catalog no longer has - the call falls
+ * back to NARRATION_MODEL_KEY (getEffectiveNarrationModelKey), and the effort
+ * chosen for that other model would be a guess for this one, so it falls back
+ * to "none" too.
+ */
+export function getEffectiveNarrationEffort(): ReasoningEffort {
+  if (typeof window === "undefined") return DEFAULT_REASONING_EFFORT;
+  let savedModel: string | null = null;
+  try {
+    savedModel = localStorage.getItem(NARRATION_OVERRIDE_KEY);
+  } catch {
+    return DEFAULT_REASONING_EFFORT;
+  }
+  if (savedModel && getEffectiveNarrationModelKey() !== savedModel) {
+    return DEFAULT_REASONING_EFFORT;
+  }
+  return getNarrationEffortOverride() ?? DEFAULT_REASONING_EFFORT;
 }
 
 export interface SubscriptionFallback {
