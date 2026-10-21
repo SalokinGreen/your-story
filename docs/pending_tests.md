@@ -10,6 +10,25 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-21 — side agents on the narration model (PR #204, decision 10)
+
+A played turn needs the author's keys, so it waits for their go.
+
+- **Side agents with only a Mistral key.** Save only a Mistral key, leave
+  every Settings → Architecture override off, and play a few turns. The
+  Debug Logs should show the Observer's judges, the Memory Keeper and (every
+  10th turn) the Story Progress Observer calling **Mistral Small 3.2**, the
+  Memory tab should gain entries, and there should be no "Side call failed"
+  warnings. *Failure looks like:* `Model key "mistral-small-2506" not found,
+  falling back to DeepSeek V4 Flash` in the console, then `NO_API_KEY` side
+  call failures (the pre-#204 behaviour). Without #204 the PR #191 side-call
+  check below fails the same way.
+- **Mistral Small 3.2 as Observer judge.** For players without a DeepSeek
+  key the Observer now runs, and can rewrite or reset a turn, for the first
+  time. Over a dozen turns, note whether its flags (Debug Logs, "observer")
+  look sensible or fire on clean turns. Too many false flags means pinning
+  the Observer to a stronger model, or a different default.
+
 ## 2026-10-21 — the native fixes merged after the health check
 
 None of these could run here: they need the author's own API keys (spending
