@@ -89,6 +89,8 @@ import {
 import { logger } from "../misc/logger";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
+import { getSubscriptionFallbacks } from "../misc/reasoningTiers";
+import { getLayerSubscriptionFallbacks } from "../misc/layerSettings";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { useSearchParams, useRouter } from "next/navigation";
 
@@ -886,6 +888,31 @@ function StoryPageContent() {
       };
     });
   }, [netSession]);
+
+  // Decision 29: subscription models are not used during online play, so a
+  // slot set to one runs on its default for as long as the session lasts.
+  // Say so once when the session starts. useNetSession's effect (declared
+  // earlier in this component) has already published the session to
+  // claudeCliModels, so the fallbacks read as active here.
+  const subscriptionNoticeForRoomRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!netSession) {
+      subscriptionNoticeForRoomRef.current = null;
+      return;
+    }
+    if (subscriptionNoticeForRoomRef.current === netSession.roomId) return;
+    subscriptionNoticeForRoomRef.current = netSession.roomId;
+    const online = [...getSubscriptionFallbacks(), ...getLayerSubscriptionFallbacks()].filter(
+      (f) => f.reason === "online",
+    );
+    if (online.length === 0) return;
+    addNotification(
+      `Online play: your Claude subscription models are not used while this game is online (${online
+        .map((f) => f.slot)
+        .join(", ")} run on their default models instead).`,
+      "info",
+    );
+  }, [netSession, addNotification]);
 
   // Live GM streaming state - chronological thinking/tool/text blocks,
   // rendered inline (Claude-style) as they arrive - see turnTimeline.ts

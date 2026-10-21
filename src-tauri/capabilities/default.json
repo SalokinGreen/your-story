@@ -25,6 +25,9 @@
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "https://*" }]
-    }
+    },
+    "allow-claude-cli-status",
+    "allow-claude-cli-run",
+    "allow-claude-cli-cancel"
   ]
 }

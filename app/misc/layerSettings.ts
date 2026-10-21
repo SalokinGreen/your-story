@@ -11,7 +11,8 @@
  * (Settings UI) and generation.ts (actually applying the overrides).
  */
 
-import { AnyModelKey, ReasoningEffort } from "./reasoningTiers";
+import { AnyModelKey, NARRATION_MODEL_KEY, ReasoningEffort } from "./reasoningTiers";
+import { canRunClaudeCliModel, claudeCliBlockReason, isClaudeCliModel } from "./claudeCliModels";
 import {
   ObserverSettings,
   ObserverCheckSettings,
@@ -101,6 +102,31 @@ export const setStoryProgressObserverModelOverride = (
   override: ModelEffortOverride | null,
 ): void => setOverride(STORY_PROGRESS_OBSERVER_MODEL_KEY, override);
 
+/**
+ * Decisions 16 and 29 for the side agents: the layers whose Claude
+ * subscription override cannot run here and now, for Settings' notice. They
+ * run on the narration model instead (resolveSideCallModel). Empty on the
+ * desktop app outside an online session.
+ */
+export function getLayerSubscriptionFallbacks(): {
+  slot: string;
+  modelKey: string;
+  reason: "device" | "online";
+}[] {
+  const reason = claudeCliBlockReason();
+  if (!reason) return [];
+  const layers: [string, ModelEffortOverride | null][] = [
+    ["Observer", getObserverModelOverride()],
+    ["Memory Keeper", getMemoryKeeperModelOverride()],
+    ["Reflection", getReflectionModelOverride()],
+    ["Director Assistant", getDirectorAssistantModelOverride()],
+    ["Story Progress Observer", getStoryProgressObserverModelOverride()],
+  ];
+  return layers
+    .filter(([, o]) => o && isClaudeCliModel(o.modelKey))
+    .map(([slot, o]) => ({ slot, modelKey: o!.modelKey, reason }));
+}
+
 // ============================================================
 // STORY PROGRESS OBSERVER CADENCE
 // ============================================================
@@ -151,7 +177,18 @@ export function resolveSideCallModel(
   override: ModelEffortOverride | null,
   fallbackModel: string,
 ): { model: string; reasoningEffort?: string } {
-  if (!override) return { model: fallbackModel };
+  // Decision 12: the side agents run on the Claude subscription only when the
+  // player points one there. A subscription model reaching them as the
+  // fallback (the narration or GM model) is swapped for the default
+  // narration model, so a subscription narration voice does not quietly add
+  // a CLI launch for every side call.
+  const fallback = isClaudeCliModel(fallbackModel) ? NARRATION_MODEL_KEY : fallbackModel;
+  if (!override) return { model: fallback };
+  // Decisions 16 and 29: a subscription override this device cannot run (a
+  // synced choice off the desktop) or may not run (online play is active).
+  if (isClaudeCliModel(override.modelKey) && !canRunClaudeCliModel()) {
+    return { model: fallback };
+  }
   return { model: override.modelKey, reasoningEffort: override.reasoningEffort };
 }
 

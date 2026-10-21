@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-claude-cli-run"
+description = "Enables the claude_cli_run command without any pre-configured scope."
+commands.allow = ["claude_cli_run"]
+
+[[permission]]
+identifier = "deny-claude-cli-run"
+description = "Denies the claude_cli_run command without any pre-configured scope."
+commands.deny = ["claude_cli_run"]

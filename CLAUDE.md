@@ -406,6 +406,33 @@ system message. A change to the GM prompt's message layout must keep the
 base messages byte-identical across a turn's rounds, or that cache stops
 hitting.
 
+**The player's own Claude subscription runs through the `claude` CLI, on the
+desktop app only** (decisions 10–13, `docs/claude-gm-design.md` §4). The
+models are "Claude Opus / Sonnet / Haiku (subscription)", provider
+`claude-cli`, pinned to `claude-*-5-5`. `providerFetch` sends them to
+`claudeCli.ts` before anything else, which renders the request into a
+system-prompt file and stdin and runs the CLI once per request through the
+Rust command in `src-tauri/src/claude_cli.rs` (`claude_cli_status`,
+`claude_cli_run`, `claude_cli_cancel`). A round that offers tools runs in
+structured mode (a JSON schema for `{narration, tool_calls}`, the CLI's own
+tools off) and the app executes the calls itself; a request without tools
+streams text. Off the desktop a synced subscription choice falls back to the
+slot's default (`reasoningTiers.ts`, decision 16), and the side agents reach
+the subscription only when a layer is pointed there (`resolveSideCallModel`,
+decision 12). A usage limit or a missing sign-in stops the turn with its
+message; it never moves to a paid provider. **During an online multiplayer
+session (host or guest) subscription models are not used at all** and every
+slot runs its default (`claudeCliModels.ts` `setOnlineSessionActive`, set by
+`useNetSession`; decision 29); party mode and couch co-op are allowed
+(decision 30). **The guardrails are rules,
+because Anthropic's terms forbid apps routing requests through subscription
+credentials:** never read `~/.claude/.credentials.json`, the keychain or any
+token; never bundle, patch or modify the binary; never relay a request from
+another device; never call the feature "Claude Code"; the child process
+always starts from a cleared environment (no `ANTHROPIC_*` or `CLAUDE_*`
+variable reaches it, `claude_cli.rs`'s `build_env` and its test) with the
+argument list built in Rust, never taken from the webview.
+
 **Every AI side call goes through `callSideModel()`** (`sideModelCall.ts`):
 it uses `providerFetch`, forwards all six provider keys, records the turn
 cost, and logs failures to the Debug Logs instead of swallowing them.
@@ -630,7 +657,10 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   OpenRouter can also be connected by PKCE sign-in: a redirect on the web, the
   system browser and a pasted code in the native apps (`openRouterOAuth.ts`,
   `openExternal.ts`, decision 8). `getAvailableModels()` (`ai_prices.ts`) is
-  "which models can this player actually call".
+  "which models can this player actually call". The one route without a key
+  is the player's own Claude subscription through the `claude` CLI on the
+  desktop (see "Generation" above): the CLI's sign-in, which the player does
+  in a terminal, unlocks it, and the app never sees it.
 - **Coins and Stripe are fully removed.** Cost figures in the UI
   (`turnCost.ts`, `TurnCostPanel.tsx`) are real dollar estimates against the
   player's own key. Don't reintroduce a coin or credit concept.
@@ -645,7 +675,10 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   `providerFetch` and `getProviderFetch()` (`platformFetch.ts` — Tauri's scoped
   HTTP plugin on the desktop) reach providers without routes. Every host the
   desktop app calls must be in `src-tauri/capabilities/default.json`; the
-  opener plugin is scoped to `https://*`.
+  opener plugin is scoped to `https://*`. The app's own Rust commands (only
+  the `claude_cli_*` ones so far) are named in `src-tauri/build.rs`'s app
+  manifest, so each needs an explicit `allow-*` permission in that file; a
+  new command must be added in both places.
 - **Multiplayer**: couch co-op on one device, and host-authoritative
   peer-to-peer online play (`app/misc/multiplayer/`, Trystero and PeerJS).
   The host broadcasts the whole `StoryData` to guests, GM secrets included,

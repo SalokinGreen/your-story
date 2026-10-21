@@ -300,6 +300,14 @@ export default function TurnCostPanel({
                         no price
                       </span>
                     )}
+                    {line.onSubscription && (
+                      <span
+                        title="Runs through the claude CLI on your own Claude plan: no per-call cost, but it counts toward your plan's usage limits"
+                        className="px-1.5 py-px rounded bg-sky-500/15 text-sky-300"
+                      >
+                        on your subscription
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}

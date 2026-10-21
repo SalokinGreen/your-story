@@ -440,6 +440,194 @@ the author's Z.ai key is a live check that needs the author's go.
     check with its failure written down in `pending_tests.md`. Building
     around behaviour nobody has seen fail would be guessing.
 
+### 2026-10-21 — B0, the two checks before building
+
+Both on the author's machine: CLI 2.1.306, Windows 11, Max plan, run from an
+empty scratch folder with the environment B1 builds (only `PATH`, `HOME`,
+`USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `SYSTEMROOT`, `WINDIR`, `TEMP`,
+`TMP`, `USERNAME`, `HOMEDRIVE`, `HOMEPATH`, `PROGRAMDATA`, `PROGRAMFILES`,
+`COMSPEC`, `PATHEXT`, plus `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`). Two Haiku
+calls, as approved.
+
+1. **`--safe-mode` keeps the subscription and drops the author's plugins.**
+   With `-p --tools "" --strict-mcp-config --disable-slash-commands
+   --no-session-persistence --safe-mode --model claude-haiku-5-5 --effort
+   low --system-prompt-file <file>`, the start-up event showed
+   `apiKeySource: "none"`, `tools: []`, `mcp_servers: []`,
+   `slash_commands: []`, `skills: []`, and `plugins` held only the three
+   built-in ones (`cc-plugin-agents-md`, `cc-plugin-telemetry`,
+   `cc-plugin-plugin-authoring`). The synced plugin from design §4.2 is
+   gone. `--safe-mode` keeps built-in plugins by design ("Auth, model
+   selection, built-in tools and plugins … work normally"); with no tools
+   and an empty folder they have nothing to act on. `--system-prompt-file`
+   works. The empty folder was still empty afterwards. 1.96 s, notional
+   $0.00014. The CLI writes its prompt cache with a **1-hour** TTL.
+   `--bare` is not an option: it accepts only an API key, never the
+   subscription sign-in.
+2. **The binary on Windows.** `where claude` finds only
+   `C:\Users\Nikolas\.local\bin\claude.exe` (the native installer; an old
+   `claude.exe.old.*` sits beside it from the auto-update). `PATHEXT` lists
+   `.EXE` before `.CMD`, so a PATH lookup that honours `PATHEXT` (the `which`
+   crate) finds the native binary first. An npm install would be
+   `claude.cmd`. Rust's `Command` runs a `.cmd` through `cmd.exe` and refuses
+   arguments it cannot escape safely. So the system prompt goes through a
+   file and the conversation through stdin. The schema is the one variable
+   argument, because `--json-schema` has no file form; B1 checks it is a
+   JSON object of at most 8,000 characters.
+
+Also learned on the second call (structured mode with
+`--output-format stream-json --verbose --include-partial-messages
+--json-schema …`, a round schema with `minItems: 1`):
+- The final `result` event carries `structured_output` (the object) and
+  `result` (its JSON string), `is_error`, `subtype`, `api_error_status`,
+  `duration_ms`, `total_cost_usd` and `usage` (`input_tokens`,
+  `cache_creation_input_tokens`, `cache_read_input_tokens`,
+  `output_tokens`). The CLI implements the schema as an internal
+  `StructuredOutput` tool, so `num_turns` is 2 and `stop_reason` is
+  `tool_use`.
+- Partial events are `{"type":"stream_event","event":<Anthropic SSE
+  event>}`; text arrives as `content_block_delta` / `text_delta`.
+- Haiku at effort `low` thought for 103 tokens and asked for
+  `formula_roll` with `["1d20+4"]`; 3.3 s.
+- `claude auth status` prints JSON: `loggedIn`, `authMethod` (`claude.ai`),
+  `apiProvider`, `subscriptionType` (`max`), plus the e-mail, org id and org
+  name, which the app must never pass on.
+
+### 2026-10-21 — Route B (PR B)
+
+Built on PR A's branch, because PR A was still unmerged when the Stop fix
+(#203) landed on master; master, with #203, is merged into both.
+
+1. **Two TypeScript modules, not one.** `claudeCliModels.ts` holds the model
+   keys, the pinned ids, `isClaudeCliAvailablePlatform()` and the cached
+   `claude_cli_status`; `claudeCli.ts` is the bridge (rendering, schema,
+   effort, `claudeCliFetch`) and re-exports the rest. `ai_prices.ts` and
+   `reasoningTiers.ts` need the keys and the platform check, and the bridge
+   imports `providerCall.ts`, which imports `ai_prices.ts`: one module would
+   have been an import cycle.
+2. **`CliProcesses` holds a cancel channel per run, not the `Child`.** The
+   run's own task owns the child so it can wait on it; `claude_cli_cancel`
+   sends on the run's `oneshot` channel and the task kills the process.
+   Each run's system-prompt file lives in the app's cache folder and is
+   deleted when the run ends; the working folder (`<app data>/claude-cli`)
+   stays empty. On Windows the child gets `CREATE_NO_WINDOW`, or every
+   round would flash a console window.
+3. **Both modes use `--output-format stream-json --verbose`**, structured
+   mode included (the plan named `json` for it). One line protocol for both,
+   and the start-up event's `apiKeySource` lets the bridge stop a run that
+   is not on the subscription: an API key in the CLI's own configuration
+   would otherwise bill the API without a word.
+4. **Transcript labels by role.** The plan's `[Player]`, `[Engine state]` and
+   `[You, earlier this turn]` cannot be told apart by role (the state message
+   and the player's action are both `user`), and "earlier this turn" would be
+   wrong for earlier turns. The blocks are `[User]`, `[You]` (with `Tool
+   calls: [...]` as JSON), `[Tool result · <name> · <id>]` and `[System
+   note]`, and the answer protocol explains them. A system message after
+   the first user message (the Designer's draft state) renders in place as
+   a note, so it never changes the system prompt.
+5. **The stable base goes in the system prompt.** `claude -p` takes stdin as
+   one text block, and the prompt cache can only match at block boundaries,
+   so a transcript that grows inside one block would never be read from the
+   cache. Everything before the message PR A marks `cacheBreakpoint` (the
+   player's action) is rendered under "The session so far" in the system
+   prompt, which is then identical in every round of a turn; stdin starts at
+   the action, and a later round only appends to it. Calls without the
+   marker (side agents, the Designer, the story stage) put the whole
+   conversation on stdin.
+6. **Prefills are dropped as in Route A**: a trailing assistant message, and
+   in the current turn a plain assistant message directly before one with
+   tool calls.
+7. **A call with no effort of its own runs at `medium`**, Claude's default on
+   Opus and Haiku (side agents and the Designer send none).
+8. **No output cap.** The CLI has no `max_tokens` flag, so Response Length
+   does not bound a subscription round; the prompt's length guidance does.
+9. **Tool-call ids are `cli<time><n>_<i>`**, unique across the rounds of a
+   turn, because a later round may run on another provider that wants
+   unique ids.
+10. **A failure never reaches the GM loop's tier fallback.** The stream path
+    always answers 200 and reports a CLI failure as an `error` frame, which
+    ends the turn with its message. The loop's lower-tier fallback runs only
+    on a non-ok response, and taking it would move a subscription turn to a
+    paid tier (design §4.5). `/api/generate` answers a failure with 502 and
+    `{error, code}`, which `callSideModel` and the Designer report.
+11. **Decision 12 is enforced in `resolveSideCallModel`.** PR #204 (open)
+    makes the narration model the side agents' default. With a subscription
+    narration voice, every Observer judge, Memory Keeper and Director call
+    would then launch the CLI. A subscription model reaching a side agent as
+    its fallback is swapped for the default narration model (Mistral Small
+    3.2); pointing a layer at a subscription model in Architecture still
+    works. The same function applies decision 16 to a synced layer override
+    off the desktop.
+12. **The pickers.** `ModelSelect` shows the subscription models on the
+    desktop even when the CLI is signed out (the tier row's badge then says
+    "Not signed in" or "CLI not found"), and off the desktop hides them
+    except a synced current value, so the dropdown does not show something
+    that is not selected. `getAvailableModels` (the creator's list) offers
+    them only on a desktop with the CLI signed in.
+13. **The Settings row is its own component**, `ClaudeSubscriptionPanel.tsx`,
+    with a `useClaudeCliStatus()` hook that the tier badges and the creator
+    page share. Off the desktop it appears only when a synced setting names
+    a subscription model, to list the slots that use their default instead
+    (decision 16).
+14. **Usage-limit wording.** `CLI_USAGE_LIMIT` matches "session limit",
+    "weekly limit", "usage limit", "5-hour limit" and "limit reached".
+    `CLI_NOT_SIGNED_IN` matches "not logged in", "/login", "invalid api
+    key", "oauth token" and "authenticat…". The CLI's own text is kept in the
+    message.
+15. **macOS and Linux** pass `PATH`, `HOME`, `TMPDIR`, `USER`, `LOGNAME` and
+    `LANG` to the child. They are untested: only Windows was built and run.
+16. **After the engine review** (the review's findings, triaged; all fixed
+    except the last):
+    - With #204 merged, compaction took the narration model directly, past
+      `resolveSideCallModel`, so a subscription narration voice would have
+      put compaction on the CLI against decision 12. It now goes through
+      `resolveSideCallModel(null, narrationModel)`. The choices re-derived
+      after an Observer rewrite stay on the narration model, like the main
+      choices stage.
+    - A narration shorter than the longest stop sequence was emitted twice
+      (the hold-back left `streamedText` empty, so the result text was added
+      again). The check is now whether any text delta arrived.
+    - A Stop pressed while the Rust command was still finding the binary or
+      writing the prompt file was lost, because the cancel channel was
+      registered only after `spawn`. It is now registered first, and a run
+      cancelled before it starts never spawns. The stream also ignores lines
+      that arrive after an abort errored it.
+    - An npm-installed CLI is `claude.cmd`, so killing the child killed only
+      `cmd.exe` and left `node.exe` running the model call. On Windows, Stop
+      now kills the process tree (`taskkill /T /F`).
+    - The subscription check failed open when the start-up event had no
+      `apiKeySource` field (a CLI update could rename it). It now fails
+      closed. `claude_cli_status` also returns `apiProvider`, and Settings
+      reads "Uses bedrock, not your subscription" (or another provider)
+      when it is not `firstParty`.
+    - Settings' decision-16 notice now also lists the side-agent layer
+      overrides that fall back off the desktop.
+    - The creator page kept a stored subscription Designer model only while
+      the CLI was signed in, so for the first seconds and whenever it was
+      signed out it quietly switched to a model the author pays for. On the
+      desktop it now keeps the stored model, and the Designer's own error
+      says why it cannot run.
+    - The GM's `<thinking>` prefill survived into the transcript when a gate
+      sent a prose round back, and in the story stage. It is now dropped
+      wherever it sits right after the marked action and before another
+      assistant message.
+    - A failed status read and a failed cancel are logged instead of
+      swallowed.
+    - The transcript is flat text, so a line inside a message (a player's,
+      a guest's, an imported note's) that starts like a block header is
+      escaped with a backslash.
+    - In an online multiplayer game, guests' input reaches the host's turn
+      and so the host's CLI. The author's answer, **decisions 29 and 30**:
+      block subscription models during online play, allow them in party mode
+      and couch co-op. Built as a flag, `setOnlineSessionActive`, that
+      `useNetSession` sets while its session exists (either role), and
+      `canRunClaudeCliModel()` (desktop and not online) is the one question
+      every fallback now asks: the tier and narration resolution, the
+      side-agent layers (`resolveSideCallModel`), the Settings notices, and
+      the guard at the top of `claudeCliFetch` (`CLI_BLOCKED_ONLINE`) for a
+      request built before the session began. The in-game notice fires once
+      per room. Party mode is not on master, and nothing here looks at it.
+
 ### 2026-10-21 — PR C, GLM through Z.ai and OpenRouter
 
 Approved as decision 20 ("Okay go on"). Built on PR A's branch with the
@@ -505,3 +693,19 @@ addendum (`f4fe2cd`) merged in.
       entries at list price, ignoring Z.ai's cached-input rate and
       OpenRouter's routing spread. That is the same follow-up as Route A's
       decision 5, for every non-Claude model.
+17. **A second review, of the fix commit itself**, found nothing blocking and
+    three small things, fixed:
+    - A CLI whose own settings send it to another API provider (Bedrock,
+      Vertex) is not "signed in" for the subscription: Settings shows it in
+      amber, the models are not offered (`isClaudeCliUsable`), and a run
+      refuses when the last known status names another provider.
+    - The GM's `<thinking>` prefill survived when the story stage ran on a
+      story with no GM history yet (`[action, prefill, story prompt]`). It
+      is now matched exactly (`GM_STAGE_AFFIRMATION`) as well as by position,
+      so a real prose reply is never mistaken for it.
+    - In Rust, a cancel channel that reported `Closed` would have panicked
+      when polled again; anything but an empty channel now counts as
+      stopped.
+    Left as they are: the fail-closed check still passes a CLI that stops
+    emitting `system/init` altogether, and a cancel invoke can still beat the
+    run's map insert by microseconds.
