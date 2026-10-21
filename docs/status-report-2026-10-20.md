@@ -510,6 +510,16 @@ generate the icons (`generate-icons.sh` exists at the repo root).
   always forwards the full key set and goes through `providerFetch`), and log
   side-call failures to the Debug Logs instead of swallowing them.
 
+> **Update 2026-10-21:** fixed by PR #191 (`callSideModel()`). A second bug of
+> the same family turned up afterwards. The Observer, Memory Keeper, Director
+> Assistant and Story Progress Observer were given `GenerationMeta.model`, the
+> provider's own model id. The proxy cannot resolve that id
+> (`getModelConfig()` only knows `AI_MODELS` keys), so it fell back to
+> DeepSeek V4 Flash, and a player without a DeepSeek key got `NO_API_KEY` from
+> every one of them. Unpinned side agents, compaction and reflection now all
+> run on the narration model, override included (decision 19);
+> `tests/generation.sideCallModel.test.ts` covers it.
+
 ### 6.14 Google tool filter is stale — session zero can't end on Gemini
 
 **Severity: medium (Google/Gemini users only).** Verified.

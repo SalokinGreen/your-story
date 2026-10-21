@@ -332,8 +332,9 @@ export function estimateTurnCost(
   const gmModel = String(gmTier.modelKey);
   const narrationModel = String(getEffectiveNarrationModelKey());
 
-  // Side calls inherit the turn's model unless the user pinned one in
-  // Settings > Architecture - exactly what generation.ts does at runtime.
+  // Side calls run on the narration model unless the user pinned one in
+  // Settings > Architecture (decision 19) - exactly what generation.ts does
+  // at runtime.
   const sideCallFallback = narrationModel;
   const observerCall = resolveSideCallModel(
     getObserverModelOverride(),
