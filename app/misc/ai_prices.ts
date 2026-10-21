@@ -264,6 +264,68 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
   // ============================================
+  // CLAUDE VIA OPENROUTER (docs/claude-gm-design.md §3)
+  // ============================================
+  // Claude 5.5 rejects sampling parameters, assistant prefill, forced
+  // tool_choice and effort "none"; providerCall.ts's isAnthropicViaOpenRouter
+  // branch drops or remaps each of them. Fable 5.1 is left out (decision 15) -
+  // it can still be added as a custom OpenRouter model, which gets the same
+  // branch since it keys on the "anthropic/" model id.
+
+  "Claude Haiku 5.5": {
+    name: "Claude Haiku 5.5",
+    original_model: "Claude Haiku 5.5",
+    model: "anthropic/claude-haiku-5.5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 0.1,
+    outputPrice: 0.5,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["cost-effective", "tool calling", "long context", "latest"],
+    weaknesses: ["prose depth"],
+    description:
+      "Anthropic's fastest Claude, through your OpenRouter key. Reliable tool calling at a very low price - a good fit for the light GM tiers and the side agents.",
+    bannerUrl: undefined,
+  },
+
+  "Claude Sonnet 5.5": {
+    name: "Claude Sonnet 5.5",
+    original_model: "Claude Sonnet 5.5",
+    model: "anthropic/claude-sonnet-5.5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 2,
+    outputPrice: 10,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["creativity", "tool calling", "reasoning", "long context", "latest"],
+    weaknesses: ["price"],
+    description:
+      "Anthropic's everyday Claude, through your OpenRouter key. Strong prose and careful rules-following; the stable GM prompt is prompt-cached, so later rounds of a turn cost far less than the first.",
+    bannerUrl: undefined,
+  },
+
+  "Claude Opus 5.5": {
+    name: "Claude Opus 5.5",
+    original_model: "Claude Opus 5.5",
+    model: "anthropic/claude-opus-5.5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 4,
+    outputPrice: 20,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["powerful", "reasoning", "creativity", "long context", "latest"],
+    weaknesses: ["price"],
+    description:
+      "Anthropic's most capable Claude in the catalog, through your OpenRouter key. For the heavy tiers - boss fights and campaign-shaping beats - where judgement matters more than cost.",
+    bannerUrl: undefined,
+  },
+  // ============================================
   // MISTRAL MODELS (BYOK - user's own Mistral key)
   // ============================================
 

@@ -10,6 +10,58 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-21 — Claude through OpenRouter (Route A of the Claude GM plan)
+
+Request shaping is unit-tested (`tests/providerCall.anthropic.test.ts`), but
+no request has reached Claude: a played turn spends the author's OpenRouter
+credit, so it waits for the author's go (`claude-gm-implementation-plan.md`
+§5).
+
+- **One played turn on Claude Sonnet 5.5.** With an OpenRouter key saved,
+  set the tier-1 slot (Settings → AI Config) to "Claude Sonnet 5.5", leave
+  its effort at `none`, and play a turn that needs a roll (an attack in a
+  combat scene). The GM should call `formula_roll`, then narrate. Then open
+  Settings → Debug Logs and read the "AI generation (stream) complete"
+  lines: round 1 should show `cacheWriteTokens` in the thousands, round 2
+  `cachedTokens` about the same size. *Failure looks like:* a 400 naming
+  `budget_tokens` or `thinking` (OpenRouter turning `reasoning.effort` into a
+  thinking budget for this model: the effort branch in `applyReasoningEffort`
+  needs another shape); a 400 about a thinking block or edited history in
+  round 2 (the replay rule in `buildRequestMessages` keeps a block Claude
+  will not take); `cachedTokens` 0 in round 2 (the breakpoint is not
+  reaching Anthropic, or the prefix before it changed between rounds).
+- **The turn's cost matches OpenRouter's bill.** For Claude the ledger takes
+  OpenRouter's own `usage.cost`, which prices the cache. The turn cost
+  panel's figure for that turn should match openrouter.ai/activity to the
+  cent, and round 2 should cost a fraction of round 1. *Failure looks like:*
+  round 2 billed about the same as round 1 (no `cost` in the usage, so the
+  list-price fallback ran). The "Cost per turn" *estimate* above the tiers
+  still uses list prices and will read high for Claude; that is known.
+- **Escalating into a Claude tier mid-turn.** Put Claude Opus 5.5 on tier 3
+  only, keep Mistral on the others, and play a turn where the GM calls
+  `set_reasoning_tier` to go up. The round after the switch continues a tool
+  loop another model started, with no thinking block (or Sonnet's, on a
+  Sonnet→Opus switch). The turn should carry on. *Failure looks like:* the
+  turn fails with an OpenRouter error about thinking blocks; a stream error
+  has no tier fallback, so the whole turn errors out.
+- **Narration on Claude after a tool round.** Set the narration voice to a
+  Claude model, play a turn where the GM rolls, then retry that turn. The
+  story stage sends the GM's tool calls and results without a `tools`
+  list. *Failure looks like:* a 400 about `tool_use` blocks without tools
+  (Anthropic has rejected that before; whether OpenRouter papers over it is
+  unknown).
+- **The Game Designer on Claude.** Point the Designer at Claude Sonnet 5.5
+  (Settings → Architecture) and ask for something that makes it write a
+  note. Its draft-state system message comes after the history and changes
+  every round. *Failure looks like:* the second round of a tool loop failing
+  with an error about thinking blocks or edited history.
+- **A side agent on Claude.** Point the Memory Keeper and the Observer at
+  Claude Haiku 5.5 and play two turns. Memories should be written and the
+  Observer's verdicts should appear in the Debug Logs. Their 200–300 token
+  caps are raised to 4,096 for Claude, because thinking counts against the
+  cap. *Failure looks like:* no memories and no warnings, which means the
+  output was used up by thinking.
+
 ## 2026-10-21 — side agents on the narration model (PR #204, decision 19)
 
 A played turn needs the author's keys, so it waits for their go.
