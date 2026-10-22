@@ -71,3 +71,51 @@ Numbers 21–28 belong to other sessions.
 |---|---|---|
 | 29 | Subscription models in an online multiplayer game | **Block them during online play** ("Block during online play"). While an online session (`NetSession`, host or guest) is active, a `claude-cli` model is treated as one the device cannot run: each tier, the narration voice and every side-agent layer uses its default model, with a notice in Settings and in the game. Solo play and couch co-op on one device are unchanged. It follows design §5.2, "never relay a request from another device": in an online game guests' actions on their own devices become the host's turn. |
 | 30 | Subscription models in party mode (the LAN feature, friends' phones as controllers for the host's desktop game) | **Allow them, like couch co-op** ("Allow, like couch co-op"). The game, the GM loop and the CLI all stay on the one desktop that owns the plan; the phones only send input to it. Party mode is not on master yet; nothing in the subscription code looks at it, and a session building it must not add a block. |
+
+### Interview five — default RPG systems, starting with Blood & Bone (2026-10-22)
+
+The author shared *Blood & Bone*, their own modern-supernatural game built on
+the Ironsworn engine, as the first of the "default RPG systems for our AI GM
+experience", and asked for a review, then a Q&A. The review and the design are
+[`default-systems-design.md`](default-systems-design.md). Numbers 31–61 belong
+to other sessions.
+
+| # | question | decision |
+|---|---|---|
+| 62 | Which default systems to build toward | **Blood & Bone first, more later** ("B&B first, more later"). Design the format for a default system, build Blood & Bone's AI edition as the first one, and add other systems once it plays well. |
+| 63 | Where a default system lives in the app | **A pre-installed notes-library pack plus a ready-to-play starter adventure** ("Library pack + starter"). The rules ship as a pack the Designer can import into any adventure; a starter adventure is built on it. |
+| 64 | How meters (Stress, Beast, Exposure) and progress tracks are kept | **Engine-tracked and generic** ("Engine-tracked, generic"). New meters and progress tracks any system can use: the GM asks for a change, and the engine clamps and does the box and tick arithmetic. An engine change with its own implementation plan. |
+| 65 | The four bugs found in the review (rules notes are titles only though the docs say they are pinned; `calculate` turns `min(12,10)` into 1210; hidden note text reaches the narrator; `search_notes` returns disabled notes) | **Log them and correct the docs now** ("Log + correct docs now"): the status report's §6.15–6.18 and `CLAUDE.md`, in a docs-only change. The code fixes are planned separately. |
+| 66 | What a "session" is in Blood & Bone, since the app has none | **One night in the story, with the Reckoning at dawn** ("One night, Reckoning at dawn"). Dawn is when the GM runs the Reckoning, resets once-per-session uses and offers downtime. |
+| 67 | How a Rule of 3 fight plays out | **One roll per player turn** ("One roll per player turn"). Three exchanges; the player describes each action and its stat; the engine holds the Advantage tally between turns. |
+| 68 | Which oracle answers yes/no questions | **Mythic's `fate_question`, with the book's other oracles as tables** ("Mythic yes/no, book's other tables"). The book's own d10 yes/no oracle is dropped; the Complication, Scene and "What They Want" oracles and the per-move miss tables become table notes. No engine change. |
+| 69 | The Chapter 1 sentences that are near-verbatim from the Ironsworn rulebook (CC BY-NC-SA 4.0), with the repo public (decision 3) | **Rewritten in the author's voice by the session, reviewed by the author** ("I rewrite them, you review"). Rules unchanged; Tomkin Press's "based on Ironsworn" credit line and a not-an-official-product statement kept. |
+| 70 | How much Stress a Kind's trigger adds, and how often | **+1, each distinct trigger at most once a scene** ("+1, each trigger once a scene"). Two different triggers in one scene give +2; the full moon's "all triggers apply" still works. |
+| 71 | Where the Ghost's Fading penalty starts (the book contradicts itself) | **Stress 4+ as the base, 5+ for the Anchored, 3+ for the Unraveling** ("Base 4+, Anchored 5+, Unraveling 3+"). |
+| 72 | How a system's always-loaded core rules reach the GM | **A pinned core, everything else on demand** ("Pinned core, rest on demand"). A core of about 3k tokens goes in a note type that loads in full every round; the rest stay `mechanics` notes the GM reads with `read_notes`. No engine change to note loading; the docs and the Designer's description of the `alwaysOn` flag are corrected. |
+| 73 | The rules the book leaves undefined (the Ledger's size, the Wendigo's Slipping Mask, the roll to resist feeding, how far Stress "spikes", whether a Troublesome fight is one roll) | **The session proposes a rule for each, with its reasoning and odds, and the author settles them in review** ("I propose, you review"). |
+| 74 | Whether the AI edition keeps every subsystem | **Keep them all; cut after playtests** ("Keep all, cut after playtest"). Anything the GM handles badly in play gets cut or simplified then. |
+| 75 | What the pre-installed packs contain besides the rules | **Two packs, rules and setting** ("Rules pack + setting pack"): the rules, and *Europe by Night* as a separate pack so an author can use the rules with their own city. *The Hollow Hour* is the starter adventure and uses both. |
+| 76 | When to test the predation content against real models (played turns on the author's keys) | **Once the edition is playable** ("Once the edition is playable"). The session flags it when the AI edition and starter exist; the author says go and picks the models. |
+| 77 | What comes next | **One design document now** ("Write the design doc now"): the default-system format, the generic meters and tracks, and Blood & Bone's AI edition, published as a reading copy, with these decisions and the bug write-up in the same change. Nothing is built until the author has read it and said yes. |
+
+### Interview five, continued — the design's open questions (2026-10-22)
+
+The author read the design ([`default-systems-design.md`](default-systems-design.md))
+and answered its open questions (§7), the proposed rules (§5.4) and the
+renames (§5.7).
+
+| # | question | decision |
+|---|---|---|
+| 78 | An `action_roll` tool for Ironsworn-style games, or the three-call recipe (`formula_roll`, then `calculate` per challenge die, the cap at 10 applied by hand) | **Add `action_roll`** ("Add action_roll"). Stat and adds in; the engine caps adds at +2 and the score at 10, rolls, compares, and returns strong hit, weak hit or miss, the dice and whether they matched. |
+| 79 | Offer the meter, track and session tools to every story, or only to adventures that use them | **Only to adventures that use them** ("Only adventures that use them"). A pack sets a flag when imported; the Designer can set it by hand. |
+| 80 | Who counts the Reckoning's 1s | **The GM, for now** ("The GM, for now"): `formula_roll` shows every die, the GM counts and raises Beast with `manage_meter`. |
+| 81 | Built-in packs and the starter: in memory or written to the device | **Kept in memory** ("Kept in memory"), merged into the library lists from the app's own code, never written to IndexedDB; importing makes an editable copy. |
+| 82 | Shipping Blood & Bone's AI edition in the public repository | **Yes, publish it** ("Yes, publish it"), under the project's licence with the Tomkin Press credit line. |
+| 83 | The Witch's Ledger | **As proposed** ("As proposed"): 10 marks; a Sate ritual costs 1, then +1 for each further ritual that night (Hedge Witch flat 1, Servant starting at 2); a full Ledger brings the source's demand; meeting it drops the Ledger to 5, or to 0 with *The Clean Slate*. |
+| 84 | The Wendigo's "the hunger only grows" | **Tied to the Beast Meter** ("Tie it to Beast"): the "starving" trigger fires at the third foodless dawn at Beast 0–2, the second at Beast 3–5, and every foodless dawn from Beast 6. |
+| 85 | What the Predator gets, now that any feed resets the Slipping Mask | **A kill holds the Mask a night** ("A kill holds the Mask a night"): killing living prey resets the Mask, and the next dawn does not advance it. |
+| 86 | The remaining proposed rules (§5.4) | **All accepted as written**: a Stress spike is +2; the Rogue's line reads "a complication from your Doomed burden"; the Slipping Mask is a 0–3 meter (+1 per foodless dawn, +2 for the Graverobber, a Sate the Beast hit sets it to 0); *Resist the Hunger* is a new +Heart move, and Resisting the Change gains its strong and weak outcomes; fights go by rank; the Fading's penalty is a stat counting as 0 or a Connection out of reach, with *The Still Self* counting Stress as 2 lower for the threshold. |
+| 87 | The renames for names the book uses twice (§5.7) | **All four accepted**: the Rite *The Reckoning* becomes *The Calling Due*, the Rite *The Vigil* becomes *The Wake*, the Haven *The Hollow* becomes *The Forgotten Room*, and the Werewolf's Beast track *The Turning* becomes *The Wild*. |
+| 88 | Is the design approved | **Approved; write the implementation plan** ("Approved: write the plan"). Building still waits for the author's yes on that plan. |
+| 89 | How the rulebook reaches a build session, since it existed only as an upload | **Committed to the repository** ("Commit the book to the repo"), as `docs/blood-and-bone/rulebook.md`, with decision 69's rewrites applied and the credits completed, as the source the AI edition is written from. |
