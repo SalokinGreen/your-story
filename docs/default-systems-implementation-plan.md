@@ -11,6 +11,16 @@ source text for the content slice is
 **1,797 tests**, all passing. Each slice captures its own baseline (suite and
 `npx tsc --noEmit`) before its first edit, as the `verify` skill says.
 
+> **Update 2026-10-22:** the token-savings work builds first (decision 97),
+> and its slice 5 ([`token-savings-implementation-plan.md`](token-savings-implementation-plan.md)
+> §6) splits the GM prompt into a stable block and a per-turn live block.
+> The two state sections this plan adds, `formatMetersAndTracksState`
+> (§3.3) and `formatActiveChallengeState` (§5.3), go into the live block
+> (`buildLiveBlock`) beside the timers, never into the system message or the
+> stable block, or every meter tick would re-price the cached history. The
+> `ai_staged.ts` line numbers cited below predate that change; take a fresh
+> baseline when this plan is built.
+
 **Who builds it.** Each slice is specified work for the `implementer` agent
 (Sonnet) or a fresh session on `claude-sonnet-5-5`, one slice at a time. The
 planning session keeps the baselines and reviews each diff. Every slice

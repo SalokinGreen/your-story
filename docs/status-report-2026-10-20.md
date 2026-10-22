@@ -342,6 +342,12 @@ Ranked by severity (sections below are numbered in the order they were found):
 > | 6.19 | A turn whose GM rounds write only `<thinking>` saves an empty story, with no narrator fallback | Medium | Small |
 > | 6.20 | Story that has left the history window but is under the 1,500-token summary batch is in neither | Medium (continuity) | Fixed by the token-savings design |
 > | 6.21 | Memory trimming shifts entries off the front while reflection tracks progress by index | Low (the trim rarely fires) | Small |
+>
+> And one found while planning the token-savings build (§6.22):
+>
+> | # | Bug | Severity | Effort |
+> |---|---|---|---|
+> | 6.22 | `story_instructions` notes never reach the narrator: the GM sees their titles among the lore, the narrator nothing | Medium (a setting that does nothing) | Small (decide) |
 
 ### 6.1 Timer auto-advance never fires
 
@@ -687,6 +693,28 @@ code, not run.
   reflected on.
 - **Fix:** move the index back by the number of entries trimmed (or track
   reflection by entry timestamp), with a test.
+
+### 6.22 `story_instructions` notes never reach the narrator
+
+**Severity: medium (a setting that does nothing).** Found 2026-10-22 while
+planning the token-savings build; verified in the code.
+
+- The type is documented as narrator guidance (`structs.ts:175`, "Story
+  Stage only"; the Designer's `write_note` schema, `designer_tools.ts:134`;
+  the Lore page and the inspector, which label it "Narrator style").
+- No stage sends its text. The GM stage's `categorizeNotes`
+  (`app/misc/ai_staged.ts:1127`) has no case for it, so it falls into the
+  `lore` bucket and is listed by title for `read_notes`. The narrator
+  (`buildStoryContinuationPrompt`, `:2251`) continues the GM's conversation
+  and adds no notes of its own, so it sees only that title. The choices
+  stage's `buildInfoMessage` excludes the type outright (`:478`) on the
+  comment that the story stage uses it.
+- **Fix (a product call):** either give the narrator the enabled
+  `story_instructions` notes in full as part of its continuation message
+  (and drop them from the GM's lore list), or retire the type and convert
+  existing notes to `dm_instructions`. The token-savings plan
+  ([`token-savings-implementation-plan.md`](token-savings-implementation-plan.md))
+  leaves this alone.
 
 ---
 

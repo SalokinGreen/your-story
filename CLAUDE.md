@@ -42,8 +42,10 @@ note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
 as 1210 (6.17), and `search_notes` returning disabled notes (6.18); and
 three from the token measurements: a thinking-only turn saving an empty
 story (6.19), story falling between the history window and the summary
-(6.20), and memory trimming upsetting reflection's index (6.21). There is
-still no CI on pull requests.
+(6.20), and memory trimming upsetting reflection's index (6.21); and one
+while planning that build: `story_instructions` notes, documented as the
+narrator's style guide, never reaching the narrator (6.22). There is still
+no CI on pull requests.
 
 **The product is the native apps (decision 1).** Tauri desktop and Capacitor
 Android/iOS, packaged from the `NEXT_PUBLIC_STANDALONE=true` static export.
