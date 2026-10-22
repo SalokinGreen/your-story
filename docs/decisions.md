@@ -98,3 +98,24 @@ to other sessions.
 | 75 | What the pre-installed packs contain besides the rules | **Two packs, rules and setting** ("Rules pack + setting pack"): the rules, and *Europe by Night* as a separate pack so an author can use the rules with their own city. *The Hollow Hour* is the starter adventure and uses both. |
 | 76 | When to test the predation content against real models (played turns on the author's keys) | **Once the edition is playable** ("Once the edition is playable"). The session flags it when the AI edition and starter exist; the author says go and picks the models. |
 | 77 | What comes next | **One design document now** ("Write the design doc now"): the default-system format, the generic meters and tracks, and Blood & Bone's AI edition, published as a reading copy, with these decisions and the bug write-up in the same change. Nothing is built until the author has read it and said yes. |
+
+### Interview five, continued — the design's open questions (2026-10-22)
+
+The author read the design ([`default-systems-design.md`](default-systems-design.md))
+and answered its open questions (§7), the proposed rules (§5.4) and the
+renames (§5.7).
+
+| # | question | decision |
+|---|---|---|
+| 78 | An `action_roll` tool for Ironsworn-style games, or the three-call recipe (`formula_roll`, then `calculate` per challenge die, the cap at 10 applied by hand) | **Add `action_roll`** ("Add action_roll"). Stat and adds in; the engine caps adds at +2 and the score at 10, rolls, compares, and returns strong hit, weak hit or miss, the dice and whether they matched. |
+| 79 | Offer the meter, track and session tools to every story, or only to adventures that use them | **Only to adventures that use them** ("Only adventures that use them"). A pack sets a flag when imported; the Designer can set it by hand. |
+| 80 | Who counts the Reckoning's 1s | **The GM, for now** ("The GM, for now"): `formula_roll` shows every die, the GM counts and raises Beast with `manage_meter`. |
+| 81 | Built-in packs and the starter: in memory or written to the device | **Kept in memory** ("Kept in memory"), merged into the library lists from the app's own code, never written to IndexedDB; importing makes an editable copy. |
+| 82 | Shipping Blood & Bone's AI edition in the public repository | **Yes, publish it** ("Yes, publish it"), under the project's licence with the Tomkin Press credit line. |
+| 83 | The Witch's Ledger | **As proposed** ("As proposed"): 10 marks; a Sate ritual costs 1, then +1 for each further ritual that night (Hedge Witch flat 1, Servant starting at 2); a full Ledger brings the source's demand; meeting it drops the Ledger to 5, or to 0 with *The Clean Slate*. |
+| 84 | The Wendigo's "the hunger only grows" | **Tied to the Beast Meter** ("Tie it to Beast"): the "starving" trigger fires at the third foodless dawn at Beast 0–2, the second at Beast 3–5, and every foodless dawn from Beast 6. |
+| 85 | What the Predator gets, now that any feed resets the Slipping Mask | **A kill holds the Mask a night** ("A kill holds the Mask a night"): killing living prey resets the Mask, and the next dawn does not advance it. |
+| 86 | The remaining proposed rules (§5.4) | **All accepted as written**: a Stress spike is +2; the Rogue's line reads "a complication from your Doomed burden"; the Slipping Mask is a 0–3 meter (+1 per foodless dawn, +2 for the Graverobber, a Sate the Beast hit sets it to 0); *Resist the Hunger* is a new +Heart move, and Resisting the Change gains its strong and weak outcomes; fights go by rank; the Fading's penalty is a stat counting as 0 or a Connection out of reach, with *The Still Self* counting Stress as 2 lower for the threshold. |
+| 87 | The renames for names the book uses twice (§5.7) | **All four accepted**: the Rite *The Reckoning* becomes *The Calling Due*, the Rite *The Vigil* becomes *The Wake*, the Haven *The Hollow* becomes *The Forgotten Room*, and the Werewolf's Beast track *The Turning* becomes *The Wild*. |
+| 88 | Is the design approved | **Approved; write the implementation plan** ("Approved: write the plan"). Building still waits for the author's yes on that plan. |
+| 89 | How the rulebook reaches a build session, since it existed only as an upload | **Committed to the repository** ("Commit the book to the repo"), as `docs/blood-and-bone/rulebook.md`, with decision 69's rewrites applied and the credits completed, as the source the AI edition is written from. |

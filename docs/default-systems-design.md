@@ -1,9 +1,12 @@
 # Default RPG systems — design
 
-**Status:** draft for the author's review, 2026-10-22. Nothing here is
-approved to build. Decisions 62–77 in [`decisions.md`](decisions.md). The
-implementation plan is a separate document, written after this one is
-approved (`workflow.md` Phase 3).
+**Status:** approved, 2026-10-22 (decision 88). Decisions 62–89 in
+[`decisions.md`](decisions.md); the author's open questions are answered in
+§7. The implementation plan is
+[`default-systems-implementation-plan.md`](default-systems-implementation-plan.md);
+building waits for the author's yes on it. The source text for Blood &
+Bone's AI edition is [`blood-and-bone/rulebook.md`](blood-and-bone/rulebook.md)
+(decision 89).
 
 ## 1. What this is
 
@@ -131,9 +134,10 @@ So:
   and track sets, and its starter adventure, as TypeScript modules, listed
   in a registry `app/misc/systems/index.ts`. Being source means it is in the
   static export the native apps package, with no fetch at runtime, and the
-  suite can test it. (The repo is public, so this publishes the AI edition's
-  text; §7.)
-- **Built-ins are never written to the device.** The library merges the
+  suite can test it. The repo is public, so this publishes the AI edition's
+  text, which the author wants (decision 82).
+- **Built-ins are never written to the device** (decision 81). The library
+  merges the
   registry's packs and starters into what it shows, marked *Built-in*: the
   notes library tab (`NotesLibraryTab.tsx`), the picker
   (`LibraryPickerModal.tsx`) and the adventure list (`library/page.tsx`,
@@ -301,8 +305,7 @@ for it (§6).
 
 The Reckoning itself stays a GM procedure with existing tools:
 `formula_roll(["4d6"])` for Stress 4 reports every die, the GM counts the 1s,
-and `manage_meter` raises Beast by that many. Automating the count is an
-open question (§7).
+and `manage_meter` raises Beast by that many (decision 80).
 
 ### 4.6 What the GM and the player see
 
@@ -323,12 +326,13 @@ open question (§7).
 
 ### 4.7 Cost
 
-Every request carries every tool schema, about 15,800 tokens today. Two new
-tools and a wider `start_challenge` add roughly 1,000–1,500 tokens to every
-request of every adventure, Blood & Bone or not. The recommendation (an open
-question in §7) is to offer `manage_meter`, `manage_track` and `end_session`
-only to stories whose adventure declares it uses them, which a pack sets when
-imported and the Designer can set by hand.
+Every request carries every tool schema, about 15,800 tokens today. The new
+tools and a wider `start_challenge` would add roughly 1,500–2,000 tokens to
+every request of every adventure, Blood & Bone or not. So `manage_meter`,
+`manage_track`, `end_session` and `action_roll` are offered only to stories
+whose adventure declares it uses them, which a pack sets when imported and
+the Designer can set by hand (decision 79). The wider `start_challenge` is
+offered as today.
 
 ### 4.8 Where it lives in the code
 
@@ -340,7 +344,7 @@ through every place a GM tool is wired.
 |---|---|
 | Shapes: `Meter`, `ProgressTrack`, the sets, `sessionCount`, the dedup keys, and the challenge's `mode`, `rounds` and `tally` | `app/misc/structs.ts` (new optional fields on `StoryData`; `SceneChallenge`); no backfill needed in `storyDataDefaults.ts`, which fills only required arrays |
 | The arithmetic: clamps, caps, dedup, ticks by rank, `progress_roll` | a new pure module, `app/misc/metersAndTracks.ts`, so it is testable without the executor |
-| Schemas for `manage_meter`, `manage_track`, `end_session`; the wider `start_challenge` and `record_challenge_result` | `app/misc/gmTools.ts` (`GM_TOOL_SCHEMAS`, `GM_TOOL_NAMES`, `GM_TOOL_MAP`) |
+| Schemas for `manage_meter`, `manage_track`, `end_session`, `action_roll`; the wider `start_challenge` and `record_challenge_result` | `app/misc/gmTools.ts` (`GM_TOOL_SCHEMAS`, `GM_TOOL_NAMES`, `GM_TOOL_MAP`) |
 | Offering them, conditionally (§4.7) | `app/misc/ai_staged.ts`, the `legacyToolNames` whitelist in `buildGMStagePrompt` |
 | Executing them | `app/misc/gmExecutor.ts` (the tool switch); the duplicate challenge path in `toolExecutor.ts` removed |
 | The GM's view: the *Meters & tracks* section and the active challenge | `app/misc/ai_staged.ts`, beside `formatTimersState` |
@@ -358,7 +362,8 @@ Every slice that touches `app/misc/` gets a test baseline first and the
 ### 5.1 What it is
 
 The book stays the author's: a 58,000-token rulebook (measured, cl100k) for
-people at a table. The AI edition is the same game repackaged for the GM:
+people at a table, kept in the repository as the source text
+(`docs/blood-and-bone/rulebook.md`, decision 89). The AI edition is the same game repackaged for the GM:
 the same rules, every gap closed (§5.4), adapted to the app's turns and tools
 (§5.3, §5.5), split into notes that fit the prompt (§5.2), with the copied
 sentences rewritten (§5.8). Every subsystem stays in for now; whatever the GM
@@ -405,10 +410,11 @@ rules themselves.
   Unraveling** (decision 71).
 - **The core is pinned; everything else is read on demand** (decision 72).
 
-### 5.4 Proposed rules for the gaps (for the author to settle)
+### 5.4 Rules for the gaps
 
-Decision 73: each of these is a proposal, with its reasoning, for the author
-to accept or change in review.
+Decision 73 had the session propose a rule for each gap the book leaves;
+the author accepted every one (decisions 83–86), with the Predator's line in
+item 3 settled by decision 85.
 
 1. **How far Stress "spikes": +2.** Used by *Feed the Beast* (a Skirmish
    cost) and a destroyed Familiar. A trigger is +1, so a spike is a step
@@ -429,9 +435,9 @@ to accept or change in review.
    2 cracking (anyone who looks closely sees something wrong), 3 slipped (the
    human face is gone). It rises by 1 at each dawn of a night without a feed,
    and a Sate the Beast hit sets it to 0. The Graverobber's "advances one
-   step faster" becomes +2 per foodless dawn. Under this rule the Predator's
-   "resets the Mask fully" adds nothing, since every feed does; the author
-   decides whether the Predator keeps that line or gets another.
+   step faster" becomes +2 per foodless dawn. The Predator's "resets the
+   Mask fully" becomes: killing living prey resets the Mask, and the next
+   dawn does not advance it (decision 85).
 4. **"The hunger only grows" (the Wendigo's weakness) is tied to the Beast
    Meter, not to a count of feeds.** "Starving", the Wendigo's Stress
    trigger, fires at the third foodless dawn at Beast 0–2, the second at
@@ -469,7 +475,7 @@ to accept or change in review.
 
 | rule | how the GM runs it |
 |---|---|
-| **Action roll** | `formula_roll(["1d6+<stat+adds>", "2d10"])`, then `calculate` once against each d10. The GM caps the score at 10 by hand and caps adds at +2. A match is the two d10s showing the same face (see §5.6) |
+| **Action roll** | `action_roll` with the stat's value and the adds (decision 78); the engine caps adds at +2 and the score at 10 and reports the outcome and any match (§5.6) |
 | **Progress roll** (Fulfil Your Vow, Clear a Condition, arrive on a journey) | `manage_track` `progress_roll` |
 | **Marking progress** | `manage_track` `mark` |
 | **Rule of 3** | `start_challenge` in tally mode, 3 rounds; one action roll per player turn; `record_challenge_result` with the outcome |
@@ -486,36 +492,36 @@ to accept or change in review.
 | **Yes/no** | `fate_question` |
 | **Antagonists** | rank and a progress track for Formidable and above; **never** `start_combat`, combatant stat blocks or `npc_roll`, since antagonists have no sheets and never roll |
 
-### 5.6 The cost of an action roll, and a tool question
+### 5.6 The action roll is a tool
 
-Each action roll as specified costs three tool calls across two rounds: the
-roll, then the two comparisons in parallel. A miss adds a table read, a d6
-and a meter change, so a missed roll can use five of the GM's ten rounds.
-Rule of 3 at one roll per turn stays inside that; two rolls in one turn
-would not.
+With the tools that exist today, an action roll costs three calls across two
+rounds (the roll, then one comparison per challenge die), and the score's
+cap at 10 can't be written: `calculate` has no functions, and `min(score,
+10)` silently returns a wrong number (§6.17). So the engine gets an
+**`action_roll`** tool for the Ironsworn family (decision 78): the stat's
+value and the adds in; the engine caps the adds at +2 and the score at 10,
+rolls one d6 and two d10s, compares, and returns strong hit, weak hit or
+miss, the dice, and whether the two d10s matched. One call instead of three,
+and the same comparison `progress_roll` does.
 
-The score's cap at 10 can't be written as `min(score, 10)`: `calculate` has
-no functions, and the attempt silently returns a wrong number (§6.17). The
-core tells the GM to cap by hand. Fixing §6.17 makes a mistake an error
-instead of a wrong answer, but the cap is still manual.
+It honours the player's dice mode like `formula_roll` does: when the player
+rolls physical or manual dice, their faces feed the same comparison. Like
+`progress_roll`, it judges the roll, a deliberate exception to "tools never
+judge" for the same reason (§4.3): with the adds and score capped by rule,
+there is no difficulty for anyone to choose.
 
-The alternative is an **`action_roll` tool** for the Ironsworn family: stat
-value and adds in, the engine caps adds at +2 and the score at 10, rolls,
-compares, and returns strong hit, weak hit or miss, the dice and whether they
-matched. One call instead of three, and the same comparison
-`progress_roll` already does. It is a system-shaped tool, beyond decision
-64's meters and tracks, so it is an open question (§7). Ironsworn, Starforged
-and most of their hacks would use it, which matters if more default systems
-follow (decision 62).
+A missed roll then takes about four of the GM's ten rounds (the roll, the
+miss table, its d6, the meter change), and Rule of 3 at one roll per turn
+stays well inside that.
 
 ### 5.7 Names that collide
 
 The GM opens notes by exact title, and several names in the book mean two
 things. The note split (§5.2) keeps note titles unique, but the names still
-appear inside notes, where the GM has to tell them apart. Proposed renames,
-for the author:
+appear inside notes, where the GM has to tell them apart. The AI edition
+renames one side of each pair (decision 87):
 
-| name | means | and also | proposal |
+| name | means | and also | renamed |
 |---|---|---|---|
 | The Reckoning | the end-of-session roll | a Rite (calling debts due) | the Rite becomes *The Calling Due* |
 | The Vigil | the hunters' network | a Rite (sitting with the dead) | the Rite becomes *The Wake* |
@@ -524,10 +530,13 @@ for the author:
 
 ### 5.8 The sentences to rewrite (decision 69)
 
-These passages in the author's draft are near-verbatim from the Ironsworn
+These passages in the author's draft were near-verbatim from the Ironsworn
 rulebook (checked against a 2019 copy; Starforged's prose was not checked).
 They are named by place here, not quoted, so the repository does not carry
-them. The replacements keep every rule.
+them. The replacements keep every rule, and they are already applied in the
+repository copy, `docs/blood-and-bone/rulebook.md` (decision 89), along with
+the three outcome lines under *Resolving the Outcome*, rewritten the same
+way.
 
 | where in the draft | replacement |
 |---|---|
@@ -541,9 +550,12 @@ them. The replacements keep every rule.
 | Ch. 2, *Core Stats*, the opening sentences | Five stats describe what your character is good at and how they tend to solve problems. Each is rated from 1 to 3. |
 | Ch. 2, *Core Stats*, the five stat descriptions (and the copies in Ch. 7 step 2 and Appendix B) | **Nerve:** quickness, guns, getting out of the way, keeping your head when everything moves at once, striking on instinct. **Heart:** resolve, compassion, how you reach people, and the humanity you are still holding on to. **Bone:** raw strength, taking punishment, and violence at arm's length or closer. **Shadow:** moving unseen, lying well, setting traps for people, hunting from the dark. **Wits:** what you know, what you notice, and thinking faster than whoever is across from you. |
 
-The credits keep Tomkin Press's "This work is based on Ironsworn…" line,
-add "not an official Ironsworn product", and drop "all text… original",
-which was not true of these passages before the rewrite.
+The credits carry Tomkin Press's "This work is based on Ironsworn…" line in
+its CC BY 4.0 form (the licence of the Ironsworn SRD, where the engine's
+basics and move names come from), add "not an official Ironsworn product",
+and replace "all text… original", which was not true of these passages
+before the rewrite, with what the game takes from Ironsworn and what is its
+own.
 
 ### 5.9 The character sheet
 
@@ -584,7 +596,7 @@ zero still builds the characters.
 - **Bookkeeping.** Even with meters and tracks in the engine, Connections,
   Burdens, ability uses and up to three Conditions' scopes stay with the GM.
   Watch for drift; decision 74 says what to do about it.
-- **Tool rounds.** A missed roll uses about half of the GM's ten rounds
+- **Tool rounds.** A missed roll uses about four of the GM's ten rounds
   (§5.6). Watch for turns that hit the cap.
 - **Scene changes.** "Once a scene" depends on the GM calling
   `increment_scene` (§4.5). If it rarely does, triggers cap far too low.
@@ -602,22 +614,20 @@ zero still builds the characters.
   secret the players should uncover; until §6.16 is fixed, the narrator can
   see it once the GM reads it.
 
-## 7. Open questions for the author
+## 7. Answered questions
 
-1. **An `action_roll` tool for the Ironsworn family** (§5.6), or the
-   three-call recipe with a hand-applied cap? Recommendation: the tool.
-2. **Offer the meter, track and session tools only to adventures that use
-   them** (§4.7), or to every story? Recommendation: only those that use them.
-3. **Should the engine count the Reckoning's 1s** (an option on
-   `end_session`), or the GM? Recommendation: the GM for now; it is a handful
-   of dice once a night.
-4. **Built-ins kept in memory and merged into the library** (§3.3), or
-   written into the device's library on first run? Recommendation: in
-   memory. Written rows would be editable in place, drift from the app's
-   version, and sync as one duplicate per device.
-5. **Publishing.** Shipping Blood & Bone in the app puts the AI edition's
-   text in this public repository. Confirm that is wanted.
-6. **The proposals in §5.4 and the renames in §5.7.**
+The author answered the design's open questions on 2026-10-22:
+
+1. **An `action_roll` tool:** yes (decision 78, §5.6).
+2. **The meter, track, session and action-roll tools:** offered only to
+   adventures that use them (decision 79, §4.7).
+3. **The Reckoning's 1s:** the GM counts them, for now (decision 80, §4.5).
+4. **Built-ins:** kept in memory and merged into the library, never written
+   to the device (decision 81, §3.3).
+5. **Publishing:** yes, the AI edition goes in the public repository
+   (decision 82), and the rulebook with it as the source (decision 89).
+6. **The proposals in §5.4 and the renames in §5.7:** all accepted
+   (decisions 83–87).
 
 ## 8. Verification
 
@@ -626,8 +636,8 @@ What proves it works, end to end:
 - **Unit tests** (seeded `Math.random`, as the suite does): meters clamp,
   cap, floor, `onlyUp`, threshold reports and once-per-scene/session keys;
   tracks' tick arithmetic for every rank and `progress_roll` outcomes;
-  tally challenges score and close after the last round; `end_session`
-  resets what it should.
+  `action_roll`'s caps, ties and matches; tally challenges score and close
+  after the last round; `end_session` resets what it should.
 - **Budget tests:** the core note ≤ 3,000 tokens, each reference note
   ≤ 2,500, the filled sheet ≤ 1,000, measured with the app's estimator; note
   titles unique across both packs.
