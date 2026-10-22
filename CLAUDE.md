@@ -36,7 +36,11 @@ tick (6.1), Fronts never linked to their clocks (6.2), random ids and keys
 during render (6.3–6.5), the dead Embeddings toggle (6.9), tools the GM
 cannot call (6.10), online guests receiving the GM's secrets (6.12), and the
 stale Google tool filter, which leaves session zero unable to end on Gemini
-(6.14). There is still no CI on pull requests.
+(6.14). Four more were found on 2026-10-22 (decision 65): rules notes listed
+by title only while the prompt, comments and docs say pinned (6.15), hidden
+note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
+as 1210 (6.17), and `search_notes` returning disabled notes (6.18). There is
+still no CI on pull requests.
 
 **The product is the native apps (decision 1).** Tauri desktop and Capacitor
 Android/iOS, packaged from the `NEXT_PUBLIC_STANDALONE=true` static export.
@@ -471,7 +475,14 @@ Flash.
 There is **no `rpgSystem` picker and no structured stat-block engine.** The
 GM improvises dice mechanics per adventure by reading a `mechanics` note and
 a `character_sheet` note (freeform text — "notes, not stat blocks"), then
-calls tools. **A GM tool lives in up to six places** — its schema
+calls tools. **What the GM sees of the notes is decided by `type` and
+`enabled` alone** (`buildGMStagePrompt`): `dm_instructions`,
+`character_sheet` and `gm_plan` notes go in full into every round, never
+truncated, and every other type — `mechanics` included — is listed by title,
+for the GM to open with `read_notes`. Neither `alwaysOn` nor keyword
+triggers change that (§6.15), and no note has a size cap, so a system's
+core rules belong in a pinned note and the rest in notes read on demand
+(decision 72). **A GM tool lives in up to six places** — its schema
 (`gmTools.ts`, or `toolSchemas.ts` for state tools), the live whitelist in
 `buildGMStagePrompt`, its executor, `GOOGLE_ESSENTIAL_TOOLS`, its label
 (`gmToolLabels.ts`) and the observer's registration — and they drift; the
@@ -490,6 +501,8 @@ report's §11.3. The ones that shape play:
   and the `target`/`forces_choice` hardness dimensions.
 - `calculate` — math *and comparisons*: `'17+3 >= 15'` comes back TRUE/FALSE.
   The only place a pass/fail verdict is decided, so every check is two steps.
+  One comparison per call, and no functions: letters and commas are stripped
+  before evaluating, so `min(12,10)` silently becomes 1210 (§6.17).
 - `start_challenge` / `record_challenge_result` / `cancel_challenge` —
   multi-roll "best of X successes" challenges (`StoryData.activeChallenge`,
   one at a time). `record_challenge_result` banks an outcome and closes the
@@ -592,8 +605,9 @@ improvises from. The prompt is `app/misc/designer_ai.ts`.
 - `designer_executor.ts` — the deterministic half. Owns `AdventureDraft`,
   applies tool calls to a *copy* so a malformed call can't corrupt the draft,
   and converts with `draftToAdventure` / `adventureToDraft`. It forces
-  `mechanics` and `character_sheet` notes `alwaysOn`, because the GM can't run
-  the game if the rules are only keyword-triggered. Its adventures carry none
+  `mechanics` and `character_sheet` notes `alwaysOn`, but the GM prompt never
+  reads that flag: character sheets load in full by type, and rules notes
+  are listed by title (§6.15). Its adventures carry none
   of the legacy arrays; `ensureStoryDataArrays()` backfills them when a story
   starts or loads.
 - `useDesignerSession.ts` — the bounded tool loop (`MAX_TOOL_ROUNDS = 5`), the
@@ -622,7 +636,9 @@ survives because the OCR pipeline uses it.
 `character_sheet`, `mechanics`, `secret`, `table`, `dm_instructions`,
 `story_instructions` and `gm_plan`, plus six legacy aliases; notes have a
 two-pass `visibility`: `always_reveal` (the default when unset), `hidden`,
-`to_be_revealed` and `check_per_turn`. Fields
+`to_be_revealed` and `check_per_turn`. `read_notes` wraps the hidden kinds in
+`[[HIDDEN_LORE]]` markers, but the function meant to strip them before the
+narrator has no caller, so the narrator receives that text (§6.16). Fields
 marked `DEPRECATED` are back-compat only — grep for it before assuming a
 field is live.
 
