@@ -58,6 +58,43 @@ import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 import { initializeAbility } from "@/app/misc/abilitySystem";
 
+const VISIBILITY_RESTRICTION: Record<string, number> = {
+  always_reveal: 0,
+  check_per_turn: 1,
+  to_be_revealed: 2,
+  hidden: 3,
+};
+
+/**
+ * What a merged note keeps of its sources' identity (decision: PR C). The
+ * first source linked to the library keeps its `libraryNoteId`, so a system's
+ * notes still resolve the system after the GM consolidates them; `type` is
+ * kept only when every source shares it; and `visibility` is the most
+ * restrictive among the sources, so merging a hidden note into a visible one
+ * never reveals it. Fields that would be the default are left off.
+ */
+export function mergedLoreIdentity(
+  sources: StoryLore[],
+): Partial<Pick<StoryLore, "libraryNoteId" | "type" | "visibility">> {
+  const out: Partial<Pick<StoryLore, "libraryNoteId" | "type" | "visibility">> =
+    {};
+  const linked = sources.find((s) => s.libraryNoteId);
+  if (linked?.libraryNoteId) out.libraryNoteId = linked.libraryNoteId;
+  const first = sources[0]?.type;
+  if (first && sources.every((s) => s.type === first)) out.type = first;
+  let worst = 0;
+  let worstValue: StoryLore["visibility"];
+  for (const s of sources) {
+    const rank = VISIBILITY_RESTRICTION[s.visibility ?? "always_reveal"] ?? 0;
+    if (rank > worst) {
+      worst = rank;
+      worstValue = s.visibility;
+    }
+  }
+  if (worstValue) out.visibility = worstValue;
+  return out;
+}
+
 /**
  * Calculate relationship value change based on magnitude, difficulty, and current value.
  * Enemies are hard to befriend (small gains), friends are easy to lose (big losses).
@@ -1693,8 +1730,10 @@ export function executeTools(
           continue;
         }
 
-        const sourceTitles = args.source_titles as string[];
-        const targetTitle = args.target_title as string;
+        // The schema sent to the model names these targetTitle/sourcesTitles;
+        // the snake_case spelling is what this handler was written against.
+        const sourceTitles = (args.source_titles ?? args.sourcesTitles) as string[];
+        const targetTitle = (args.target_title ?? args.targetTitle) as string;
         const separator = (args.separator as string) || "\n\n---\n\n";
         const deleteSourcesFlag = args.delete_sources !== false; // Default true
 
@@ -1749,6 +1788,7 @@ export function executeTools(
           keys: [],
           on: sourceLore.every((s) => s.item.on !== false),
           embedded: false,
+          ...mergedLoreIdentity(sourceLore.map((s) => s.item)),
         };
 
         // Add the merged entry

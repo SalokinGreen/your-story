@@ -62,9 +62,9 @@ describe("resolveSystem", () => {
     expect(on.usesSystemTools).toBe(true);
   });
 
-  it("handles missing lore and the empty default registry", () => {
+  it("handles missing lore", () => {
     expect(resolveSystem({ lore: undefined as never, systemState: undefined }).usesSystemTools).toBe(false);
-    expect(BUILTIN_SYSTEMS).toEqual([]);
+    expect(BUILTIN_SYSTEMS.map((s) => s.id)).toEqual(["blood-and-bone"]);
   });
 
   it("names the four tools", () => {

@@ -1,10 +1,11 @@
 # Default RPG systems — design
 
-**Status:** approved, 2026-10-22 (decision 88). Decisions 62–89 in
-[`decisions.md`](decisions.md); the author's open questions are answered in
-§7. The implementation plan is
-[`default-systems-implementation-plan.md`](default-systems-implementation-plan.md);
-building waits for the author's yes on it. The source text for Blood &
+**Status:** approved, 2026-10-22 (decision 88); **built** in three PRs
+(A the engine, B the screens and library, C the content), 2026-10-22 — the
+plan's "Decisions made during implementation" records where the build
+differs. Decisions 62–89 in [`decisions.md`](decisions.md); the author's open
+questions are answered in §7. The implementation plan is
+[`default-systems-implementation-plan.md`](default-systems-implementation-plan.md). The source text for Blood &
 Bone's AI edition is [`blood-and-bone/rulebook.md`](blood-and-bone/rulebook.md)
 (decision 89).
 

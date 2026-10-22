@@ -1,9 +1,10 @@
 /**
  * The built-in default systems. Kept in memory, never written to IndexedDB
- * (decision 81). Empty until slice 8 adds Blood & Bone.
+ * (decision 81). Blood & Bone is the first.
  */
 import type { LibraryNote } from "../localNotesLibraryManager";
 import type { LocalAdventure } from "../localAdventureManager";
+import { BLOOD_AND_BONE } from "./blood-and-bone";
 import type {
   BuiltinAdventure,
   BuiltinNote,
@@ -18,7 +19,7 @@ export type {
   BuiltinSystem,
 } from "./types";
 
-export const BUILTIN_SYSTEMS: BuiltinSystem[] = [];
+export const BUILTIN_SYSTEMS: BuiltinSystem[] = [BLOOD_AND_BONE];
 
 export function isBuiltinId(id: string | undefined): boolean {
   return typeof id === "string" && id.startsWith("builtin:");

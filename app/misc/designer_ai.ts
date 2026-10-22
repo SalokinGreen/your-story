@@ -69,15 +69,19 @@ Never claim to have written something without calling the matching tool. If you 
 /**
  * One paragraph naming the built-in rules packs the author can import from
  * the library, so the Designer points to them instead of rewriting a system
- * that already exists. Empty while there are none, which keeps the system
- * prompt byte-identical for now.
+ * that already exists. Empty when there are none.
  */
 export function builtinSystemsParagraph(
   systems: BuiltinSystem[] = BUILTIN_SYSTEMS,
 ): string {
   if (systems.length === 0) return "";
   const list = systems
-    .map((s) => `**${s.title}** (${s.description})`)
+    .map(
+      (s) =>
+        `**${s.title}** (${s.description}) Packs: ${s.packs
+          .map((p) => `"${p.title}"`)
+          .join(", ")}.`,
+    )
     .join(" ");
   return `## Built-in rules packs\n\nThe library ships ready-made rules the author can import with the library picker: ${list} Importing a pack adds its notes to the adventure and turns on the engine's meters, progress tracks and action rolls. If the author wants one of these systems, tell them to import the pack rather than rewriting its rules, and design the setting, people and opening around it.`;
 }
