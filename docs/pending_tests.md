@@ -90,6 +90,33 @@ they decide whether S7 is a small change or needs fal's storage upload
    and `ctx.tags` for the category names, so an empty category list on the card
    is not a failure but a hint to read the body.
 
+**Added after the engine review (PR #219):**
+
+- **Does `AbortSignal` cancel a request in both native fetches?** Tauri's
+  scoped HTTP plugin and `CapacitorHttp` (Android and iOS). Start a picture on
+  DeepInfra or fal, press Stop (or Undo) while "Painting…" shows. *Expected:*
+  the card ends "Cancelled" at once, and the provider call stops (Debug Logs
+  shows no later "done"). *Failure looks like:* the request keeps running
+  until it answers; the result is still dropped (not saved, billed or
+  attached, `imageJobs.runJob`), so the cost is only time and the provider's
+  own bill.
+- **Does a 1–3 MB base64 `sync_mode` response arrive intact through both
+  native fetches?** One FLUX.2 [pro] portrait on the desktop and on the APK.
+  *Expected:* a normal picture. *Failure looks like:* a "Picture failed" card
+  mentioning JSON, or a truncated or garbled picture.
+- **Do DeepInfra and OpenRouter answer with a link instead of bytes, and which
+  host?** The code fetches a link once (`imageFetch.ts`), but the desktop
+  allowlist has no entry for those image hosts. If a card reads "Could not
+  fetch the picture: …" naming a host, add it to
+  `src-tauri/capabilities/default.json` and rebuild.
+- **Clear this story's pictures.** Make a portrait, Clear (Story Editor →
+  Story → Pictures), then ask the GM for that NPC's portrait. *Expected:* the
+  GM is not told "already has a portrait", and the NPC row shows its emoji
+  again.
+- **Leave the story while a picture paints**, open another story, wait. *Expected:*
+  the other story is untouched; on reopening the first, the picture is on its
+  NPC or turn.
+
 **The built apps (`tauri build` launched, then the APK):**
 
 - **The allowlist.** In the desktop app with a fal key, press **Illustrate

@@ -27,9 +27,11 @@ import {
 import {
   enqueueImageJob,
   cancelImageJobsForTurn,
+  getImageJobState,
   type ImageJobDeps,
   type ImageToolContext,
 } from "@/app/misc/imageJobs";
+import { collectImageIds, missingImageIds } from "@/app/misc/imageStore";
 import { getImageSettings, isImageToolAvailable } from "@/app/misc/imageSettings";
 import {
   buildChoicesPrompt,
@@ -933,6 +935,24 @@ export async function generateStoryTurn(
         }
       : undefined;
 
+  // Ids StoryData points to whose file is not here (cleared, or made on another
+  // device) count as no picture for the "already has one" checks; a picture
+  // still painting is not missing.
+  if (imageToolContext && options.storyId) {
+    try {
+      const missing = await missingImageIds(
+        options.storyId,
+        collectImageIds(storyData),
+      );
+      for (const id of Array.from(missing)) {
+        if (getImageJobState(id)?.status === "pending") missing.delete(id);
+      }
+      imageToolContext.missingImageIds = missing;
+    } catch {
+      // No store to ask (a test, a locked-down WebView): every id counts as present.
+    }
+  }
+
   let preTurnSnapshot: StoryData | null = null;
   try {
     preTurnSnapshot = structuredClone(storyData);
@@ -1596,7 +1616,7 @@ export async function generateStoryTurn(
           observerNote = majorFlag.correctivePrompt;
           // The discarded attempt's pictures are for narration nobody will
           // read: drop the queued ones and abort the one painting.
-          cancelImageJobsForTurn(costTurnId);
+          cancelImageJobsForTurn(costTurnId, "gm");
           callbacks.onObserverReset?.(flags, majorFlag);
           continue;
         }

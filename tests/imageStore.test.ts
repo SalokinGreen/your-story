@@ -8,7 +8,9 @@ import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   blobToDataUri,
+  clearImageIds,
   collectImageIds,
+  missingImageIds,
   dataUriToBlob,
   deleteImage,
   deleteImagesForStory,
@@ -119,6 +121,37 @@ describe("collectImageIds", () => {
   it("is empty for a story with no pictures, and tolerates missing arrays", () => {
     expect(collectImageIds({ scene: { parts: [] } } as unknown as StoryData).size).toBe(0);
     expect(collectImageIds({} as unknown as StoryData).size).toBe(0);
+  });
+});
+
+describe("missingImageIds and clearImageIds (engine review 7)", () => {
+  it("reports the ids with no stored file for the story", async () => {
+    await saveImage(image("here", "story-a"));
+    await saveImage(image("elsewhere", "story-b"));
+    expect(await missingImageIds("story-a", ["here", "gone", "elsewhere"])).toEqual(
+      new Set(["gone", "elsewhere"]),
+    );
+    expect(await missingImageIds("story-a", [])).toEqual(new Set());
+  });
+
+  it("drops every picture id from scene parts, NPCs, notes and the player", () => {
+    const sd = {
+      scene: {
+        parts: [
+          { content: "x", user: false, images: [{ imageId: "s1", requestedBy: "gm" }] },
+          { content: "y", user: true },
+        ],
+      },
+      npcs: [{ id: "n1", name: "K", portraitImageId: "p1" }, { id: "n2", name: "B" }],
+      lore: [{ title: "Harbour", imageId: "l1", thumbnailUrl: "data:keep" }],
+      playerPortraitImageId: "me",
+    } as unknown as StoryData;
+    const cleared = { ...sd, ...clearImageIds(sd) } as StoryData;
+    expect(collectImageIds(cleared).size).toBe(0);
+    // Everything else on them is untouched.
+    expect(cleared.scene.parts[0].content).toBe("x");
+    expect(cleared.lore[0].thumbnailUrl).toBe("data:keep");
+    expect(cleared.npcs[0].name).toBe("K");
   });
 });
 

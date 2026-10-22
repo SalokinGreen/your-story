@@ -17,6 +17,7 @@
 import type { NPC, StoryData, SceneImageRef, ImageSubject } from "./structs";
 import { generateFalImage, type FalImageResult } from "./falImageCall";
 import { creatorImageFetch } from "./creatorFetch";
+import { imageUrlToDataUri } from "./imageFetch";
 import {
   dataUriToBlob,
   getImage,
@@ -83,6 +84,12 @@ export interface ImageToolContext {
   enqueue: (
     req: Pick<ImageJobRequest, "subject" | "description" | "featuring" | "target">,
   ) => string;
+  /**
+   * Picture ids StoryData points to whose file is not on this device and whose
+   * job is not running (cleared, or made on another device, decision 59).
+   * The "already has one" checks treat these as no picture.
+   */
+  missingImageIds?: Set<string>;
   /** The turn's part does not exist yet: this adds the card's ref to it. */
   onSceneImage?: (ref: SceneImageRef) => void;
 }
@@ -102,6 +109,7 @@ export interface ImageJobIO {
     prompt: string;
     size: { width: number; height: number };
     keys: ImageKeys;
+    signal?: AbortSignal;
   }) => Promise<
     | { ok: true; dataUri: string }
     | { ok: false; message: string }
@@ -341,25 +349,40 @@ export function detachImageFromTarget(
 function defaultIO(): ImageJobIO {
   return {
     generateFal: generateFalImage,
-    generateOther: async ({ provider, model, prompt, size, keys }) => {
-      const response = await creatorImageFetch({
-        prompt,
-        model,
-        imageType: size.width >= size.height ? "banner" : "thumbnail",
-        provider,
-        openRouterKey: keys.openRouterKey,
-        deepInfraKey: keys.deepInfraKey,
-        plainPrompt: true,
-        size,
-      });
-      const data = (await response.json()) as {
-        imageUrl?: string;
-        error?: string;
-      };
-      if (!response.ok || !data.imageUrl) {
-        return { ok: false, message: data.error || `Image request failed (${response.status})` };
+    generateOther: async ({ provider, model, prompt, size, keys, signal }) => {
+      try {
+        const response = await creatorImageFetch(
+          {
+            prompt,
+            model,
+            imageType: size.width >= size.height ? "banner" : "thumbnail",
+            provider,
+            openRouterKey: keys.openRouterKey,
+            deepInfraKey: keys.deepInfraKey,
+            plainPrompt: true,
+            size,
+          },
+          signal,
+        );
+        const data = (await response.json()) as {
+          imageUrl?: string;
+          error?: string;
+        };
+        if (!response.ok || !data.imageUrl) {
+          return { ok: false, message: data.error || `Image request failed (${response.status})` };
+        }
+        // A provider that answers with a link is fetched once, so "done"
+        // always means real bytes.
+        return await imageUrlToDataUri(data.imageUrl, signal).then((r) =>
+          r.ok ? r : { ok: false as const, message: r.message },
+        );
+      } catch (error) {
+        if (signal?.aborted) return { ok: false, message: "Cancelled" };
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : "The picture request failed.",
+        };
       }
-      return { ok: true, dataUri: data.imageUrl };
     },
     saveImage,
     getImage,
@@ -393,15 +416,26 @@ export function enqueueImageJob(req: ImageJobRequest, deps: ImageJobDeps): strin
   return id;
 }
 
-/** Stop: queued pictures of that turn are dropped and a running one is aborted. */
-export function cancelImageJobsForTurn(costTurnId: string): void {
+/**
+ * Drops the queued pictures of a turn and aborts the one painting. With
+ * `only: "gm"` (an Observer reset, a Retry or an Undo: the GM's attempt is
+ * being thrown away) a picture the player asked for is left alone, though it
+ * bills to the same turn.
+ */
+export function cancelImageJobsForTurn(
+  costTurnId: string,
+  only?: "gm",
+): void {
+  const matches = (job: QueuedJob) =>
+    job.req.costTurnId === costTurnId &&
+    (only === undefined || job.req.requestedBy === only);
   for (let i = queue.length - 1; i >= 0; i--) {
     const job = queue[i];
-    if (job.req.costTurnId !== costTurnId) continue;
+    if (!matches(job)) continue;
     queue.splice(i, 1);
     settle(job, { status: "failed", message: "Cancelled" });
   }
-  if (running && running.req.costTurnId === costTurnId) running.controller.abort();
+  if (running && matches(running)) running.controller.abort();
 }
 
 async function pump(): Promise<void> {
@@ -490,7 +524,7 @@ async function runJob(job: QueuedJob): Promise<void> {
 
   const attempt = async (): Promise<
     | { ok: true; dataUri: string; width: number; height: number }
-    | { ok: false; kind: "declined" | "failed" | "key" | "busy" | "cancelled"; message: string; categories?: string[] }
+    | { ok: false; kind: "declined" | "failed" | "key" | "busy" | "cancelled"; message: string; categories?: string[]; billed?: boolean }
   > => {
     if (provider === "fal") {
       const result: FalImageResult = await io.generateFal({
@@ -509,8 +543,13 @@ async function runJob(job: QueuedJob): Promise<void> {
       prompt,
       size,
       keys: deps.keys,
+      signal: job.controller.signal,
     });
-    if (!result.ok) return { ok: false, kind: "failed", message: result.message };
+    if (!result.ok) {
+      return result.message === "Cancelled"
+        ? { ok: false, kind: "cancelled", message: "Cancelled" }
+        : { ok: false, kind: "failed", message: result.message };
+    }
     return { ok: true, dataUri: result.dataUri, width: size.width, height: size.height };
   };
 
@@ -525,14 +564,40 @@ async function runJob(job: QueuedJob): Promise<void> {
     result = await attempt();
   }
 
+  const recordCost = () =>
+    recordAICall({
+      stage: "image",
+      label: `${req.subject} picture`,
+      modelKey: picked.modelKey,
+      promptTokens: 0,
+      completionTokens: 0,
+      providerReportedUsd: picked.pricePerImage,
+      costTurnId: req.costTurnId,
+    });
+
   if (!result.ok) {
     if (result.kind === "declined") {
+      // fal's safety checker withheld the picture but still billed for it.
+      if (result.billed) recordCost();
       settle(job, { status: "declined", message: result.message, categories: result.categories });
     } else if (result.kind === "cancelled") {
       settle(job, { status: "failed", message: "Cancelled" });
     } else {
       settle(job, { status: "failed", message: result.message });
     }
+    return;
+  }
+
+  // The job was cancelled while the provider was still answering (an Observer
+  // reset, Retry, Undo or Stop): the picture belongs to a discarded attempt, so
+  // it is not saved, billed or attached.
+  if (job.controller.signal.aborted) {
+    settle(job, { status: "failed", message: "Cancelled" });
+    return;
+  }
+  // "Done" must mean a real image, never a link or an error page.
+  if (!result.dataUri.startsWith("data:image/")) {
+    settle(job, { status: "failed", message: "The provider did not return a picture." });
     return;
   }
 
@@ -563,15 +628,7 @@ async function runJob(job: QueuedJob): Promise<void> {
     return;
   }
 
-  recordAICall({
-    stage: "image",
-    label: `${req.subject} picture`,
-    modelKey: picked.modelKey,
-    promptTokens: 0,
-    completionTokens: 0,
-    providerReportedUsd: picked.pricePerImage,
-    costTurnId: req.costTurnId,
-  });
+  recordCost();
 
   deps.patchStoryData((sd) =>
     attachImageToTarget(sd, req.target, job.id, {

@@ -458,6 +458,59 @@ in the order the slices met them.
   because the wiring between the page, `generateStoryTurn` and the executor is
   where this feature could break without a unit test noticing. The whitelist
   cases were added to `tests/aiStaged.gmStageToolWhitelist.test.ts` as planned.
+**After the engine review (2026-10-22, same PR).** One line per finding.
+
+1. **A job that settles mid-turn is lost.** Fixed in `imagePatcher.ts`: while a
+   turn is in flight the patch is applied *in place* to the turn's own StoryData
+   object (`syncInPlace`, which also removes keys the patch removed) and
+   mirrored to state, with no save (the turn's commit saves). Chosen over
+   queueing patches because the turn has about fifteen commit points in
+   `page.tsx` and one in-place write cannot be missed by any of them.
+   `generateTrackedTurn` sets and clears `turnLiveRef` around the three
+   `generateStoryTurn` calls. Open: the fire-and-forget background layers that
+   run after `onComplete` also commit `{...storyData}`; a picture settling in
+   that short window can still be overwritten.
+2. **DeepInfra/OpenRouter jobs cannot be cancelled.** The signal now reaches
+   `creatorImageFetch` and `generateImage`; `runJob` checks `aborted` after the
+   provider answers and before saving, billing or attaching. An abort after an
+   answer means the provider may still have billed; that cost is not recorded
+   (as asked). `cancelImageJobsForTurn(turn, "gm")` cancels only GM-requested
+   jobs; the reset passes `"gm"`.
+3. **A non-data URI was stored as done.** `imageFetch.imageUrlToDataUri` fetches
+   an https result once through `getProviderFetch` (it checks the status, a
+   `image/*` content type and a non-empty body) and `runJob` refuses anything
+   that is not a `data:image/` URI. The desktop allowlist has no entry for those
+   providers' image hosts (unknown); a blocked host fails the card with its
+   name. Pending test added.
+4. **fal's safety-checker block is billed.** `generateFalImage` marks that
+   result `billed: true` and the job records the cost on a decline. A 422 policy
+   decline is not recorded (fal does not run the model).
+5. **Discarded attempts keep running.** A full-reroll Retry and Undo call
+   `cancelImageJobsForTurn(lastTurnCostId, "gm")` (the id comes from the last
+   turn's result, kept in `lastTurnCostIdRef`). The reword-only Retry keeps its
+   pictures, as before.
+6. **A stale page saves over a newer story.** `buildImageJobDeps` is safe after
+   unmount: `mountedRef` false sends the patch to the stored story
+   (`getLocalStory`, patch, `saveLocalStory`) and never touches the old page's
+   state. Open: if the same story is reopened before the job settles, the new
+   page's in-memory copy may be older than the stored one and overwrite it at
+   its next autosave.
+7. **Clear left the ids.** `clearImageIds` strips every picture id with the files.
+   The executor's "already has one" checks treat an id whose file is missing as
+   none: `generateStoryTurn` asks the store once per turn
+   (`missingImageIds`), leaving out ids whose job is still pending, and passes
+   the set on `ImageToolContext.missingImageIds`. This also covers another
+   device (decision 59).
+8. **ContextViewer** passes `imageToolAvailable` and the cap, from the saved keys
+   and image settings.
+- **Tests that failed before the fix:** the five in `imageJobs.test.ts`
+  (signal, late arrival, GM-only cancel, junk URI, billed decline) and the two
+  in `imageTool.executor.test.ts` (missing file) were run red first. Finding 1's
+  logic lives in a React page, so it was extracted to `imagePatcher.ts`; its
+  test includes one that reproduces the old behaviour (a patch on a separate
+  copy is lost by the turn's `{...storyData}`) next to the fixed path, rather
+  than failing against deleted code.
+
 - **Not done, deliberately:** nothing in `estimateTurnCost` (the pre-turn
   prediction) knows about pictures; the "Pictures" row shows in the actual
   cost only. Story export drops nothing new (ids only).

@@ -179,6 +179,54 @@ export function collectImageIds(storyData: StoryData): Set<string> {
   return ids;
 }
 
+/** Which of `ids` have no stored file for this story on this device. */
+export async function missingImageIds(
+  storyId: string,
+  ids: Iterable<string>,
+): Promise<Set<string>> {
+  const wanted = Array.from(ids);
+  if (wanted.length === 0) return new Set();
+  const db = await openDB();
+  try {
+    const present = new Set((await imagesForStory(db, storyId)).map((i) => i.id));
+    return new Set(wanted.filter((id) => !present.has(id)));
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * The StoryData fields that drop every picture id: after "Clear this story's
+ * pictures" nothing may point at a file that is gone, or the GM would be told
+ * "already has one" for ever.
+ */
+export function clearImageIds(storyData: StoryData): Partial<StoryData> {
+  return {
+    scene: {
+      ...storyData.scene,
+      parts: storyData.scene.parts.map((p) => {
+        if (!p.images) return p;
+        const { images: _gone, ...rest } = p;
+        void _gone;
+        return rest;
+      }),
+    },
+    npcs: (storyData.npcs ?? []).map((n) => {
+      if (!n.portraitImageId) return n;
+      const { portraitImageId: _gone, ...rest } = n;
+      void _gone;
+      return rest as typeof n;
+    }),
+    lore: (storyData.lore ?? []).map((l) => {
+      if (!l.imageId) return l;
+      const { imageId: _gone, ...rest } = l;
+      void _gone;
+      return rest as typeof l;
+    }),
+    playerPortraitImageId: undefined,
+  };
+}
+
 /** A data: URI as a Blob, without a network round trip. */
 export function dataUriToBlob(dataUri: string): Blob {
   const comma = dataUri.indexOf(",");

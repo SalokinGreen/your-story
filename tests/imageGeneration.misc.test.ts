@@ -10,6 +10,7 @@ const fetchMock = vi.fn();
 vi.mock("@/app/misc/platformFetch", () => ({ getProviderFetch: () => fetchMock }));
 
 import { shrinkGeneratedImage } from "@/app/misc/imageShrink";
+import { imageUrlToDataUri } from "@/app/misc/imageFetch";
 import { generateImage } from "@/app/misc/generateImageCall";
 import { findMentionedNpcIds } from "@/app/misc/noteMentions";
 import { fallbackDescription } from "@/app/misc/imagePromptWriter";
@@ -87,6 +88,37 @@ describe("generateImage plainPrompt (in-play pictures)", () => {
     expect(content).toContain("A harbour");
     expect(content).not.toContain("text adventure");
     expect(content).not.toContain("game cover style");
+  });
+});
+
+describe("imageUrlToDataUri (a provider that answers with a link)", () => {
+  it("passes a data: image through and fetches an https link once", async () => {
+    const same = await imageUrlToDataUri("data:image/png;base64,AAAA");
+    expect(same).toEqual({ ok: true, dataUri: "data:image/png;base64,AAAA" });
+
+    fetchMock.mockResolvedValue(
+      new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-type": "image/webp" },
+      }),
+    );
+    const fetched = await imageUrlToDataUri("https://cdn.example/p.webp");
+    expect(fetched).toEqual({ ok: true, dataUri: "data:image/webp;base64,AQID" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an error page, an empty body, a non-https link and a failed fetch", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response("<html>", { status: 200, headers: { "content-type": "text/html" } }),
+    );
+    expect((await imageUrlToDataUri("https://x.example/a")).ok).toBe(false);
+    fetchMock.mockResolvedValueOnce(new Response("nope", { status: 403 }));
+    expect((await imageUrlToDataUri("https://x.example/b")).ok).toBe(false);
+    expect((await imageUrlToDataUri("http://x.example/c")).ok).toBe(false);
+    fetchMock.mockRejectedValueOnce(new Error("blocked by scope"));
+    const failed = await imageUrlToDataUri("https://x.example/d");
+    expect(failed).toMatchObject({ ok: false });
+    if (!failed.ok) expect(failed.message).toContain("blocked by scope");
   });
 });
 

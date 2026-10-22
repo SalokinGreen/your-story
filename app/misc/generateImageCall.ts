@@ -112,6 +112,7 @@ async function handleOpenRouter(
   openRouterKey: string | undefined,
   plainPrompt = false,
   size?: { width: number; height: number },
+  signal?: AbortSignal,
 ): Promise<GenerateImageSuccess | GenerateImageError> {
   if (!openRouterKey) {
     return {
@@ -155,6 +156,7 @@ async function handleOpenRouter(
         model: modelConfig.model,
         messages: [{ role: "user", content: fullPrompt }],
       }),
+      signal,
     });
 
     if (!response.ok) {
@@ -194,6 +196,7 @@ async function handleDeepInfra(
   deepInfraKey: string | undefined,
   plainPrompt = false,
   size?: { width: number; height: number },
+  signal?: AbortSignal,
 ): Promise<GenerateImageSuccess | GenerateImageError> {
   const modelKey = requestedModel || "Bria 3.2";
   const modelConfig = getDeepInfraModelConfig(modelKey);
@@ -234,6 +237,7 @@ async function handleDeepInfra(
           size: sizeDescription,
           n: 1,
         }),
+        signal,
       },
     );
 
@@ -276,6 +280,7 @@ async function handleDeepInfra(
 
 export async function generateImage(
   body: GenerateImageRequestBody,
+  signal?: AbortSignal,
 ): Promise<GenerateImageSuccess | GenerateImageError> {
   const {
     prompt,
@@ -297,7 +302,7 @@ export async function generateImage(
   }
 
   if (provider === "openrouter") {
-    return handleOpenRouter(prompt, requestedModel, imageType, openRouterKey, plainPrompt, size);
+    return handleOpenRouter(prompt, requestedModel, imageType, openRouterKey, plainPrompt, size, signal);
   }
-  return handleDeepInfra(prompt, requestedModel, imageType, deepInfraKey, plainPrompt, size);
+  return handleDeepInfra(prompt, requestedModel, imageType, deepInfraKey, plainPrompt, size, signal);
 }

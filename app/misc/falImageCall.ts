@@ -29,7 +29,14 @@ export type FalFailureKind = "declined" | "key" | "busy" | "failed" | "cancelled
 
 export type FalImageResult =
   | { ok: true; dataUri: string; width: number; height: number; seed?: number }
-  | { ok: false; kind: FalFailureKind; message: string; categories?: string[] };
+  | {
+      ok: false;
+      kind: FalFailureKind;
+      message: string;
+      categories?: string[];
+      /** fal charged for this call although it returned no usable picture. */
+      billed?: boolean;
+    };
 
 interface FalImageEntry {
   url?: string;
@@ -147,10 +154,12 @@ export async function generateFalImage(req: FalImageRequest): Promise<FalImageRe
 
     // fal sends a black picture when its safety checker trips: declined, never saved.
     if (data.has_nsfw_concepts?.[0] === true) {
+      // fal ran the model and bills for it even though the picture is withheld.
       return {
         ok: false,
         kind: "declined",
         message: "The image service declined this one.",
+        billed: true,
       };
     }
 

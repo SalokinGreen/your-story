@@ -3206,6 +3206,10 @@ function executeGenerateImage(
     );
   };
 
+  // An id whose file is gone (cleared, or made on another device) is no picture.
+  const hasPicture = (id: string | undefined) =>
+    !!id && !ctx.missingImageIds?.has(id);
+
   let target: ImageJobTarget;
   let npcIndex = -1;
   let loreIndex = -1;
@@ -3218,14 +3222,14 @@ function executeGenerateImage(
         `npc_id "${params.npc_id ?? ""}" is not a known NPC. Add the NPC first, then ask for the portrait.`
       );
     }
-    if (npc.portraitImageId) {
+    if (hasPicture(npc.portraitImageId)) {
       return refuse(`${npc.name} already has a portrait.`);
     }
     npcIndex = npcs.indexOf(npc);
     target = { kind: "npc", npcId: npc.id };
     featuring.push(npc.id);
   } else if (subject === "player") {
-    if (storyData.playerPortraitImageId) {
+    if (hasPicture(storyData.playerPortraitImageId)) {
       return refuse("the player character already has a portrait.");
     }
     target = { kind: "player" };
@@ -3239,7 +3243,7 @@ function executeGenerateImage(
         `lore_title "${params.lore_title ?? ""}" is not the title of a note. Use the exact title.`
       );
     }
-    if (lore[loreIndex].imageId || lore[loreIndex].thumbnailUrl) {
+    if (hasPicture(lore[loreIndex].imageId) || lore[loreIndex].thumbnailUrl) {
       return refuse(`the note "${lore[loreIndex].title}" already has a picture.`);
     }
     target = { kind: "lore", loreTitle: lore[loreIndex].title };

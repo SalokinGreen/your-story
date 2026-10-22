@@ -117,7 +117,7 @@ describe("generateFalImage failures", () => {
       jsonResponse(200, { images: [{ url: PNG_URI }], has_nsfw_concepts: [true] }),
     );
     const result = await generateFalImage(baseReq);
-    expect(result).toMatchObject({ ok: false, kind: "declined" });
+    expect(result).toMatchObject({ ok: false, kind: "declined", billed: true });
     expect("dataUri" in result).toBe(false);
   });
 

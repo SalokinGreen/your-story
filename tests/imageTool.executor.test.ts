@@ -198,6 +198,35 @@ describe("generate_image accepted", () => {
   });
 });
 
+describe("engine review: an id whose file is missing counts as no picture", () => {
+  it("lets the GM make a portrait for an NPC whose stored file is gone (cleared, or another device)", async () => {
+    const { ctx, enqueued } = context({ missingImageIds: new Set(["gone"]) });
+    const sd = story({ npcs: [npc("n1", "Kessa", { portraitImageId: "gone" })] });
+    const r = await run(sd, { subject: "npc", npc_id: "n1", description: "x" }, ctx);
+    expect(r.results[0].success).toBe(true);
+    expect(r.modifiedStoryData.npcs[0].portraitImageId).toBe("job-1");
+    expect(enqueued).toHaveLength(1);
+  });
+
+  it("same for the player and for a note; a present file still refuses", async () => {
+    const { ctx } = context({ missingImageIds: new Set(["gone"]) });
+    const player = await run(story({ playerPortraitImageId: "gone" }), { subject: "player", description: "x" }, ctx);
+    expect(player.results[0].success).toBe(true);
+    const lore = await run(
+      story({ lore: [{ title: "Harbour", content: "x", imageId: "gone" } as StoryLore] }),
+      { subject: "location", lore_title: "Harbour", description: "x" },
+      context({ missingImageIds: new Set(["gone"]) }).ctx,
+    );
+    expect(lore.results[0].success).toBe(true);
+    const present = await run(
+      story({ npcs: [npc("n1", "Kessa", { portraitImageId: "here" })] }),
+      { subject: "npc", npc_id: "n1", description: "x" },
+      ctx,
+    );
+    expect(present.results[0].success).toBe(false);
+  });
+});
+
 describe("the per-scene cap", () => {
   it("allows the cap, refuses beyond it, and says why", async () => {
     const { ctx, enqueued } = context({ maxPerScene: 2 });

@@ -1702,6 +1702,7 @@ export default function MenuPage({
                   {storyDbId ? (
                     <PictureSettings
                       storyDbId={storyDbId}
+                      storyData={storyData}
                       imageStyle={storyData.imageStyle}
                       onUpdateStoryData={onUpdateStoryData}
                     />

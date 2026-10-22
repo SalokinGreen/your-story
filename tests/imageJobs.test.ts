@@ -75,6 +75,8 @@ interface Harness {
   sleeps: number[];
   settled: { id: string; state: ImageJobState }[];
   setFal: (fn: ImageJobIO["generateFal"]) => void;
+  setOther: (fn: ImageJobIO["generateOther"]) => void;
+  otherCalls: { signal?: AbortSignal }[];
 }
 
 function harness(): Harness {
@@ -89,6 +91,8 @@ function harness(): Harness {
     width: 1024,
     height: 768,
   });
+  let other: ImageJobIO["generateOther"] = async () => ({ ok: true, dataUri: PNG_URI });
+  const otherCalls: Harness["otherCalls"] = [];
   let n = 0;
   const deps: ImageJobDeps = {
     keys: { falKey: "k" },
@@ -103,6 +107,10 @@ function harness(): Harness {
         falCalls.push({ model: req.model, prompt: req.prompt, signal: req.signal });
         return fal(req);
       },
+      generateOther: (req) => {
+        otherCalls.push({ signal: req.signal });
+        return other(req);
+      },
       saveImage: async (img) => {
         saved.push(img);
       },
@@ -113,7 +121,17 @@ function harness(): Harness {
       newId: () => `job-${++n}`,
     },
   };
-  return { deps, current, saved, falCalls, sleeps, settled, setFal: (f) => (fal = f) };
+  return {
+    deps,
+    current,
+    saved,
+    falCalls,
+    sleeps,
+    settled,
+    setFal: (f) => (fal = f),
+    setOther: (f) => (other = f),
+    otherCalls,
+  };
 }
 
 function request(overrides: Partial<ImageJobRequest> = {}): ImageJobRequest {
@@ -451,6 +469,76 @@ describe("regenerate", () => {
     await untilSettled(id);
     expect(h.falCalls[0].prompt).toBe("EXACT SAVED PROMPT");
     expect(h.saved[0].id).toBe("old-picture");
+  });
+});
+
+describe("engine review: DeepInfra and OpenRouter jobs can be cancelled", () => {
+  it("hands the job's abort signal to the provider call", async () => {
+    const h = harness();
+    const id = enqueueImageJob(request(), { ...h.deps, keys: { deepInfraKey: "d" } });
+    await untilSettled(id);
+    expect(h.otherCalls[0].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("drops a picture that arrives after the job was cancelled: not saved, billed or attached", async () => {
+    const h = harness();
+    const turn = beginTurnCost();
+    let release!: (r: { ok: true; dataUri: string }) => void;
+    h.setOther(() => new Promise((r) => (release = r)));
+    const id = enqueueImageJob(request({ costTurnId: turn }), { ...h.deps, keys: { deepInfraKey: "d" } });
+    await vi.waitFor(() => expect(h.otherCalls).toHaveLength(1));
+
+    cancelImageJobsForTurn(turn, "gm");
+    release({ ok: true, dataUri: PNG_URI }); // the provider answers anyway
+
+    expect(await untilSettled(id)).toEqual({ status: "failed", message: "Cancelled" });
+    expect(h.saved).toHaveLength(0);
+    expect(getTurnCostReport(turn)!.calls).toBe(0);
+  });
+
+  it("an observer reset cancels only the GM's pictures, not one the player asked for", async () => {
+    const h = harness();
+    const turn = beginTurnCost();
+    const releases: Array<(r: FalResult) => void> = [];
+    h.setFal((req) => new Promise<FalResult>((resolve) => {
+      releases.push(resolve);
+      req.signal?.addEventListener("abort", () => resolve({ ok: false, kind: "cancelled", message: "Cancelled" }));
+    }));
+    const gm = enqueueImageJob(request({ costTurnId: turn, requestedBy: "gm" }), h.deps);
+    const player = enqueueImageJob(request({ costTurnId: turn, requestedBy: "player" }), h.deps);
+    await vi.waitFor(() => expect(h.falCalls).toHaveLength(1));
+
+    cancelImageJobsForTurn(turn, "gm");
+
+    expect(await untilSettled(gm)).toEqual({ status: "failed", message: "Cancelled" });
+    // The player's job is still queued and runs next.
+    await vi.waitFor(() => expect(h.falCalls).toHaveLength(2));
+    releases[1]({ ok: true, dataUri: PNG_URI, width: 1024, height: 768 });
+    expect((await untilSettled(player)).status).toBe("done");
+  });
+});
+
+describe("engine review: done means a real image", () => {
+  it("fails a result that is not a data: image instead of storing junk", async () => {
+    const h = harness();
+    h.setOther(async () => ({ ok: true, dataUri: "https://cdn.example/pic.png" }));
+    const id = enqueueImageJob(request(), { ...h.deps, keys: { deepInfraKey: "d" } });
+    const state = await untilSettled(id);
+    expect(state.status).toBe("failed");
+    expect(h.saved).toHaveLength(0);
+  });
+});
+
+describe("engine review: a blocked picture is still billed", () => {
+  it("records the cost when fal's safety checker withheld the picture", async () => {
+    const h = harness();
+    const turn = beginTurnCost();
+    h.setFal(async () => ({ ok: false, kind: "declined", message: "no", billed: true }));
+    const id = enqueueImageJob(request({ costTurnId: turn }), h.deps);
+    expect((await untilSettled(id)).status).toBe("declined");
+    const report = getTurnCostReport(turn)!;
+    expect(report.byStage.find((s) => s.stage === "image")?.costUsd).toBeCloseTo(0.0024, 6);
+    expect(h.saved).toHaveLength(0);
   });
 });
 

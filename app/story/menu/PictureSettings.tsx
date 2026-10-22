@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { DynamicIcon } from "../../components/DynamicIcon";
 import { DEFAULT_IMAGE_STYLE, getImageSettings } from "../../misc/imageSettings";
-import { deleteImagesForStory, storyImageBytes } from "../../misc/imageStore";
+import { clearImageIds, deleteImagesForStory, storyImageBytes } from "../../misc/imageStore";
 import type { StoryData } from "../../misc/structs";
 
 function formatBytes(bytes: number): string {
@@ -19,10 +19,12 @@ function formatBytes(bytes: number): string {
 
 export default function PictureSettings({
   storyDbId,
+  storyData,
   imageStyle,
   onUpdateStoryData,
 }: {
   storyDbId: string;
+  storyData: StoryData;
   imageStyle: string | undefined;
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
 }) {
@@ -56,6 +58,8 @@ export default function PictureSettings({
     setClearing(true);
     try {
       await deleteImagesForStory(storyDbId);
+      // And every id that pointed at them, so nothing says "already has one".
+      onUpdateStoryData(clearImageIds(storyData));
     } finally {
       setClearing(false);
     }

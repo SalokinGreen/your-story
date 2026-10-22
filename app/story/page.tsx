@@ -68,6 +68,8 @@ import {
   type ImageJobState,
 } from "../misc/imageJobs";
 import { getImageSettings } from "../misc/imageSettings";
+import { applyStoryPatch } from "../misc/imagePatcher";
+import { cancelImageJobsForTurn } from "../misc/imageJobs";
 import { pickImageProvider } from "../misc/imageProvider";
 import {
   writeSceneDescription,
@@ -572,6 +574,30 @@ function StoryPageContent() {
   useEffect(() => {
     storyDataRef.current = storyData;
   }, [storyData]);
+  // The StoryData object a turn in flight is mutating (see imagePatcher.ts),
+  // false-ish between turns; and whether this page is still on screen.
+  const turnLiveRef = useRef<StoryData | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  // The last finished turn's cost-ledger id, to cancel its pictures on Retry/Undo.
+  const lastTurnCostIdRef = useRef<string | null>(null);
+  async function generateTrackedTurn(
+    ...args: Parameters<typeof generateStoryTurn>
+  ) {
+    turnLiveRef.current = args[0];
+    try {
+      const result = await generateStoryTurn(...args);
+      lastTurnCostIdRef.current = result.meta?.costTurnId ?? null;
+      return result;
+    } finally {
+      turnLiveRef.current = null;
+    }
+  }
   const [illustrating, setIllustrating] = useState(false);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
   const [sourceAdventureId, setSourceAdventureId] = useState<string | null>(
@@ -1826,19 +1852,49 @@ function StoryPageContent() {
   // that asked for them, so a job reads and writes the LATEST StoryData through
   // the ref and saves what it changed.
   function buildImageJobDeps(): ImageJobDeps {
+    // Captured now: this closure outlives the page when a story is left while a
+    // picture paints.
+    const patchStoryId = storyDbId;
     return {
       keys: { falKey, deepInfraKey: deepinfraKey, openRouterKey },
       getSettings: getImageSettings,
       getStoryData: () => storyDataRef.current,
-      patchStoryData: (fn) => {
-        const current = storyDataRef.current;
-        if (!current) return;
-        const next = fn(current);
-        if (next === current) return;
-        storyDataRef.current = next;
-        setStoryData(next);
-        saveProgress(next);
-      },
+      // Three paths (imagePatcher.ts): into the running turn's own object, into
+      // state plus a save, or, once this page is gone, into the stored story.
+      patchStoryData: (fn) =>
+        applyStoryPatch(
+          {
+            getLive: () => turnLiveRef.current,
+            getState: () => storyDataRef.current,
+            setState: (next) => {
+              storyDataRef.current = next;
+              setStoryData(next);
+            },
+            save: (next) => saveProgress(next),
+            isMounted: () => mountedRef.current,
+            patchStored: (patch) => {
+              if (!patchStoryId) return;
+              void (async () => {
+                try {
+                  const { getLocalStory, saveLocalStory } = await import(
+                    "@/app/misc/localStoryManager"
+                  );
+                  const stored = await getLocalStory(patchStoryId);
+                  if (!stored) return;
+                  const next = patch(stored.storyData);
+                  if (next !== stored.storyData) {
+                    await saveLocalStory(patchStoryId, next);
+                  }
+                } catch (error) {
+                  logger.error("Could not file a picture on the stored story", {
+                    error: error instanceof Error ? error.message : String(error),
+                  });
+                }
+              })();
+            },
+          },
+          fn,
+        ),
       onSettled: (_jobId: string, state: ImageJobState, req: ImageJobRequest) => {
         // A scene picture's card shows its own failure; a portrait has no card.
         if (req.target.kind === "scenePart") return;
@@ -2423,7 +2479,7 @@ function StoryPageContent() {
       // Create abort controller for this generation
       generationAbortRef.current = new AbortController();
 
-      await generateStoryTurn(
+      await generateTrackedTurn(
         storyData,
         "", // Custom input already in storyData.scene.parts
         {
@@ -3036,7 +3092,7 @@ function StoryPageContent() {
     generationAbortRef.current = new AbortController();
 
     try {
-      await generateStoryTurn(
+      await generateTrackedTurn(
         storyData,
         "", // User choice already in storyData.scene.parts
         {
@@ -3973,6 +4029,10 @@ function StoryPageContent() {
     // rerolls first.
     const snapshot = undoStackRef.current[undoStackRef.current.length - 1];
     if (snapshot) {
+      // The attempt being rerolled is thrown away: so are its pictures.
+      if (lastTurnCostIdRef.current) {
+        cancelImageJobsForTurn(lastTurnCostIdRef.current, "gm");
+      }
       const userChoiceContent = userChoicePart.content;
       const savedPlayerComment = userChoicePart.playerComment;
       const savedSpeakerIds = userChoicePart.speakerIds;
@@ -4172,7 +4232,7 @@ function StoryPageContent() {
     });
 
     try {
-      await generateStoryTurn(
+      await generateTrackedTurn(
         storyData,
         userChoiceContent, // Use the user's original choice content
         {
@@ -4559,6 +4619,10 @@ function StoryPageContent() {
     }
 
     logger.action("User requested undo");
+    // The undone turn's GM pictures are still queued or painting: drop them.
+    if (lastTurnCostIdRef.current) {
+      cancelImageJobsForTurn(lastTurnCostIdRef.current, "gm");
+    }
 
     // Restore in place (mutate the existing object, matching this
     // codebase's storyData-mutation convention) rather than swapping to a
