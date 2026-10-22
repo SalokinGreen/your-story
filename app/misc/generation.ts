@@ -172,6 +172,7 @@ const DICE_TOOLS = [
   "npc_roll",
   "calculate",
   "record_challenge_result",
+  "action_roll",
 ];
 
 /**

@@ -1188,6 +1188,8 @@ export async function checkPlayerAgencyViolation(
 const OUTCOME_CHECK_TOOL_NAMES = new Set([
   "calculate",
   "record_challenge_result",
+  // action_roll's engine-decided verdict: a miss narrated as a success is a mismatch.
+  "action_roll",
 ]);
 
 export interface RollOutcomeForCheck {

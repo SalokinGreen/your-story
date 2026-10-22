@@ -12,7 +12,11 @@ import { DESIGN_FIXTURE, buildFixtureStory, warmTokenizer } from "./helpers/turn
 vi.setConfig({ testTimeout: 120_000 }); // the fixture story is slow to build
 
 const DEFAULT_LIST_BUDGET = 10_000; // tokens (was 15,841 before PR T3)
-const MANUAL_DICE_EXTRA = 400; // ask_for_roll, the one gated tool today
+const MANUAL_DICE_EXTRA = 400; // ask_for_roll
+// The four system tools (manage_meter, manage_track, end_session, action_roll),
+// offered only to stories that use a system (decision 79). Their own bound, so
+// the default list's budget is not loosened for them.
+const SYSTEM_TOOLS_EXTRA = 1_500; // measured 1,204 on 2026-10-22
 
 beforeAll(async () => {
   await warmTokenizer();
@@ -49,6 +53,23 @@ describe("the GM's tool list", () => {
     const extra =
       estimateTokens(JSON.stringify(manual)) - estimateTokens(JSON.stringify(base));
     expect(extra).toBeLessThan(MANUAL_DICE_EXTRA);
+  });
+
+  it("adds only a bounded amount for the system tools, and only to a system story", () => {
+    const base = toolsFor(emptyStory());
+    const sys = toolsFor(
+      emptyStory({
+        systemState: { usesSystemTools: true, sessionCount: 0, dedupKeys: [] },
+      } as Partial<StoryData>),
+    );
+    for (const n of ["manage_meter", "manage_track", "end_session", "action_roll"]) {
+      expect(sys.map((t) => t.function.name)).toContain(n);
+      expect(base.map((t) => t.function.name)).not.toContain(n);
+    }
+    const extra = estimateTokens(JSON.stringify(sys)) - estimateTokens(JSON.stringify(base));
+    expect(extra).toBeLessThan(SYSTEM_TOOLS_EXTRA);
+    // a system story's whole list still fits the default budget plus its own bound
+    expect(estimateTokens(JSON.stringify(sys))).toBeLessThan(DEFAULT_LIST_BUDGET + SYSTEM_TOOLS_EXTRA);
   });
 
   it("is byte-identical across turns of the same story", () => {

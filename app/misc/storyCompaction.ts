@@ -332,6 +332,11 @@ export async function buildCondensedStorySeed(
   seed.gameOver = undefined;
   seed.activeChallenge = undefined;
   seed.timers = [];
+  // Meters and tracks carry over; scene count restarts, so scene-scoped keys
+  // would collide with the new count, so the dedup keys are cleared.
+  if (seed.systemState) {
+    seed.systemState = { ...seed.systemState, dedupKeys: [] };
+  }
   seed.combatState = undefined;
   seed.reasoningTierState = undefined;
   seed.pendingRandomEvents = [];

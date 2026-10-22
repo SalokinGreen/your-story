@@ -51,6 +51,9 @@ const KEEP_WHOLE_TOOLS = new Set([
   "roll_portent",
   "ask_for_roll",
   "ask_question",
+  // Rolls with a verdict the GM must still see in later turns (decision 90).
+  "action_roll",
+  "manage_track",
 ]);
 
 function formatTokens(n: number): string {

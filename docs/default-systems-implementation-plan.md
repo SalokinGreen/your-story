@@ -1,7 +1,9 @@
 # Default RPG systems — implementation plan
 
-**Status:** written 2026-10-22, **waiting for the author's yes** (CLAUDE.md:
-no coding without an explicit blessing on the plan). It implements
+**Status:** written 2026-10-22; **approved by decision 108** (the author,
+2026-10-22: "Approved. Also pull from origin and do the token saving + default
+system plans."). PR A (slices 1-5) is built on `claude/default-systems-a`;
+B and C are not started. It implements
 [`default-systems-design.md`](default-systems-design.md), approved by
 decision 88; decisions 62–89 are in [`decisions.md`](decisions.md). The
 source text for the content slice is
@@ -850,4 +852,54 @@ catch a wrong rule.
 
 ## Decisions made during implementation
 
-*None yet.*
+### 2026-10-22 - PR A (slices 1-5), `claude/default-systems-a`
+
+Built on master after token savings T1-T3, image generation I1 and party
+mode (baseline: 153 files, 2,413 tests; after: 162 files, 2,500 tests).
+Approval is decision 108.
+
+- **Live block, not the state message.** The meters and challenge sections
+  are two optional fields on `LiveBlockInput` (`metersSection`,
+  `challengeSection`), written after the timers. A test checks that a meter
+  tick changes only the live-block message. Optional, so the existing
+  `buildLiveBlock` test and any other caller compile unchanged.
+- **Tool budget.** The four system tools add 1,204 estimated tokens to a
+  system story (own bound in `tests/toolBudget.test.ts`, 1,500). The default
+  list is 9,822 under its unchanged 10,000 bound: the wider
+  `start_challenge` (mode, rounds) and `record_challenge_result` (three more
+  outcomes) schemas are paid by every story, as the plan's §4.7 said.
+- **`create_set` needs a resolved system.** Meter sets come from
+  `resolveSystem().meterSets`, which is non-empty only when the lore holds a
+  built-in system's notes. A hand-set `usesSystemTools: true` with no
+  built-in notes can use `create`, not `create_set` (its error lists "none").
+  Tests install a test system into the `BUILTIN_SYSTEMS` array.
+- **`onlyUp` is stricter than the plan said.** `set` below the current value
+  and `set_cap` below it are refused as well as a negative `adjust`, since
+  either would make the meter fall.
+- **A closed track is not markable.** `mark` and `progress_roll` on a track
+  whose status is not `active` return an `[ERROR]`; `set_status` and the
+  others still work. `progress_roll` never changes the status itself.
+- **`start_challenge` errors name the missing field.** A `first_to` call
+  without `required_successes`/`max_failures`, or a `tally` call without
+  `rounds` 2-10, returns `success: false` with `[ERROR: ...]`. In tally mode
+  `currentSuccesses`/`currentFailures` still count hits and misses (weak hits
+  count for neither), so the same fields work for display.
+- **A tally challenge refuses `success`/`failure`** with an error and leaves
+  the challenge untouched; `first_to` accepts the hit/miss outcomes.
+- **`STATE_CHANGE_TOOLS` keeps `"start_challenge"`.** The GM path still
+  emits that name into the advisory leniency log (`generation.ts`), so only
+  the duplicate handler and schema were removed. `parseChallengeRoundsValue`
+  lost its last live caller with the duplicate; the import was dropped.
+- **`manage_track` joins `KEEP_WHOLE_TOOLS`** with `action_roll`, since a
+  progress roll is a roll with a verdict (decision 90).
+- **Hidden meters.** A result for a `hidden` meter is stamped
+  `hiddenFromPlayer`; the GM's own state section still lists it.
+- **The Designer.** `AdventureDraft.systemState` carries only the hand
+  switch. `draftToAdventure` does not carry `meters`/`progressTracks` (a
+  draft has no field for them), so PR B must handle a built-in starter that
+  has them when it is opened in the Designer (slice 7's "Open a copy").
+  The Designer's built-in-systems paragraph is empty while the registry is,
+  so its system prompt is byte-identical until PR C.
+- **Tests.** Tally tests are a new file (`gmTools.tallyChallenge.test.ts`)
+  rather than an extension of `challengeParity`; a shared
+  `tests/helpers/systemsHarness.ts` holds the story and test-system helpers.

@@ -56,6 +56,12 @@ const TOOL_LABELS: Record<string, string> = {
   // Timers
   manage_timer: "Managing timer",
 
+  // Systems (meters, tracks, sessions, action rolls)
+  manage_meter: "Updating a meter",
+  manage_track: "Updating a track",
+  end_session: "Ending the night",
+  action_roll: "Rolling the action",
+
   // Goals / threads
   create_goal: "Creating goal",
   update_goal: "Updating goal",

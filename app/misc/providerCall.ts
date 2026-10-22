@@ -213,6 +213,13 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "npc_roll",
   // Pictures (only present in the request when imageToolAvailable)
   "generate_image",
+  // System tools (only present for stories that use a system, decision 79).
+  // This does not fix status report 6.14: start_challenge and
+  // record_challenge_result are still dropped on Gemini.
+  "manage_meter",
+  "manage_track",
+  "end_session",
+  "action_roll",
   // Terminal - required
   "end_gm_thinking",
 ]);

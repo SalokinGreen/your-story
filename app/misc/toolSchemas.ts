@@ -988,67 +988,6 @@ const gameOverTool: ToolSchema = {
 };
 
 // Scene Challenge (Progress Clock) Tools
-const startChallengeTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "start_challenge",
-    description:
-      "Start a new Scene Challenge (Best of X) for multi-step tasks like combat, chases, heists, or complex negotiations. Use when a task is too significant to resolve in one roll. Guidelines: Small brawl/locked door = don't use (simple check). Dangerous combat = quick (best of 3). Boss fight = standard/extended (best of 5-7). Epic battle = epic (best of 9). Only one challenge can be active at a time.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description:
-            "Challenge name (e.g., 'Battle with the Orcs', 'Escape the Burning Inn', 'Convince the Council')",
-        },
-        description: {
-          type: "string",
-          description:
-            "Brief description of the challenge and win/lose conditions",
-        },
-        rounds: {
-          oneOf: [
-            { type: "number", minimum: 3, maximum: 9 },
-            {
-              type: "string",
-              enum: ["quick", "standard", "extended", "epic"],
-            },
-          ],
-          description:
-            'Challenge length: prefer a plain unquoted tier string - "quick" (best of 3), "standard" (best of 5), "extended" (best of 7), or "epic" (best of 9). Only pass a bare odd number 3-9 (no quotes) if you need an exact custom length instead of a tier.',
-        },
-        points: {
-          oneOf: [
-            { type: "number", minimum: 0 },
-            {
-              type: "string",
-              enum: ["trivial", "minor", "moderate", "major", "legendary"],
-            },
-          ],
-          description:
-            'Points tier awarded on victory: prefer a plain unquoted tier string - "trivial", "minor", "moderate" (default), "major", or "legendary". Only pass a bare number (no quotes) if you need an exact custom value instead of a tier.',
-        },
-        initialSuccesses: {
-          type: "number",
-          description:
-            "Starting successes (use when the triggering action already counts as a success)",
-          minimum: 0,
-          maximum: 3,
-        },
-        initialFailures: {
-          type: "number",
-          description:
-            "Starting failures (use when the triggering action already counts as a failure)",
-          minimum: 0,
-          maximum: 3,
-        },
-      },
-      required: ["name", "rounds"],
-    },
-  },
-};
-
 const updateChallengeTool: ToolSchema = {
   type: "function",
   function: {
@@ -1324,8 +1263,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
 
   gameOverTool,
 
-  // Scene Challenges (4 tools)
-  startChallengeTool,
+  // Scene Challenges (3 tools; start_challenge is a GM tool, gmTools.ts)
   updateChallengeTool,
   resolveChallengeTool,
   cancelChallengeTool,

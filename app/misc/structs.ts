@@ -621,7 +621,7 @@ export interface SceneChallenge {
   id: string; // Unique identifier
   name: string; // Display name (e.g., "Battle with the Orcs")
   description?: string; // Optional description of the challenge
-  rounds: number; // "Best of X" display figure only (odd: 3, 5, 7, 9) - NOT the win/loss threshold, see requiredSuccesses/maxFailures.
+  rounds: number; // first_to: "Best of X" display figure only (odd: 3, 5, 7, 9) - NOT the win/loss threshold, see requiredSuccesses/maxFailures. tally: the real number of results the challenge takes.
   currentSuccesses: number; // Current success count
   currentFailures: number; // Current failure count
   // The actual win/loss thresholds as declared at start_challenge time -
@@ -635,7 +635,13 @@ export interface SceneChallenge {
   active: boolean; // Whether challenge is ongoing
   createdAt: number; // Timestamp when challenge started
   resolvedAt?: number; // Timestamp when challenge ended
-  result?: "won" | "lost"; // Outcome if resolved
+  result?: "won" | "lost" | "even"; // Outcome if resolved ("even": a tally challenge that ended at 0)
+  // "first_to" (default, unset on old saves): currentSuccesses/currentFailures
+  // against requiredSuccesses/maxFailures. "tally": exactly `rounds` results,
+  // strong hit +1 / weak hit 0 / miss -1, summed into `tally`.
+  mode?: "first_to" | "tally";
+  tally?: number;
+  recorded?: number; // results recorded so far, tally mode
 }
 
 // ============================================
@@ -658,6 +664,88 @@ export interface CountdownTimer {
   visibility: "visible" | "hidden"; // Whether player sees the countdown
   createdAt: number; // Timestamp when timer was created
   triggeredAt?: number; // Timestamp when timer reached 0
+}
+
+// ============================================
+// METERS, PROGRESS TRACKS, SESSIONS
+// docs/default-systems-design.md section 4
+// ============================================
+
+export interface MeterThreshold {
+  at: number; // the label applies at and above this value
+  label: string; // "Attention"
+  note?: string; // what it means, reported to the GM when crossed
+}
+
+export interface Meter {
+  id: string; // meterId(owner, name), see metersAndTracks.ts
+  owner: string; // a character's name as the GM writes it, or "world"
+  name: string; // unique per owner, case-insensitive
+  min: number;
+  max: number;
+  cap: number; // current ceiling: floor <= cap <= max
+  floor: number; // current floor: min <= floor <= cap
+  value: number; // floor <= value <= cap
+  thresholds?: MeterThreshold[];
+  resetsAtSessionEnd?: number; // end_session sets value to this
+  onlyUp?: boolean; // never falls (Beast)
+  hidden?: boolean; // GM state only, not the player's panel
+  description?: string;
+}
+
+export interface MeterDefinition {
+  name: string;
+  min: number;
+  max: number;
+  start: number;
+  cap?: number; // defaults to max
+  floor?: number; // defaults to min
+  thresholds?: MeterThreshold[];
+  resetsAtSessionEnd?: number;
+  onlyUp?: boolean;
+  hidden?: boolean;
+  description?: string;
+}
+
+export interface MeterSet {
+  name: string; // "Blood & Bone character"
+  description?: string;
+  meters: MeterDefinition[];
+}
+
+export type TrackRank =
+  | "troublesome"
+  | "dangerous"
+  | "formidable"
+  | "extreme"
+  | "epic";
+export type TrackKind = "vow" | "condition" | "enemy" | "journey" | "other";
+export type TrackStatus = "active" | "fulfilled" | "forsaken" | "cleared";
+
+export interface ProgressTrack {
+  id: string; // trackId(owner, name)
+  owner: string;
+  name: string;
+  kind: TrackKind;
+  rank: TrackRank;
+  ticks: number; // 0..40
+  status: TrackStatus;
+}
+
+export interface MeterDedupKey {
+  meterId: string;
+  key: string; // the trigger: "sunlight"
+  scope: "scene" | "session";
+  at: number; // sceneCount or sessionCount when used
+}
+
+export interface SystemState {
+  // Explicit switch for decision 79, set by hand in the AdventureInspector.
+  // Unset means "derive it": a story whose lore holds a built-in system's
+  // notes uses that system's tools (systems/resolve.ts).
+  usesSystemTools?: boolean;
+  sessionCount: number;
+  dedupKeys: MeterDedupKey[];
 }
 
 // ============================================
@@ -1017,6 +1105,9 @@ export interface StoryData {
   // bookkeeping, not meaningful once the turn ends - don't read it elsewhere.
   notesReadThisTurn?: boolean;
   timers?: CountdownTimer[]; // Countdown timers for deadlines/events
+  meters?: Meter[]; // Numeric meters (Stress, Beast, Heat...), see metersAndTracks.ts
+  progressTracks?: ProgressTrack[]; // Vows, conditions, enemies, journeys
+  systemState?: SystemState; // Session count, once-per dedup keys, the tools switch
   combatState?: CombatState; // Active tactical combat state (turn-based combat tracking)
   threads?: StoryThread[]; // Active story threads/plotlines (independent of AGMT)
   reasoningTierState?: ReasoningTierState; // Reasoning-tier router: decay/cap tracking across turns

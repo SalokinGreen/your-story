@@ -520,6 +520,9 @@ const ROLL_OR_ORACLE_TOOL_NAMES = new Set([
   "opposed_formula",
   "npc_roll",
   "fate_question",
+  // The system's own roll (Ironsworn-style); without it the M2 gate would
+  // demand another roll after every action roll in a skirmish.
+  "action_roll",
 ]);
 
 /**
