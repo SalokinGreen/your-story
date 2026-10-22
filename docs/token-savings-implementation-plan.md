@@ -2,7 +2,7 @@
 
 **Status:** written 2026-10-22; **approved the same day (decision 107)**:
 "Approved. Also pull from origin and do the token saving + default system
-plans." Building has started, PR T1 first. It implements
+plans." Building has started: T1 and T2 are merged, T3 (slices 8-9) is built. It implements
 [`token-savings-design.md`](token-savings-design.md), approved by decision
 106; decisions 90–106 are in [`decisions.md`](decisions.md). It goes before
 default systems' PR A (decision 97).
@@ -360,6 +360,19 @@ system prompt is not repeated per tool; long examples become one line;
 parameter descriptions say what the value is, not how to play. The order
 and the offered set are unchanged.
 
+**How a gated tool fits.** The list is built once per request from
+*story-level* flags (`storyData.diceMode === "manual"` adds `ask_for_roll`),
+never from the turn, the round or the history, so within a story it is the
+same on every round of every turn and caches with the prefix. A new optional
+tool (the image tool; the default-systems tools, decision 79) joins the same
+way: one entry in the whitelist, appended behind a condition that depends only
+on a story or settings flag that does not change during play. Flipping the
+flag mid-story costs one cache miss and nothing else. A gate that depended on
+per-turn state (a scene, a tension level) would break the cache and is not
+allowed. The budget test measures the default list under 10,000 and each gated
+tool as an extra under its own bound, so a gated tool cannot hide in the
+default measurement.
+
 Test (`tests/toolBudget.test.ts`): the tool list `buildGMStagePrompt` offers
 for a default story is under **10,000** tokens (from 15,841); the four
 default-systems tools are measured separately when they land. The
@@ -655,3 +668,102 @@ fixtures updated). Supersedes the "slice 7 not built" lines above.
 - **The estimate side (`turnCostEstimate.ts`) is untouched**: it still
   predicts at full input price, now an overstatement once caching works.
   Calibration against real turns is the follow-up, after the live check.
+
+### 2026-10-22 - PR T3 (slices 8 and 9), `claude/token-savings-t3`
+
+Built on master `be0bc6e` (T1 and T2 merged). Baseline before the first edit:
+143 files, **2,292 tests**, `tsc` clean. After: 145 files, **2,304 tests**
+(+12: `toolBudget` 4, `contextLimits` 8; no existing test changed). The
+default tool list went from **15,841 to 9,686 tokens** (`estimateTokens` of the
+JSON, 56 tools); with `ask_for_roll` in Manual Dice Mode it is 9,933. No
+`engine-review` agent ran from this session (no agent tool was available to
+the builder); the coordinating session should run it on the descriptions
+against their executors.
+
+- **How the trim was done.** Measured every offered schema, then rewrote the
+  descriptions of the 20 largest (the whole description for each, as one short
+  paragraph) and shortened the longest parameter descriptions. Nothing else
+  changed: no parameter was added, removed, renamed or re-typed, no `required`
+  list or enum was touched, and the offered set and order are as before.
+  Largest cuts: `fate_question` 858 to 324, `roll_portent` 840 to 285,
+  `formula_roll` 786 to 434, `add_combatant` 783 to 381, `generate_name` 655 to
+  323, `gm_roll` 565 to 265.
+- **What a description kept, and what went.** Kept: what the tool does, when
+  it is the right tool, the non-obvious rules the executor enforces (attitude
+  moves two steps, `npc_roll` only on the active combatant, `start_game`
+  needing the Campaign Plan note, `record_challenge_result` being the third of
+  three calls), the fate result meanings (they exist only here), and the
+  built-in `roll_table` names. Cut: worked examples (one line, or none),
+  "use when" lists that restated the system prompt, per-rung glosses of the
+  eleven fate likelihoods (the enum already orders them), repeated "decided
+  before the dice land" and "echoed back" explanations on three tools, and the
+  second and third copies of a parameter's explanation.
+- **One list, no per-situation lists.** The only gate today is
+  `ask_for_roll`, which depends on `storyData.diceMode`, a story setting; the
+  slice 8 section now says how a later gated tool (images, default systems)
+  joins without breaking the cache. `tests/toolBudget.test.ts` also asserts the
+  list is byte-identical for a story with 2 prior turns and one with 16.
+- **The test's bounds.** Default list under 10,000 (9,686 today, so about 300
+  tokens of room); the manual-dice extra under 400 (247 today). A gated tool
+  added later should get its own bound next to the manual-dice one rather than
+  loosen the default.
+- **Pinned notes are three types, not four.** The plan's list was "DM
+  instructions, a character sheet, the campaign plan". The mechanics note is
+  *not* sent in full by the GM prompt (it is listed by title and read on
+  demand), so it is not pinned for the cap or the warning, although the
+  Designer forces it `alwaysOn`. `gm_notes`, the legacy alias of
+  `dm_instructions`, is included because the prompt sends it as DM
+  instructions.
+- **The cap shares by water-filling.** Notes at or under an equal share keep
+  everything; what they leave is shared among the rest, repeating until none
+  is under its share. The shortened note's allowance includes its own pointer
+  line, and the front is kept, cut back to a line break when one is within the
+  last fifth. The pointer is exactly the plan's: `[… 1,840 more tokens:
+  read_notes "Title" for the rest]`.
+- **Where the cap applies.** `buildGMStagePrompt` only: the DM instructions in
+  the stable block, the sheets and the plan in the live block. The choices and
+  the narrator's prompts (`buildInfoMessage`) are untouched: they have their
+  own budgets. A note shortened for the prompt is never saved shortened.
+- **A known soft spot.** A GM that edits the campaign plan from its shortened
+  view with a whole-note `edit_note` would overwrite the part it did not see.
+  The pointer says tokens are missing and to `read_notes`, and the plan's
+  edits are mostly `edit_lore_*` and checklist ticks, so this was left; the
+  live check in `pending_tests.md` watches for it.
+- **The warning's three homes.** The Adventure Inspector's note card and the
+  lore editor's content box show an amber line under the text for a pinned
+  type over 3,000 tokens; the Designer's `write_note` result ends with
+  "WARNING: ..." so the Designer relays it. All three come from
+  `pinnedNoteWarning`. The Debug Logs line (console) in `buildGMStagePrompt`
+  names a note over the line and the tokens the cap left out. Not seen
+  rendered (no browser in this session).
+- **Not touched.** The Google `GOOGLE_ESSENTIAL_TOOLS` list, the labels and the
+  observer registration: no tool was added, removed or renamed, so all six
+  places still agree.
+
+### 2026-10-22 - after the engine review (PR T3)
+
+Tests 2,304 to 2,310 (+6 in `contextLimits.test.ts`, one existing test there
+reworked for the new DM share).
+
+- **The cap keeps the plan's current beat (decision 110).** `capPinnedNotes`
+  splits a `gm_plan` note at its last `\n## Current beat` section, budgets that
+  section out of the cap first (bounded to half the cap), shares the rest among
+  the fronts, and writes `front + pointer + beat`. `cutTokens` counts the front
+  only.
+- **`edit_note` refuses a rewrite from a shortened view.** New
+  `wholeNoteRewriteRefusal` (`toolExecutor.ts`): refused when the new content
+  carries the `[… N more tokens: read_notes "` pointer, or the note is a pinned
+  type whose prompt form is cut and `notesReadThisTurn` is false. The message
+  points to `read_notes` / `edit_lore_replace`.
+- **The DM instructions' cut is independent of the sheet and plan.** New
+  `capPinnedForGM`: the DM instructions are capped alone at
+  `DM_INSTRUCTIONS_CAP_TOKENS` (4,000, a judgment call for "a fixed share"),
+  then the sheets and the plan share the 10,000 total minus what the DM
+  instructions took. The stable block is therefore byte-identical when the
+  sheet grows. Both `buildGMStagePrompt` and `edit_note` call it, so they agree
+  on what is shortened.
+- **Descriptions.** `add_combatant`: "`lore_ref` links a note."
+  `manage_timer`: no longer says `auto_advance` ticks (§6.1). `ask_for_roll`:
+  secret rolls are `gm_roll`.
+- **Comments** in `buildGMStagePrompt` about the plan and mechanics notes
+  corrected. The tool list is still under the 10,000 bound.

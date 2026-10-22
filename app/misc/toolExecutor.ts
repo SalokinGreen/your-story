@@ -5,6 +5,7 @@
  * commandResponses.ts implementation, reusing all validation and fuzzy matching logic.
  */
 
+import { capPinnedForGM, isPinnedGmNoteType } from "@/app/misc/contextLimits";
 import {
   StoryData,
   CommandResponse,
@@ -504,6 +505,32 @@ function searchLoreEntries(
  * Execute multiple tool calls and return command responses with state changes
  * Converts tool calls to XML command format and reuses existing validation
  */
+
+const CUT_POINTER_PATTERN = /\[… [\d,]+ more tokens: read_notes "/;
+
+/**
+ * Why an edit_note that replaces a note's whole content must be refused, or
+ * undefined if it may go ahead (decisions 96 and 110): the new content carries
+ * the prompt's "more tokens" pointer (the GM copied a shortened view), or the
+ * note is a pinned type the prompt shortens and the GM has not read it this turn.
+ */
+export function wholeNoteRewriteRefusal(
+  storyData: StoryData,
+  note: StoryLore,
+  newContent: string,
+): string | undefined {
+  if (CUT_POINTER_PATTERN.test(newContent)) {
+    return `Refused: the new content contains a "[… N more tokens: read_notes …]" pointer, which marks text the prompt left out, not part of the note. read_notes "${note.title}" for the whole note, then change it with edit_lore_replace / edit_lore_append, or send the complete text.`;
+  }
+  if (isPinnedGmNoteType(note.type) && !storyData.notesReadThisTurn) {
+    const capped = capPinnedForGM(storyData.lore || []).get(note);
+    if (capped && capped.cutTokens > 0) {
+      return `Refused: "${note.title}" is shown to you shortened (${capped.cutTokens} tokens are left out), so a whole-note rewrite would erase the part you have not seen. read_notes "${note.title}" first, or use edit_lore_replace / edit_lore_append for a small change.`;
+    }
+  }
+  return undefined;
+}
+
 export function executeTools(
   toolCalls: ToolCall[],
   storyData: StoryData
@@ -1274,6 +1301,23 @@ export function executeTools(
 
         // Update content if provided
         if (args.content !== undefined) {
+          // The GM prompt shortens pinned notes past the cap (decision 96/110),
+          // so a whole-note rewrite from that view would drop what it never saw.
+          const refusal = wholeNoteRewriteRefusal(
+            storyData,
+            noteEntry,
+            String(args.content),
+          );
+          if (refusal) {
+            responses.push({
+              command: toolCall.function.name,
+              success: false,
+              message: refusal,
+              timestamp: Date.now(),
+              toolCallId: toolCall.id,
+            });
+            continue;
+          }
           noteEntry.content = args.content;
           noteEntry.embedded = false; // Mark for re-embedding
           storyData.loreEmbeddingsDirty = true;

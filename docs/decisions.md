@@ -176,6 +176,7 @@ design's open questions.
 | 105 | When to confirm the caching on a real model | **One session after the build** ("One session after the build"), once the ledger records cached tokens, on the default models; a pending test until the author says go. |
 | 106 | Is the design approved | **Approved; write the implementation plan** ("Approved: write the plan"). Building waits for the author's yes on the plan. |
 | 107 | Build the token-savings plan | **Approved** (2026-10-22, to the coordinating session: "Approved. Also pull from origin and do the token saving + default system plans."). `token-savings-implementation-plan.md` is built in three PRs, T1 (slices 1-4) first; each merge still waits for the author (decision 5). |
+| 110 | How the cap shortens always-loaded notes ("When always-loaded notes go over the 10k budget, the cap keeps the start of each note (decision 96). But the campaign plan grows at the end, so its current beat is the part that gets cut. How should the cap shorten notes?") | **Keep the current beat.** Every note keeps its start; the campaign plan also keeps its last `## Current beat` section whole, after the kept front and the pointer. Revises how decision 96 shortens the plan. |
 
 ### Interview seven — model catalog and defaults (2026-10-21)
 

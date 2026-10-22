@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { AdventureDraft, draftReadiness } from "@/app/misc/designer_executor";
+import { pinnedNoteWarning } from "@/app/misc/contextLimits";
 import { LoreType, NPC, StoryLore } from "@/app/misc/structs";
 
 interface AdventureInspectorProps {
@@ -198,6 +199,14 @@ export default function AdventureInspector({
         ) : (
           <p className="text-xs text-white/50 line-clamp-3 whitespace-pre-wrap">
             {note.content || "(empty)"}
+          </p>
+        )}
+        {pinnedNoteWarning(note) && (
+          <p
+            role="status"
+            className="mt-2 text-[11px] leading-relaxed text-amber-300/90"
+          >
+            {pinnedNoteWarning(note)}
           </p>
         )}
       </div>
