@@ -1,10 +1,11 @@
 # Token savings: history, caching and compaction — design
 
-**Status:** draft for the author's review, 2026-10-22. Nothing here is
-approved to build. Decisions 90–98 in [`decisions.md`](decisions.md). It goes
-before default systems' PR A (decision 97), which then builds on the prompt
-layout set here. The implementation plan follows approval
-(`workflow.md` Phase 3).
+**Status:** approved, 2026-10-22 (decision 106). Decisions 90–106 in
+[`decisions.md`](decisions.md). It goes before default systems' PR A
+(decision 97), which then builds on the prompt layout set here. The
+implementation plan is
+[`token-savings-implementation-plan.md`](token-savings-implementation-plan.md);
+building waits for the author's yes on it.
 
 ## 1. What this is
 
@@ -112,8 +113,8 @@ full:
   TRUE/FALSE, state-change confirmations. They are what a later turn most
   needs to stay consistent, and they cost little.
 - **Old turns' private `<thinking>` text** is dropped from history on the
-  same rule (the prose the player saw stays). The GM reasons afresh each
-  turn; its old reasoning is cost, not memory.
+  same rule (the prose the player saw stays; decision 99). The GM reasons
+  afresh each turn; its old reasoning is cost, not memory.
 - **Nothing is cleared within the current turn.** The rounds of a turn
   share their prefix exactly as today.
 - **Stored in full, stubbed when sent.** The story part keeps its full
@@ -146,7 +147,8 @@ request mostly matches the one before it:
   status report §6.20, where story could fall between the window and the
   summary.
 - **The character sheet moves into the live block** because the GM edits it
-  often; DM instructions and the plan change rarely and stay early.
+  often (decision 100); DM instructions and the plan change rarely and stay
+  early.
 - **Claude gets four breakpoints** (its maximum): after the system prompt,
   after history (the end of the previous turn), after the action (shared by
   this turn's rounds), and on the latest message of each round. Today it has
@@ -163,8 +165,9 @@ live state where models weigh text most: right before they answer.
 **When.** The history is measured as it is actually sent: prose, stubs, and
 anything else replayed. When it passes the history share of Memory Size (60%,
 21.6k by default), a summary folds in the oldest turns until history is back
-to about half that share. The margin means a summary runs every few dozen
-turns rather than every turn, and the prefix stays cached in between. The
+to about half that share (decision 101). The margin means a summary runs
+every few dozen turns rather than every turn, and the prefix stays cached in
+between. The
 summary runs before the GM's first round, as compaction does today. If it
 fails, that turn falls back to today's sliding window so the request still
 fits, and the summary is retried next turn.
@@ -193,8 +196,8 @@ Settings > Architecture (decision 19).
 **"Compact now."** The story menu's Compact Story dialog
 (`app/story/menu/CompactStoryModal.tsx`) gains a *Summarise now* action
 with an optional focus ("keep everything about the Salon"). It folds all
-but the last two turns into the summary immediately, like Claude Code's
-`/compact <focus>`.
+but the last two turns into the summary immediately (decision 102), like
+Claude Code's `/compact <focus>`.
 
 **Summary instructions.** A new note type, `summary_instructions`, read only
 by the summariser, never by the GM or the narrator: the author's standing
@@ -321,15 +324,16 @@ For the implementation plan to turn into signatures and slices:
 - Server-side compaction from a provider: Anthropic's is beta, Claude-only,
   and not documented through OpenRouter; the app's own works on every model.
 
-**Open, for the implementation plan or a measurement:**
-- Whether Mistral Small 3.2 honours `prompt_cache_key`. One real call
-  answers it; it waits for the author's go (CLAUDE.md).
-- Whether Claude should use the 1-hour cache on the stable prefix (writes
-  cost 2× instead of 1.25×). It pays off when players take longer than 5
-  minutes per turn but less than an hour. Measure first.
-- The exact stub threshold (about 150 tokens) and summary target (about
-  2,000), tuned in playtests.
-- The real hit rates, from the ledger, against §5.
+**Settled by the author (decisions 103–105), measured after the build:**
+- Whether Mistral Small 3.2 honours `prompt_cache_key`, and the real hit
+  rates against §5: one real session on the default models once the ledger
+  records cached tokens (decision 105), a pending test until the author says
+  go.
+- Claude's cache stays at 5 minutes; the stable prefix moves to the 1-hour
+  cache (writes 2× instead of 1.25×) only if the ledger shows Claude players
+  missing between turns (decision 104).
+- The stub threshold (about 150 tokens) and the summary target (about
+  2,000) ship as constants and are tuned in playtests (decision 103).
 
 ## 8. Risks
 

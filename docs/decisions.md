@@ -158,3 +158,20 @@ the compaction tool of claude code." The measurements and the design are
 | 96 | A size limit on always-loaded notes | **Warn, then cap the total** ("Warn, then cap the total"): a warning when one always-loaded note passes about 3,000 tokens; past a total of about 10,000 the GM prompt keeps the first part of each and points to `read_notes` for the rest. |
 | 97 | This work or the approved default-systems plan first | **Token savings first** ("Token savings first"). Default systems' PR A follows on the new prompt layout. |
 | 98 | What next | **Write the design document** ("Write the design doc"), with these decisions, the measurements and the bugs found; nothing built until the author has read it and said yes. |
+
+### Interview — tokens, continued: the design's open calls (2026-10-22)
+
+The author read [`token-savings-design.md`](token-savings-design.md) and
+answered the calls the session had made inside decisions 90–98, and the
+design's open questions.
+
+| # | question | decision |
+|---|---|---|
+| 99 | Whether an old turn's private `<thinking>` text goes with its tool results | **Drop it** ("Drop it"). The prose the player saw stays. |
+| 100 | Where the always-loaded character sheet sits, since the GM edits it often | **Next to the action** ("Next to the action"), in the live block, so an edit no longer breaks the cache for the history. |
+| 101 | How far a summary folds history back | **To half the budget** ("Half the budget"), so a summary runs every few dozen turns. |
+| 102 | What "Compact now" keeps word for word | **The last two turns** ("The last two turns"). |
+| 103 | The stub threshold (~150 tokens) and the summary target (~2,000) | **Defaults, tuned in playtests** ("Defaults, tune in playtests"): set as constants in code. |
+| 104 | Claude's 5-minute or 1-hour cache | **Measure first** ("Measure first"): 5 minutes, cache hits recorded in the ledger, and the stable prefix moved to 1 hour if Claude players keep missing between turns. |
+| 105 | When to confirm the caching on a real model | **One session after the build** ("One session after the build"), once the ledger records cached tokens, on the default models; a pending test until the author says go. |
+| 106 | Is the design approved | **Approved; write the implementation plan** ("Approved: write the plan"). Building waits for the author's yes on the plan. |
