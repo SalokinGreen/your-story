@@ -867,7 +867,13 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 - **The native shells.** `NEXT_PUBLIC_STANDALONE=true` builds the static
   export; `isStandalone()` (`standalone.ts`) switches code paths;
   `providerFetch` and `getProviderFetch()` (`platformFetch.ts` — Tauri's scoped
-  HTTP plugin on the desktop) reach providers without routes. Every host the
+  HTTP plugin on the desktop) reach providers without routes. In the Capacitor
+  apps `capacitor.config.ts`'s `CapacitorHttp` patches `window.fetch`, which
+  reads any non-JSON POST answer as text, so a request whose answer is binary
+  (the TTS audio) goes through `getBinaryProviderFetch()` instead. A browser
+  permission the WebView asks for (the microphone) must be declared in
+  `android/app/src/main/AndroidManifest.xml` and `ios/App/App/Info.plist`, or
+  it is refused without a prompt. Every host the
   desktop app calls must be in `src-tauri/capabilities/default.json`; the
   opener plugin is scoped to `https://*`. The app's own Rust commands (only
   the `claude_cli_*` ones so far) are named in `src-tauri/build.rs`'s app

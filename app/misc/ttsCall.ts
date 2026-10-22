@@ -6,7 +6,7 @@
  */
 
 import { TTSModelKey } from "@/app/misc/ai_prices";
-import { getProviderFetch } from "@/app/misc/platformFetch";
+import { getBinaryProviderFetch } from "@/app/misc/platformFetch";
 
 // Cartesia TTS endpoint - see https://docs.cartesia.ai/api-reference/tts/bytes
 const CARTESIA_ENDPOINT = "https://api.cartesia.ai/tts/bytes";
@@ -275,7 +275,7 @@ async function fetchChunkAudio(
   chunk: string,
   voiceId: string,
   apiKey: string,
-  providerFetch: ReturnType<typeof getProviderFetch>,
+  providerFetch: ReturnType<typeof getBinaryProviderFetch>,
 ): Promise<ArrayBuffer | null> {
   if (ttsModel === "cartesia") {
     const response = await providerFetch(CARTESIA_ENDPOINT, {
@@ -395,7 +395,7 @@ export async function generateTTSAudioStream(
   // not total generation time.
   const chunkSize = 500;
   const chunks = splitTextIntoChunks(cleanText, chunkSize);
-  const providerFetch = getProviderFetch();
+  const providerFetch = getBinaryProviderFetch();
 
   // Dispatch every chunk to the provider in parallel (as before), but keep
   // each chunk's own promise instead of collapsing them with Promise.all -

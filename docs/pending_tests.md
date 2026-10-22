@@ -10,6 +10,21 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-22 — Microphone and TTS on Android (`claude/android-mic-tts`)
+
+No phone was connected to this PC, so the APK was built but not run.
+
+- **Microphone prompt.** On a fresh install, open a story and tap the mic
+  button. Android should ask "Allow Your Story to record audio?"; allow it,
+  speak, and the words should appear in the action box (needs a Mistral key).
+  Failure: no prompt and a "microphone not allowed" message means the
+  manifest permissions did not reach the build.
+- **TTS plays.** With a Cartesia or ElevenLabs key and TTS on, play a story
+  part. It should be read aloud. Failure: silence, or a decode error in the
+  Debug Logs, means the audio still comes through the patched fetch as text.
+- **iOS microphone prompt** (needs a Mac or `build-apps.yml`): the same mic
+  check should show the system prompt with the usage text from `Info.plist`.
+
 ## 2026-10-22 — Default systems PR A: the engine (`claude/default-systems-a`)
 
 The suite covers every tool through `executeGMTools`, the state sections, the
