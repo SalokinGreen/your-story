@@ -139,7 +139,7 @@ export const AI_MODELS = {
   // limits access to them to keys that have used them before. The direct
   // Google route sends a filtered tool list (providerCall.ts
   // GOOGLE_ESSENTIAL_TOOLS, status report 6.14), which still lacks
-  // start_game and the Designer's tools; the OpenRouter Gemini entry above
+  // the plan, timer, thread and goal tools and the Designer's tools; the OpenRouter Gemini entry above
   // does not have that limit.
 
   // `gemini-flash-latest` is Google's alias for its newest Flash model, which

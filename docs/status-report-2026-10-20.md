@@ -564,6 +564,19 @@ generate the icons (`generate-icons.sh` exists at the repo root).
 - **Fix:** derive the Google set from the live whitelist (or a tag on each
   schema), keep it in a test, and only force `required` when the caller asks.
 
+> **Update 2026-10-22 (default-systems PR C, engine review): partly fixed.**
+> `GOOGLE_ESSENTIAL_TOOLS` now includes `start_game`, `start_challenge`,
+> `record_challenge_result`, `cancel_challenge` and `increment_scene`, so
+> session zero can end on Gemini and challenges and the scene counter run
+> (`tests/loreTools.schemaArgs.test.ts` pins the five). Only those five were
+> added, checked against the live whitelist in `buildGMStagePrompt`: the rest of
+> the list above is still missing on Gemini (`advance_plan`, `ask_question`,
+> `acknowledge_director_move`, `resolve_random_event`, `gm_roll`, `roll_table`,
+> `manage_timer`, the thread/goal tools, `roll_portent`, `get_game_state`,
+> `remove_npc`, `take_rest`, the `edit_lore_*` family), and the Designer's
+> tools are still stripped. The list is still hard-coded rather than derived, and
+> `tool_choice: "required"` is still forced.
+
 ### 6.15 Rules notes are titles only, though the prompt, comments and docs say pinned
 
 **Severity: medium (the GM is told two things, and authors are told a third).**

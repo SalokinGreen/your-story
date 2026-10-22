@@ -35,8 +35,9 @@ native apps (#198, #201). **Still open from §6:** `auto_advance` timers never
 tick (6.1), Fronts never linked to their clocks (6.2), random ids and keys
 during render (6.3–6.5), the dead Embeddings toggle (6.9), tools the GM
 cannot call (6.10), online guests receiving the GM's secrets (6.12), and the
-stale Google tool filter, which leaves session zero unable to end on Gemini
-(6.14). Four more were found on 2026-10-22 (decision 65): rules notes listed
+stale Google tool filter (6.14, partly fixed 2026-10-22: `start_game` and the
+challenge and scene tools now reach Gemini, the rest of the list is still
+dropped). Four more were found on 2026-10-22 (decision 65): rules notes listed
 by title only while the prompt, comments and docs say pinned (6.15), hidden
 note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
 as 1210 (6.17), and `search_notes` returning disabled notes (6.18); and
@@ -428,7 +429,8 @@ OpenRouter, Mistral, DeepInfra, Google AI Studio, Z.ai) and normalise each
 provider's response into one shape. They know nothing about `StoryData`, prompts or tools. **The
 standalone build has no API routes**: `providerFetch()` calls the provider
 in-process when `isStandalone()`. Google gets a filtered tool list
-(`GOOGLE_ESSENTIAL_TOOLS`), which is stale (§6.14).
+(`GOOGLE_ESSENTIAL_TOOLS`), which is still stale (§6.14: it has `start_game`
+and the challenge tools now, not the plan, timer, thread or goal tools).
 
 **Claude reaches the app through OpenRouter** (Haiku, Sonnet and Opus 5.5,
 `anthropic/…` ids; decision 10) and has its own branch in `providerCall.ts`,
@@ -626,7 +628,7 @@ report's §11.3. The ones that shape play:
 - **System tools — offered only to stories that use a system** (decision 79:
   `resolveSystem()` in `app/misc/systems/resolve.ts`, true when the story's
   lore holds a built-in system's notes, or `systemState.usesSystemTools` says
-  so, set by hand in the Designer inspector; none exist until Blood & Bone, PR C): `manage_meter` (named numbers
+  so, set by hand in the Designer inspector; the first system is Blood & Bone, below): `manage_meter` (named numbers
   owned by a character or `world`, clamped to floor and cap, thresholds
   reported, `once_per` scene/session dedup, `create_set` from the system's
   meter sets), `manage_track` (Ironsworn-style ten-box progress tracks, with
@@ -634,6 +636,20 @@ report's §11.3. The ones that shape play:
   resets, the system's reminder) and `action_roll` (d6 + stat against two
   d10s, adds capped at +2, score at 10, ties to the dice; `success` is false
   on a miss). Shapes in `structs.ts`, arithmetic in `metersAndTracks.ts`.
+- **Blood & Bone is the first default system** (`app/misc/systems/blood-and-bone/`,
+  decisions 62–89; design `docs/default-systems-design.md`). Two built-in
+  packs (*Rules*: a ≤3,000-token `dm_instructions` core the GM carries every
+  round plus ~30 notes it reads on demand, miss tables and oracles as `table`
+  notes; *Europe by Night*: a setting), the starter *The Hollow Hour*, the
+  sheet template and four meter sets (character, Witch, Wendigo, City). The
+  text is original, condensed from the author's `docs/blood-and-bone/rulebook.md`
+  and credited to the Ironsworn engine under CC BY 4.0. A note keeps its
+  `builtin:blood-and-bone:…` id as `libraryNoteId`, which is how
+  `resolveSystem` knows a story runs it; `merge_lore` now keeps that id (and
+  the sources' shared type and most restrictive visibility), but `delete_note`
+  can still remove built-in notes, which turns the tools off in Automatic mode.
+  `tests/systems.bloodAndBone.test.ts` holds the token budgets and runs the
+  core's recipes against the engine.
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9
   chaos factor) and the 45 **built-in** Mythic element tables. The
   adventure's own tables are `StoryLore` notes with `type: "table"` that name
@@ -924,7 +940,7 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 ## Directory map
 
 - `app/misc/systems/` — the built-in default systems registry
-  (`BUILTIN_SYSTEMS`, empty until Blood & Bone), `resolveSystem()`, the
+  (`BUILTIN_SYSTEMS`, holding Blood & Bone in `blood-and-bone/`), `resolveSystem()`, the
   `BuiltinSystem` shapes, and the converters the library uses
   (`builtinPackToLibraryNotes`, `builtinAdventureToLocal`). Built-ins live
   in memory and are never stored; `app/story/MetersPanel.tsx` is the

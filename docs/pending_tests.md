@@ -10,16 +10,74 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-22 — Default systems PR C: Blood & Bone's content (`claude/default-systems-c`)
+
+No display and no model key in this session. The suite checks the content's
+budgets, titles, references and the core's tool recipes against the real
+engine, and the library section and the panel render to static markup with
+the real registry; nothing was seen on a screen and no model read the core.
+The screens first (checks a person performs), then the model play that
+decision 76 reserves for the author.
+
+- **Library section.** Library home. *Expected:* a "Built-in systems" section
+  between "Jump back in" and "Folders" with Blood & Bone, its two packs
+  (*Blood & Bone — Rules*, *Blood & Bone — Europe by Night*, note titles
+  collapsible) and *The Hollow Hour* with Play and "Open a copy in the
+  Designer". *Failure:* no section (the registry did not load), or a pack
+  showing a handful of notes instead of ~31 and 7.
+- **Start the starter.** Play *The Hollow Hour*, skip the picker. *Expected:*
+  the character creation form shows the Blood & Bone sheet (Kind, Archetype,
+  Path, five stats, Stress triggers, Connections, background); after you make
+  a character the Lore page's panel shows Heat 3/6 ("A pattern" under it) and
+  three vows in the Cohort group at 0 of 10 boxes. The note list shows the
+  Blood & Bone notes, *The Hollow Hour — Running it* and *The truth about
+  Runa* (hidden). *Failure:* no panel (the story has no `meters`), or two
+  copies of every note (the pack was attached on top of the starter's).
+- **Open a copy.** "Open a copy in the Designer" on the starter. *Expected:*
+  "The Hollow Hour (copy)" in Adventures, opening in the Designer with all
+  notes, three NPCs, Heat and the vows; the Inspector's Rules switch reads
+  "Automatic (on: Blood & Bone)". Save and play the copy: Heat and the vows
+  are still there. (The copy loses the starter's session-zero flag; the GM
+  still reads *Running it*, which says what to do without a Campaign Plan.)
+- **The picker.** From the Designer's or the in-game lore editor's import:
+  *Expected:* chips "Built-in: Blood & Bone — Rules" and "… — Europe by
+  Night"; importing the rules into a draft with no sheet template sets the
+  Blood & Bone sheet, and importing twice leaves one copy of each note.
+- **A phone does not see the rules.** Run party mode on a Blood & Bone story;
+  a phone's page must show only that player's sheet, the narration and
+  choices: no *Core rules*, no *The truth about Runa*. (Covered by
+  `tests/party.redaction.test.ts` with the real starter; this is the on-device
+  confirmation.)
+- **Session zero and a played night (a real model, the author's keys).** On
+  models the author picks (decision 76): play *The Hollow Hour* through
+  session zero (the GM reads *B&B — Character creation*, walks the steps,
+  creates the character's meter set with `create_set` and the vow with
+  `manage_track`, writes the Campaign Plan and calls `start_game`), then one
+  feeding scene, one Rule of 3 fight and one dawn. *Expected:* Stress rises
+  once per trigger per scene (a repeat is refused and the GM does not
+  retry), the fight is `start_challenge` in tally mode with one `action_roll`
+  and one `record_challenge_result` per player turn and the tally shown on
+  the Lore panel, dawn is `end_session` followed by the Reckoning (a
+  `formula_roll` of Stress d6, the GM counting the 1s) and a Beast `adjust`
+  by exactly that count; the Beast thresholds are acted on (`set_cap` at 6
+  and 9). *Failure looks like:* the GM rolling `formula_roll` for the action
+  roll, using `start_combat`, forgetting `increment_scene` (every trigger
+  then stays capped for the whole night), skipping the Reckoning, or
+  softening or refusing the feeding scene (the first thing decision 76 wants
+  to know; note which model).
+- **The core note is the author's to read** before this PR merges (plan 9.5):
+  it is game design in the GM's voice. Read *B&B — Core rules* (Library home,
+  Blood & Bone — Rules) and mark any rule that is wrong.
+- **Dice tray.** With physical dice on, an `action_roll` throws one d6 and two
+  d10s in one toss (still only the request shape is tested).
+
 ## 2026-10-22 — Default systems PR B: the screens and the library (`claude/default-systems-b`)
 
 No session had a display, so none of this was seen running. The tests render
 the panel and the Library section to static markup and run the import rule,
-the converters and the starter through `startAdventureLocally`. **The
-registry is empty until PR C, so on the author's machine none of these screens
-show anything until Blood & Bone lands** (a Library section with no system
-renders nothing, by design). To check them before PR C, push a test system
-into `BUILTIN_SYSTEMS` temporarily (see `tests/helpers/systemsHarness.ts`),
-or wait for PR C and run all five below.
+the converters and the starter through `startAdventureLocally`. **Blood &
+Bone landed in PR C, so all five checks below can now be run on the author's
+machine** (PR C's own section repeats them against the real data).
 
 - **The panel.** Open a Blood & Bone story in the desktop app, Lore page.
   *Expected:* a "Meters and tracks" card above "Story Notes": Stress, Beast,
@@ -80,14 +138,13 @@ No phone was connected to this PC, so the APK was built but not run.
 ## 2026-10-22 — Default systems PR A: the engine (`claude/default-systems-a`)
 
 The suite covers every tool through `executeGMTools`, the state sections, the
-offered tool list and its token bound. No model was called, and nothing is
-offered to a GM until PR C ships a system (the registry is empty), so none of
-this is reachable in play yet except by the hand switch.
+offered tool list and its token bound. No model was called. The tools are
+offered only to a story that runs a system; since PR C, a story started from
+*The Hollow Hour* (or with the Blood & Bone rules imported), or an adventure
+with the Inspector's Rules switch set to On, gets them.
 
-- **The system tools through a real model.** In the Game Designer, set the
-  hand switch (not exposed in the inspector until PR B; edit
-  `storyTemplate.systemState.usesSystemTools` to `true` in a saved
-  adventure, or wait for PR B), start the adventure, and tell the GM to
+- **The system tools through a real model.** Start *The Hollow Hour* (or any
+  adventure with the Rules switch On), and tell the GM to
   create a Stress meter for you and raise it twice, make a vow, mark it and
   roll its progress. *Expected:* `manage_meter`/`manage_track` calls with
   valid arguments, results in the tool log, the "Meters & tracks" lines in

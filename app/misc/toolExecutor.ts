@@ -58,6 +58,43 @@ import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 import { initializeAbility } from "@/app/misc/abilitySystem";
 
+const VISIBILITY_RESTRICTION: Record<string, number> = {
+  always_reveal: 0,
+  check_per_turn: 1,
+  to_be_revealed: 2,
+  hidden: 3,
+};
+
+/**
+ * What a merged note keeps of its sources' identity (decision: PR C). The
+ * first source linked to the library keeps its `libraryNoteId`, so a system's
+ * notes still resolve the system after the GM consolidates them; `type` is
+ * kept only when every source shares it; and `visibility` is the most
+ * restrictive among the sources, so merging a hidden note into a visible one
+ * never reveals it. Fields that would be the default are left off.
+ */
+export function mergedLoreIdentity(
+  sources: StoryLore[],
+): Partial<Pick<StoryLore, "libraryNoteId" | "type" | "visibility">> {
+  const out: Partial<Pick<StoryLore, "libraryNoteId" | "type" | "visibility">> =
+    {};
+  const linked = sources.find((s) => s.libraryNoteId);
+  if (linked?.libraryNoteId) out.libraryNoteId = linked.libraryNoteId;
+  const first = sources[0]?.type;
+  if (first && sources.every((s) => s.type === first)) out.type = first;
+  let worst = 0;
+  let worstValue: StoryLore["visibility"];
+  for (const s of sources) {
+    const rank = VISIBILITY_RESTRICTION[s.visibility ?? "always_reveal"] ?? 0;
+    if (rank > worst) {
+      worst = rank;
+      worstValue = s.visibility;
+    }
+  }
+  if (worstValue) out.visibility = worstValue;
+  return out;
+}
+
 /**
  * Calculate relationship value change based on magnitude, difficulty, and current value.
  * Enemies are hard to befriend (small gains), friends are easy to lose (big losses).
@@ -1622,7 +1659,24 @@ export function executeTools(
         }
 
         const lore = match.item;
-        const searchPattern = args.search_line as string;
+        // The schema names this `pattern` (and `isRegex`); `search_line` is the
+        // spelling this handler was first written against.
+        const searchPattern = (args.pattern ?? args.search_line) as string;
+        let patternRegex: RegExp | null = null;
+        if (args.isRegex === true) {
+          try {
+            patternRegex = new RegExp(searchPattern, "i");
+          } catch {
+            responses.push({
+              command: toolCall.function.name,
+              success: false,
+              message: `"${searchPattern}" is not a valid regular expression`,
+              timestamp: Date.now(),
+              toolCallId: toolCall.id,
+            });
+            continue;
+          }
+        }
         const newContent = args.content as string;
         const position = (args.position as "above" | "below") || "below";
 
@@ -1632,7 +1686,11 @@ export function executeTools(
 
         // Find the line that matches (case-insensitive contains)
         for (let i = 0; i < lines.length; i++) {
-          if (lines[i].toLowerCase().includes(searchPattern.toLowerCase())) {
+          if (
+            patternRegex
+              ? patternRegex.test(lines[i])
+              : lines[i].toLowerCase().includes(searchPattern.toLowerCase())
+          ) {
             foundIndex = i;
             break;
           }
@@ -1693,21 +1751,34 @@ export function executeTools(
           continue;
         }
 
-        const sourceTitles = args.source_titles as string[];
-        const targetTitle = args.target_title as string;
+        // The schema sent to the model names these targetTitle/sourcesTitles
+        // and requires them, so validation leaves the snake_case spelling
+        // (the one this handler was first written against) unreachable; it is
+        // kept as a harmless fallback.
+        const sourceTitles = (args.sourcesTitles ?? args.source_titles) as string[];
+        const targetTitle = ((args.targetTitle ?? args.target_title) as string)
+          ?.trim();
         const separator = (args.separator as string) || "\n\n---\n\n";
         const deleteSourcesFlag = args.delete_sources !== false; // Default true
 
-        if (!sourceTitles || sourceTitles.length < 2) {
+        if (!targetTitle || !Array.isArray(sourceTitles)) {
           responses.push({
             command: toolCall.function.name,
             success: false,
-            message: "Need at least 2 source titles to merge.",
+            message: "merge_lore needs a targetTitle and sourcesTitles.",
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
           continue;
         }
+
+        // The target is the note already carrying that title (case-insensitive),
+        // if any; otherwise the merge creates it.
+        const targetKey = targetTitle.toLowerCase();
+        const existingTarget =
+          storyData.lore.find(
+            (l) => (l.title ?? "").trim().toLowerCase() === targetKey,
+          ) ?? null;
 
         // Find all source lore entries
         const sourceLore: { item: StoryLore; index: number }[] = [];
@@ -1716,6 +1787,9 @@ export function executeTools(
         for (const title of sourceTitles) {
           const match = findBestMatch(title, storyData.lore, (l) => l.title);
           if (match) {
+            // The target is never its own source.
+            if (match.item === existingTarget) continue;
+            if (sourceLore.some((s) => s.item === match.item)) continue;
             const index = storyData.lore.indexOf(match.item);
             sourceLore.push({ item: match.item, index });
           } else {
@@ -1734,37 +1808,63 @@ export function executeTools(
           continue;
         }
 
-        // Merge content
-        const mergedContent = sourceLore
-          .map((s) => `## ${s.item.title}\n\n${s.item.content}`)
-          .join(separator);
+        const minSources = existingTarget ? 1 : 2;
+        if (sourceLore.length < minSources) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: existingTarget
+              ? `Need at least 1 source note besides "${existingTarget.title}" to merge.`
+              : "Need at least 2 source titles to merge into a new note.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
 
-        // Create new merged lore entry
-        const newLore: StoryLore = {
-          title: targetTitle,
-          content: mergedContent,
-          relatedCharacters: [],
-          relatedLocations: [],
-          secrtet: sourceLore.some((s) => s.item.secrtet),
-          keys: [],
-          on: sourceLore.every((s) => s.item.on !== false),
-          embedded: false,
-        };
+        if (existingTarget) {
+          // Merge the sources into the existing note: its own text first, and
+          // it keeps its identity (title, triggers, folder, ...).
+          existingTarget.content = [
+            existingTarget.content,
+            ...sourceLore.map((s) => `## ${s.item.title}\n\n${s.item.content}`),
+          ].join(separator);
+          const all = [existingTarget, ...sourceLore.map((s) => s.item)];
+          existingTarget.secrtet = all.some((n) => n.secrtet);
+          const identity = mergedLoreIdentity(all);
+          if (identity.libraryNoteId)
+            existingTarget.libraryNoteId = identity.libraryNoteId;
+          if (identity.visibility) existingTarget.visibility = identity.visibility;
+          if (identity.type) existingTarget.type = identity.type;
+          existingTarget.embedded = false;
+        } else {
+          // Create the merged lore entry
+          const mergedContent = sourceLore
+            .map((s) => `## ${s.item.title}\n\n${s.item.content}`)
+            .join(separator);
+          const newLore: StoryLore = {
+            title: targetTitle,
+            content: mergedContent,
+            relatedCharacters: [],
+            relatedLocations: [],
+            secrtet: sourceLore.some((s) => s.item.secrtet),
+            keys: [],
+            on: sourceLore.every((s) => s.item.on !== false),
+            embedded: false,
+            ...mergedLoreIdentity(sourceLore.map((s) => s.item)),
+          };
+          storyData.lore.push(newLore);
+        }
 
-        // Add the merged entry
-        storyData.lore.push(newLore);
-
-        // Delete source entries if requested (in reverse order to preserve indices)
+        // Delete source entries if requested, by identity (indices shift)
         if (deleteSourcesFlag) {
-          const indices = sourceLore.map((s) => s.index).sort((a, b) => b - a);
-          for (const idx of indices) {
-            storyData.lore.splice(idx, 1);
-          }
+          const doomed = new Set(sourceLore.map((s) => s.item));
+          storyData.lore = storyData.lore.filter((l) => !doomed.has(l));
         }
 
         const stateChange = `📝 Merged ${
-          sourceTitles.length
-        } notes into "${targetTitle}"${
+          sourceLore.length
+        } notes into ${existingTarget ? "existing note " : ""}"${targetTitle}"${
           deleteSourcesFlag ? " (sources deleted)" : ""
         }`;
         stateChanges.push(stateChange);
@@ -1796,8 +1896,11 @@ export function executeTools(
           continue;
         }
 
+        // The schema names these sourceTitle/newTitle; snake_case is the
+        // spelling the handler was first written against.
+        const sourceTitleArg = (args.sourceTitle ?? args.source_title) as string;
         const match = findBestMatch(
-          args.source_title,
+          sourceTitleArg,
           storyData.lore,
           (l) => l.title
         );
@@ -1805,7 +1908,7 @@ export function executeTools(
           responses.push({
             command: toolCall.function.name,
             success: false,
-            message: `Could not find lore entry matching "${args.source_title}"`,
+            message: `Could not find lore entry matching "${sourceTitleArg}"`,
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
@@ -1813,7 +1916,7 @@ export function executeTools(
         }
 
         const sourceLore = match.item;
-        const newTitle = args.new_title as string;
+        const newTitle = (args.newTitle ?? args.new_title) as string;
 
         // Check if new title already exists
         const existingMatch = findBestMatch(
@@ -1858,8 +1961,12 @@ export function executeTools(
             ? [...sourceLore.var_off_triggers]
             : undefined,
           type: sourceLore.type,
+          // A copy of a hidden note stays hidden.
+          visibility: sourceLore.visibility,
           tags: sourceLore.tags ? [...sourceLore.tags] : undefined,
           folder: sourceLore.folder,
+          // Deliberately no libraryNoteId: the duplicate is a new note, not the
+          // library entry, so a later Pull or pack re-import must not replace it.
           embedded: false, // New copy needs embedding
         };
 

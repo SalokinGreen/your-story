@@ -16,6 +16,7 @@ import {
   type PartyHostState,
 } from "@/app/misc/party/partyHost";
 import type { StoryData, StoryLore } from "@/app/misc/structs";
+import { BLOOD_AND_BONE } from "@/app/misc/systems/blood-and-bone";
 
 const TOKEN = "t";
 
@@ -224,5 +225,44 @@ describe("buildPlayerView: the redaction boundary", () => {
     expect(views.mara.me?.seatKey).toBe(maraKey);
     expect(JSON.stringify(views.mara)).not.toContain(tomKey);
     expect(JSON.stringify(views.lobby)).not.toContain(maraKey);
+  });
+});
+
+describe("buildPlayerView: a built-in system story (Blood & Bone)", () => {
+  const starter = BLOOD_AND_BONE.starters[0].adventure.storyTemplate!;
+  const bbStory = {
+    ...story(),
+    premise: starter.premise,
+    npcs: starter.npcs,
+    meters: starter.meters,
+    progressTracks: starter.progressTracks,
+    lore: [
+      ...(starter.lore ?? []),
+      note("Character: Mara", MARA_SHEET, { type: "character_sheet" }),
+    ],
+  } as unknown as StoryData;
+  const s = seated();
+  const view = buildPlayerView(s, bbStory, "mara", 0);
+  const json = JSON.stringify(view);
+
+  it("sends no rules note, no hidden pack or starter note and no GM instructions", () => {
+    const lore = starter.lore ?? [];
+    expect(lore.some((l) => l.visibility === "hidden")).toBe(true);
+    for (const l of lore) {
+      // A distinctive slice of each note's text, past its title line.
+      const slice = l.content.slice(40, 100);
+      expect(json, l.title).not.toContain(slice);
+      expect(json, l.title).not.toContain(l.title);
+    }
+    expect(json).not.toContain("fledgling");
+    expect(json).not.toContain("Running it");
+  });
+
+  it("sends no meters, tracks or NPC text, and still shows the player their own sheet", () => {
+    expect(json).not.toContain("Slipping Mask");
+    expect(json).not.toContain("Find Runa before Callum does");
+    expect(json).not.toContain("Callum Reyes");
+    expect(view.sheet).toEqual({ title: "Character: Mara", content: MARA_SHEET });
+    expect(Object.keys(view).sort()).toEqual(ALLOWED_KEYS);
   });
 });

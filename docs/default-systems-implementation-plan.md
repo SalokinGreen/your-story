@@ -2,8 +2,10 @@
 
 **Status:** written 2026-10-22; **approved by decision 108** (the author,
 2026-10-22: "Approved. Also pull from origin and do the token saving + default
-system plans."). PR A (slices 1-5) is merged (652433b); PR B (slices 6-7) is built
-on `claude/default-systems-b`; C is not started. It implements
+system plans."). PR A (slices 1-5) is merged (652433b); PR B (slices 6-7) is merged
+(6494efa); PR C (slice 8, the content) is built on `claude/default-systems-c`
+and waits for the author's merge, and for the author to read the core note
+(§9.5). It implements
 [`default-systems-design.md`](default-systems-design.md), approved by
 decision 88; decisions 62–89 are in [`decisions.md`](decisions.md). The
 source text for the content slice is
@@ -1001,3 +1003,103 @@ test system installed.
   vanish while the meters remain), and a merged hidden pack note becomes
   always-reveal. PR C should decide whether `merge_lore` keeps
   `libraryNoteId`/`visibility`, or whether the switch latches once on.
+
+### 2026-10-22 - PR C (slice 8), `claude/default-systems-c`
+
+Built on master at 6494efa (baseline: 166 files, 2,542 tests; after: 168
+files, 2,587 tests: `mergeLore.identity.test.ts` 5, `systems.bloodAndBone.test.ts`
+38, two cases in `party.redaction.test.ts`; one assertion in
+`systems.resolve.test.ts` changed from "registry is empty" to "holds Blood &
+Bone"). tsc clean, standalone build compiles. No screen was seen and no model
+read the core (see `pending_tests.md`).
+
+- **`merge_lore` (coordinator's call).** A merged note keeps the
+  `libraryNoteId` of the first source that has one, keeps `type` only when
+  every source shares it, and takes the most restrictive `visibility`
+  (hidden > to_be_revealed > check_per_turn > always_reveal; the default is
+  left unset). `mergedLoreIdentity()` in `toolExecutor.ts`, tests in
+  `tests/mergeLore.identity.test.ts`. **Found on the way:** the model is
+  given `targetTitle`/`sourcesTitles`, but the handler read only
+  `source_titles`/`target_title`, so a real `merge_lore` call always failed
+  with "Need at least 2 source titles". The handler now accepts both
+  spellings (one line), so the rule above is reachable. **Not resolved:**
+  `delete_note` can still delete a system's built-in notes, which in Automatic
+  mode turns the tools off mid-campaign. The Inspector's On switch is the
+  author's guard; a latch is still an open call.
+- **How the content was made.** The Kind, asset, table, creation-prompt,
+  Europe, Time Skip, Progress and Creation notes were assembled by a one-off
+  script from `docs/blood-and-bone/rulebook.md` (the author's own text, whose
+  Ironsworn-like passages decision 69 already rewrote), with the decided
+  rules (66-87) applied as exact string patches that fail if the source
+  changes. The script is not committed; the generated TypeScript is the
+  source from here. The core, the Moves note, the sheet template, the meter
+  sets and the starter are written by hand. Flavour taglines were dropped
+  from the powers; every mechanics note is 1,300-2,200 tokens.
+- **Move names stay (flagged).** The brief for PR C said no move names from
+  Ironsworn or Starforged. The plan, decisions 69/82 and design 5.8 keep the
+  generic move names (Face Danger, Secure an Advantage, Gather Information,
+  Compel, Undertake a Journey, Face Defeat, Pay the Price, Fulfil Your Vow) as
+  the engine's basics under the SRD's CC BY 4.0 licence, with the credit
+  line. They are kept and credited (in the Moves note and the system
+  description), and the test guards the SRD names this game does not use.
+  Renaming is mechanical (the names are string constants in the notes) if
+  the author prefers it.
+- **The 5.8 phrase test.** Plan 9.4 asked for a test that none of the
+  Ironsworn sentences named in design 5.8 appears. Those sentences are named
+  by place, not quoted, so a phrase list cannot be written without putting the
+  text into the repository. The test instead keeps a list of SRD move names
+  and phrases the game does not use out of every note.
+- **A fourth meter set, "City".** Heat is a world meter that a story on the
+  rules (not the starter) also needs; the plan listed three sets. `create_set`
+  "City" for owner `world` makes it (start 0); the starter builds its own
+  Heat at 3.
+- **Creation prompts** are one note per Kind holding all its questions (six
+  general, three per Archetype), each question with its own six answers; the
+  note starts "Roll 1d6 for each question", which is what the table check
+  needs.
+- **Rules the core had to say that the book does not.** Hunters have the same
+  "Beast" meter (the book's Erosion); the Abstinent's *The Held Line* (Stress
+  cap 7) is done by removing and re-creating Stress with max 7, since
+  `set_cap` cannot exceed `max`; the Predator's "twice as easily" cold trigger
+  is +2 instead of +1 (once a scene); "foodless dawn" for the Wendigo's
+  starving trigger means consecutive nights without a feed; a spike is
+  written as a +2 `adjust` with its own key.
+- **`start_challenge` still requires `primary_stat` and `difficulty`** in
+  tally mode (the schema's required list), so the core's recipe names them.
+- **The starter** sets `sessionZeroActive: true` so the standard "create the
+  campaign plan, then `start_game`" prompt runs after the creation form; a copy
+  opened in the Designer loses that flag (the draft has no slot for it), so
+  *Running it* tells the GM to write a plan from the four endings if there is
+  none. The NPC entries are spoiler-free (the NPC list is player-visible);
+  the truth is in the hidden secret note and in *Running it*, which the GM
+  alone reads. Its three tracks are all `vow` kind, owner "Cohort".
+- **Importing only the Europe pack** also resolves the system (its note ids
+  are the system's), so it switches the system tools on without the rules. The
+  pack description says it is a setting for the rules; left as is.
+- **Budgets measured** with js-tiktoken cl100k: core 2,129 (cap 3,000);
+  *Running it* 548, so the DM instructions total 2,677 (cap 4,000); filled
+  sheet 273 (cap 1,000); largest mechanics notes: Progress 2,156, Character
+  creation 2,018, Witch/Warlock 1,914 (cap 2,500).
+
+
+### 2026-10-22: PR C engine review
+
+Fixed: the Google tool list (five tools added, §6.14 partly fixed); `merge_lore`
+merges into an existing note titled `targetTitle` (exact title,
+case-insensitive; one source is enough then, the target is never its own
+source, never two notes with one title); `duplicate_lore` and `edit_lore_insert`
+read the schema's argument names (`sourceTitle`/`newTitle`, `pattern` and
+`isRegex`), `duplicate_lore` copies `visibility` and not `libraryNoteId`; the
+Reckoning is skipped at Stress 0. Checked the other lore tools against their
+schemas: `edit_lore_replace`, `_append`, `_prepend` and `toggle_lore` already
+match.
+
+Left as is, on purpose:
+
+- A merged note keeps the first linked source's `libraryNoteId` though it now
+  holds other text, so a later Pull or pack re-import replaces it. That only
+  happens by an explicit player action.
+- The Vampire's Held Line re-create resets a Beast-lowered Stress cap.
+- The DM-instructions cap is shared (4,000 tokens), so a Designer adventure
+  with about 2,000 or more tokens of the author's own DM instructions
+  truncates the core's last sections; the pointer line keeps them reachable.
