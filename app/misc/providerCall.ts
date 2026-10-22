@@ -116,6 +116,38 @@ interface AIResponse {
     // OpenRouter: tokens read from / written to the prompt cache (Claude
     // only writes when the request marks a breakpoint). Logged, not priced.
     prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
+    // DeepSeek's own API reports its cache here instead.
+    prompt_cache_hit_tokens?: number;
+  };
+}
+
+/**
+ * Input tokens a call was served from the provider's prompt cache, and
+ * tokens it wrote to one, from whichever usage shape the provider sends:
+ * OpenAI-style `prompt_tokens_details` (OpenRouter, Mistral, Z.ai, DeepInfra,
+ * Grok, Gemini) or DeepSeek's `prompt_cache_hit_tokens`. Zero and absent
+ * figures read as undefined, so a provider that reports nothing and one that
+ * reports a miss look the same.
+ */
+export function readCacheUsage(
+  provider: Provider,
+  usage:
+    | {
+        prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
+        prompt_cache_hit_tokens?: number;
+      }
+    | null
+    | undefined,
+): { cachedTokens?: number; cacheWriteTokens?: number } {
+  if (!usage) return {};
+  const cached =
+    provider === "deepseek"
+      ? usage.prompt_cache_hit_tokens ?? usage.prompt_tokens_details?.cached_tokens
+      : usage.prompt_tokens_details?.cached_tokens;
+  const written = usage.prompt_tokens_details?.cache_write_tokens;
+  return {
+    ...(cached ? { cachedTokens: cached } : {}),
+    ...(written ? { cacheWriteTokens: written } : {}),
   };
 }
 
@@ -132,6 +164,10 @@ export interface GenerateSuccess {
       promptTokens: number;
       completionTokens: number;
       totalTokens: number;
+      /** Of promptTokens, how many came from the provider's prompt cache. */
+      cachedTokens?: number;
+      /** Tokens written to the cache by this call. */
+      cacheWriteTokens?: number;
     };
     /** Provider-reported cost in dollars, when the provider sends one. */
     estimatedCost?: number;
@@ -1080,8 +1116,7 @@ async function requestNonStreaming(
       provider,
       promptTokens: usage.prompt_tokens,
       completionTokens: usage.completion_tokens,
-      cachedTokens: usage.prompt_tokens_details?.cached_tokens,
-      cacheWriteTokens: usage.prompt_tokens_details?.cache_write_tokens,
+      ...readCacheUsage(provider, usage),
       hasToolCalls: !!toolCalls,
     });
 
@@ -1098,6 +1133,7 @@ async function requestNonStreaming(
           promptTokens: usage.prompt_tokens,
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,
+          ...readCacheUsage(provider, usage),
         },
         ...(reportedCost !== undefined && { estimatedCost: reportedCost }),
       },
@@ -1365,8 +1401,9 @@ export function generateStream(
               ? openRouterBilledUsd(parsed.usage)
               : parsed.usage.estimated_cost;
             if (reported !== undefined) estimatedCost = reported;
-            cachedTokens = parsed.usage.prompt_tokens_details?.cached_tokens;
-            cacheWriteTokens = parsed.usage.prompt_tokens_details?.cache_write_tokens;
+            const cacheUsage = readCacheUsage(provider, parsed.usage);
+            cachedTokens = cacheUsage.cachedTokens;
+            cacheWriteTokens = cacheUsage.cacheWriteTokens;
           }
 
           if (finishReason === "stop" || finishReason === "end_turn" || finishReason === "length") {
@@ -1488,6 +1525,8 @@ export function generateStream(
               promptTokens,
               completionTokens,
               totalTokens: promptTokens + completionTokens,
+              ...(cachedTokens ? { cachedTokens } : {}),
+              ...(cacheWriteTokens ? { cacheWriteTokens } : {}),
             },
             // The provider's own dollar figure when it reports one (DeepInfra
             // does). Until now this was parsed off the usage chunk and then

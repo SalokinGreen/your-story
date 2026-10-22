@@ -596,6 +596,43 @@ it on the diff.
   `resetMistralCacheKeyRejected()` exists for tests.
 - **OpenRouter's `session_id` is cut to 128 characters** (its documented
   limit); a story id plus `ys:` and `:narration` is far under it.
-- **No ledger work**, as above; `callSideModel` gained an optional `cacheKey`
-  but no caller passes one (the side agents are not a conversation to keep
-  warm).
+- `callSideModel` gained an optional `cacheKey` but no caller passes one (the
+  side agents are not a conversation to keep warm).
+
+### 2026-10-22 - PR T2, slice 7 (cached tokens in the ledger), added after the first report
+
+Tests 2,283 to 2,291 (+8: `cacheUsage` 8; `claudeCli.fetch` and `turnCost`
+fixtures updated). Supersedes the "slice 7 not built" lines above.
+
+- **`readCacheUsage(provider, usage)`** (`providerCall.ts`) reads
+  `prompt_tokens_details.cached_tokens` / `cache_write_tokens`, and for
+  DeepSeek `prompt_cache_hit_tokens`. Zero reads as absent. Both the streaming
+  and non-streaming paths put `cachedTokens` / `cacheWriteTokens` on
+  `meta.usage`; `claudeCli.ts`'s `usageOf` fills them from the CLI's
+  `cache_read_input_tokens` / `cache_creation_input_tokens` (summed over a
+  retry). The CLI's `promptTokens` already included both, as before.
+- **Cached tokens are part of `promptTokens`**, not extra. `priceCall` takes an
+  optional `cachedTokens` (clamped to the prompt), prices them at
+  `cachedInputPrice` or, without one, at the plain input price, and the entry
+  gets `cachedAtFullPrice: true` so the panel can say its dollar figure
+  overstates that call. A provider-reported dollar figure (Claude's
+  `usage.cost`, DeepInfra) still wins in the totals, as before.
+- **Cache-write premium is not priced.** Claude's 1.25x writes are recorded
+  (`cacheWriteTokens`) but not added to the estimate: Claude is billed at
+  OpenRouter's own `usage.cost` anyway.
+- **`cachedInputPrice` is filled only where a dated price was already in the
+  file's comments**: Grok 4.5 ($0.30), Grok 4.7 ($0.50), GLM 5.3 and 5.3 Flash
+  on Z.ai ($0.26, $0.03), Mistral Large 4 ($0.14). DeepSeek's and Gemini's
+  comments give prices that are off-peak or date-limited, so those stay
+  empty for now.
+- **Wired into** the GM rounds, narration and choices ledger entries
+  (`generation.ts`) and `recordSideCall` (every side agent). The one-off tier
+  classifier is not wired (its prompt is tiny). `GenerationMeta.usage` sums the
+  GM rounds' cached figures.
+- **The Turn Cost panel** shows "N% of input from cache" next to the last
+  turn's token counts when any call reported a hit; its tooltip says when some
+  models were priced without a cached rate. Not seen rendered (no browser in
+  this session): it is a text span in an existing line.
+- **The estimate side (`turnCostEstimate.ts`) is untouched**: it still
+  predicts at full input price, now an overstatement once caching works.
+  Calibration against real turns is the follow-up, after the live check.

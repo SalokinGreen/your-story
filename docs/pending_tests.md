@@ -15,10 +15,15 @@ session cannot do".
 The suite measures the layout against a recording `fetch` (consecutive turns
 share 11,165 of 14,598 message tokens, from 0) and the provider bodies against
 a mocked one; no model was called. Decision 105: one real session on the
-default models, after this merges, with the author's go. This PR does not
-record cached tokens in the ledger (plan slice 7), so the check is the Debug
-Logs, whose "AI generation complete" line already logs `cachedTokens` and
-`cacheWriteTokens` for OpenRouter-style usage.
+default models, after this merges, with the author's go. Cached tokens are in
+the cost ledger (slice 7): the Turn Cost panel shows "N% of input from cache"
+for the last turn, and the Debug Logs' "AI generation complete" line logs
+`cachedTokens` and `cacheWriteTokens`.
+
+- **The cache share on screen.** After a second turn on any cached model,
+  open Settings' Turn Cost panel. *Expected:* "N% of input from cache" beside
+  the token counts, above 0. The panel line was never seen rendered (no
+  browser in the building session).
 
 - **Mistral's cache.** Play two turns on a Mistral Small model.
   *Expected:* after the first round, `cachedTokens` is above 0 in the Debug

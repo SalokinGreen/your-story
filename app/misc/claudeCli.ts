@@ -520,7 +520,15 @@ function usageOf(line: CliLine | null) {
     (u?.cache_creation_input_tokens ?? 0) +
     (u?.cache_read_input_tokens ?? 0);
   const completionTokens = u?.output_tokens ?? 0;
-  return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
+  const cachedTokens = u?.cache_read_input_tokens ?? 0;
+  const cacheWriteTokens = u?.cache_creation_input_tokens ?? 0;
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens: promptTokens + completionTokens,
+    ...(cachedTokens ? { cachedTokens } : {}),
+    ...(cacheWriteTokens ? { cacheWriteTokens } : {}),
+  };
 }
 
 /**
@@ -789,6 +797,12 @@ function sumUsage(a: RunOutcome["usage"], b: RunOutcome["usage"]): RunOutcome["u
     promptTokens: a.promptTokens + b.promptTokens,
     completionTokens: a.completionTokens + b.completionTokens,
     totalTokens: a.totalTokens + b.totalTokens,
+    ...((a.cachedTokens ?? 0) + (b.cachedTokens ?? 0)
+      ? { cachedTokens: (a.cachedTokens ?? 0) + (b.cachedTokens ?? 0) }
+      : {}),
+    ...((a.cacheWriteTokens ?? 0) + (b.cacheWriteTokens ?? 0)
+      ? { cacheWriteTokens: (a.cacheWriteTokens ?? 0) + (b.cacheWriteTokens ?? 0) }
+      : {}),
   };
 }
 

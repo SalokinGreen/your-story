@@ -87,7 +87,7 @@ describe("a GM round (structured mode)", () => {
       model: "claude-sonnet-5-5",
       modelName: "Claude Sonnet (subscription)",
       provider: "claude-cli",
-      usage: { promptTokens: 1003, completionTokens: 50, totalTokens: 1053 },
+      usage: { promptTokens: 1003, completionTokens: 50, totalTokens: 1053, cacheWriteTokens: 1000 },
       estimatedCost: 0,
     });
   });

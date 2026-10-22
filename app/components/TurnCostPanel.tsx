@@ -192,6 +192,22 @@ export default function TurnCostPanel({
             {lastTurn.calls} API call{lastTurn.calls === 1 ? "" : "s"} &middot;{" "}
             {lastTurn.promptTokens.toLocaleString()} in /{" "}
             {lastTurn.completionTokens.toLocaleString()} out
+            {lastTurn.promptTokens > 0 && lastTurn.cachedTokens > 0 && (
+              <span
+                title={
+                  lastTurn.entries.some((e) => e.cachedAtFullPrice)
+                    ? "Share of input tokens the providers served from their prompt caches. Some of these models have no cached price on file, so the dollar figure prices their cached tokens as plain input and overstates the cost."
+                    : "Share of input tokens the providers served from their prompt caches, billed at the cached rate."
+                }
+              >
+                {" "}
+                &middot;{" "}
+                {Math.round(
+                  (lastTurn.cachedTokens / lastTurn.promptTokens) * 100,
+                )}
+                % of input from cache
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {lastTurn.byStage.map((stage) => (

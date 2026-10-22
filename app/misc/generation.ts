@@ -444,6 +444,9 @@ export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /** Of promptTokens, how many the provider served from its prompt cache. */
+  cachedTokens?: number;
+  cacheWriteTokens?: number;
 }
 
 export interface GenerationMeta {
@@ -2636,6 +2639,8 @@ async function generateStoryTurnOnce(
               modelKey: String(gmModel),
               promptTokens: gmResult.meta.usage?.promptTokens || 0,
               completionTokens: gmResult.meta.usage?.completionTokens || 0,
+              cachedTokens: gmResult.meta.usage?.cachedTokens,
+              cacheWriteTokens: gmResult.meta.usage?.cacheWriteTokens,
               providerReportedUsd: gmResult.meta.estimatedCost,
             });
 
@@ -2648,6 +2653,12 @@ async function generateStoryTurnOnce(
               gmMeta.usage.completionTokens +=
                 gmResult.meta.usage?.completionTokens || 0;
               gmMeta.usage.totalTokens += gmResult.meta.usage?.totalTokens || 0;
+              gmMeta.usage.cachedTokens =
+                (gmMeta.usage.cachedTokens || 0) +
+                (gmResult.meta.usage?.cachedTokens || 0);
+              gmMeta.usage.cacheWriteTokens =
+                (gmMeta.usage.cacheWriteTokens || 0) +
+                (gmResult.meta.usage?.cacheWriteTokens || 0);
               gmMeta.tokenCost += gmResult.meta.tokenCost || 0;
             }
             totalTokenCost += gmResult.meta.tokenCost || 0;
@@ -3389,6 +3400,8 @@ async function generateStoryTurnOnce(
             modelKey: String(narrationModel),
             promptTokens: event.meta.usage?.promptTokens || 0,
             completionTokens: event.meta.usage?.completionTokens || 0,
+            cachedTokens: event.meta.usage?.cachedTokens,
+            cacheWriteTokens: event.meta.usage?.cacheWriteTokens,
             providerReportedUsd: event.meta.estimatedCost,
           });
           totalTokenCost += event.meta.tokenCost;
@@ -3543,6 +3556,8 @@ async function generateStoryTurnOnce(
           modelKey: String(narrationModel),
           promptTokens: choicesResultMeta.usage?.promptTokens || 0,
           completionTokens: choicesResultMeta.usage?.completionTokens || 0,
+          cachedTokens: choicesResultMeta.usage?.cachedTokens,
+          cacheWriteTokens: choicesResultMeta.usage?.cacheWriteTokens,
           providerReportedUsd: choicesResultMeta.estimatedCost,
         });
         totalTokenCost += choicesResultMeta.tokenCost;
