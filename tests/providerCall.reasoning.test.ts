@@ -367,7 +367,32 @@ describe("reasoning field forwarding on outgoing messages (buildRequestMessages)
     vi.unstubAllGlobals();
   });
 
-  it("restores reasoning/reasoning_details on outgoing OpenRouter messages", async () => {
+  it("restores reasoning/reasoning_details on the current turn's OpenRouter messages", async () => {
+    const fetchMock = mockJsonFetchOnce(SIMPLE_RESPONSE);
+
+    await generateNonStreaming({
+      messages: [
+        { role: "user", content: "go north" },
+        {
+          role: "assistant",
+          content: "You head north.",
+          reasoning: "The player chose north.",
+          reasoning_details: [{ type: "reasoning.text", text: "north" }],
+        },
+      ],
+      model: "GLM 5.2",
+      openRouterKey: "test-key",
+    });
+
+    const body = capturedBody(fetchMock);
+    const assistantMsg = body.messages.find((m: { role: string }) => m.role === "assistant");
+    expect(assistantMsg.reasoning).toBe("The player chose north.");
+    expect(assistantMsg.reasoning_details).toEqual([
+      { type: "reasoning.text", text: "north" },
+    ]);
+  });
+
+  it("leaves reasoning off an earlier turn's OpenRouter messages (decision 91, design 4.7)", async () => {
     const fetchMock = mockJsonFetchOnce(SIMPLE_RESPONSE);
 
     await generateNonStreaming({
@@ -385,12 +410,11 @@ describe("reasoning field forwarding on outgoing messages (buildRequestMessages)
       openRouterKey: "test-key",
     });
 
-    const body = capturedBody(fetchMock);
-    const assistantMsg = body.messages.find((m: any) => m.role === "assistant");
-    expect(assistantMsg.reasoning).toBe("The player chose north.");
-    expect(assistantMsg.reasoning_details).toEqual([
-      { type: "reasoning.text", text: "north" },
-    ]);
+    const assistantMsg = capturedBody(fetchMock).messages.find(
+      (m: { role: string }) => m.role === "assistant",
+    );
+    expect(assistantMsg.reasoning).toBeUndefined();
+    expect(assistantMsg.reasoning_details).toBeUndefined();
   });
 
   it("does not attach reasoning fields for a provider without a reasoning replay lever (Mistral)", async () => {

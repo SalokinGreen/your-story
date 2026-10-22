@@ -31,7 +31,7 @@ function gmRound(overrides: Partial<GenerateRequestBody> = {}): GenerateRequestB
   return {
     messages: [
       { role: "system", content: "You ARE the Game Master." },
-      { role: "user", content: "> I attack the goblin", cacheBreakpoint: true },
+      { role: "user", content: "> I attack the goblin", cacheBreakpoint: "turn" },
     ],
     tools: TOOLS,
     model: "Claude Sonnet (subscription)",
@@ -369,7 +369,7 @@ describe("the first round of a fresh conversation", () => {
     gmRound({
       messages: [
         { role: "system", content: "You ARE the Game Master." },
-        { role: "user", content: "> I attack the goblin", cacheBreakpoint: true },
+        { role: "user", content: "> I attack the goblin", cacheBreakpoint: "turn" },
         {
           role: "assistant",
           content: "",

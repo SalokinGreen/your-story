@@ -432,7 +432,7 @@ describe("regressions on other models", () => {
     const body = await streamedBody({
       messages: [
         { role: "system", content: "sys" },
-        { role: "user", content: "> I attack", cacheBreakpoint: true },
+        { role: "user", content: "> I attack", cacheBreakpoint: "turn" },
       ],
       tools: TOOLS,
       model: "GLM 5.2",
@@ -509,7 +509,7 @@ describe("Claude prompt caching on the GM stage (A3)", () => {
       .filter((i) => i >= 0);
   }
 
-  it("puts the breakpoints on the system message and the player's action, the same messages in rounds 1 and 2", async () => {
+  it("puts the breakpoints on the system message, the end of history and the player's action, the same messages in rounds 1 and 2", async () => {
     const [round1, round2] = await scriptedTurnBodies();
     const asClaude = (b: GenerateRequestBody): GenerateRequestBody => ({
       ...b,
@@ -522,11 +522,20 @@ describe("Claude prompt caching on the GM stage (A3)", () => {
 
     const marks1 = breakpointIndexes(sent1.messages);
     const marks2 = breakpointIndexes(sent2.messages);
-    expect(marks1).toHaveLength(2);
-    expect(marks1).toEqual(marks2);
+    // Round 1 has no round history yet: system, the end of history (here the
+    // acknowledgement after the stable block) and the action. Round 2 adds
+    // the round mark on its latest message, so its marks are a superset.
+    expect(marks1).toHaveLength(3);
+    expect(marks2.slice(0, 3)).toEqual(marks1);
+    expect(marks2).toHaveLength(4);
     expect(marks1[0]).toBe(0);
     expect(sent1.messages[0].role).toBe("system");
+    expect(sent1.messages[marks1[1]].role).toBe("assistant");
+    // The round mark is the last message of round 2's request.
+    expect(marks2[3]).toBe(sent2.messages.length - 1);
 
+    // marks1[2] is the action; keep the older names below.
+    marks1.splice(1, 1);
     const action1 = sent1.messages[marks1[1]];
     expect(action1.role).toBe("user");
     const actionPart = (action1.content as SentPart[])[0];

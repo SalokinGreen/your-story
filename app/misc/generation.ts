@@ -43,6 +43,7 @@ import {
 } from "@/app/misc/pacingFeedback";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
+import { storyCacheKey, markRoundBreakpoint } from "@/app/misc/cacheMarks";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { pickProviderKeys } from "@/app/misc/sideModelCall";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
@@ -2387,6 +2388,12 @@ async function generateStoryTurnOnce(
             }
           }
 
+          // Claude's third cache breakpoint: the latest message of this
+          // round's request, which the next round extends. On a copy - the
+          // stored gmBaseMessages never carry it, and a round with no history
+          // yet already has the turn mark on its last message.
+          markRoundBreakpoint(messagesWithHistory, conversationHistory.length > 0);
+
           // Check if user cancelled
           if (options.abortSignal?.aborted) {
             throw new Error("Generation cancelled by user");
@@ -2420,6 +2427,7 @@ async function generateStoryTurnOnce(
               deepinfraKey: options.deepinfraKey,
               zaiKey: options.zaiKey,
               customModel: getCustomModelIfUUID(model),
+              ...storyCacheKey(options.storyId, "gm"),
               // Set only on the round immediately after the M2 gate fires -
               // forces the model to call some tool rather than relying on
               // the prose re-prompt alone. Omitted otherwise, letting the
@@ -3237,6 +3245,7 @@ async function generateStoryTurnOnce(
         deepinfraKey: options.deepinfraKey,
         zaiKey: options.zaiKey,
         customModel: getCustomModelIfUUID(narrationModel),
+        ...storyCacheKey(options.storyId, "narration"),
         // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
         // Also stop on [STOP] marker for player agency stopping points
         stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],

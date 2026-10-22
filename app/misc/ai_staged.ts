@@ -1061,6 +1061,99 @@ export function getLengthGuidance(replyLength: ReplyLength = "medium"): {
   }
 }
 
+const STATE_RULE =
+  "═══════════════════════════════════════════════════════════════";
+
+/**
+ * The GM request's stable block (decision 91): what changes least within a
+ * story, so it sits before history and is cached with it. The player,
+ * their archetype, the DM instructions, then the summary of earlier events
+ * (which changes only when a summary runs, and then the history start moves
+ * with it). Nothing in it may change from turn to turn on its own.
+ */
+export function buildStableBlock(input: {
+  playerSection: string;
+  archetypeSection: string;
+  dmInstructions: string;
+  summary?: string;
+}): string {
+  let out = `${STATE_RULE}\n📋 THE STORY'S FOUNDATION (changes rarely)\n${STATE_RULE}\n`;
+  // Who the player character is - first, because every other section is read
+  // in relation to them.
+  if (input.playerSection) out += "\n" + input.playerSection + "\n\n";
+  // How the player wants to be engaged (advisory)
+  if (input.archetypeSection) out += input.archetypeSection + "\n\n";
+  if (input.dmInstructions) out += input.dmInstructions + "\n";
+  // Story-so-far summary (see compaction.ts): earlier scene history that has
+  // been folded in here instead of silently disappearing.
+  if (input.summary) {
+    out += `\n## 📖 STORY SO FAR (summary of earlier events, no longer shown in full below)\n${input.summary}\n`;
+  }
+  return out;
+}
+
+/**
+ * The GM request's live block: everything that can change every turn, sent
+ * in the same user message as the player's action, after history. State
+ * first (the character sheet and plan are the GM's own to edit, decision
+ * 100; the campaign plan and the note-title lists change at beat changes and
+ * whenever a note is made, so they stay out of the cached prefix), then the
+ * per-turn nudges, right next to the action where models weigh text most.
+ */
+export interface LiveBlockInput {
+  loreSection: string;
+  npcList: string;
+  goalsSection: string;
+  threadsSection: string;
+  oracleSection: string;
+  combatSection: string;
+  timersSection: string;
+  pendingEventsSection: string;
+  pendingMovesSection: string;
+  freshStorySetupBlock: string;
+  sessionZeroStartGameReminder: string;
+  setupOverdueBlock: string;
+  observerNoteBlock: string;
+  storyProgressNoteBlock: string;
+  repetitionNoteBlock: string;
+  knowledgeNoteBlock: string;
+  pacingFeedbackLine: string;
+  gmAdviceSection: string;
+}
+
+export function buildLiveBlock(input: LiveBlockInput): string {
+  let out = `${STATE_RULE}\n📋 LIVE GAME STATE (this turn)\n${STATE_RULE}\n`;
+  if (input.loreSection) out += "\n" + input.loreSection + "\n";
+  if (input.npcList) {
+    out += `## 👥 NPCs Summary (read their notes for more details)\n- ${input.npcList}\n\n`;
+  }
+  if (input.goalsSection) out += input.goalsSection + "\n\n";
+  if (input.threadsSection) out += input.threadsSection + "\n\n";
+  if (input.oracleSection) out += input.oracleSection + "\n\n";
+  if (input.combatSection) out += input.combatSection + "\n";
+  if (input.timersSection) out += input.timersSection + "\n";
+  // Pending random events / director moves - must be addressed
+  if (input.pendingEventsSection) out += input.pendingEventsSection + "\n\n";
+  if (input.pendingMovesSection) out += input.pendingMovesSection + "\n\n";
+
+  // Per-turn nudges, kept verbatim (they used to sit inside the system
+  // prompt, which made it different every turn).
+  const nudges =
+    input.freshStorySetupBlock +
+    input.sessionZeroStartGameReminder +
+    input.setupOverdueBlock +
+    input.observerNoteBlock +
+    input.storyProgressNoteBlock +
+    input.repetitionNoteBlock +
+    input.knowledgeNoteBlock +
+    (input.pacingFeedbackLine
+      ? `\n\n## 📏 PACING NOTE (this turn)${input.pacingFeedbackLine}`
+      : "") +
+    input.gmAdviceSection;
+  if (nudges) out += nudges.replace(/^\n+/, "\n") + "\n";
+  return out;
+}
+
 export function buildGMStagePrompt({
   storyData,
   userChoice,
@@ -1225,11 +1318,14 @@ export function buildGMStagePrompt({
   // Build the lore/notes section
   let loreSection = "";
 
-  // Pinned notes: Full content (DM Instructions and Character Sheet only)
+  // Pinned notes: Full content. The DM instructions rarely change, so they go
+  // in the stable block (before history); the character sheet and the plan
+  // are edited by the GM itself, so they ride in the live block (decision 100).
+  let dmInstructionsSection = "";
   if (dmInstructionsLore.length > 0) {
-    loreSection += `## 📌 DM INSTRUCTIONS\nRead these guidelines every turn. They define how to run this adventure.\n`;
+    dmInstructionsSection += `## 📌 DM INSTRUCTIONS\nRead these guidelines every turn. They define how to run this adventure.\n`;
     for (const l of dmInstructionsLore) {
-      loreSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
+      dmInstructionsSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
     }
   }
   if (characterSheetLore.length > 0) {
@@ -1594,8 +1690,12 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
     ),
   );
 
+  // Nothing per-turn lives in the system prompt (decision 91): the setup
+  // blocks, the observer/progress/repetition/knowledge notes, the pacing line
+  // and the GM tip all ride in the live block next to the player's action
+  // (buildLiveBlock), so this text is byte-identical from turn to turn.
   const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
-${freshStorySetupBlock}${sessionZeroStartGameReminder}${setupOverdueBlock}
+
 ## CORE STANCE (read this first)
 1. **You resolve, the player decides.** Never narrate what the player character says, thinks, feels, chooses, or does next - only the outcome of the action they already declared. (Full agency rules below.)
 2. **Roll dice only when they matter.** Call a *dice* tool (\`formula_roll\`, \`opposed_formula\`, \`npc_roll\`) ONLY when the player has declared an action whose outcome is genuinely uncertain AND a failure would change the fiction. Casual talk, description, simple movement, and foregone conclusions need no roll - just narrate them. Never invent a check to look busy.
@@ -1620,14 +1720,14 @@ ${freshStorySetupBlock}${sessionZeroStartGameReminder}${setupOverdueBlock}
 - Know which one is which: the player character is named in the PLAYER CHARACTER section of the game state below, and "you" in your narration always means them. Give NPCs all the dialogue and initiative you like - that's your job - but the moment a line puts words, a decision, or a next move into the player character's mouth, you've taken their turn for them.
 - Use the character sheet and their chosen traits every turn (see the CHARACTER SHEET section): pick difficulties from it, let NPCs react to who they actually are, and give their traits, flaws, and background something to push against. Referencing what a character IS is not the same as deciding what they DO.
 - Resolve ONE beat at a time: the current action and its immediate consequence. Don't chain a second unrequested event, enemy turn, or complication onto the same turn "for free" - stop and hand control back at the next decision point.
-- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.${observerNoteBlock}${storyProgressNoteBlock}${repetitionNoteBlock}${knowledgeNoteBlock}
+- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.
 
 ## LENGTH & PACING
 A real tabletop GM talks in a few sentences and hands the mic back - they don't narrate a mini scene around every action. Match your narration length to the moment, and end the instant the player has something to react to:
 - Routine action or quick line of dialogue: ${lengthGuidance.routine}
 - Notable action with an NPC reaction: ${lengthGuidance.notable}
 - Combat beat, big reveal, or emotional climax: ${lengthGuidance.climax}
-These are hard ceilings, not targets to fill. Never pad a turn to hit a length bracket, and never write a second scene/beat "for free" just because you have room left - stop at the decision point even if that's one sentence of NPC dialogue.${pacingFeedbackLine}
+These are hard ceilings, not targets to fill. Never pad a turn to hit a length bracket, and never write a second scene/beat "for free" just because you have room left - stop at the decision point even if that's one sentence of NPC dialogue.
 
 **Cut the flavor, keep the beat.** Don't build out a whole vignette (extra sensory detail, incidental banter with a background character, describing actions no one asked about) around the actual outcome - state the outcome and stop.
 - Bad (too much staging): "You slide your hand into the paint case with the practiced ease of a man who's done this a thousand times. As you lift the tube, you tilt it just so, letting the light catch the crimp. There. A tiny roll of microfilm. 'Saving that blue for the next one, Bob?' calls Danny, the cameraman. 'Oh, you know me,' you say, flashing that gentle smile. 'Phthalo Blue waits for no one.' Danny chuckles and disappears. The microfilm is pressed between your fingers as you hum a tune."
@@ -1788,7 +1888,7 @@ A Front is a danger with its own agenda that moves in the background whether or 
 - The player's character sheet and game rules are in the pinned notes - reference them
 
 Write immersive prose. The player should experience the story, not see game mechanics.
-Keep every turn tight and short: one action, one consequence, then stop and hand control back - never decide what the player character does next, and never write more than the moment calls for.${gmAdviceSection}`;
+Keep every turn tight and short: one action, one consequence, then stop and hand control back - never decide what the player character does next, and never write more than the moment calls for.`;
 
   // Use tools + state tools
   const legacyToolNames = [
@@ -1899,87 +1999,54 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
   );
   const toolsToUse = [...gmTools, ...stateTools];
 
-  // Build the state/info message (separate from system prompt for cleaner context)
-  let stateMessage = `═══════════════════════════════════════════════════════════════
-📋 CURRENT GAME STATE
-═══════════════════════════════════════════════════════════════
-`;
+  // The request is laid out by how often each piece changes (decision 91), so
+  // each request matches the one before it as far as possible:
+  //   system prompt (nothing per-turn) -> stable block + ack -> history
+  //   -> live block + the player's action -> this turn's rounds.
+  // See buildStableBlock / buildLiveBlock.
+  const stableBlock = buildStableBlock({
+    playerSection: gmPlayerSection,
+    archetypeSection: gmArchetypeSection,
+    dmInstructions: dmInstructionsSection,
+    summary: storyData.scene.summary,
+  });
 
-  // Story-so-far summary (see compaction.ts): earlier scene history that has
-  // aged out of the history budget below gets folded in here instead of
-  // silently disappearing.
-  if (storyData.scene.summary) {
-    stateMessage += `\n## 📖 STORY SO FAR (summary of earlier events, no longer shown in full below)\n${storyData.scene.summary}\n`;
-  }
-
-  // Who the player character is - first, before the notes, because every
-  // other section is read in relation to them.
-  if (gmPlayerSection) {
-    stateMessage += "\n" + gmPlayerSection + "\n\n";
-  }
-
-  // Add lore/notes section
-  if (loreSection) {
-    stateMessage += loreSection + "\n";
-  }
-
-  // Add NPCs
-  if (npcList) {
-    stateMessage += `## 👥 NPCs Summary (read their notes for more details)\n- ${npcList}\n\n`;
-  }
-
-  // Player archetype - how the player wants to be engaged (advisory)
-  if (gmArchetypeSection) {
-    stateMessage += gmArchetypeSection + "\n\n";
-  }
-
-  // Active goals + story threads - the GM's own open objectives/plotlines
-  if (gmGoalsSection) {
-    stateMessage += gmGoalsSection + "\n\n";
-  }
-  if (gmThreadsSection) {
-    stateMessage += gmThreadsSection + "\n\n";
-  }
-
-  // Oracle/chaos state
-  if (gmOracleSection) {
-    stateMessage += gmOracleSection + "\n\n";
-  }
-
-  // Add combat state
-  if (combatSection) {
-    stateMessage += combatSection + "\n";
-  }
-
-  // Add timers
-  if (timersSection) {
-    stateMessage += timersSection + "\n";
-  }
-
-  // Add pending random events / director moves - must be addressed
-  if (gmStagePendingEventsSection) {
-    stateMessage += gmStagePendingEventsSection + "\n\n";
-  }
-  if (gmStagePendingDirectorMovesSection) {
-    stateMessage += gmStagePendingDirectorMovesSection + "\n\n";
-  }
+  const liveBlock = buildLiveBlock({
+    loreSection,
+    npcList,
+    goalsSection: gmGoalsSection,
+    threadsSection: gmThreadsSection,
+    oracleSection: gmOracleSection,
+    combatSection,
+    timersSection,
+    pendingEventsSection: gmStagePendingEventsSection,
+    pendingMovesSection: gmStagePendingDirectorMovesSection,
+    freshStorySetupBlock,
+    sessionZeroStartGameReminder,
+    setupOverdueBlock,
+    observerNoteBlock,
+    storyProgressNoteBlock,
+    repetitionNoteBlock,
+    knowledgeNoteBlock,
+    pacingFeedbackLine,
+    gmAdviceSection,
+  });
 
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
   ];
 
-  // Add state as a separate user message (keeps system prompt lean)
-  if (stateMessage.trim().length > 100) {
-    messages.push({
-      role: "user",
-      content: cleanString(stateMessage),
-    });
-    messages.push({
-      role: "assistant",
-      content:
-        "<thinking>I've reviewed the current game state. Ready to process the player's action.</thinking>",
-    });
-  }
+  // The stable block is its own user message, followed by a short assistant
+  // acknowledgement (keeps the system prompt lean, and the roles alternating).
+  messages.push({
+    role: "user",
+    content: cleanString(stableBlock),
+  });
+  messages.push({
+    role: "assistant",
+    content:
+      "<thinking>I've reviewed the current game state. Ready to process the player's action.</thinking>",
+  });
 
   // Examples are now embedded in the system prompt for natural reading
   // No separate few-shot messages needed
@@ -2038,8 +2105,15 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     );
   }
 
-  // Add the current player action as the final user message
-  // Story context is now in the previous assistant message, so just include the action
+  // The end of history (or the acknowledgement, when there is none) closes the
+  // prefix the next turn can reuse: stable block + history, byte for byte.
+  messages[messages.length - 1] = {
+    ...messages[messages.length - 1],
+    cacheBreakpoint: "prefix",
+  };
+
+  // The live block and the player's action go out as ONE user message (some
+  // providers reject consecutive user messages).
   const playerActionMessage = `> ${userChoice.replace(
     /^>\s*/,
     "",
@@ -2056,11 +2130,12 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
 
   messages.push({
     role: "user",
-    content: cleanString(playerActionMessage),
+    content: cleanString(`${liveBlock}\n\n${playerActionMessage}`),
     // Everything up to here is reused unchanged by every round of this turn
-    // (generation.ts keeps gmBaseMessages), so it is where Claude's prompt
-    // cache breakpoint goes. Ignored by every other provider.
-    cacheBreakpoint: true,
+    // (generation.ts keeps gmBaseMessages), so it is where Claude's second
+    // cache breakpoint goes ("prefix" above is the first). Ignored by every
+    // other provider.
+    cacheBreakpoint: "turn",
   });
 
   // Add the <thinking> prefill ONLY for non-reasoning models. It nudges them
@@ -2091,7 +2166,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     `[buildGMStagePrompt] Context budget: ${totalContextBudget} tokens (history: ${historyBudget}, info: ${infoBudget})`,
   );
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
-  console.log(`  - State message: ${estimateTokens(stateMessage)} tokens`);
+  console.log(`  - Stable block: ${estimateTokens(stableBlock)} tokens`);
+  console.log(`  - Live block: ${estimateTokens(liveBlock)} tokens`);
   console.log(
     `  - Chat history: ${recentParts.length} parts from #${historyStartIndex}${historySlidingFallback ? " (sliding-window fallback)" : ""} (${partsWithGMHistory} with GM data, ${partsWithNewFormat} with new gmConversation format)`,
   );

@@ -127,7 +127,7 @@ function parseArguments(raw: unknown): unknown {
  * Prefills the CLI cannot take: a trailing assistant message, and the GM's
  * `<thinking>` prefill once a round has been appended after it. That prefill
  * is the plain assistant message directly after the message marked
- * `cacheBreakpoint` (the player's action, buildGMStagePrompt), followed by
+ * `cacheBreakpoint: "turn"` (the player's action, buildGMStagePrompt), followed by
  * another assistant message - the round's reply, whether it called tools,
  * wrote prose a gate then sent back, or led into the story stage. Also, in
  * the current turn (after the last user message), any plain assistant
@@ -143,7 +143,7 @@ function dropPrefills(messages: ChatMessage[]): ChatMessage[] {
   return kept.filter((m, i) => {
     if (m.role !== "assistant" || m.tool_calls?.length) return true;
     const next = kept[i + 1];
-    if (kept[i - 1]?.cacheBreakpoint && (next?.role === "assistant" || m.content === GM_STAGE_AFFIRMATION)) {
+    if (kept[i - 1]?.cacheBreakpoint === "turn" && (next?.role === "assistant" || m.content === GM_STAGE_AFFIRMATION)) {
       return false;
     }
     if (i <= lastUser) return true;
@@ -250,10 +250,11 @@ const PLAIN_PROTOCOL = [
  * Renders a request into the CLI's system prompt (a file) and its prompt
  * (stdin). Deterministic: the same messages render to the same bytes. The
  * leading system messages, the tool list, every message before the one the
- * caller marked `cacheBreakpoint` (the GM's stable base), and the answer
- * protocol make up the system prompt, which is therefore identical in every
- * round of a turn, so the CLI's prompt cache can serve it. Everything from
- * the marked message on is the prompt, and since a later round only appends
+ * caller marked `cacheBreakpoint: "prefix"` (the GM's stable block and
+ * history), and the answer protocol make up the system prompt, which is
+ * therefore identical in every round of a turn and grows only at its end
+ * between turns, so the CLI's prompt cache can serve it. Everything after
+ * the marked message is the prompt, and since a later round only appends
  * messages, its prompt starts with the earlier round's byte for byte.
  */
 export function renderCliPrompt(
@@ -269,9 +270,21 @@ export function renderCliPrompt(
   const leadingSystem = usable.slice(0, firstNonSystem).map((m) => m.content);
   const conversation = usable.slice(firstNonSystem);
 
-  const markIndex = conversation.map((m) => !!m.cacheBreakpoint).lastIndexOf(true);
-  const stable = markIndex > 0 ? conversation.slice(0, markIndex) : [];
-  const current = markIndex > 0 ? conversation.slice(markIndex) : conversation;
+  // Everything up to and including the "prefix" message (history's end) is
+  // the stable part; the live block, the action and the rounds are the prompt.
+  // A request marked only "turn" (no prefix) keeps the older split: before the
+  // marked action is stable, the action on is the prompt. The split falls back
+  // to "all prompt" when it would leave the prompt empty.
+  const prefixIndex = conversation.map((m) => m.cacheBreakpoint === "prefix").lastIndexOf(true);
+  const turnIndex = conversation.map((m) => m.cacheBreakpoint === "turn").lastIndexOf(true);
+  const splitAt =
+    prefixIndex >= 0 && prefixIndex < conversation.length - 1
+      ? prefixIndex + 1
+      : turnIndex > 0
+        ? turnIndex
+        : 0;
+  const stable = splitAt > 0 ? conversation.slice(0, splitAt) : [];
+  const current = splitAt > 0 ? conversation.slice(splitAt) : conversation;
 
   const toolNameById = new Map<string, string>();
   for (const message of conversation) {

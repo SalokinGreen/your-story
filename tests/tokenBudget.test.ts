@@ -65,7 +65,7 @@ describe("the design's four-round turn", () => {
     }
   }, LONG);
 
-  it("shares round 1's prefix with round 2 but nothing with the next turn", async () => {
+  it("shares round 1's prefix with round 2, and the whole stable prefix with the next turn", async () => {
     const story = buildFixtureStory(DESIGN_FIXTURE);
     const first = await runRecordedTurnWithResult(story, {
       input: "I go left",
@@ -83,12 +83,52 @@ describe("the design's four-round turn", () => {
     );
     expect(within).toBeGreaterThan(10_000);
 
-    // Still 0 after T1: the first difference is inside the system prompt
-    // (the per-turn GM tip). T2's stable prefix is what raises this.
+    // T2 (decision 91): was 0, because the first difference sat inside the
+    // system prompt (the per-turn GM tip). Now the system prompt, the stable
+    // block and all of the previous turn's history are shared; only the live
+    // block and the action, then the new history tail, differ.
     const across = sharedPrefixTokens(
       first.requests[0].body.messages,
       second.requests[0].body.messages,
     );
-    expect(across).toBe(0);
+    const firstRound = first.requests[0].messageTokens;
+    console.log(
+      `[tokenBudget] consecutive turns share ${across} of ${firstRound} message tokens`,
+    );
+    // Everything but the live block and the action (about 3.4k of 14.6k tokens here).
+    expect(across).toBeGreaterThan(10_000);
+    expect(across).toBeGreaterThan(firstRound * 0.7);
+  }, LONG);
+
+  it("keeps everything per-turn out of the system message", async () => {
+    // The fixture's long replies trigger the pacing note, and the GM tip is
+    // always there; the Observer-style notes are covered by the unit test in
+    // aiStaged.stablePrefix.test.ts.
+    const story = buildFixtureStory(DESIGN_FIXTURE);
+    const { requests } = await runRecordedTurnWithResult(story, {
+      rounds: designTurnRounds(),
+    });
+    const system = requests[0].body.messages[0].content as string;
+    const lastUser = [...requests[0].body.messages]
+      .reverse()
+      .find((m: { role: string }) => m.role === "user").content as string;
+    for (const marker of ["PACING FEEDBACK", "GM Advice for this scene", "Oracle State"]) {
+      expect(system).not.toContain(marker);
+    }
+    // ...and they sit next to the action instead.
+    expect(lastUser).toContain("PACING FEEDBACK");
+    expect(lastUser).toContain("GM Advice for this scene");
+    expect(lastUser).toContain("> I keep walking.");
+  }, LONG);
+
+  it("sends the same story key on every GM round, and none without a story id", async () => {
+    const story = buildFixtureStory({ ...DESIGN_FIXTURE, priorTurns: 2 });
+    const keyed = await runRecordedTurnWithResult(story, {
+      rounds: designTurnRounds(),
+      options: { storyId: "story-abc" },
+    });
+    for (const r of keyed.requests) expect(r.body.cacheKey).toBe("ys:story-abc:gm");
+    const unkeyed = await runRecordedTurnWithResult(story, { rounds: designTurnRounds() });
+    for (const r of unkeyed.requests) expect(r.body.cacheKey).toBeUndefined();
   }, LONG);
 });

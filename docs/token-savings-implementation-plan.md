@@ -545,3 +545,57 @@ Tests 2,246 to 2,256 (+10). New tests use the run-time shape: the last part of
 - **Minor:** `increment_scene` joins `KEEP_WHOLE_TOOLS`; a stubbed `**ERROR**`
   result keeps its first line.
 - Skipped as told: the tokenizer-load cache miss and object-shaped arguments.
+
+### 2026-10-22 - PR T2 (slices 5 and 6), `claude/token-savings-t2`
+
+Built on master `e80c7f6` (T1 merged). Baseline before the first edit: 139
+files, **2,256 tests**, `tsc` clean. After: 142 files, **2,283 tests** (+27:
+`providerCall.cache` 10, `aiStaged.stablePrefix` 10, `claudeCli.prefix` 4,
+`tokenBudget` +2, `providerCall.reasoning` +1; five existing tests updated,
+net 0). Slice 7 (cached tokens in the ledger) is **not built** in this PR:
+the brief for T2 named slices 5 and 6. Everything else in the plan's T2 row
+is here. The harness now measures **11,165 of 14,598 message tokens shared
+between consecutive turns** (was 0): the system prompt, the stable block and
+all the previous turn's history; only the live block, the action and the
+new history tail differ. No `engine-review` agent ran from this session (no
+agent tool was available to the builder); the coordinating session should run
+it on the diff.
+
+- **`cacheBreakpoint` is `"prefix" | "turn" | "round"`** in both `ChatMessage`
+  types (`providerCall.ts`, `chatMessage.ts`). Five tests that set `true`
+  now set `"turn"`.
+- **The helpers for the marks and the key live in a new `cacheMarks.ts`**
+  (`storyCacheKey`, `markRoundBreakpoint`), not in `generation.ts`, so
+  `generation.ts` takes three small edits (an import, two spreads, one call)
+  and the merge with the image-generation branch stays small. The round mark
+  goes on a copy of the request's last message and only when the round has
+  history appended (a first round's last message already carries `"turn"`).
+- **The stable block always exists.** The old code skipped the state message
+  if it was under 100 characters, which its header alone never allowed; the
+  block is now unconditional, so the acknowledgement always follows it and
+  `"prefix"` always has a message to land on.
+- **Per-turn blocks keep their text, with one added heading.** The pacing line
+  was the tail of the Length & Pacing paragraph; in the live block it sits
+  under "PACING NOTE (this turn)". The setup blocks, the four notes and the GM
+  tip are verbatim, after the state sections and right before the action.
+- **The live block opens with a "LIVE GAME STATE (this turn)" rule, the stable
+  block with "THE STORY'S FOUNDATION (changes rarely)"**, replacing the one
+  "CURRENT GAME STATE" header.
+- **The CLI split.** `renderCliPrompt` splits after the last `"prefix"` message
+  when something follows it; a request with only a `"turn"` mark keeps the
+  old split (before the marked action), so a caller without a prefix mark
+  behaves as before.
+- **Claude's third mark can land on a `tool` message** (a round after a tool
+  call ends in one). Its content goes out as a list of text parts with
+  `cache_control`, like the other marks. Whether OpenRouter forwards that on a
+  `tool` message is unverified; it is the first entry in `pending_tests.md`
+  for Claude, with the fallback (mark the assistant message before it).
+- **Mistral's rejection check** reads the error text with `response.clone()`
+  and looks for `prompt_cache_key` in a 400 or 422; the retry runs once, the
+  flag is module-level and survives for the session, and
+  `resetMistralCacheKeyRejected()` exists for tests.
+- **OpenRouter's `session_id` is cut to 128 characters** (its documented
+  limit); a story id plus `ys:` and `:narration` is far under it.
+- **No ledger work**, as above; `callSideModel` gained an optional `cacheKey`
+  but no caller passes one (the side agents are not a conversation to keep
+  warm).

@@ -50,11 +50,14 @@ export interface ChatMessage {
   tool_call_id?: string;
   /**
    * The last message of a prefix the caller keeps byte-identical across the
-   * requests that follow (the GM stage's base messages, reused every round
-   * of a turn). Providers with explicit prompt caching (Claude) put a cache
-   * breakpoint here; everyone else ignores it. See buildRequestMessages.
+   * requests that follow. Providers with explicit prompt caching (Claude) put
+   * a cache breakpoint here; everyone else ignores it. Three kinds, by how
+   * long the prefix lives (see buildRequestMessages):
+   * - "prefix": the end of history, reused by the next turn;
+   * - "turn": the end of the player's action, reused by every round of this turn;
+   * - "round": the latest message of a round, reused by the next round.
    */
-  cacheBreakpoint?: boolean;
+  cacheBreakpoint?: "prefix" | "turn" | "round";
 }
 
 export interface GenerateRequestBody {
@@ -81,6 +84,10 @@ export interface GenerateRequestBody {
   // best-effort, translated per-provider below. Ignored by providers/models
   // with no lever for it.
   reasoningEffort?: string;
+  // A stable id for the conversation this request belongs to (`ys:<storyId>:gm`),
+  // so providers with sticky caching can route a story's requests together.
+  // Mistral takes it as `prompt_cache_key`, OpenRouter as `session_id`.
+  cacheKey?: string;
 }
 
 interface AIResponse {
@@ -564,6 +571,69 @@ function buildEndpoint(provider: Provider, hasPrefill: boolean, hasTools: boolea
   return "https://openrouter.ai/api/v1/chat/completions";
 }
 
+/**
+ * Set once Mistral answers a request with a 400 or 422 that names
+ * `prompt_cache_key` (decision 105: Mistral Small 3.2's support is
+ * unconfirmed). From then on, this session's Mistral requests leave it out.
+ */
+let mistralCacheKeyRejected = false;
+
+/** Test hook: forget a rejection. */
+export function resetMistralCacheKeyRejected(): void {
+  mistralCacheKeyRejected = false;
+}
+
+/** The caller's stable conversation id, in each provider's own field. */
+function applyCacheKey(requestBody: Record<string, unknown>, provider: Provider, cacheKey: string | undefined): void {
+  if (!cacheKey) return;
+  if (provider === "mistral" && !mistralCacheKeyRejected) {
+    requestBody.prompt_cache_key = cacheKey;
+  } else if (provider === "openrouter") {
+    // Keeps OpenRouter routing a story to one upstream provider, and so to its
+    // warm cache, for the whole session. OpenRouter caps the id at 128 chars.
+    requestBody.session_id = cacheKey.slice(0, 128);
+  }
+}
+
+/**
+ * POSTs a chat request. A Mistral request that carries `prompt_cache_key` and
+ * is refused for it is sent once more without it, and later requests skip it.
+ */
+async function postChatRequest(
+  endpoint: string,
+  headers: Record<string, string>,
+  requestBody: Record<string, unknown>,
+  provider: Provider,
+  signal: AbortSignal | undefined,
+): Promise<Response> {
+  const providerFetch = getProviderFetch();
+  const send = () =>
+    providerFetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
+      signal,
+    });
+  const response = await send();
+  if (
+    !response.ok &&
+    provider === "mistral" &&
+    requestBody.prompt_cache_key !== undefined &&
+    (response.status === 400 || response.status === 422)
+  ) {
+    const text = await response.clone().text().catch(() => "");
+    if (text.includes("prompt_cache_key")) {
+      mistralCacheKeyRejected = true;
+      delete requestBody.prompt_cache_key;
+      logger.action("Mistral rejected prompt_cache_key - retrying without it", {
+        status: response.status,
+      });
+      return send();
+    }
+  }
+  return response;
+}
+
 function buildHeaders(provider: Provider, apiKey: string): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -663,21 +733,30 @@ function buildRequestMessages(
   // requests only: the tool list is the start of Claude's cached prefix, so
   // the story stage (same base messages, no tools) could never read the GM's
   // entry and would only pay the cache-write premium for one of its own.
-  let cacheMarkIndex = -1;
+  //
+  // Up to four breakpoints, Claude's maximum: the system message, then the
+  // last message of each mark kind - "prefix" (end of history, reused by the
+  // next turn), "turn" (end of the action, reused by every round) and "round"
+  // (the latest message, reused by the next round). Marks that land on the
+  // same message collapse into one.
+  const cacheIndexes = new Set<number>();
   if (isClaude && hasTools) {
-    for (let i = processedMessages.length - 1; i >= 0; i--) {
-      if (processedMessages[i].cacheBreakpoint && processedMessages[i].content) {
-        cacheMarkIndex = i;
-        break;
+    for (const kind of ["prefix", "turn", "round"] as const) {
+      for (let i = processedMessages.length - 1; i >= 0; i--) {
+        if (processedMessages[i].cacheBreakpoint === kind && processedMessages[i].content) {
+          cacheIndexes.add(i);
+          break;
+        }
       }
     }
+    if (
+      cacheIndexes.size > 0 &&
+      processedMessages[0]?.role === "system" &&
+      processedMessages[0].content
+    ) {
+      cacheIndexes.add(0);
+    }
   }
-  const cacheSystemIndex =
-    cacheMarkIndex >= 0 &&
-    processedMessages[0]?.role === "system" &&
-    processedMessages[0].content
-      ? 0
-      : -1;
 
   // Gemini's thought-signature quirk below keys on the model, not the
   // provider: an OpenRouter reply from any other model (Claude's signed
@@ -711,8 +790,12 @@ function buildRequestMessages(
       if (m.reasoning_details && index > lastUserIndex) {
         msg.reasoning_details = m.reasoning_details;
       }
-    } else if (provider === "openrouter" || provider === "google") {
-      // Restore reasoning/thinking details for models that require them (Gemini 3 on OpenRouter)
+    } else if ((provider === "openrouter" || provider === "google") && index > lastUserIndex) {
+      // Restore reasoning/thinking details for models that require them
+      // (Gemini 3 on OpenRouter) - the current turn's tool loop only. An
+      // earlier turn's blob is unbudgeted payload that also changes the
+      // prefix a provider's cache could match, and Gemini rejects a stale
+      // signature outright.
       if (m.reasoning) msg.reasoning = m.reasoning;
       if (m.reasoning_details) msg.reasoning_details = m.reasoning_details;
     }
@@ -808,7 +891,7 @@ function buildRequestMessages(
       delete msg.reasoning_content;
     }
 
-    if (index === cacheMarkIndex || index === cacheSystemIndex) {
+    if (cacheIndexes.has(index)) {
       msg.content = withCacheBreakpoint(msg.content);
     }
     return msg;
@@ -937,14 +1020,9 @@ async function requestNonStreaming(
     }
 
     applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude, thinksAlways);
+    applyCacheKey(requestBody, provider, body.cacheKey);
 
-    const providerFetch = getProviderFetch();
-    const response = await providerFetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-      signal,
-    });
+    const response = await postChatRequest(endpoint, headers, requestBody, provider, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -1187,13 +1265,15 @@ export function generateStream(
           requestBody.stop = provider === "zai" ? stop.slice(0, 1) : stop;
         }
 
-        const providerFetch = getProviderFetch();
-        const response = await providerFetch(endpoint, {
-          method: "POST",
+        applyCacheKey(requestBody, provider, body.cacheKey);
+
+        const response = await postChatRequest(
+          endpoint,
           headers,
-          body: JSON.stringify(requestBody),
-          signal: requestAbort?.signal,
-        });
+          requestBody,
+          provider,
+          requestAbort?.signal,
+        );
 
         if (!response.ok) {
           const errorText = await response.text();
