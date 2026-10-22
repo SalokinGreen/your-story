@@ -41,6 +41,8 @@ import VariablesEditor from "./menu/VariablesEditor";
 import StoryMetaEditor from "./menu/StoryMetaEditor";
 import CouchPlayersEditor from "./menu/CouchPlayersEditor";
 import OnlinePlayEditor from "./menu/OnlinePlayEditor";
+import PartyModeEditor from "./menu/PartyModeEditor";
+import type { PartyHostApi } from "./usePartyHost";
 import APIKeysModal from "../components/APIKeysModal";
 import CompactStoryModal from "./menu/CompactStoryModal";
 import FullScreenView from "../components/FullScreenView";
@@ -69,6 +71,9 @@ interface MenuProps extends StoryData {
   ) => Promise<void>;
   onLeaveNetRoom: () => Promise<void>;
   onSwitchNetBackend: (backend: MPBackend) => Promise<void>;
+  // Party mode (desktop app): phones join over the home network. Omitted
+  // where it can't run.
+  party?: PartyHostApi;
   // Opens the Story Editor straight to this section on mount - used when
   // arriving here via an auto-host deep link from the Library/home page.
   autoOpenSection?: MenuTab;
@@ -78,6 +83,7 @@ type MenuTab =
   | "basic"
   | "hotseat"
   | "online"
+  | "party"
   | "abilities"
   | "goals"
   | "lore"
@@ -102,6 +108,7 @@ export default function MenuPage({
   onJoinNetRoom,
   onLeaveNetRoom,
   onSwitchNetBackend,
+  party,
   autoOpenSection,
   ...storyData
 }: MenuProps) {
@@ -214,6 +221,9 @@ export default function MenuPage({
     { id: "basic", label: "Basic", icon: "FileText" },
     { id: "hotseat", label: "Hot-seat", icon: "Users" },
     { id: "online", label: "Online Play", icon: "Wifi" },
+    ...(party?.available
+      ? [{ id: "party" as const, label: "Party Mode", icon: "Smartphone" }]
+      : []),
     { id: "abilities", label: "Abilities", icon: "Wand2" },
     { id: "goals", label: "Goals", icon: "Scroll" },
     { id: "lore", label: "Notes", icon: "Book" },
@@ -1263,6 +1273,25 @@ export default function MenuPage({
                     switchBackend={onSwitchNetBackend}
                   />
                 </div>
+
+                {party?.available && (
+                  <div
+                    ref={(el) => {
+                      sectionRefs.current["party"] = el;
+                    }}
+                    data-section-id="party"
+                    style={{ scrollSnapAlign: "start" }}
+                    className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  >
+                    <SectionHeading tab={getSection("party")} />
+                    <p className="text-xs text-blue-200/50 -mt-3 mb-4">
+                      This desktop is the table and everyone plays from their
+                      own phone, over your home Wi-Fi. No account and no
+                      internet needed.
+                    </p>
+                    <PartyModeEditor party={party} onlineRoomOpen={!!netSession} />
+                  </div>
+                )}
 
                 <div
                   ref={(el) => {

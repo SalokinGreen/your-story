@@ -324,6 +324,16 @@ Ranked by severity (sections below are numbered in the order they were found):
 | 6.5 | `useSavedImport` hook-named handler | Low | Trivial |
 | 6.6 | CLAUDE.md advertises `resolve_challenge` | Docs | Trivial |
 
+> **Update 2026-10-22:** four more bugs turned up while reviewing a rulebook
+> for the GM (decision 65). They are §6.15–6.18, after 6.14:
+>
+> | # | Bug | Severity | Effort |
+> |---|---|---|---|
+> | 6.16 | Hidden note text reaches the narrator: the stripper is never called | Medium | Small |
+> | 6.15 | Rules notes are titles only, though prompts, comments and docs say pinned; `alwaysOn` and keyword triggers do nothing | Medium (confusing) | Small (decide) |
+> | 6.17 | `calculate` strips letters and commas: `min(12,10)` evaluates as 1210 | Medium | Small |
+> | 6.18 | `search_notes` ignores `enabled`, returning disabled notes | Low | Trivial |
+
 ### 6.1 Timer auto-advance never fires
 
 **Severity: medium-high (silent gameplay bug).** Verified directly.
@@ -538,6 +548,89 @@ generate the icons (`generate-icons.sh` exists at the repo root).
   prose — it relies on the round cap.
 - **Fix:** derive the Google set from the live whitelist (or a tag on each
   schema), keep it in a test, and only force `required` when the caller asks.
+
+### 6.15 Rules notes are titles only, though the prompt, comments and docs say pinned
+
+**Severity: medium (the GM is told two things, and authors are told a third).**
+Found 2026-10-22; verified in the code.
+
+- `buildGMStagePrompt` puts `dm_instructions`, `character_sheet` and `gm_plan`
+  notes in full in every round, and lists `mechanics` notes **by title only**
+  (`app/misc/ai_staged.ts:1208-1213`). The GM has to call `read_notes` to see
+  the rules; the prompt says so at line 1555. That has been the behaviour
+  since at least July 2026.
+- Everything else says the opposite. The comments at `ai_staged.ts:448` and
+  `:1093-1095` and `:1115` call `mechanics` pinned and "always loaded in
+  full"; **the GM's own NOTE TYPES table** (`ai_staged.ts:1680`) tells the
+  model the same, contradicting line 1555 of the same prompt; so does the
+  `LoreType` comment (`app/misc/structs.ts:176`) and `CLAUDE.md`.
+- **`alwaysOn` and keyword triggers do not change what the GM sees.**
+  Nothing in `ai_staged.ts`, `gmExecutor.ts` or `generation.ts` reads
+  `alwaysOn`, `on` or `on_triggers`; `processLoreTriggers` (`app/misc/lore.ts`)
+  sets `on`, which only search ranking reads. The Designer's tool schema
+  still tells it `alwaysOn` means "always in the GM's context" and that
+  `keys` "pull this note into context" (`app/misc/designer_tools.ts:158-163`),
+  and `designer_executor.ts:282-286` forces `alwaysOn` on rules notes for
+  that reason. The PDF importer marks every rules note `alwaysOn` too
+  (`app/misc/ocrSummarizeCall.ts:1178`).
+- **There is no size cap anywhere.** The pinned notes are never truncated
+  (the 40% "info budget" is only logged, `ai_staged.ts:2229-2231`), and
+  `read_notes` returns a note whole. So a book-length note is either tens of
+  thousands of tokens in every round (pinned types) or in one tool result
+  (`mechanics`).
+- **Fix:** decide which behaviour is meant. Decision 72 keeps titles-only for
+  rules notes (a system's core goes in a pinned note); then correct the NOTE
+  TYPES table, the comments, the `LoreType` comment and the Designer's
+  `alwaysOn`/`keys` descriptions to match.
+
+### 6.16 Hidden note text reaches the narrator: the stripper is never called
+
+**Severity: medium (a secret-keeping guarantee that isn't there).** Found
+2026-10-22; verified in the code, not in a played turn.
+
+- `read_notes` wraps `hidden`, `to_be_revealed` and `check_per_turn` content
+  in `[[HIDDEN_LORE]]` markers, with a comment promising that
+  `stripHiddenLoreContent()` "removes everything between these markers before
+  the Narrator stage ever sees it" (`app/misc/gmExecutor.ts:3214-3232`).
+- `stripHiddenLoreContent` (`app/misc/ai_staged.ts:57`) is defined and
+  unit-tested (`tests/twoPassVisibility.test.ts`) but **has no caller**.
+- When the narrator continues the turn, its messages are the GM's base
+  messages plus the GM's whole conversation, tool results included
+  (`app/misc/generation.ts:3009`, `:3140-3145`). So the hidden text reaches
+  the narrator model, guarded only by the "do not narrate" line inside it.
+  `search_notes` also includes hidden notes by default
+  (`app/misc/toolExecutor.ts:1875`), as excerpts.
+- `docs/research-paper-ttrpg-theory-gap-analysis.md` describes the stripper as
+  working.
+- **Fix:** strip the markers' contents from the GM conversation before it is
+  handed to the story stage (and decide whether `search_notes` should default
+  to excluding hidden notes), with a test on the narrator's messages.
+
+### 6.17 `calculate` strips letters and commas: `min(12,10)` evaluates as 1210
+
+**Severity: medium (a confident wrong answer).** Found 2026-10-22; verified in
+the code and measured.
+
+- `evaluateArithmetic` removes everything but digits, `+ - * / ( ) .` and
+  spaces before evaluating (`app/misc/gmExecutor.ts:1666`). So
+  `min(12,10) >= 7` becomes `(1210) >= 7` and comes back
+  **"1210 >= 7 → TRUE"**; `min(5+6,10)` gives 615. With a space,
+  `min(12, 10)` becomes `(12 10)` and errors.
+- The tool has no functions, and one comparison per call
+  (`splitComparison`, `gmExecutor.ts:1617-1640`). Systems with a capped
+  score (Ironsworn's action score caps at 10) can't express the cap, and a
+  model that tries `min()` gets a wrong number instead of an error.
+- **Fix:** reject any letter or comma with an error that names what is
+  supported (or support `min`/`max` explicitly), with tests for both.
+
+### 6.18 `search_notes` ignores `enabled`
+
+**Severity: low.** Found 2026-10-22; verified in the code.
+
+- `search_notes` skips notes with `on === false` but never checks `enabled`
+  (`app/misc/toolExecutor.ts:392-399`), so excerpts of disabled notes come
+  back, while `read_notes` refuses the same notes (`gmExecutor.ts:3182-3185`).
+- **Fix:** skip `enabled === false` in the search loop, with a test.
 
 ---
 

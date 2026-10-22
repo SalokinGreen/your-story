@@ -32,10 +32,23 @@ tauri-plugin-http = "2"
 # the plugin injects. Scoped to https:// in capabilities/default.json.
 tauri-plugin-opener = "2.7.2"
 
+# Desktop only: a phone cannot run the CLI or host a table.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 # The bridge to the player's own `claude` CLI (src/claude_cli.rs,
 # docs/claude-gm-design.md §4): spawning it with a cleared environment,
-# streaming its stdout, killing it on Stop, and finding it on PATH. Desktop
-# only - a phone cannot run the CLI (decision 10).
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macros", "rt"] }
+# streaming its stdout, killing it on Stop, and finding it on PATH.
+# Party mode's LAN server (src/party_server.rs) adds the `net` feature.
+tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macros", "rt", "net"] }
 which = "8"
+# Party mode's LAN server (src/party_server.rs): serves the phone page from
+# the bundled frontend and relays WebSocket messages. Game logic stays in the
+# webview's TypeScript.
+axum = { version = "0.8", default-features = false, features = ["ws", "http1", "tokio", "query"] }
+local-ip-address = "0.6"
+rand = "0.10"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+tower = { version = "0.5", features = ["util"] }
+tokio-tungstenite = "0.29"
+futures-util = "0.3"

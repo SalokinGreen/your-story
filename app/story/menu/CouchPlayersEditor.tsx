@@ -4,22 +4,14 @@ import { useState } from "react";
 import { CouchPlayer, PlayerArchetype } from "../../misc/structs";
 import { DynamicIcon } from "../../components/DynamicIcon";
 import { ARCHETYPE_INFO } from "../../misc/gmAdvice";
+import { PLAYER_PALETTE } from "../../misc/multiplayer/palette";
 
 const ARCHETYPE_OPTIONS = Object.entries(ARCHETYPE_INFO) as [
   PlayerArchetype,
   (typeof ARCHETYPE_INFO)[PlayerArchetype],
 ][];
 
-export const PALETTE = [
-  "#22c55e", // green
-  "#ec4899", // pink
-  "#3b82f6", // blue
-  "#f59e0b", // amber
-  "#a855f7", // purple
-  "#ef4444", // red
-  "#14b8a6", // teal
-  "#eab308", // yellow
-];
+export const PALETTE = PLAYER_PALETTE;
 
 function nextColor(existing: CouchPlayer[]): string {
   const used = new Set(existing.map((p) => p.color));

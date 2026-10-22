@@ -6,6 +6,7 @@ import { DynamicIcon } from "./DynamicIcon";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { sttFetch } from "../misc/sttFetch";
+import { buildTurnText } from "../misc/party/turnText";
 import {
   createFloor,
   lockedOutIds as floorLockedOutList,
@@ -324,10 +325,9 @@ export default function PlayerBubbles({
 
   const submitLines = useCallback(
     (lines: PendingLine[]) => {
-      if (lines.length === 0) return;
-      const text = lines.map((l) => `> ${l.name}: ${l.text}`).join("\n");
-      const speakerIds = Array.from(new Set(lines.map((l) => l.playerId)));
-      onSubmit(text, speakerIds);
+      const turn = buildTurnText(lines);
+      if (!turn) return;
+      onSubmit(turn.text, turn.speakerIds);
     },
     [onSubmit],
   );

@@ -7,6 +7,10 @@ fn main() {
       "claude_cli_status",
       "claude_cli_run",
       "claude_cli_cancel",
+      "party_start",
+      "party_send",
+      "party_kick",
+      "party_stop",
     ]),
   ))
   .expect("failed to run tauri-build");

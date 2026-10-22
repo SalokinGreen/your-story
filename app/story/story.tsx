@@ -15,6 +15,8 @@ import type {
 } from "../misc/multiplayer/session";
 import TurnLobbyOverlay from "../components/TurnLobbyOverlay";
 import PlayerBubbles from "../components/PlayerBubbles";
+import PartyTableStrip from "../components/PartyTableStrip";
+import type { PartyTable } from "../misc/party/partyRuntime";
 import CombatDisplay from "../components/CombatDisplay";
 import { ChapterNav } from "../components/ChapterNav";
 import { ObjectivesStrip } from "../components/ObjectivesStrip";
@@ -148,6 +150,14 @@ interface StoryProps {
   turnLobby?: TurnStatus | null;
   onTurnLobbyStartNow?: () => void;
   onTurnLobbyPass?: () => void;
+  // Party mode (desktop app): every player is on their own phone and this
+  // screen is the table. While the table is open (partyTable set) the party
+  // strip replaces couch co-op's voice bubbles. See app/misc/party/.
+  partyTable?: PartyTable | null;
+  onPartyGo?: () => void;
+  onPartyJoin?: () => void;
+  onPartyRemove?: (playerId: string) => void;
+  onPartyAnswerHere?: (requestId: string) => void;
 }
 
 // Font settings interface
@@ -788,6 +798,11 @@ export default function Story({
   turnLobby,
   onTurnLobbyStartNow,
   onTurnLobbyPass,
+  partyTable,
+  onPartyGo,
+  onPartyJoin,
+  onPartyRemove,
+  onPartyAnswerHere,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -1616,6 +1631,18 @@ export default function Story({
           />
         )}
 
+        {/* Party mode: who is at the table, the spotlight, the queue and Go.
+            Rendered in normal flow above the composer, like the lobby. */}
+        {partyTable && onPartyGo && onPartyJoin && onPartyRemove && onPartyAnswerHere && (
+          <PartyTableStrip
+            table={partyTable}
+            onGo={onPartyGo}
+            onJoin={onPartyJoin}
+            onRemove={onPartyRemove}
+            onAnswerHere={onPartyAnswerHere}
+          />
+        )}
+
         {/* Composer: suggested choices, player switcher, and chat input */}
         {!editMode && (
           <StoryComposer
@@ -1636,7 +1663,7 @@ export default function Story({
           input UI now, replacing the old composer mic button. Couch
           co-op/multiplayer get one bubble per player; solo play gets a
           single default bubble instead. */}
-      {onCustomInput && (
+      {onCustomInput && !partyTable && (
         <PlayerBubbles
           players={couchPlayers.length > 0 ? couchPlayers : SOLO_VOICE_PLAYER}
           onSubmit={(text, speakerIds) =>
