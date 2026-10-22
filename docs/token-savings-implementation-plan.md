@@ -739,3 +739,31 @@ against their executors.
 - **Not touched.** The Google `GOOGLE_ESSENTIAL_TOOLS` list, the labels and the
   observer registration: no tool was added, removed or renamed, so all six
   places still agree.
+
+### 2026-10-22 - after the engine review (PR T3)
+
+Tests 2,304 to 2,310 (+6 in `contextLimits.test.ts`, one existing test there
+reworked for the new DM share).
+
+- **The cap keeps the plan's current beat (decision 110).** `capPinnedNotes`
+  splits a `gm_plan` note at its last `\n## Current beat` section, budgets that
+  section out of the cap first (bounded to half the cap), shares the rest among
+  the fronts, and writes `front + pointer + beat`. `cutTokens` counts the front
+  only.
+- **`edit_note` refuses a rewrite from a shortened view.** New
+  `wholeNoteRewriteRefusal` (`toolExecutor.ts`): refused when the new content
+  carries the `[… N more tokens: read_notes "` pointer, or the note is a pinned
+  type whose prompt form is cut and `notesReadThisTurn` is false. The message
+  points to `read_notes` / `edit_lore_replace`.
+- **The DM instructions' cut is independent of the sheet and plan.** New
+  `capPinnedForGM`: the DM instructions are capped alone at
+  `DM_INSTRUCTIONS_CAP_TOKENS` (4,000, a judgment call for "a fixed share"),
+  then the sheets and the plan share the 10,000 total minus what the DM
+  instructions took. The stable block is therefore byte-identical when the
+  sheet grows. Both `buildGMStagePrompt` and `edit_note` call it, so they agree
+  on what is shortened.
+- **Descriptions.** `add_combatant`: "`lore_ref` links a note."
+  `manage_timer`: no longer says `auto_advance` ticks (§6.1). `ask_for_roll`:
+  secret rolls are `gm_roll`.
+- **Comments** in `buildGMStagePrompt` about the plan and mechanics notes
+  corrected. The tool list is still under the 10,000 bound.

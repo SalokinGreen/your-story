@@ -482,9 +482,13 @@ full every turn** (the DM instructions, the character sheets and the campaign
 plan) are warned about past about 3,000 tokens each, in the Adventure
 Inspector, the lore editor and the Designer's `write_note` result, and capped
 at 10,000 tokens together (decision 96, `contextLimits.ts`): past that the
-prompt carries the front of each, ends it with
+prompt carries the front of each (the plan also keeps its last
+`## Current beat` section whole, decision 110), ends the front with
 `[… N more tokens: read_notes "Title" for the rest]`, and the stored note is
-untouched.
+untouched. The DM instructions are capped on their own (4,000 tokens) so
+the stable block never moves when the sheet or plan changes length, and
+`edit_note` refuses a whole-note rewrite of a shortened pinned note until the
+GM has read it (or if the new text carries the pointer line).
 
 **The player's own Claude subscription runs through the `claude` CLI, on the
 desktop app only** (decisions 10–13, `docs/claude-gm-design.md` §4). The

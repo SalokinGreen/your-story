@@ -937,7 +937,7 @@ const askForRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "ask_for_roll",
-    description: `Manual Dice Mode only. Ask the player to roll REAL dice and tell you what came up; use it instead of formula_roll for the player character's rolls. Give the exact formula with their modifiers worked out. The game pauses; their answer comes back as their own words ("17", "natural 20, so 23"), so work out what it means and use \`calculate\` for the arithmetic and the comparison. If the answer is unreadable, ask again in (round brackets). Not for NPC or secret rolls (formula_roll or npc_roll).`,
+    description: `Manual Dice Mode only. Ask the player to roll REAL dice and tell you what came up; use it instead of formula_roll for the player character's rolls. Give the exact formula with their modifiers worked out. The game pauses; their answer comes back as their own words ("17", "natural 20, so 23"), so work out what it means and use \`calculate\` for the arithmetic and the comparison. If the answer is unreadable, ask again in (round brackets). Not for NPC rolls (npc_roll) or secret rolls (gm_roll).`,
     parameters: {
       type: "object",
       properties: {
@@ -1518,7 +1518,7 @@ const addCombatantTool: ToolSchema = {
   type: "function",
   function: {
     name: "add_combatant",
-    description: `Add combatants to the active combat. One: pass name/type/stats/initiative. Several: pass a \`combatants\` array (duplicate names get suffixed). Stats are free-form numbers for whatever system fits ({ HP: 30, AC: 14 }). Initiative is a number or a dice formula ("1d20+2"). Always add the player, with type "player". \`lore_ref\` pulls details from a note.`,
+    description: `Add combatants to the active combat. One: pass name/type/stats/initiative. Several: pass a \`combatants\` array (duplicate names get suffixed). Stats are free-form numbers for whatever system fits ({ HP: 30, AC: 14 }). Initiative is a number or a dice formula ("1d20+2"). Always add the player, with type "player". \`lore_ref\` links a note.`,
     parameters: {
       type: "object",
       properties: {
@@ -1771,7 +1771,7 @@ const manageTimerTool: ToolSchema = {
   type: "function",
   function: {
     name: "manage_timer",
-    description: `Create, advance, pause/resume, cancel or trigger a countdown timer (rituals, deadlines, arriving reinforcements). Timers count down to 0, then trigger. Actions: create (name + ticks; auto_advance true ticks each GM turn, false means you advance it), advance (timer, optional ticks, default 1), toggle_pause, cancel (without triggering), trigger (fire now). Several timers can run at once.`,
+    description: `Create, advance, pause/resume, cancel or trigger a countdown timer (rituals, deadlines, arriving reinforcements). Timers count down to 0, then trigger. Actions: create (name + ticks; advance it yourself with the advance action, as auto_advance does not tick yet), advance (timer, optional ticks, default 1), toggle_pause, cancel (without triggering), trigger (fire now). Several timers can run at once.`,
     parameters: {
       type: "object",
       properties: {

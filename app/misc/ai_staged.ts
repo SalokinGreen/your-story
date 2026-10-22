@@ -28,7 +28,7 @@ import { cleanString } from "@/app/misc/textUtils";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import {
   PINNED_TOTAL_CAP_TOKENS,
-  capPinnedNotes,
+  capPinnedForGM,
   pinnedNoteWarning,
 } from "@/app/misc/contextLimits";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
@@ -1269,13 +1269,13 @@ export function buildGMStagePrompt({
     (l) => l.enabled !== false && l.type === "character_sheet",
   );
 
-  // 📌 Game Mechanics - Always loaded in full
+  // 📌 Game Mechanics - listed by title only below; read with read_notes
   const mechanicsLore = (storyData.lore || []).filter(
     (l) => l.enabled !== false && l.type === "mechanics",
   );
 
-  // 📌 Campaign Plan - Always loaded in full (spine + per-player arcs + any
-  // open side beat). See docs/gm-plan-notes-design.md.
+  // 📌 Campaign Plan - sent in full (shortened only past the pinned cap, which
+  // keeps its current beat; spine + per-player arcs + any open side beat). See docs/gm-plan-notes-design.md.
   const gmPlanLore = (storyData.lore || []).filter(
     (l) => l.enabled !== false && l.type === "gm_plan",
   );
@@ -1329,13 +1329,10 @@ export function buildGMStagePrompt({
   // Together the pinned notes are capped (decision 96): past the cap each is
   // shortened in this prompt only, with a pointer to read_notes for the rest.
   const pinnedForGM = [...dmInstructionsLore, ...characterSheetLore, ...gmPlanLore];
-  const cappedPinned = capPinnedNotes(pinnedForGM);
-  const cappedContentOf = new Map<unknown, string>(
-    pinnedForGM.map((l, i) => [l, cappedPinned[i].content]),
-  );
-  const pinnedCutTokens = cappedPinned.reduce((sum, n) => sum + n.cutTokens, 0);
+  const cappedPinned = capPinnedForGM(storyData.lore || []);
+  const pinnedCutTokens = [...cappedPinned.values()].reduce((sum, n) => sum + n.cutTokens, 0);
   const pinnedContent = (l: (typeof pinnedForGM)[number]): string =>
-    cleanString(cappedContentOf.get(l) ?? l.content);
+    cleanString(cappedPinned.get(l)?.content ?? l.content);
 
   let dmInstructionsSection = "";
   if (dmInstructionsLore.length > 0) {
