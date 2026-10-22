@@ -21,6 +21,8 @@ export interface APIKeys {
   googleKey: string;
   mistralKey: string;
   deepinfraKey: string;
+  // Z.ai's general pay-as-you-go API, never its Coding Plan (decision 18).
+  zaiKey: string;
   braveSearchKey: string;
   cartesiaKey: string;
   elevenlabsKey: string;
@@ -54,6 +56,7 @@ const defaultKeys: APIKeys = {
   googleKey: "",
   mistralKey: "",
   deepinfraKey: "",
+  zaiKey: "",
   braveSearchKey: "",
   cartesiaKey: "",
   elevenlabsKey: "",
@@ -68,6 +71,7 @@ const LOCAL_KEYS = {
   googleKey: "googleKey",
   mistralKey: "mistralKey",
   deepinfraKey: "deepinfraKey",
+  zaiKey: "zaiKey",
   braveSearchKey: "braveSearchKey",
   cartesiaKey: "cartesiaKey",
   elevenlabsKey: "elevenlabsKey",
@@ -88,6 +92,7 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
       googleKey: localStorage.getItem(LOCAL_KEYS.googleKey) || "",
       mistralKey: localStorage.getItem(LOCAL_KEYS.mistralKey) || "",
       deepinfraKey: localStorage.getItem(LOCAL_KEYS.deepinfraKey) || "",
+      zaiKey: localStorage.getItem(LOCAL_KEYS.zaiKey) || "",
       braveSearchKey: localStorage.getItem(LOCAL_KEYS.braveSearchKey) || "",
       cartesiaKey: localStorage.getItem(LOCAL_KEYS.cartesiaKey) || "",
       elevenlabsKey: localStorage.getItem(LOCAL_KEYS.elevenlabsKey) || "",

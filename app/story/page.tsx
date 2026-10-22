@@ -53,7 +53,7 @@ import {
   type ElementCategory,
 } from "../misc/mythic";
 import {
-  NARRATION_MODEL_KEY,
+  getEffectiveNarrationModelKey,
   type ResolvedTier,
 } from "../misc/reasoningTiers";
 import { migrateCustomTablesToNotes } from "../misc/tableNotes";
@@ -92,20 +92,24 @@ import {
 import { logger } from "../misc/logger";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
+import { getSubscriptionFallbacks } from "../misc/reasoningTiers";
+import { getLayerSubscriptionFallbacks } from "../misc/layerSettings";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { useSearchParams, useRouter } from "next/navigation";
 
-// Helper function to get models for generation options.
-// storyModel/toolsModel/choicesModel are no longer read from presets or
-// localStorage - the reasoning-tier router (generation.ts) picks the actual
-// model per stage/turn internally. These fields stay on GenerationOptions
-// for type compatibility with other callers, filled with the narration
-// model as an inert default that's never actually dispatched to.
+// Helper function to get models for generation options. They are no longer
+// read from presets: generateStoryTurn ignores all three (the reasoning-tier
+// router picks the GM's model, and narration, choices and every side call run
+// on the narration model, decision 19), and only choicesModel is used, by
+// generateChoicesOnly. They stay on GenerationOptions for type compatibility,
+// filled with the narration model so the player's override reaches
+// generateChoicesOnly too.
 function getModelsFromPreset() {
+  const narrationModel = getEffectiveNarrationModelKey();
   return {
-    storyModel: NARRATION_MODEL_KEY,
-    toolsModel: NARRATION_MODEL_KEY,
-    choicesModel: NARRATION_MODEL_KEY,
+    storyModel: narrationModel,
+    toolsModel: narrationModel,
+    choicesModel: narrationModel,
   };
 }
 
@@ -435,6 +439,7 @@ function StoryPageContent() {
     googleKey,
     mistralKey,
     deepinfraKey,
+    zaiKey,
     braveSearchKey,
   } = apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
@@ -933,6 +938,31 @@ function StoryPageContent() {
       };
     });
   }, [netSession]);
+
+  // Decision 29: subscription models are not used during online play, so a
+  // slot set to one runs on its default for as long as the session lasts.
+  // Say so once when the session starts. useNetSession's effect (declared
+  // earlier in this component) has already published the session to
+  // claudeCliModels, so the fallbacks read as active here.
+  const subscriptionNoticeForRoomRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!netSession) {
+      subscriptionNoticeForRoomRef.current = null;
+      return;
+    }
+    if (subscriptionNoticeForRoomRef.current === netSession.roomId) return;
+    subscriptionNoticeForRoomRef.current = netSession.roomId;
+    const online = [...getSubscriptionFallbacks(), ...getLayerSubscriptionFallbacks()].filter(
+      (f) => f.reason === "online",
+    );
+    if (online.length === 0) return;
+    addNotification(
+      `Online play: your Claude subscription models are not used while this game is online (${online
+        .map((f) => f.slot)
+        .join(", ")} run on their default models instead).`,
+      "info",
+    );
+  }, [netSession, addNotification]);
 
   // Live GM streaming state - chronological thinking/tool/text blocks,
   // rendered inline (Claude-style) as they arrive - see turnTimeline.ts
@@ -2150,6 +2180,7 @@ function StoryPageContent() {
           googleKey,
           mistralKey,
           deepinfraKey,
+          zaiKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -2752,6 +2783,7 @@ function StoryPageContent() {
           googleKey,
           mistralKey,
           deepinfraKey,
+          zaiKey,
           storyId: storyDbId || undefined,
           abortSignal: generationAbortRef.current.signal,
           enableEmbeddings: embeddingsEnabled,
@@ -3236,6 +3268,7 @@ function StoryPageContent() {
           googleKey,
           mistralKey,
           deepinfraKey,
+          zaiKey,
         });
 
         const lastPartIndex = storyData.scene.parts.length - 1;
@@ -3869,6 +3902,7 @@ function StoryPageContent() {
           googleKey,
           mistralKey,
           deepinfraKey,
+          zaiKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -4416,6 +4450,7 @@ function StoryPageContent() {
         googleKey,
         mistralKey,
         deepinfraKey,
+        zaiKey,
       });
 
       // Update the last part with new choices

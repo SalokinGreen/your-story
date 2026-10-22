@@ -10,4 +10,7 @@ export type ChatMessage = {
   reasoning_details?: any[]; // Structured reasoning tokens (ReasoningDetail[])
   tool_calls?: any[]; // OpenAI/DeepSeek format tool calls
   tool_call_id?: string; // For tool role messages
+  // End of a prefix the caller keeps byte-identical across requests - a
+  // prompt-cache breakpoint for Claude (providerCall.ts buildRequestMessages).
+  cacheBreakpoint?: boolean;
 };

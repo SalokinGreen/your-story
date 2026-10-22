@@ -2196,6 +2196,10 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
   messages.push({
     role: "user",
     content: cleanString(playerActionMessage),
+    // Everything up to here is reused unchanged by every round of this turn
+    // (generation.ts keeps gmBaseMessages), so it is where Claude's prompt
+    // cache breakpoint goes. Ignored by every other provider.
+    cacheBreakpoint: true,
   });
 
   // Add the <thinking> prefill ONLY for non-reasoning models. It nudges them

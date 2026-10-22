@@ -23,6 +23,7 @@ const ALL_KEYS = {
   googleKey: "g-key",
   mistralKey: "mistral-key",
   deepinfraKey: "di-key",
+  zaiKey: "zai-key",
 };
 
 const MESSAGES = [
@@ -48,7 +49,7 @@ afterEach(() => {
 });
 
 describe("pickProviderKeys", () => {
-  it("copies exactly the five AI-provider keys and drops everything else", () => {
+  it("copies exactly the six AI-provider keys and drops everything else", () => {
     const picked = pickProviderKeys({
       ...ALL_KEYS,
       // The APIKeys context also holds these - they must never ride along.
@@ -61,7 +62,7 @@ describe("pickProviderKeys", () => {
 });
 
 describe("callSideModel - web build", () => {
-  it("posts to /api/generate with all five provider keys", async () => {
+  it("posts to /api/generate with all six provider keys", async () => {
     const fetchMock = vi.fn(async () => okResponse("verdict"));
     global.fetch = fetchMock as unknown as typeof fetch;
 

@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StoryData } from "@/app/misc/structs";
+import { setOnlineSessionActive } from "@/app/misc/claudeCliModels";
 import {
   ClaimedProfile,
   DiceThrowRelayRequest,
@@ -343,6 +344,14 @@ export function useNetSession({
       sessionRef.current?.leave();
     };
   }, []);
+
+  // Decision 29: a Claude subscription model is not used while an online
+  // session (either role) is active. Published here, where the session's
+  // lifetime is known, and cleared when the page goes away.
+  useEffect(() => {
+    setOnlineSessionActive(!!netSession);
+  }, [netSession]);
+  useEffect(() => () => setOnlineSessionActive(false), []);
 
   return {
     netSession,

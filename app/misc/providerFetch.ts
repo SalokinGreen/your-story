@@ -13,6 +13,8 @@
  */
 
 import { isStandalone } from "./standalone";
+import { claudeCliFetch } from "./claudeCli";
+import { isClaudeCliAvailablePlatform, isClaudeCliModel } from "./claudeCliModels";
 import {
   generateNonStreaming,
   generateStream,
@@ -30,6 +32,15 @@ export async function providerFetch(
   body: GenerateRequestBody,
   signal?: AbortSignal,
 ): Promise<Response> {
+  // A Claude subscription model runs through the player's own `claude` CLI
+  // (claudeCli.ts), on the desktop only. Checked before isStandalone(),
+  // because `tauri dev` is the desktop app without a standalone build. Off
+  // the desktop the request falls through to providerCall, which answers
+  // with a clear "desktop only" error.
+  if (isClaudeCliAvailablePlatform() && isClaudeCliModel(body.model)) {
+    return claudeCliFetch(path, body, signal);
+  }
+
   if (!isStandalone()) {
     return fetch(path, {
       method: "POST",

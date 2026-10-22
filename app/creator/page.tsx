@@ -17,6 +17,8 @@ import LibraryPickerModal from "@/app/components/LibraryPickerModal";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { getAvailableModels } from "@/app/misc/ai_prices";
+import { useClaudeCliStatus } from "@/app/components/ClaudeSubscriptionPanel";
+import { isClaudeCliAvailablePlatform, isClaudeCliModel } from "@/app/misc/claudeCliModels";
 import { CustomModel, getCustomModels } from "@/app/misc/user_settings";
 import { LibraryNote } from "@/app/misc/localNotesLibraryManager";
 import { startAdventureLocally } from "@/app/misc/localStoryManager";
@@ -33,6 +35,9 @@ function CreatorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { keys: apiKeys } = useAPIKeys();
+  // The Claude subscription models need no key, only the desktop app's
+  // signed-in `claude` CLI; getAvailableModels reads its cached status.
+  const cliStatus = useClaudeCliStatus();
   const { addNotification } = useNotification();
 
   const editId = searchParams.get("edit") || undefined;
@@ -64,7 +69,8 @@ function CreatorPage() {
     }
   }, []);
 
-  // Everything is BYOK: a model is offered when its provider's key is saved.
+  // Everything is BYOK: a model is offered when its provider's key is saved
+  // (or, for a Claude subscription model, when the CLI is signed in).
   // The Designer works entirely through tool calls, so models that can't call
   // tools would produce a chat that never writes into the adventure.
   const availableModels = useMemo(() => {
@@ -75,6 +81,7 @@ function CreatorPage() {
         googleKey: !!apiKeys.googleKey,
         mistralKey: !!apiKeys.mistralKey,
         deepinfraKey: !!apiKeys.deepinfraKey,
+        zaiKey: !!apiKeys.zaiKey,
       },
       { requireToolCalling: true },
     ).map(([key, config]) => [key, config.name]);
@@ -82,8 +89,22 @@ function CreatorPage() {
     if (apiKeys.openRouterKey) {
       customModels.forEach((m) => entries.push([m.id, `⭐ ${m.name}`]));
     }
+    // A stored subscription model stays chosen on the desktop while the CLI's
+    // status is unknown or signed out, rather than quietly giving way to a
+    // model the author pays for; the Designer's own error then says why.
+    if (
+      model &&
+      isClaudeCliModel(model) &&
+      isClaudeCliAvailablePlatform() &&
+      !entries.some(([key]) => key === model)
+    ) {
+      entries.push([model, model]);
+    }
     return entries;
-  }, [apiKeys, customModels]);
+    // cliStatus is not read here, but getAvailableModels reads the cached
+    // copy of it, so a fresh status has to recompute the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKeys, customModels, cliStatus, model]);
 
   const hasAnyKey = availableModels.length > 0;
   // Fall back to the first usable model when nothing is stored, or when the

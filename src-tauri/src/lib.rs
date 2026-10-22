@@ -1,12 +1,25 @@
+// The bridge to the player's own `claude` CLI (docs/claude-gm-design.md §4).
+// Desktop only: a phone cannot run the CLI (decision 10).
+#[cfg(desktop)]
+mod claude_cli;
+// Party mode's LAN server (docs/party-mode-design.md §4.1). Desktop only: it
+// is the table, and phones are the players.
+#[cfg(desktop)]
 mod party_server;
 
+#[cfg(desktop)]
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
+  let builder = tauri::Builder::default()
     .plugin(tauri_plugin_http::init())
-    .plugin(tauri_plugin_opener::init())
+    .plugin(tauri_plugin_opener::init());
+
+  // One invoke_handler for every command: a second one would replace the first.
+  #[cfg(desktop)]
+  let builder = builder
+    .manage(claude_cli::CliProcesses::default())
     .manage(party_server::PartyServer::default())
     // A full page load (a reload, or the webview navigating away) ends the
     // JavaScript that owns an open party table, so the LAN server stops with
@@ -22,11 +35,16 @@ pub fn run() {
       }
     })
     .invoke_handler(tauri::generate_handler![
+      claude_cli::claude_cli_status,
+      claude_cli::claude_cli_run,
+      claude_cli::claude_cli_cancel,
       party_server::party_start,
       party_server::party_send,
       party_server::party_kick,
-      party_server::party_stop,
-    ])
+      party_server::party_stop
+    ]);
+
+  builder
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

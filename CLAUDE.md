@@ -36,7 +36,11 @@ tick (6.1), Fronts never linked to their clocks (6.2), random ids and keys
 during render (6.3–6.5), the dead Embeddings toggle (6.9), tools the GM
 cannot call (6.10), online guests receiving the GM's secrets (6.12), and the
 stale Google tool filter, which leaves session zero unable to end on Gemini
-(6.14). There is still no CI on pull requests.
+(6.14). Four more were found on 2026-10-22 (decision 65): rules notes listed
+by title only while the prompt, comments and docs say pinned (6.15), hidden
+note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
+as 1210 (6.17), and `search_notes` returning disabled notes (6.18). There is
+still no CI on pull requests.
 
 **The product is the native apps (decision 1).** Tauri desktop and Capacitor
 Android/iOS, packaged from the `NEXT_PUBLIC_STANDALONE=true` static export.
@@ -126,12 +130,30 @@ over). The agents live in `.claude/agents/`.
 
 | delegate to | for |
 |---|---|
-| `code-explorer` (Sonnet) or `Explore` | tracing a subsystem, hunting call sites, auditing docs against code — read-only, and cheap enough to read widely |
-| a `general-purpose` subagent, or a fresh session | implementing a change that has *already been planned* — specified work is Sonnet work (`workflow.md` §3) |
+| `code-explorer` (Haiku) | tracing a subsystem, hunting call sites, auditing docs against code: read-only, and cheap enough to read widely |
+| `researcher` (Haiku) | web research (docs, APIs, prices, terms of service), as sourced facts with links |
+| `implementer` (Sonnet), or a fresh session started with `model: "claude-sonnet-5-5"` | building a change that has *already been planned*, one slice or one PR at a time; specified work is Sonnet work (`workflow.md` §3) |
+| `docs-writer` (Haiku) | writing or updating docs for work that already exists |
 | `engine-review` (Opus) | reviewing any change to the engine in `app/misc/` before it merges, against the bug families this codebase keeps producing |
 | the `/code-review` skill | a correctness review of the current diff in a fresh context |
 | the `codex-review` skill | a second opinion from a different model family on a plan or a diff, when the author asks for one |
 | `fable-escalation` (Fable) | a problem you have genuinely tried and failed to solve — attempted, verified to fail, not merely tedious. Not a first resort |
+
+**Every delegation names its model.** A session started with
+`start_session`, and a `general-purpose` or `Explore` subagent, inherit the
+caller's model unless they are given one. Here that means Opus, the most
+expensive one. So pass the model explicitly every time, or use an agent from
+the table above, which has its model pinned:
+
+- **Sonnet** (`claude-sonnet-5-5`) for building and fixing from a clear brief.
+- **Haiku** (`claude-haiku-5-5`) for docs, research, exploration and
+  mechanical edits.
+- **Opus** only for planning, design and reviews.
+
+If a running session is on the wrong model, switch it with
+`set_session_model`. (On 2026-10-21 every session and research agent
+inherited Opus, and the author caught it: "I think you're only using
+yourselves, opus, which costs a lot.")
 
 **Keep, and do not delegate:** the implementation plan itself, and the
 before-and-after baseline. The plan is where being wrong is most expensive,
@@ -230,6 +252,17 @@ The `verify` skill has every command and how to read it. The things that bite:
 - **Inside Tauri a request to a missing path returns `index.html` with
   200 OK**, so a stray `fetch("/api/...")` fails as a JSON `SyntaxError`,
   not a 404.
+- **Driving a built app over WebView2's debugging port: use your own port
+  and your own profile, and check who owns the port.** Several sessions run
+  at once, and `--remote-debugging-port=9222` is the number everyone copies.
+  A second app on the same port, or on the same WebView2 profile, leaves your
+  driver talking to *another session's* app (on 2026-10-21 one created a
+  stray story in a session's party-mode app). Launch with
+  `WEBVIEW2_USER_DATA_FOLDER=<a short folder>` (a long path, such as the
+  scratchpad's, makes IndexedDB fail with "Internal error opening backing
+  store") and a port of your own, then confirm the port's owner is a
+  `msedgewebview2` whose parent is your `app.exe` before sending a command.
+  Close only the `app.exe` whose path is your worktree's.
 
 ## Devlogs
 
@@ -365,14 +398,61 @@ always runs **before** the story stage:
 proxies: they take `{ messages, tools?, model, ... }` and hand them to
 `providerCall.ts`, whose two entry points, `generateNonStreaming()` and
 `generateStream()`, branch on the provider the model implies (DeepSeek,
-OpenRouter, Mistral, DeepInfra, Google AI Studio) and normalise each
+OpenRouter, Mistral, DeepInfra, Google AI Studio, Z.ai) and normalise each
 provider's response into one shape. They know nothing about `StoryData`, prompts or tools. **The
 standalone build has no API routes**: `providerFetch()` calls the provider
 in-process when `isStandalone()`. Google gets a filtered tool list
 (`GOOGLE_ESSENTIAL_TOOLS`), which is stale (§6.14).
 
+**Claude reaches the app through OpenRouter** (Haiku, Sonnet and Opus 5.5,
+`anthropic/…` ids; decision 10) and has its own branch in `providerCall.ts`,
+keyed on `isAnthropicViaOpenRouter()`, because Claude 5.5 returns a 400 for
+things every other provider is sent: no sampling parameters (not even
+`temperature`), no assistant prefill (trailing or mid-history), `tool_choice`
+always `auto` (the gates' own user message does the forcing), effort `none`
+sent as `low`, and only the current turn's signed `reasoning_details`
+replayed. `max_tokens` never goes below 4,096, because Claude's thinking
+counts against it, and a Claude call is billed at OpenRouter's own
+`usage.cost`. A request built outside `providerCall` (the OCR importer's
+`callProviderAI`) needs the same care. The GM stage marks the player's
+action `cacheBreakpoint`, and a
+Claude request with tools gets prompt-cache breakpoints there and on the
+system message. A change to the GM prompt's message layout must keep the
+base messages byte-identical across a turn's rounds, or that cache stops
+hitting.
+
+**The player's own Claude subscription runs through the `claude` CLI, on the
+desktop app only** (decisions 10–13, `docs/claude-gm-design.md` §4). The
+models are "Claude Opus / Sonnet / Haiku (subscription)", provider
+`claude-cli`, pinned to `claude-*-5-5`. `providerFetch` sends them to
+`claudeCli.ts` before anything else, which renders the request into a
+system-prompt file and stdin and runs the CLI once per request through the
+Rust command in `src-tauri/src/claude_cli.rs` (`claude_cli_status`,
+`claude_cli_run`, `claude_cli_cancel`). A round that offers tools runs in
+structured mode (a JSON schema for `{narration, tool_calls}`, the CLI's own
+tools off) and the app executes the calls itself; a request without tools
+streams text. The first round of a fresh conversation that makes no call and
+claims its tools are down is retried once with a call required (`runRound`,
+`claimsToolsUnavailable`); every CLI run writes a "Claude CLI run" line to the
+Debug Logs. Off the desktop a synced subscription choice falls back to the
+slot's default (`reasoningTiers.ts`, decision 16), and the side agents reach
+the subscription only when a layer is pointed there (`resolveSideCallModel`,
+decision 12). A usage limit or a missing sign-in stops the turn with its
+message; it never moves to a paid provider. **During an online multiplayer
+session (host or guest) subscription models are not used at all** and every
+slot runs its default (`claudeCliModels.ts` `setOnlineSessionActive`, set by
+`useNetSession`; decision 29); party mode and couch co-op are allowed
+(decision 30). **The guardrails are rules,
+because Anthropic's terms forbid apps routing requests through subscription
+credentials:** never read `~/.claude/.credentials.json`, the keychain or any
+token; never bundle, patch or modify the binary; never relay a request from
+another device; never call the feature "Claude Code"; the child process
+always starts from a cleared environment (no `ANTHROPIC_*` or `CLAUDE_*`
+variable reaches it, `claude_cli.rs`'s `build_env` and its test) with the
+argument list built in Rust, never taken from the webview.
+
 **Every AI side call goes through `callSideModel()`** (`sideModelCall.ts`):
-it uses `providerFetch`, forwards all five provider keys, records the turn
+it uses `providerFetch`, forwards all six provider keys, records the turn
 cost, and logs failures to the Debug Logs instead of swallowing them.
 `tests/noRawApiFetch.test.ts` fails on a raw `fetch("/api/...")` outside the
 `*Fetch.ts` wrappers.
@@ -383,14 +463,26 @@ cost, and logs failures to the Debug Logs instead of swallowing them.
 and each side agent (`layerSettings.ts`) can be overridden in Settings, and
 the GM can raise its own tier with `set_reasoning_tier`, capped by
 `MAX_TIER3_CALLS_PER_SCENE`. The heavy tiers are Grok 4.5 (combat) and Kimi
-K3 (boss fights).
+K3 (boss fights). An unpinned side agent (the Observer, Memory Keeper,
+Director Assistant, Story Progress Observer, compaction and reflection) runs
+on the narration model (decision 19). A model handed to a call must be an
+`AI_MODELS` key or a custom model's UUID, never `GenerationMeta.model` (the
+provider's own id), which `getModelConfig()` silently swaps for DeepSeek V4
+Flash.
 
 ## The GM is tool-calling, not a fixed dice system
 
 There is **no `rpgSystem` picker and no structured stat-block engine.** The
 GM improvises dice mechanics per adventure by reading a `mechanics` note and
 a `character_sheet` note (freeform text — "notes, not stat blocks"), then
-calls tools. **A GM tool lives in up to six places** — its schema
+calls tools. **What the GM sees of the notes is decided by `type` and
+`enabled` alone** (`buildGMStagePrompt`): `dm_instructions`,
+`character_sheet` and `gm_plan` notes go in full into every round, never
+truncated, and every other type — `mechanics` included — is listed by title,
+for the GM to open with `read_notes`. Neither `alwaysOn` nor keyword
+triggers change that (§6.15), and no note has a size cap, so a system's
+core rules belong in a pinned note and the rest in notes read on demand
+(decision 72). **A GM tool lives in up to six places** — its schema
 (`gmTools.ts`, or `toolSchemas.ts` for state tools), the live whitelist in
 `buildGMStagePrompt`, its executor, `GOOGLE_ESSENTIAL_TOOLS`, its label
 (`gmToolLabels.ts`) and the observer's registration — and they drift; the
@@ -409,6 +501,8 @@ report's §11.3. The ones that shape play:
   and the `target`/`forces_choice` hardness dimensions.
 - `calculate` — math *and comparisons*: `'17+3 >= 15'` comes back TRUE/FALSE.
   The only place a pass/fail verdict is decided, so every check is two steps.
+  One comparison per call, and no functions: letters and commas are stripped
+  before evaluating, so `min(12,10)` silently becomes 1210 (§6.17).
 - `start_challenge` / `record_challenge_result` / `cancel_challenge` —
   multi-roll "best of X successes" challenges (`StoryData.activeChallenge`,
   one at a time). `record_challenge_result` banks an outcome and closes the
@@ -511,8 +605,9 @@ improvises from. The prompt is `app/misc/designer_ai.ts`.
 - `designer_executor.ts` — the deterministic half. Owns `AdventureDraft`,
   applies tool calls to a *copy* so a malformed call can't corrupt the draft,
   and converts with `draftToAdventure` / `adventureToDraft`. It forces
-  `mechanics` and `character_sheet` notes `alwaysOn`, because the GM can't run
-  the game if the rules are only keyword-triggered. Its adventures carry none
+  `mechanics` and `character_sheet` notes `alwaysOn`, but the GM prompt never
+  reads that flag: character sheets load in full by type, and rules notes
+  are listed by title (§6.15). Its adventures carry none
   of the legacy arrays; `ensureStoryDataArrays()` backfills them when a story
   starts or loads.
 - `useDesignerSession.ts` — the bounded tool loop (`MAX_TOOL_ROUNDS = 5`), the
@@ -541,7 +636,9 @@ survives because the OCR pipeline uses it.
 `character_sheet`, `mechanics`, `secret`, `table`, `dm_instructions`,
 `story_instructions` and `gm_plan`, plus six legacy aliases; notes have a
 two-pass `visibility`: `always_reveal` (the default when unset), `hidden`,
-`to_be_revealed` and `check_per_turn`. Fields
+`to_be_revealed` and `check_per_turn`. `read_notes` wraps the hidden kinds in
+`[[HIDDEN_LORE]]` markers, but the function meant to strip them before the
+narrator has no caller, so the narrator receives that text (§6.16). Fields
 marked `DEPRECATED` are back-compat only — grep for it before assuming a
 field is live.
 
@@ -574,12 +671,26 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 - **There is no auth, no account and no database.** `app/layout.tsx` wraps
   only `NotificationProvider` and `APIKeysProvider`.
 - **AI is BYOK, always.** Keys live in the player's storage, read through
-  `useAPIKeys()` (`APIKeysContext.tsx`): five LLM keys (OpenRouter, DeepSeek,
-  Google, Mistral, DeepInfra) plus Brave Search, Cartesia and ElevenLabs.
+  `useAPIKeys()` (`APIKeysContext.tsx`): six LLM keys (OpenRouter, DeepSeek,
+  Google, Mistral, DeepInfra, Z.ai) plus Brave Search, Cartesia and
+  ElevenLabs. **The Z.ai key is for Z.ai's general pay-as-you-go API only**
+  (decision 18): `providerCall.ts` calls `ZAI_CHAT_COMPLETIONS_URL`
+  (`/api/paas/v4`) and nothing else, and the desktop allowlist admits only
+  `https://api.z.ai/api/paas/*`. Never add the GLM Coding Plan's endpoints
+  (`/api/coding/paas/v4`, `/api/anthropic`): Z.ai limits that plan to its
+  supported coding tools, and `tests/providerCall.zai.test.ts` fails on
+  either. Z.ai's GLM-5.3 always thinks, so its requests carry
+  `thinking: {type: "enabled"}` and `reasoning_effort` low, high or max,
+  `tool_choice` `auto` (the only value Z.ai accepts), `temperature` clamped
+  to [0, 1], the same 4,096 `max_tokens` floor as Claude, and the model's
+  `reasoning_content` handed back inside a tool loop.
   OpenRouter can also be connected by PKCE sign-in: a redirect on the web, the
   system browser and a pasted code in the native apps (`openRouterOAuth.ts`,
   `openExternal.ts`, decision 8). `getAvailableModels()` (`ai_prices.ts`) is
-  "which models can this player actually call".
+  "which models can this player actually call". The one route without a key
+  is the player's own Claude subscription through the `claude` CLI on the
+  desktop (see "Generation" above): the CLI's sign-in, which the player does
+  in a terminal, unlocks it, and the app never sees it.
 - **Coins and Stripe are fully removed.** Cost figures in the UI
   (`turnCost.ts`, `TurnCostPanel.tsx`) are real dollar estimates against the
   player's own key. Don't reintroduce a coin or credit concept.
@@ -594,14 +705,17 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   `providerFetch` and `getProviderFetch()` (`platformFetch.ts` — Tauri's scoped
   HTTP plugin on the desktop) reach providers without routes. Every host the
   desktop app calls must be in `src-tauri/capabilities/default.json`; the
-  opener plugin is scoped to `https://*`.
+  opener plugin is scoped to `https://*`. The app's own Rust commands (only
+  the `claude_cli_*` ones so far) are named in `src-tauri/build.rs`'s app
+  manifest, so each needs an explicit `allow-*` permission in that file; a
+  new command must be added in both places.
 - **Multiplayer**: couch co-op on one device, and host-authoritative
   peer-to-peer online play (`app/misc/multiplayer/`, Trystero and PeerJS).
   The host broadcasts the whole `StoryData` to guests, GM secrets included,
   and `ask_question` is not relayed to guests (§6.12). In the native apps,
   "Copy invite link" copies a text invite with the room code (decision 7).
 - **Party mode** (desktop app only; `docs/party-mode-design.md`, decisions
-  21–28): the desktop is the **table** and every player plays from their own
+  21–28, 30 and 31): the desktop is the **table** and every player plays from their own
   phone on the home Wi-Fi. `src-tauri/src/party_server.rs` runs only while the
   table is open: it serves the phone page (`/party`, `app/party/`, a page of
   the static export) and a WebSocket, and **only relays text; Rust never
@@ -658,8 +772,11 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 - `app/library/` — folder-first browsing (`LibraryHome.tsx`,
   `FolderDetailView.tsx`), stories, adventures and the notes library.
 - `app/components/` — shared UI: the dice tray (`DiceThrowModal.tsx`,
-  `ManualRollModal.tsx`), the character sheet renderer, TTS/STT controls, the
-  API key modal, `PDFImporter.tsx`, the Settings tabs.
+  `ManualRollModal.tsx`), TTS/STT controls, the API key modal,
+  `PDFImporter.tsx`, the Settings tabs. `CharacterSheetEditor.tsx` and
+  `CharacterSheetTemplateEditor.tsx` are imported nowhere; during play the
+  sheet is a pinned note on the Lore page (`app/story/lore.tsx`), and the
+  nine `CHARACTER_SHEET_PRESET_TEMPLATES` reach no live screen.
 - `app/misc/party/` and `app/party/` — party mode: the protocol, the pure host
   state machine, the runtime and Tauri bridge, and the phone controller page.
 - `src-tauri/`, `android/`, `ios/` — the native shells (`src-tauri/src/party_server.rs`

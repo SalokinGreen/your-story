@@ -83,6 +83,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tower",
+ "which",
 ]
 
 [[package]]
@@ -4403,6 +4404,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",
@@ -5058,6 +5060,15 @@ dependencies = [
  "thiserror 2.0.19",
  "windows",
  "windows-core",
+]
+
+[[package]]
+name = "which"
+version = "8.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

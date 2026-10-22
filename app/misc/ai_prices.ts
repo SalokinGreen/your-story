@@ -1,3 +1,9 @@
+import {
+  getCachedClaudeCliStatus,
+  isClaudeCliAvailablePlatform,
+  isClaudeCliUsable,
+} from "@/app/misc/claudeCliModels";
+
 export const AI_MODELS = {
   "Grok 4.5": {
     name: "Grok 4.5",
@@ -158,21 +164,105 @@ export const AI_MODELS = {
       "Google's latest Gemini 3 Flash preview via AI Studio. Requires your own Google API key (BYOK). Great for creative tasks.",
     bannerUrl: undefined,
   },
+  // OpenRouter prices GLM per provider endpoint, from $0.03 to $2.31 per M
+  // input on 2026-10-21, and its model listing shows whichever endpoint sorts
+  // first ($0.034 in / $7.00 out for GLM 5.2). The GLM entries use the model
+  // maker's own price on OpenRouter (Z.ai's endpoint), the most common one
+  // and close to the median; what a call actually costs depends on routing.
   "GLM 5.2": {
     name: "GLM 5.2",
     original_model: "GLM 5.2",
     model: "z-ai/glm-5.2",
     maxTokens: 1048576,
     maxOutputTokens: 128000,
-    inputPrice: 0.65,
-    outputPrice: 2.1,
+    inputPrice: 1.4,
+    outputPrice: 4.4,
     provider: "openrouter",
     supportsToolCalling: true,
     finetunes: [],
     strengths: ["long context", "powerful", "nsfw", "agentic"],
     weaknesses: ["price"],
     description:
-      "Z.ai's current flagship - #1 open-weight model on the Artificial Analysis intelligence index, strong on long-horizon agentic work and complex storytelling. Replaces GLM 4.6.",
+      "Z.ai's previous flagship - strong on long-horizon agentic work and complex storytelling. Superseded by GLM 5.3.",
+    bannerUrl: undefined,
+  },
+
+  "GLM 5.3": {
+    name: "GLM 5.3",
+    original_model: "GLM 5.3",
+    model: "z-ai/glm-5.3",
+    maxTokens: 1048576,
+    maxOutputTokens: 128000,
+    inputPrice: 1.4,
+    outputPrice: 4.4,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["long context", "powerful", "agentic", "latest"],
+    weaknesses: ["always thinks"],
+    description:
+      "Z.ai's current flagship, through your OpenRouter key. Strong long-horizon tool use and storytelling; thinking cannot be turned off. For a device without a Z.ai key.",
+    bannerUrl: undefined,
+  },
+
+  "GLM 5.3 Flash": {
+    name: "GLM 5.3 Flash",
+    original_model: "GLM 5.3 Flash",
+    model: "z-ai/glm-5.3-flash",
+    maxTokens: 1048576,
+    maxOutputTokens: 128000,
+    inputPrice: 0.15,
+    outputPrice: 0.5,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["cost-effective", "long context", "tool calling", "latest"],
+    weaknesses: ["always thinks"],
+    description:
+      "Z.ai's fast, cheap GLM 5.3, through your OpenRouter key. Good for the light GM tiers.",
+    bannerUrl: undefined,
+  },
+
+  // ============================================
+  // Z.AI MODELS (BYOK - the player's own Z.ai key, decision 18)
+  // ============================================
+  // Z.ai's general pay-as-you-go API only (providerCall.ts
+  // ZAI_CHAT_COMPLETIONS_URL), never the GLM Coding Plan. Prices from
+  // docs.z.ai's pricing page, 2026-10-21; cached input is $0.26 / $0.03.
+
+  "GLM 5.3 (Z.ai)": {
+    name: "GLM 5.3 (Z.ai)",
+    original_model: "glm-5.3",
+    model: "glm-5.3",
+    maxTokens: 1048576,
+    maxOutputTokens: 128000,
+    inputPrice: 1.4,
+    outputPrice: 4.4,
+    provider: "zai",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["long context", "powerful", "agentic", "latest"],
+    weaknesses: ["always thinks"],
+    description:
+      "Z.ai's current flagship, straight from Z.ai on your own pay-as-you-go Z.ai key (not the Coding Plan). Thinking cannot be turned off.",
+    bannerUrl: undefined,
+  },
+
+  "GLM 5.3 Flash (Z.ai)": {
+    name: "GLM 5.3 Flash (Z.ai)",
+    original_model: "glm-5.3-flash",
+    model: "glm-5.3-flash",
+    maxTokens: 1048576,
+    maxOutputTokens: 128000,
+    inputPrice: 0.15,
+    outputPrice: 0.5,
+    provider: "zai",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["cost-effective", "long context", "tool calling", "latest"],
+    weaknesses: ["always thinks"],
+    description:
+      "Z.ai's fast, cheap GLM 5.3, straight from Z.ai on your own pay-as-you-go Z.ai key (not the Coding Plan).",
     bannerUrl: undefined,
   },
 
@@ -261,6 +351,130 @@ export const AI_MODELS = {
     weaknesses: ["logic"],
     description:
       "A small-sized model from Mistral, offering a balance between performance and cost, suitable for story generation..",
+    bannerUrl: undefined,
+  },
+  // ============================================
+  // CLAUDE VIA OPENROUTER (docs/claude-gm-design.md §3)
+  // ============================================
+  // Claude 5.5 rejects sampling parameters, assistant prefill, forced
+  // tool_choice and effort "none"; providerCall.ts's isAnthropicViaOpenRouter
+  // branch drops or remaps each of them. Fable 5.1 is left out (decision 15) -
+  // it can still be added as a custom OpenRouter model, which gets the same
+  // branch since it keys on the "anthropic/" model id.
+
+  "Claude Haiku 5.5": {
+    name: "Claude Haiku 5.5",
+    original_model: "Claude Haiku 5.5",
+    model: "anthropic/claude-haiku-5.5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 0.1,
+    outputPrice: 0.5,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["cost-effective", "tool calling", "long context", "latest"],
+    weaknesses: ["prose depth"],
+    description:
+      "Anthropic's fastest Claude, through your OpenRouter key. Reliable tool calling at a very low price - a good fit for the light GM tiers and the side agents.",
+    bannerUrl: undefined,
+  },
+
+  "Claude Sonnet 5.5": {
+    name: "Claude Sonnet 5.5",
+    original_model: "Claude Sonnet 5.5",
+    model: "anthropic/claude-sonnet-5.5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 2,
+    outputPrice: 10,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["creativity", "tool calling", "reasoning", "long context", "latest"],
+    weaknesses: ["price"],
+    description:
+      "Anthropic's everyday Claude, through your OpenRouter key. Strong prose and careful rules-following; the stable GM prompt is prompt-cached, so later rounds of a turn cost far less than the first.",
+    bannerUrl: undefined,
+  },
+
+  "Claude Opus 5.5": {
+    name: "Claude Opus 5.5",
+    original_model: "Claude Opus 5.5",
+    model: "anthropic/claude-opus-5.5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 4,
+    outputPrice: 20,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["powerful", "reasoning", "creativity", "long context", "latest"],
+    weaknesses: ["price"],
+    description:
+      "Anthropic's most capable Claude in the catalog, through your OpenRouter key. For the heavy tiers - boss fights and campaign-shaping beats - where judgement matters more than cost.",
+    bannerUrl: undefined,
+  },
+  // ============================================
+  // CLAUDE ON THE PLAYER'S SUBSCRIPTION (docs/claude-gm-design.md §4)
+  // ============================================
+  // The desktop app runs these through the player's own signed-in `claude`
+  // CLI (claudeCli.ts), not an API key, so they cost nothing per call here.
+  // Offered only on the desktop with the CLI signed in (getAvailableModels,
+  // ModelSelect); elsewhere a synced choice falls back to the slot's default
+  // (reasoningTiers.ts, decision 16). Keys must match claudeCliModels.ts.
+
+  "Claude Opus (subscription)": {
+    name: "Claude Opus (subscription)",
+    original_model: "claude-opus-5-5",
+    model: "claude-opus-5-5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 0,
+    outputPrice: 0,
+    provider: "claude-cli",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["powerful", "reasoning", "creativity", "long context"],
+    weaknesses: ["desktop only", "slower turns"],
+    description:
+      "Claude Opus 5.5 on your own Claude plan, through the claude CLI on this computer. No per-call cost; it draws on your plan's usage limits, and each round takes a few extra seconds to start.",
+    bannerUrl: undefined,
+  },
+
+  "Claude Sonnet (subscription)": {
+    name: "Claude Sonnet (subscription)",
+    original_model: "claude-sonnet-5-5",
+    model: "claude-sonnet-5-5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 0,
+    outputPrice: 0,
+    provider: "claude-cli",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["creativity", "tool calling", "reasoning", "long context"],
+    weaknesses: ["desktop only", "slower turns"],
+    description:
+      "Claude Sonnet 5.5 on your own Claude plan, through the claude CLI on this computer. No per-call cost; it draws on your plan's usage limits, and each round takes a few extra seconds to start.",
+    bannerUrl: undefined,
+  },
+
+  "Claude Haiku (subscription)": {
+    name: "Claude Haiku (subscription)",
+    original_model: "claude-haiku-5-5",
+    model: "claude-haiku-5-5",
+    maxTokens: 1000000,
+    maxOutputTokens: 128000,
+    inputPrice: 0,
+    outputPrice: 0,
+    provider: "claude-cli",
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["tool calling", "long context"],
+    weaknesses: ["desktop only", "slower turns"],
+    description:
+      "Claude Haiku 5.5 on your own Claude plan, through the claude CLI on this computer. No per-call cost; it draws on your plan's usage limits, and each round takes a few extra seconds to start.",
     bannerUrl: undefined,
   },
   // ============================================
@@ -885,18 +1099,22 @@ export interface APIKeysAvailable {
   googleKey?: boolean;
   mistralKey?: boolean;
   deepinfraKey?: boolean;
+  zaiKey?: boolean;
 }
 
-/** Maps a model's provider onto the key field that unlocks it. */
-const PROVIDER_KEY_FIELD: Record<
-  AIModelConfig["provider"],
-  keyof APIKeysAvailable
+/**
+ * Maps a model's provider onto the key field that unlocks it. The Claude
+ * subscription has none: the `claude` CLI's own sign-in unlocks it.
+ */
+const PROVIDER_KEY_FIELD: Partial<
+  Record<AIModelConfig["provider"], keyof APIKeysAvailable>
 > = {
   openrouter: "openRouterKey",
   deepseek: "deepseekKey",
   google: "googleKey",
   mistral: "mistralKey",
   deepinfra: "deepinfraKey",
+  zai: "zaiKey",
 };
 
 export interface AvailableModelOptions {
@@ -919,6 +1137,11 @@ export function getAvailableModels(
 
   return entries.filter(([, config]) => {
     if (options.requireToolCalling && !config.supportsToolCalling) return false;
+    if (config.provider === "claude-cli") {
+      return (
+        isClaudeCliAvailablePlatform() && isClaudeCliUsable(getCachedClaudeCliStatus())
+      );
+    }
     const field = PROVIDER_KEY_FIELD[config.provider];
     return field ? !!keys[field] : false;
   });
@@ -943,7 +1166,8 @@ export function hasAnyAIKey(keys: APIKeysAvailable): boolean {
     keys.deepseekKey ||
     keys.googleKey ||
     keys.mistralKey ||
-    keys.deepinfraKey
+    keys.deepinfraKey ||
+    keys.zaiKey
   );
 }
 
@@ -981,7 +1205,9 @@ export interface AIModelConfig {
     | "deepseek"
     | "mistral"
     | "deepinfra"
-    | "google";
+    | "google"
+    | "zai"
+    | "claude-cli";
   supportsToolCalling?: boolean; // Whether this model supports function calling
   inputPrice: number;
   outputPrice: number;

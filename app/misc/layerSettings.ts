@@ -11,7 +11,8 @@
  * (Settings UI) and generation.ts (actually applying the overrides).
  */
 
-import { AnyModelKey, ReasoningEffort } from "./reasoningTiers";
+import { AnyModelKey, NARRATION_MODEL_KEY, ReasoningEffort } from "./reasoningTiers";
+import { canRunClaudeCliModel, claudeCliBlockReason, isClaudeCliModel } from "./claudeCliModels";
 import {
   ObserverSettings,
   ObserverCheckSettings,
@@ -31,9 +32,9 @@ function notifyChanged(): void {
 // ============================================================
 // PER-STAGE MODEL/EFFORT OVERRIDES
 // ============================================================
-// null (default) means "inherit whatever model generated the turn this
-// side-call is reacting to" - today's behavior, unchanged from before these
-// overrides existed.
+// null (default) means "run on the narration model"
+// (getEffectiveNarrationModelKey, decision 19) - generation.ts passes it in
+// as resolveSideCallModel's fallback.
 
 export interface ModelEffortOverride {
   modelKey: AnyModelKey;
@@ -101,6 +102,31 @@ export const setStoryProgressObserverModelOverride = (
   override: ModelEffortOverride | null,
 ): void => setOverride(STORY_PROGRESS_OBSERVER_MODEL_KEY, override);
 
+/**
+ * Decisions 16 and 29 for the side agents: the layers whose Claude
+ * subscription override cannot run here and now, for Settings' notice. They
+ * run on the narration model instead (resolveSideCallModel). Empty on the
+ * desktop app outside an online session.
+ */
+export function getLayerSubscriptionFallbacks(): {
+  slot: string;
+  modelKey: string;
+  reason: "device" | "online";
+}[] {
+  const reason = claudeCliBlockReason();
+  if (!reason) return [];
+  const layers: [string, ModelEffortOverride | null][] = [
+    ["Observer", getObserverModelOverride()],
+    ["Memory Keeper", getMemoryKeeperModelOverride()],
+    ["Reflection", getReflectionModelOverride()],
+    ["Director Assistant", getDirectorAssistantModelOverride()],
+    ["Story Progress Observer", getStoryProgressObserverModelOverride()],
+  ];
+  return layers
+    .filter(([, o]) => o && isClaudeCliModel(o.modelKey))
+    .map(([slot, o]) => ({ slot, modelKey: o!.modelKey, reason }));
+}
+
 // ============================================================
 // STORY PROGRESS OBSERVER CADENCE
 // ============================================================
@@ -142,15 +168,27 @@ export function setStoryProgressCheckInterval(turns: number): void {
 
 /**
  * Resolves a stage's { model, reasoningEffort } for its API call: the
- * override if one is set, otherwise the fallback model (whatever generated
- * the turn) with no reasoningEffort field at all - preserving the exact
- * fetch body these stages sent before overrides existed.
+ * override if one is set, otherwise the fallback model (the narration
+ * model, which must be an AI_MODELS key or a custom model's UUID) with no
+ * reasoningEffort field at all - preserving the exact fetch body these
+ * stages sent before overrides existed.
  */
 export function resolveSideCallModel(
   override: ModelEffortOverride | null,
   fallbackModel: string,
 ): { model: string; reasoningEffort?: string } {
-  if (!override) return { model: fallbackModel };
+  // Decision 12: the side agents run on the Claude subscription only when the
+  // player points one there. A subscription model reaching them as the
+  // fallback (the narration or GM model) is swapped for the default
+  // narration model, so a subscription narration voice does not quietly add
+  // a CLI launch for every side call.
+  const fallback = isClaudeCliModel(fallbackModel) ? NARRATION_MODEL_KEY : fallbackModel;
+  if (!override) return { model: fallback };
+  // Decisions 16 and 29: a subscription override this device cannot run (a
+  // synced choice off the desktop) or may not run (online play is active).
+  if (isClaudeCliModel(override.modelKey) && !canRunClaudeCliModel()) {
+    return { model: fallback };
+  }
   return { model: override.modelKey, reasoningEffort: override.reasoningEffort };
 }
 

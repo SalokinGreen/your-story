@@ -485,6 +485,47 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                 </div>
 
+                {/* Z.ai - GLM on the general pay-as-you-go API (decision 18) */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-sky-500 to-blue-700 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">Z</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">
+                        Z.ai API key (pay-as-you-go, not the Coding Plan)
+                      </span>
+                      {hasKey("zaiKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <a
+                        href="https://z.ai/manage-apikey/apikey-list"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
+                      >
+                        Get key →
+                      </a>
+                    </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.zaiKey}
+                      onChange={(e) => setKey("zaiKey", e.target.value)}
+                      placeholder="..."
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                    />
+                    <p className="text-xs text-blue-300/50 mt-1">
+                      Used for the GLM 5.3 (Z.ai) models, billed per token to
+                      your Z.ai account. A GLM Coding Plan subscription does
+                      not cover this: Z.ai limits it to its supported coding
+                      tools.
+                    </p>
+                  </div>
+                </div>
+
                 {/* Cartesia - TTS only */}
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-teal-500 to-cyan-600 flex items-center justify-center">

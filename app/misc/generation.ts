@@ -197,6 +197,10 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
  */
 
 export interface GenerationOptions {
+  // Not read by generateStoryTurn: the reasoning-tier router picks the GM's
+  // model, and narration, choices and every side call run on the narration
+  // model (getEffectiveNarrationModelKey, decision 19). Kept so existing
+  // callers type-check.
   storyModel: string;
   toolsModel: string;
   choicesModel: string;
@@ -211,6 +215,7 @@ export interface GenerationOptions {
   googleKey?: string;
   mistralKey?: string;
   deepinfraKey?: string;
+  zaiKey?: string;
   // Embedding-based context retrieval
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
@@ -590,6 +595,7 @@ interface ChoicesFetchOptions {
   googleKey?: string;
   mistralKey?: string;
   deepinfraKey?: string;
+  zaiKey?: string;
   abortSignal?: AbortSignal;
 }
 
@@ -633,6 +639,7 @@ async function generateChoicesWithRetry(
         googleKey: fetchOptions.googleKey,
         mistralKey: fetchOptions.mistralKey,
         deepinfraKey: fetchOptions.deepinfraKey,
+        zaiKey: fetchOptions.zaiKey,
         customModel: getCustomModelIfUUID(fetchOptions.model),
       },
       fetchOptions.abortSignal,
@@ -938,15 +945,14 @@ export async function generateStoryTurn(
     result.meta.costTurnId = costTurnId;
 
     // Shared by the observer and the memory agent below - both are
-    // best-effort side calls for the turn that just completed, using
-    // whatever model actually generated it, unless the user pinned a
-    // specific model/effort for that stage in Settings > Architecture
-    // (layerSettings.ts).
+    // best-effort side calls for the turn that just completed, run on the
+    // narration model (decision 19) unless the user pinned a specific
+    // model/effort for that stage in Settings > Architecture
+    // (layerSettings.ts). It has to be an AI_MODELS key (or a custom model's
+    // UUID): GenerationMeta.model is the provider's own id, which the proxy
+    // can't resolve and silently swaps for DeepSeek V4 Flash.
     const sideCallApiOptions = {
-      model:
-        result.meta.storyMeta?.model ||
-        result.meta.gmMeta?.model ||
-        options.storyModel,
+      model: getEffectiveNarrationModelKey(),
       token: null,
       // Bill every side call to THIS turn even when it lands after the
       // player has already started the next one (see runBackgroundLayers).
@@ -956,6 +962,7 @@ export async function generateStoryTurn(
       googleKey: options.googleKey,
       mistralKey: options.mistralKey,
       deepinfraKey: options.deepinfraKey,
+      zaiKey: options.zaiKey,
       abortSignal: options.abortSignal,
     };
 
@@ -995,6 +1002,7 @@ export async function generateStoryTurn(
               googleKey: options.googleKey,
               mistralKey: options.mistralKey,
               deepinfraKey: options.deepinfraKey,
+              zaiKey: options.zaiKey,
               abortSignal: options.abortSignal,
             },
           );
@@ -1372,8 +1380,8 @@ export async function generateStoryTurn(
               narrationThoughts: result.narrationThoughts,
               // Same model/effort the Observer was just judged with (the
               // Architecture tab's override, if the user pinned one) - not
-              // sideCallApiOptions, or the rewrite would silently fall back
-              // to whichever model generated the flagged turn.
+              // sideCallApiOptions, or the rewrite would silently skip that
+              // override and run on the plain narration model.
               apiOptions: observerApiOptions,
             });
           } catch (rewriteError) {
@@ -2053,6 +2061,7 @@ async function generateStoryTurnOnce(
                 googleKey: options.googleKey,
                 mistralKey: options.mistralKey,
                 deepinfraKey: options.deepinfraKey,
+                zaiKey: options.zaiKey,
                 customModel: getCustomModelIfUUID(classifierModel),
               },
             );
@@ -2118,12 +2127,15 @@ async function generateStoryTurnOnce(
             storyData,
             gmHistoryBudget,
             {
-              model: options.storyModel || gmModel,
+              // The narration model, like every other side call (decision 19)
+              // - through resolveSideCallModel, which keeps a subscription
+              // narration voice off compaction (decision 12).
+              ...resolveSideCallModel(null, narrationModel),
               token,
               // All five, not just the ones this model "usually" needs: the
-              // default storyModel is the Mistral narration model, and
-              // leaving a provider out here is how compaction silently never
-              // ran (status report §6.13).
+              // default narration model is a Mistral model, and leaving a
+              // provider out here is how compaction silently never ran
+              // (status report §6.13).
               ...pickProviderKeys(options),
               abortSignal: options.abortSignal,
             },
@@ -2157,10 +2169,7 @@ async function generateStoryTurnOnce(
         try {
           const reflectionModelOverride = getReflectionModelOverride();
           const reflectionApiOptions = {
-            ...resolveSideCallModel(
-              reflectionModelOverride,
-              options.storyModel || gmModel,
-            ),
+            ...resolveSideCallModel(reflectionModelOverride, narrationModel),
             token,
             ...pickProviderKeys(options),
             abortSignal: options.abortSignal,
@@ -2352,6 +2361,7 @@ async function generateStoryTurnOnce(
               googleKey: options.googleKey,
               mistralKey: options.mistralKey,
               deepinfraKey: options.deepinfraKey,
+              zaiKey: options.zaiKey,
               customModel: getCustomModelIfUUID(model),
               // Set only on the round immediately after the M2 gate fires -
               // forces the model to call some tool rather than relying on
@@ -2712,6 +2722,7 @@ async function generateStoryTurnOnce(
                   googleKey: options.googleKey,
                   mistralKey: options.mistralKey,
                   deepinfraKey: options.deepinfraKey,
+                  zaiKey: options.zaiKey,
                 },
                 token,
                 webResearchEnabled: options.webResearchEnabled,
@@ -3166,6 +3177,7 @@ async function generateStoryTurnOnce(
         googleKey: options.googleKey,
         mistralKey: options.mistralKey,
         deepinfraKey: options.deepinfraKey,
+        zaiKey: options.zaiKey,
         customModel: getCustomModelIfUUID(narrationModel),
         // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
         // Also stop on [STOP] marker for player agency stopping points
@@ -3448,6 +3460,7 @@ async function generateStoryTurnOnce(
             googleKey: options.googleKey,
             mistralKey: options.mistralKey,
             deepinfraKey: options.deepinfraKey,
+            zaiKey: options.zaiKey,
             abortSignal: options.abortSignal,
           },
         );
@@ -3710,6 +3723,7 @@ export async function generateSimple(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
+    zaiKey?: string;
     customModel?: CustomModel;
   },
 ): Promise<{
@@ -3728,6 +3742,7 @@ export async function generateSimple(
     googleKey: options.googleKey,
     mistralKey: options.mistralKey,
     deepinfraKey: options.deepinfraKey,
+    zaiKey: options.zaiKey,
     customModel: options.customModel,
   });
 
@@ -3760,6 +3775,7 @@ export async function* generateSimpleStream(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
+    zaiKey?: string;
   },
 ): AsyncGenerator<StreamEvent> {
   const response = await providerFetch("/api/generate-stream", {
@@ -3773,6 +3789,7 @@ export async function* generateSimpleStream(
     googleKey: options.googleKey,
     mistralKey: options.mistralKey,
     deepinfraKey: options.deepinfraKey,
+    zaiKey: options.zaiKey,
   });
 
   if (!response.ok) {
@@ -3795,6 +3812,7 @@ export async function generateChoicesOnly(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
+    zaiKey?: string;
   },
 ): Promise<Choice[]> {
   // No backend auth system anymore - see generateStoryTurn's comment above.
@@ -3821,6 +3839,7 @@ export async function generateChoicesOnly(
       googleKey: options.googleKey,
       mistralKey: options.mistralKey,
       deepinfraKey: options.deepinfraKey,
+      zaiKey: options.zaiKey,
     },
   );
 

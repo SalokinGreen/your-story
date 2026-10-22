@@ -19,6 +19,7 @@
         { "url": "https://api.mistral.ai/*" },
         { "url": "https://api.deepinfra.com/*" },
         { "url": "https://generativelanguage.googleapis.com/*" },
+        { "url": "https://api.z.ai/api/paas/*" },
         { "url": "https://api.search.brave.com/*" },
         { "url": "https://api.cartesia.ai/*" },
         { "url": "https://api.elevenlabs.io/*" },
@@ -28,6 +29,9 @@
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "https://*" }]
-    }
+    },
+    "allow-claude-cli-status",
+    "allow-claude-cli-run",
+    "allow-claude-cli-cancel"
   ]
 }
