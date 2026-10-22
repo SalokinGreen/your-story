@@ -209,10 +209,10 @@ describe("a side agent's effort (decision 53)", () => {
   });
 
   it("stays none when the layer falls to the narration voice for want of a key, even at a high narration effort", () => {
-    localStorage.setItem("narrationModelOverride", "Mistral Small 3.2");
+    localStorage.setItem("narrationModelOverride", "Mistral Small 4");
     localStorage.setItem("narrationEffortOverride", "high");
     expect(resolveSideCallModel(null, { mistralKey: "m" })).toEqual({
-      model: "Mistral Small 3.2",
+      model: "Mistral Small 4",
       reasoningEffort: "none",
     });
   });
@@ -220,8 +220,8 @@ describe("a side agent's effort (decision 53)", () => {
   it("keeps a pin's own effort", () => {
     for (const reasoningEffort of REASONING_EFFORTS) {
       expect(
-        resolveSideCallModel({ modelKey: "Mistral Medium 3.1", reasoningEffort }),
-      ).toEqual({ model: "Mistral Medium 3.1", reasoningEffort });
+        resolveSideCallModel({ modelKey: "Mistral Medium 3.5", reasoningEffort }),
+      ).toEqual({ model: "Mistral Medium 3.5", reasoningEffort });
     }
     // ...and a pin the desktop can run keeps the subscription model and its effort.
     expect(
@@ -236,8 +236,8 @@ describe("the Observer's rewrite carries the narration effort (decision 53)", ()
       model: "GLM 5.3",
       reasoningEffort: "high",
     });
-    expect(resolveObserverRewriteModel(null, "Mistral Nemo", "none")).toEqual({
-      model: "Mistral Nemo",
+    expect(resolveObserverRewriteModel(null, "Ministral 3 8B", "none")).toEqual({
+      model: "Ministral 3 8B",
       reasoningEffort: "none",
     });
   });
@@ -256,11 +256,11 @@ describe("the Observer's rewrite carries the narration effort (decision 53)", ()
   it("but a pin keeps its own model and effort", () => {
     expect(
       resolveObserverRewriteModel(
-        { modelKey: "Mistral Medium 3.1", reasoningEffort: "low" },
+        { modelKey: "Mistral Medium 3.5", reasoningEffort: "low" },
         "GLM 5.3",
         "xhigh",
       ),
-    ).toEqual({ model: "Mistral Medium 3.1", reasoningEffort: "low" });
+    ).toEqual({ model: "Mistral Medium 3.5", reasoningEffort: "low" });
   });
 });
 

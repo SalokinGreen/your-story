@@ -151,6 +151,13 @@ export type OCRSummarizeEvent =
 
 export type OCRSummarizeEventHandler = (event: OCRSummarizeEvent) => void;
 
+// DeepSeek's current Flash model name. `deepseek-v4-flash` is the retired name
+// DeepSeek still accepts and serves from V4.1 Flash; "Use deepseek-flash as the
+// model name" (https://api-docs.deepseek.com/quick_start/pricing, read
+// 2026-10-21).
+const DEEPSEEK_FLASH_MODEL = "deepseek-flash";
+const DEEPSEEK_FLASH_RETIRED_NAME = "deepseek-v4-flash";
+
 export function inferProvider(model: string): AIProvider {
   if (
     model.startsWith("mistral-") ||
@@ -160,7 +167,10 @@ export function inferProvider(model: string): AIProvider {
   ) {
     return "mistral";
   }
-  if (model === "deepseek-v4-flash") return "deepseek";
+  // The retired name stays recognised so a stored value still routes to DeepSeek.
+  if (model === DEEPSEEK_FLASH_MODEL || model === DEEPSEEK_FLASH_RETIRED_NAME) {
+    return "deepseek";
+  }
   return "openrouter";
 }
 
@@ -254,7 +264,13 @@ export async function callProviderAI(
     }
 
     const requestBody: Record<string, unknown> = {
-      model: provider === "deepseek" ? model || "deepseek-v4-flash" : model,
+      // A stored retired name is sent as the current one.
+      model:
+        provider === "deepseek"
+          ? !model || model === DEEPSEEK_FLASH_RETIRED_NAME
+            ? DEEPSEEK_FLASH_MODEL
+            : model
+          : model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

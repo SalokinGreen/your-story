@@ -10,7 +10,25 @@ import { getProviderFetch } from "@/app/misc/platformFetch";
 
 // Cartesia TTS endpoint - see https://docs.cartesia.ai/api-reference/tts/bytes
 const CARTESIA_ENDPOINT = "https://api.cartesia.ai/tts/bytes";
-const CARTESIA_VERSION = "2025-11-04";
+// The API version the request body below was written against: the bytes
+// reference (read 2026-10-21) lists 2026-08-14 as its only version, and every
+// field we send is valid in it. That version "drops fields that were already
+// deprecated" (https://docs.cartesia.ai/changelog/2026); its `voice` is the
+// voice ID as a plain string, or an object whose only required field is `id`
+// (embeddings are not accepted), so the string form is sent.
+export const CARTESIA_VERSION = "2026-08-14";
+// Cartesia's current model (https://docs.cartesia.ai/build-with-cartesia/tts-models/latest):
+// `sonic-3.6` follows the newest stable snapshot (`sonic-3.6-YYYY-MM-DD` pins
+// one), and is "fully backwards compatible with Sonic 3.5". Cartesia's
+// deprecation page lists the sonic-3 snapshot sonic-3-2025-10-27 for sunset on
+// 2026-10-20.
+// A Pro Voice Clone must be asked for with one of the models in its
+// `fine_tunes.public_model_id` (today the dated snapshots sonic-3.5-2026-05-04
+// and sonic-3.6-2026-08-27), or Cartesia answers 400 `voice_model_mismatch`
+// (https://docs.cartesia.ai/build-with-cartesia/capability-guides/clone-voices-pro).
+// This app takes any voice ID the player pastes and cannot know which model
+// the voice was trained on, so it sends the undated `sonic-3.6`.
+export const CARTESIA_MODEL_ID = "sonic-3.6";
 
 // ElevenLabs TTS endpoint - see
 // https://elevenlabs.io/docs/api-reference/text-to-speech/convert
@@ -268,9 +286,9 @@ async function fetchChunkAudio(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model_id: "sonic-3",
+        model_id: CARTESIA_MODEL_ID,
         transcript: chunk,
-        voice: { mode: "id", id: voiceId },
+        voice: voiceId,
         language: "en",
         generation_config: { volume: 1, speed: 1 },
         // container stays "mp3" (not Cartesia's telephony-oriented raw

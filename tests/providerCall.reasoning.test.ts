@@ -152,7 +152,7 @@ describe("applyReasoningEffort (via generateNonStreaming)", () => {
 
     await generateNonStreaming({
       messages: BASE_MESSAGES,
-      model: "Mistral Small 3.2",
+      model: "Mistral Small 4",
       mistralKey: "test-key",
       reasoningEffort: "low",
     });
@@ -405,7 +405,7 @@ describe("reasoning field forwarding on outgoing messages (buildRequestMessages)
           reasoning: "The player chose north.",
         },
       ],
-      model: "Mistral Small 3.2",
+      model: "Mistral Small 4",
       mistralKey: "test-key",
     });
 

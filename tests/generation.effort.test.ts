@@ -221,7 +221,7 @@ describe("the side agents carry none, or their pin's effort (decision 53)", () =
 
   it("a pinned layer keeps its own effort and the others stay on none", async () => {
     stubBrowserStorage({
-      memoryKeeperModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.1", reasoningEffort: "high" }),
+      memoryKeeperModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.5", reasoningEffort: "high" }),
     });
     const calls = await runTurn();
     const sideCalls = calls.filter((c) => c.url === "/api/generate");
@@ -256,7 +256,7 @@ describe("the side agents carry none, or their pin's effort (decision 53)", () =
     expect(effortsOf(calls.filter(isReflection))).toEqual(["none"]);
 
     stubBrowserStorage({
-      reflectionModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.1", reasoningEffort: "low" }),
+      reflectionModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.5", reasoningEffort: "low" }),
     });
     calls = await runTurn({ story: dueStory(), extra: { customMaxContext: 8000 } });
     expect(effortsOf(calls.filter(isReflection))).toEqual(["low"]);
@@ -341,13 +341,13 @@ describe("the narration voice's calls carry the narration effort (decision 53)",
     it("keep a pinned Observer's own model and effort for the rewrite, but not for the choices", async () => {
       stubBrowserStorage({
         narrationEffortOverride: "high",
-        observerModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.1", reasoningEffort: "low" }),
+        observerModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.5", reasoningEffort: "low" }),
       });
       const calls = await runTurn({ gmRound: LONG_NARRATION, respond, extra: { mistralKey: "mistral-key" } });
 
       const rewrites = calls.filter(isRewrite);
       expect(rewrites).toHaveLength(1);
-      expect(rewrites[0].body.model).toBe("Mistral Medium 3.1");
+      expect(rewrites[0].body.model).toBe("Mistral Medium 3.5");
       expect(rewrites[0].body.reasoningEffort).toBe("low");
       // The choices re-run is the narrator's, pin or no pin.
       expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["high"]);

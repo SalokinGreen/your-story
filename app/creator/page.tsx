@@ -26,6 +26,7 @@ import {
   isReasoningEffort,
 } from "@/app/misc/reasoningTiers";
 import {
+  getDesignerModel,
   getDesignerReasoningEffort,
   setDesignerReasoningEffort,
 } from "@/app/misc/designerSettings";
@@ -70,7 +71,7 @@ function CreatorPage() {
   useEffect(() => {
     const stored = {
       customModels: getCustomModels(),
-      model: localStorage.getItem("designerModel") || "",
+      model: getDesignerModel(),
       reasoningEffort: getDesignerReasoningEffort(),
       maxOutput: parseInt(
         localStorage.getItem("designerMaxOutput") || "",

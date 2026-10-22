@@ -147,10 +147,10 @@ describe("the default ladder (decision 50)", () => {
       "reasoningTierOverrides",
       JSON.stringify([null, null, { modelKey: "Grok 4.5", reasoningEffort: "high" }, null]),
     );
-    localStorage.setItem("narrationModelOverride", "Mistral Small 3.2");
+    localStorage.setItem("narrationModelOverride", "Mistral Small 4");
     expect(getEffectiveTiers()[2].modelKey).toBe("Grok 4.5");
     expect(getEffectiveTiers()[3].modelKey).toBe("Claude Sonnet 5.5");
-    expect(getEffectiveNarrationModelKey()).toBe("Mistral Small 3.2");
+    expect(getEffectiveNarrationModelKey()).toBe("Mistral Small 4");
   });
 });
 
@@ -246,8 +246,8 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
   });
 
   it("does not follow the narration voice", () => {
-    localStorage.setItem("narrationModelOverride", "Mistral Nemo");
-    expect(getEffectiveNarrationModelKey()).toBe("Mistral Nemo");
+    localStorage.setItem("narrationModelOverride", "Ministral 3 8B");
+    expect(getEffectiveNarrationModelKey()).toBe("Ministral 3 8B");
     expect(resolveSideCallModel(null).model).toBe("Claude Haiku 5.5");
     expect(NARRATION_MODEL_KEY).not.toBe(resolveSideCallModel(null).model);
   });
@@ -255,9 +255,9 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
   it("does not follow the GM's tier model", () => {
     localStorage.setItem(
       "reasoningTierOverrides",
-      JSON.stringify(REASONING_TIERS.map(() => ({ modelKey: "Mistral Nemo", reasoningEffort: "none" }))),
+      JSON.stringify(REASONING_TIERS.map(() => ({ modelKey: "Ministral 3 8B", reasoningEffort: "none" }))),
     );
-    expect(getEffectiveTiers().every((t) => t.modelKey === "Mistral Nemo")).toBe(true);
+    expect(getEffectiveTiers().every((t) => t.modelKey === "Ministral 3 8B")).toBe(true);
     expect(resolveSideCallModel(null).model).toBe("Claude Haiku 5.5");
   });
 
@@ -278,14 +278,45 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
     expect(modelOf("observer_rewrite")).toBe("GLM 5.3");
   });
 
+  it("prices the Reflection line at the Reflection pin, not at the Memory Keeper's", () => {
+    // generation.ts resolves Reflection through getReflectionModelOverride(),
+    // so the estimate has to as well: pinning the two layers differently must
+    // show up on their own lines.
+    localStorage.setItem(
+      "memoryKeeperModelOverride",
+      JSON.stringify({ modelKey: "Claude Sonnet 5.5", reasoningEffort: "high" }),
+    );
+    localStorage.setItem(
+      "reflectionModelOverride",
+      JSON.stringify({ modelKey: "Mistral Small 4", reasoningEffort: "low" }),
+    );
+    const lines = estimateTurnCost().lines;
+    const line = (stage: string) => lines.find((l) => l.stage === stage);
+    expect(line("memory_keeper")).toMatchObject({ modelKey: "Claude Sonnet 5.5", reasoningEffort: "high" });
+    expect(line("reflection")).toMatchObject({ modelKey: "Mistral Small 4", reasoningEffort: "low" });
+    expect(line("reflection")?.provider).toBe("mistral");
+  });
+
+  it("prices an unpinned Reflection at the side-agent default even when the Memory Keeper is pinned", () => {
+    localStorage.setItem(
+      "memoryKeeperModelOverride",
+      JSON.stringify({ modelKey: "Claude Sonnet 5.5", reasoningEffort: "high" }),
+    );
+    const lines = estimateTurnCost().lines;
+    expect(lines.find((l) => l.stage === "reflection")).toMatchObject({
+      modelKey: "Claude Haiku 5.5",
+      reasoningEffort: "none",
+    });
+  });
+
   it("keeps a layer's pin, model and effort", () => {
     for (const [name, storageKey, read] of SIDE_AGENT_LAYERS) {
       localStorage.setItem(
         storageKey,
-        JSON.stringify({ modelKey: "Mistral Medium 3.1", reasoningEffort: "low" }),
+        JSON.stringify({ modelKey: "Mistral Medium 3.5", reasoningEffort: "low" }),
       );
       expect(resolveSideCallModel(read()), name).toEqual({
-        model: "Mistral Medium 3.1",
+        model: "Mistral Medium 3.5",
         reasoningEffort: "low",
       });
     }
@@ -305,7 +336,7 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
     // Keys the catalog dropped (a shut-down model, one synced from a newer
     // build) read as unset. With the narration voice moved off its default,
     // landing on it would show.
-    localStorage.setItem("narrationModelOverride", "Mistral Nemo");
+    localStorage.setItem("narrationModelOverride", "Ministral 3 8B");
     for (const [name, storageKey, read] of SIDE_AGENT_LAYERS) {
       localStorage.setItem(
         storageKey,
@@ -353,7 +384,7 @@ describe("an unpinned side agent never reaches the Claude subscription (decision
 
   it("falls a subscription pin this device cannot run to Haiku, not to the narration model", () => {
     fakeCli.platform = false;
-    localStorage.setItem("narrationModelOverride", "Mistral Nemo");
+    localStorage.setItem("narrationModelOverride", "Ministral 3 8B");
     localStorage.setItem(
       "observerModelOverride",
       JSON.stringify({ modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "low" }),
@@ -400,20 +431,20 @@ describe("the Observer's rewrite follows the narration voice, not the judges (de
   });
 
   it("follows a narration voice the player picked", () => {
-    localStorage.setItem("narrationModelOverride", "Mistral Nemo");
+    localStorage.setItem("narrationModelOverride", "Ministral 3 8B");
     expect(
       resolveObserverRewriteModel(null, String(getEffectiveNarrationModelKey()), getEffectiveNarrationEffort()),
-    ).toEqual({ model: "Mistral Nemo", reasoningEffort: "none" });
+    ).toEqual({ model: "Ministral 3 8B", reasoningEffort: "none" });
   });
 
   it("takes a pinned Observer's model and effort with it", () => {
     localStorage.setItem(
       "observerModelOverride",
-      JSON.stringify({ modelKey: "Mistral Medium 3.1", reasoningEffort: "low" }),
+      JSON.stringify({ modelKey: "Mistral Medium 3.5", reasoningEffort: "low" }),
     );
     // A pin keeps its own effort, whatever the narration voice is set to.
     expect(resolveObserverRewriteModel(getObserverModelOverride(), "GLM 5.3", "high")).toEqual({
-      model: "Mistral Medium 3.1",
+      model: "Mistral Medium 3.5",
       reasoningEffort: "low",
     });
   });
@@ -443,7 +474,7 @@ describe("the Observer's rewrite follows the narration voice, not the judges (de
 describe("a side agent without a key for the default falls to the narration voice (decision 51)", () => {
   const OPENROUTER = { openRouterKey: "or-key" };
   const MISTRAL_ONLY = { mistralKey: "mistral-key" };
-  const MISTRAL_NARRATOR = "Mistral Small 3.2";
+  const MISTRAL_NARRATOR = "Mistral Small 4";
   const CUSTOM_MODEL_UUID = "123e4567-e89b-42d3-a456-426614174000";
 
   const pin = (storageKey: string, modelKey: string) =>
@@ -527,13 +558,13 @@ describe("a side agent without a key for the default falls to the narration voic
       model: "Claude Sonnet 5.5",
       reasoningEffort: "low",
     });
-    pin("observerModelOverride", "Mistral Medium 3.1");
+    pin("observerModelOverride", "Mistral Medium 3.5");
     expect(resolveSideCallModel(getObserverModelOverride(), OPENROUTER)).toEqual({
-      model: "Mistral Medium 3.1",
+      model: "Mistral Medium 3.5",
       reasoningEffort: "low",
     });
     expect(resolveSideCallModel(getObserverModelOverride(), {})).toEqual({
-      model: "Mistral Medium 3.1",
+      model: "Mistral Medium 3.5",
       reasoningEffort: "low",
     });
   });

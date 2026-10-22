@@ -23,6 +23,7 @@ import {
   splitIntoWindows,
   MAX_PROMPT_CHARS,
   callProviderAI,
+  inferProvider,
 } from "@/app/misc/ocrSummarizeCall";
 
 describe("processParserResult", () => {
@@ -936,5 +937,52 @@ describe("callProviderAI temperature", () => {
   it("keeps temperature 0.3 for every other model", async () => {
     await callProviderAI("openrouter", "sys", "user", "z-ai/glm-5.2", 4000, "key");
     expect(sentBody().temperature).toBe(0.3);
+  });
+});
+
+describe("the DeepSeek Flash model name", () => {
+  // https://api-docs.deepseek.com/quick_start/pricing (read 2026-10-21): "Use
+  // deepseek-flash as the model name"; the legacy deepseek-v4-flash is still
+  // accepted but retired.
+  beforeEach(() => {
+    mockProviderFetch.mockReset();
+    mockProviderFetch.mockImplementation(async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "{}" }, finish_reason: "stop" }] }),
+    }));
+  });
+
+  function sentModel(): unknown {
+    return JSON.parse(mockProviderFetch.mock.calls[0][1].body as string).model;
+  }
+
+  it("routes the current name and the retired one to DeepSeek", () => {
+    expect(inferProvider("deepseek-flash")).toBe("deepseek");
+    expect(inferProvider("deepseek-v4-flash")).toBe("deepseek");
+  });
+
+  it("still routes the Mistral families to Mistral and anything else to OpenRouter", () => {
+    expect(inferProvider("ministral-14b-2512")).toBe("mistral");
+    expect(inferProvider("mistral-small-2603")).toBe("mistral");
+    expect(inferProvider("anthropic/claude-sonnet-5.5")).toBe("openrouter");
+    expect(inferProvider("deepseek-v4-pro")).toBe("openrouter");
+  });
+
+  it("calls deepseek-flash when no model is named", async () => {
+    await callProviderAI("deepseek", "sys", "user", "", 4000, "key");
+    expect(sentModel()).toBe("deepseek-flash");
+  });
+
+  it("sends the current name for a stored retired one, and any other DeepSeek model as given", async () => {
+    await callProviderAI("deepseek", "sys", "user", "deepseek-v4-flash", 4000, "key");
+    expect(sentModel()).toBe("deepseek-flash");
+    mockProviderFetch.mockClear();
+    await callProviderAI("deepseek", "sys", "user", "deepseek-v4-pro", 4000, "key");
+    expect(sentModel()).toBe("deepseek-v4-pro");
+  });
+
+  it("does not rewrite the model for another provider", async () => {
+    await callProviderAI("openrouter", "sys", "user", "deepseek/deepseek-v4-flash", 4000, "key");
+    expect(sentModel()).toBe("deepseek/deepseek-v4-flash");
   });
 });

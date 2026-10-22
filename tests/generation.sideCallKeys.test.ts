@@ -30,7 +30,7 @@ import type { MemoryEntry, StoryData } from "@/app/misc/structs";
 const MISTRAL_KEY = "mistral-test-key";
 const ZAI_KEY = "zai-test-key";
 /** The narration voice a Mistral-only player picks in Settings. */
-const MISTRAL_NARRATION_MODEL = "Mistral Small 3.2";
+const MISTRAL_NARRATION_MODEL = "Mistral Small 4";
 const NARRATION = "The lock clicks open. The corridor beyond is dark.";
 
 /** ~1,500 tokens apiece - several of these age well past a small history budget. */

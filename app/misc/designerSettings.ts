@@ -9,6 +9,7 @@
  * syncableSettingsKeys.ts, like "designerModel" itself.
  */
 
+import { resolveModelKeyAlias } from "./ai_prices";
 import {
   DEFAULT_REASONING_EFFORT,
   ReasoningEffort,
@@ -16,6 +17,23 @@ import {
 } from "./reasoningTiers";
 
 export const DESIGNER_EFFORT_KEY = "designerReasoningEffort";
+export const DESIGNER_MODEL_KEY = "designerModel";
+
+/**
+ * The saved Designer model, "" when none was saved. A retired catalog key that
+ * LEGACY_MODEL_KEY_ALIASES maps to a successor comes back as the successor's
+ * key; without that the Designer would quietly start on the first model the
+ * player has a key for. Any other value is returned as stored.
+ */
+export function getDesignerModel(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const stored = localStorage.getItem(DESIGNER_MODEL_KEY);
+    return stored ? resolveModelKeyAlias(stored) : "";
+  } catch {
+    return "";
+  }
+}
 
 /** The saved effort, or "none" when none was saved or the stored value is not an effort. */
 export function getDesignerReasoningEffort(): ReasoningEffort {

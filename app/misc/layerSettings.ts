@@ -17,7 +17,12 @@ import {
   ReasoningEffort,
   getEffectiveNarrationModelKey,
 } from "./reasoningTiers";
-import { AIModelKey, hasKeyForModel, isKnownModelKey } from "./ai_prices";
+import {
+  AIModelKey,
+  hasKeyForModel,
+  isKnownModelKey,
+  resolveModelKeyAlias,
+} from "./ai_prices";
 import { canRunClaudeCliModel, claudeCliBlockReason, isClaudeCliModel } from "./claudeCliModels";
 import type { ProviderKeys } from "./sideModelCall";
 import {
@@ -81,14 +86,18 @@ export interface ModelEffortOverride {
 // A saved override whose model the catalog no longer has (one its provider
 // shut down, or a key synced from a newer build) reads as null, so the layer
 // runs on its default (SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51) rather than
-// reaching getModelConfig, which would swap in DeepSeek V4 Flash.
+// reaching getModelConfig, which would swap in DeepSeek V4 Flash. A retired
+// key that LEGACY_MODEL_KEY_ALIASES maps to a successor comes back as the
+// successor's key, so a Mistral-key player's pin keeps working.
 function getOverride(key: string): ModelEffortOverride | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ModelEffortOverride | null;
-    return parsed && isKnownModelKey(parsed.modelKey) ? parsed : null;
+    return parsed && isKnownModelKey(parsed.modelKey)
+      ? { ...parsed, modelKey: resolveModelKeyAlias(parsed.modelKey) }
+      : null;
   } catch {
     return null;
   }

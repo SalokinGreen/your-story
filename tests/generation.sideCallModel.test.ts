@@ -224,23 +224,23 @@ describe("side calls default to Claude Haiku 5.5, not the narration model (decis
 
   it("ignore the player's narration override, and a pinned stage override beats the default", async () => {
     stubBrowserStorage({
-      narrationModelOverride: "Mistral Nemo",
+      narrationModelOverride: "Ministral 3 8B",
       memoryKeeperModelOverride: JSON.stringify({
-        modelKey: "Mistral Medium 3.1",
+        modelKey: "Mistral Medium 3.5",
         reasoningEffort: "none",
       }),
     });
 
     const calls = await runTurn(NARRATION);
     expect(calls.some(isStoryProgress)).toBe(true);
-    expect(modelsOf(calls.filter(isMemoryKeeper))).toEqual(["Mistral Medium 3.1"]);
+    expect(modelsOf(calls.filter(isMemoryKeeper))).toEqual(["Mistral Medium 3.5"]);
     expect(modelsOf(calls.filter((c) => !isMemoryKeeper(c)))).toEqual([
       SIDE_AGENT_DEFAULT_MODEL_KEY,
     ]);
   });
 
   it("compaction and reflection ignore the narration override too", async () => {
-    stubBrowserStorage({ narrationModelOverride: "Mistral Nemo" });
+    stubBrowserStorage({ narrationModelOverride: "Ministral 3 8B" });
 
     const calls = await runTurn(NARRATION, storyDueForCompactionAndReflection(), {
       customMaxContext: 8000,

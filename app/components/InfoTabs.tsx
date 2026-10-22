@@ -37,7 +37,7 @@ const KEY_REQUIREMENTS: KeyRequirement[] = [
     provider: "Cartesia or ElevenLabs",
     providerUrl: "https://elevenlabs.io/app/settings/api-keys",
     description:
-      "Text-to-speech narration is powered by Cartesia Sonic-3 or ElevenLabs voice models.",
+      "Text-to-speech narration is powered by Cartesia Sonic-3.6 or ElevenLabs voice models.",
   },
 ];
 

@@ -30,9 +30,9 @@ import {
 import { estimateTurnCost } from "@/app/misc/turnCostEstimate";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 
-// "Mistral Nemo" is $0.15/$0.15 per 1M tokens - a model with equal input and
+// "Ministral 3 8B" is $0.15/$0.15 per 1M tokens - a model with equal input and
 // output prices keeps the hand-computed expectations below readable.
-const CHEAP_MODEL = "Mistral Nemo";
+const CHEAP_MODEL = "Ministral 3 8B";
 // "GLM 5.2" is $1.40 in / $4.40 out - asymmetric, so it catches an
 // input/output price mix-up that a symmetric model would hide.
 const PRICEY_MODEL = "GLM 5.2";

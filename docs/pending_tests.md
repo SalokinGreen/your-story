@@ -52,6 +52,59 @@ request per item is enough.
   opening a lore entry's image generator should show Nano Banana, not a blank
   or mismatched picker.
 
+**The fixed models (2026-10-22).** Mistral's retired chat models were replaced
+(Mistral Small 4, Medium 3.5, Ministral 3 3B and 8B), image prices and ids
+were corrected, the OCR summariser and Cartesia TTS moved to their current
+names. The ids were read from the vendors' own pages and the request shapes
+are covered by tests with a faked `fetch`; none was sent to a provider.
+
+- **A turn with tools on each new Mistral id, with only a Mistral key.**
+  Save only a Mistral key, pin the narration voice to "Mistral Small 4" and
+  tier 1 to the same, and play a turn that makes the GM roll. Repeat with
+  "Mistral Medium 3.5" (`mistral-medium-3-5`), "Ministral 3 8B"
+  (`ministral-8b-2512`) and "Ministral 3 3B" (`ministral-3b-2512`). *Expected:*
+  the roll happens, the scene arrives, and the Debug Logs name the Mistral id.
+  *Failure looks like:* a 404 or "model not found" (the id), a 400 naming
+  `tool_choice`, `max_tokens` or `reasoning_effort` (Small 4 and Medium 3.5
+  reason, and Mistral may take effort differently from the one value the app
+  sends them), or a 400 about the prompt size on Ministral 3 3B (Mistral's page
+  says 256k, OpenRouter lists 128k; the catalog follows Mistral).
+- **A saved choice of a retired Mistral model.** In localStorage set
+  `narrationModelOverride` to `Mistral Small 3.2`, `reasoningTierOverrides`
+  to `[{"modelKey":"Mistral Medium 3.1","reasoningEffort":"low"},null,null,null]`,
+  `observerModelOverride` to `{"modelKey":"Mistral Nemo","reasoningEffort":"none"}`
+  and `designerModel` to `Devstral 2`, with only a Mistral key saved, and reload.
+  *Expected:* Settings → AI Config shows Mistral Small 4, Mistral Medium 3.5
+  and (Architecture) Ministral 3 8B, `/creator` opens on Mistral Medium 3.5, and
+  a turn runs without asking for an OpenRouter key. *Failure looks like:* a
+  blank picker, "No key" on a slot that has a Mistral key, or a "Model key …
+  not found" line. The PDF importer has its own saved id: set
+  `pdfImporterSettings` to `{"aiModel":"mistral-small-2506"}`; the importer's
+  model picker should open on Mistral Small 4.
+- **A narration line on Cartesia.** With a Cartesia key and a voice ID (try
+  the bundled Barbershop Man, and a Professional Voice Clone if you have one),
+  switch the voice model to Cartesia and play a narration line. The request
+  now carries `Cartesia-Version: 2026-08-14`, `model_id: "sonic-3.6"` and
+  `voice` as a string. *Expected:* audio plays. *Failure looks like:* a 400
+  with `voice_model_mismatch` on a Professional Voice Clone (Cartesia wants one
+  of the voice's own models, `sonic-3.5-2026-05-04` or `sonic-3.6-2026-08-27`,
+  and the app sends the undated `sonic-3.6`; if so, the voice needs a model
+  field), a 400 naming `voice` or `model_id`, or silence. If it fails for every
+  voice, revert `CARTESIA_VERSION` and `CARTESIA_MODEL_ID` in `ttsCall.ts`.
+- **One Nano Banana Pro image.** With an OpenRouter key, generate a lore image
+  on "Nano Banana Pro" (now `google/gemini-3-pro-image`). *Expected:* an image,
+  at about $0.13 in the OpenRouter activity page (the picker shows ~$0.134).
+  Then "Nano Banana" (now `google/gemini-3.1-flash-lite-image`, ~$0.034) and
+  "GPT-5.4 Image 2" (`openai/gpt-5.4-image-2`, ~$0.045, an estimate). *Failure
+  looks like:* "Could not extract image from AI response" (the model returns
+  the picture in a shape `extractImageFromOpenRouterResponse` does not read),
+  a 404, or a cost far from the figure shown.
+- **A DeepInfra image.** Generate a lore image on "FLUX 2 Pro" and on
+  "Bria 3.2". *Expected:* about $0.03 and $0.04 on DeepInfra's usage page.
+- **The OCR summariser on DeepSeek.** Import a short PDF with the importer's
+  model set to a DeepSeek model (its request now names `deepseek-flash`).
+  *Failure looks like:* a 400 naming the model.
+
 **The Balanced defaults (decisions 50 and 51).** The default ladder and the
 side agents' own default changed in this same branch. Every item here plays
 real turns on the author's OpenRouter key, so it waits for the author's go.
@@ -302,7 +355,9 @@ credit, so it waits for the author's go (`claude-gm-implementation-plan.md`
 A played turn needs the author's keys, so it waits for their go.
 
 *Superseded in part by decision 51 (2026-10-21):* an unpinned side agent no
-longer follows the narration model, it runs on Claude Haiku 5.5. Read
+longer follows the narration model, it runs on Claude Haiku 5.5. Mistral then
+retired Small 3.2 (`mistral-small-2506`), so a pin on it now runs on Mistral
+Small 4 (`mistral-small-2603`; `LEGACY_MODEL_KEY_ALIASES`). Read
 "Mistral Small 3.2" in the checks below as "the model the layer is pinned to":
 pin the layers (Settings → Architecture) to a Mistral model to run them. The
 failure they guard against, a side call naming `mistral-small-2506` and

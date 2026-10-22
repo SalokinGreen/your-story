@@ -10,7 +10,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 
 // A model whose provider these tests hold the key for - not the default narration
 // model, which moves with the catalog (decision 50).
-const MISTRAL_MODEL = "Mistral Small 3.2";
+const MISTRAL_MODEL = "Mistral Small 4";
 
 const mockPlatformFetch = vi.fn();
 vi.mock("@/app/misc/platformFetch", () => ({

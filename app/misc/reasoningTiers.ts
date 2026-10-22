@@ -20,6 +20,7 @@ import {
   AIModelKey,
   getModelConfig,
   isKnownModelKey,
+  resolveModelKeyAlias,
 } from "@/app/misc/ai_prices";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 import {
@@ -180,7 +181,9 @@ function notifyConfigChanged() {
  * default). A slot whose saved model the catalog no longer has (a model its
  * provider shut down, or a key synced from a newer build) reads as null, so it
  * uses its default instead of reaching getModelConfig, which would swap in
- * DeepSeek V4 Flash. The stored value is left alone; the next write drops it.
+ * DeepSeek V4 Flash. A retired key that LEGACY_MODEL_KEY_ALIASES maps to a
+ * successor is returned as the successor's key instead, so the slot keeps
+ * working. The stored value is left alone; the next write replaces it.
  */
 export function getTierOverrides(): (TierOverride | null)[] {
   if (typeof window === "undefined") return REASONING_TIERS.map(() => null);
@@ -189,7 +192,9 @@ export function getTierOverrides(): (TierOverride | null)[] {
     const parsed: (TierOverride | null)[] = raw ? JSON.parse(raw) : [];
     return REASONING_TIERS.map((_, i) => {
       const o = parsed[i];
-      return o && isKnownModelKey(o.modelKey) ? o : null;
+      return o && isKnownModelKey(o.modelKey)
+        ? { ...o, modelKey: resolveModelKeyAlias(o.modelKey) }
+        : null;
     });
   } catch {
     return REASONING_TIERS.map(() => null);
@@ -244,11 +249,15 @@ export function getEffectiveTiers(): ReasoningTier[] {
   });
 }
 
-/** The saved narration voice; null when none, or when the catalog dropped it. */
+/**
+ * The saved narration voice; null when none, or when the catalog dropped it. A
+ * retired key with a successor (LEGACY_MODEL_KEY_ALIASES) comes back as the
+ * successor's key.
+ */
 export function getNarrationModelOverride(): AnyModelKey | null {
   if (typeof window === "undefined") return null;
   const stored = localStorage.getItem(NARRATION_OVERRIDE_KEY);
-  return isKnownModelKey(stored) ? stored : null;
+  return isKnownModelKey(stored) ? resolveModelKeyAlias(stored) : null;
 }
 
 export function setNarrationModelOverride(modelKey: AnyModelKey | null): void {

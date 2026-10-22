@@ -497,7 +497,11 @@ provider's own id), which `getModelConfig()` silently swaps for DeepSeek V4
 Flash. A saved choice (a tier, the narration voice, a side agent, a lore image
 model) naming a key the catalog has dropped reads as unset and uses the slot's
 default (`isKnownModelKey()`, `resolveImageModelKey()` in `ai_prices.ts`), so
-removing a catalog entry is safe for saved and synced settings. The catalog was
+removing a catalog entry is safe for saved and synced settings; a retired key
+can instead be aliased to its successor (`LEGACY_MODEL_KEY_ALIASES`, read by
+every saved-choice reader through `resolveModelKeyAlias()`), so a saved choice
+keeps working, which the retired Mistral models rely on for a player whose only
+key is Mistral's. The catalog was
 checked against OpenRouter and each vendor on 2026-10-21 (see the dated note in
 `docs/research/gm-models-2026-10-21.md` §6); `DeepSeek V4 Flash` is kept as a
 key only for the fallback and saved settings, and calls `deepseek-flash`.

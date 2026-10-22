@@ -46,6 +46,7 @@ import {
 import {
   getObserverModelOverride,
   getMemoryKeeperModelOverride,
+  getReflectionModelOverride,
   getDirectorAssistantModelOverride,
   getStoryProgressObserverModelOverride,
   getStoryProgressCheckInterval,
@@ -343,6 +344,8 @@ export function estimateTurnCost(
   // at runtime.
   const observerCall = resolveSideCallModel(getObserverModelOverride());
   const memoryCall = resolveSideCallModel(getMemoryKeeperModelOverride());
+  // Reflection has its own pin (generation.ts resolves it the same way).
+  const reflectionCall = resolveSideCallModel(getReflectionModelOverride());
   const directorCall = resolveSideCallModel(getDirectorAssistantModelOverride());
   const progressCall = resolveSideCallModel(
     getStoryProgressObserverModelOverride(),
@@ -535,8 +538,8 @@ export function estimateTurnCost(
   plans.push({
     stage: "reflection",
     label: "Reflection",
-    modelKey: memoryCall.model,
-    reasoningEffort: memoryCall.reasoningEffort,
+    modelKey: reflectionCall.model,
+    reasoningEffort: reflectionCall.reasoningEffort,
     inputPerCall: REFLECTION_INPUT_TOKENS,
     outputPerCall: REFLECTION_OUTPUT_TOKENS,
     expectedCalls: calibratedCalls(
