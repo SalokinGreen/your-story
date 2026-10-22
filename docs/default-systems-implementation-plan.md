@@ -984,3 +984,20 @@ test system installed.
 - **Library home** shows the built-in section only when the registry has a
   system, between "Jump back in" and "Folders". Built-ins are not in the
   Adventures/Notes tabs or folders (as planned, section 13).
+
+### 2026-10-22: engine-review fixes to PR B
+
+- `mergeImportedLore` now builds a replacement from the incoming note (enabled
+  unless it says otherwise, its own visibility), carrying over only `pinned`
+  and `imageId`. Notes have no ids. `startAdventureLocally` takes an optional
+  `onReplaced(titles)` callback and the library page announces replaced
+  template notes with an info notification.
+- The built-in push-guard text no longer points at a Save button a linked note
+  does not have.
+- **For PR C:** `merge_lore` (`app/misc/toolExecutor.ts`, about line 1739)
+  drops `libraryNoteId`, `type` and `visibility`, and `delete_note` removes
+  built-in notes. In Automatic mode a GM that merges or deletes all of a
+  system's built-in notes turns `usesSystemTools` off mid-campaign (the tools
+  vanish while the meters remain), and a merged hidden pack note becomes
+  always-reveal. PR C should decide whether `merge_lore` keeps
+  `libraryNoteId`/`visibility`, or whether the switch latches once on.

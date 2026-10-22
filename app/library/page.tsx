@@ -167,17 +167,26 @@ export default function LibraryPage() {
     const context = pendingPlay;
     setPendingPlay(null);
     try {
+      const replaced: string[] = [];
       const localId =
         context.kind === "adventure"
           ? await startAdventureLocally(
               context.adventure.adventureData,
               "Player",
               initialLore.length ? initialLore : undefined,
+              (titles) => replaced.push(...titles),
             )
           : await startFreeformStoryLocally(
               "Player",
               initialLore.length ? initialLore : undefined,
             );
+      if (replaced.length) {
+        const n = replaced.length;
+        addNotification(
+          `${n} note${n === 1 ? "" : "s"} from the adventure ${n === 1 ? "was" : "were"} replaced by ${n === 1 ? "the one" : "the ones"} you attached${n <= 3 ? `: ${replaced.join(", ")}` : ""}`,
+          "info",
+        );
+      }
       router.push(`/story?storyId=${localId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

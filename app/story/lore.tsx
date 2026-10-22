@@ -276,7 +276,7 @@ export default function LorePage(props: LorePageProps) {
     if (!selectedLore?.libraryNoteId || syncingLibrary) return;
     if (isBuiltinId(selectedLore.libraryNoteId)) {
       addNotification(
-        "Built-in notes can't be changed in the library - save this as a new library note instead",
+        "Built-in notes can't be changed in the library - edits to it stay in this story",
         "warning",
       );
       return;

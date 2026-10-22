@@ -174,6 +174,8 @@ export async function startAdventureLocally(
   adventure: Partial<Adventure>,
   playerName: string = "Player",
   initialLore?: StoryLore[],
+  // Called with the titles of template notes the attached notes replaced.
+  onReplaced?: (titles: string[]) => void,
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -186,6 +188,11 @@ export async function startAdventureLocally(
 
   // A Designer-made adventure's template has none of the legacy stat-block
   // arrays, so they're filled in here (see ensureStoryDataArrays).
+  const mergedLore = mergeImportedLore(
+    adventure.storyTemplate?.lore || [],
+    initialLore || [],
+  );
+  if (mergedLore.replaced.length) onReplaced?.(mergedLore.replaced);
   const newStoryData = ensureStoryDataArrays({
     ...adventure.storyTemplate,
     story_name: `${adventure.title || "Adventure"} - ${new Date().toLocaleDateString()}`,
@@ -201,10 +208,7 @@ export async function startAdventureLocally(
     // the library import rule (a built-in starter already holds copies of its
     // rules packs, so attaching the pack again replaces them, not doubles).
     lore: [
-      ...mergeImportedLore(
-        adventure.storyTemplate?.lore || [],
-        initialLore || [],
-      ).lore,
+      ...mergedLore.lore,
       ...(adventure.storyTemplate?.customTables || []).map(customTableToNote),
     ],
   } as unknown as StoryData);

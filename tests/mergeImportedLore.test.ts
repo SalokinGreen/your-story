@@ -69,3 +69,37 @@ describe("mergeImportedLore", () => {
     expect(first.lore).toHaveLength(1);
   });
 });
+
+describe("mergeImportedLore replacement starts clean", () => {
+  it("a disabled template note is replaced by an enabled one", () => {
+    const { lore } = mergeImportedLore(
+      [note({ title: "The Docks", enabled: false })],
+      [note({ title: "The Docks", content: "mine" })],
+    );
+    expect(lore[0].content).toBe("mine");
+    expect(lore[0].enabled).toBe(true);
+  });
+
+  it("takes the incoming visibility, not the old note's", () => {
+    const { lore } = mergeImportedLore(
+      [note({ title: "The Docks", visibility: "hidden" })],
+      [note({ title: "The Docks" })],
+    );
+    expect(lore[0].visibility).toBeUndefined();
+    const second = mergeImportedLore(
+      [note({ title: "The Docks" })],
+      [note({ title: "The Docks", visibility: "hidden" })],
+    );
+    expect(second.lore[0].visibility).toBe("hidden");
+  });
+
+  it("carries pinned and imageId over", () => {
+    const { lore } = mergeImportedLore(
+      [note({ title: "The Docks", pinned: true, imageId: "img1", embedded: true })],
+      [note({ title: "The Docks" })],
+    );
+    expect(lore[0].pinned).toBe(true);
+    expect(lore[0].imageId).toBe("img1");
+    expect(lore[0].embedded).toBeUndefined();
+  });
+});

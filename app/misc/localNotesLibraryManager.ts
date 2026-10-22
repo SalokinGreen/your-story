@@ -192,9 +192,9 @@ export function libraryNoteToStoryLore(note: LibraryNote): StoryLore {
  * adventure). A note matches an existing one by `libraryNoteId`, else by
  * case-insensitive title against existing notes that have no `libraryNoteId`
  * (a note linked to a different library note is a different note that
- * happens to share a title). A match is overwritten field by field, so the
- * flags the existing note carries (`on`, `pinned`, ...) survive unless the
- * incoming note sets them.
+ * happens to share a title). A match is replaced by the incoming note, which
+ * starts clean (enabled, its own visibility); only `pinned` and `imageId`
+ * carry over from the old note.
  */
 export function mergeImportedLore(
   existing: StoryLore[],
@@ -211,7 +211,22 @@ export function mergeImportedLore(
         : !l.libraryNoteId && l.title.trim().toLowerCase() === title,
     );
     if (index >= 0) {
-      lore[index] = { ...lore[index], ...note };
+      // Built explicitly, not spread over the old note: a spread kept the
+      // old note's `enabled` and `visibility`, so an author-disabled template
+      // note replaced by the player's own stayed switched off (the GM never
+      // saw it) and a hidden one made the player's note hidden. The incoming
+      // note is the player's choice and starts clean: its own visibility
+      // (unset = always_reveal) and enabled unless it says otherwise. Only
+      // `pinned` and `imageId` (a place in the list, a picture made in play)
+      // carry over from the old note. Notes have no ids; `embedded` is not
+      // carried because the content changed.
+      const old = lore[index];
+      const merged: StoryLore = { ...note, enabled: note.enabled ?? true };
+      if (merged.pinned === undefined && old.pinned !== undefined)
+        merged.pinned = old.pinned;
+      if (merged.imageId === undefined && old.imageId !== undefined)
+        merged.imageId = old.imageId;
+      lore[index] = merged;
       replaced.push(note.title);
     } else {
       lore.push(note);

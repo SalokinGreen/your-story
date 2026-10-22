@@ -206,7 +206,7 @@ export default function LoreEditor({
     if (!item.libraryNoteId) return;
     if (isBuiltinId(item.libraryNoteId)) {
       addNotification(
-        "Built-in notes can't be changed in the library - save this as a new library note instead",
+        "Built-in notes can't be changed in the library - edits to it stay in this story",
         "warning",
       );
       return;
