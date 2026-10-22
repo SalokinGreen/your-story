@@ -66,8 +66,8 @@ note's size. So a system is built from these pieces:
 | **Core rules** | `dm_instructions`, titled "*System* — Core rules" | in full, every round | **≤ 3,000 tokens** |
 | **Reference notes** | `mechanics`, one topic each | title in the prompt; `read_notes` when a rule comes up | ≤ 2,500 tokens each |
 | **Tables** (miss tables, oracles, creation prompts) | `table` | title; read, then rolled with `formula_roll` | as written |
-| **Character sheet** | a template in `CHARACTER_SHEET_PRESET_TEMPLATES`, filled into a `character_sheet` note | in full, every round | ≤ 1,000 tokens filled in |
-| **Meters and tracks** | engine data (§4), defined by the pack | a compact section of the state block | one line each |
+| **Character sheet** | a sheet template the pack carries, set as the adventure's `characterSheetTemplate`; filled into a `character_sheet` note | in full, every round | ≤ 1,000 tokens filled in |
+| **Meter and track sets** | engine data (§4.2), defined by the pack and carried by the adventure | a compact section of the state block | one line each |
 | **Setting** (optional, its own pack) | `lore`, `secret` | titles; read on demand | as written |
 | **Starter adventure** | an `Adventure` built on the packs | — | — |
 
@@ -111,29 +111,59 @@ system, not only Blood & Bone.
 
 ### 3.3 How a system ships
 
+What exists today (checked in the code, 2026-10-22): library notes are
+independent IndexedDB rows (`YourStoryNotesLibraryDB`,
+`localNotesLibraryManager.ts`) with random ids and no notion of a pack, an
+origin or a version; folders are a localStorage list shared by notes,
+adventures, stories and tables (`localFolderManager.ts`). Adventures are
+IndexedDB rows too (`localAdventureManager.ts`), and they sync: a row with a
+per-device id is pushed from every device that has it (`syncManager.ts`
+`mergeItems`). Nothing seeds content on first run; the nearest pattern is the
+idempotent `migrateTablesLibraryToNotes` that runs on every library load.
+`sample_adventures.ts` and `starter_stories.ts` are dead code with empty
+lore and legacy stat arrays, and one of them carries sexual content under
+`nsfw: false`; they are not a model to revive.
+
+So:
+
 - **In the repository, as source.** Each system lives in
-  `app/misc/systems/<system-id>/`: its notes, tables, character-sheet
-  template, meter and track definitions, and its starter adventure, as
-  TypeScript modules. Being source means it is in the static export the
-  native apps package, with no fetch at runtime, and the suite can test it.
-  (The repo is public, so this publishes the AI edition's text; §7.)
-- **Two packs in the notes library** (decisions 63, 75): *Blood & Bone —
-  Rules* and *Blood & Bone — Europe by Night*. They appear in the notes
-  library on first run as built-in packs. The Designer imports them into an
-  adventure with the existing `importFromLibrary` and `LibraryPickerModal`;
-  the in-story lore editor can do the same.
-- **A starter adventure in the adventure library:** *The Hollow Hour*, built
-  on both packs, which a player can start straight away or open in the
-  Designer.
-- **Updates.** A built-in pack carries a version. A newer app replaces the
-  library's built-in copy and never touches notes already imported into an
-  adventure or a story: those belong to the author or the player.
+  `app/misc/systems/<system-id>/`: its notes, tables, sheet template, meter
+  and track sets, and its starter adventure, as TypeScript modules, listed
+  in a registry `app/misc/systems/index.ts`. Being source means it is in the
+  static export the native apps package, with no fetch at runtime, and the
+  suite can test it. (The repo is public, so this publishes the AI edition's
+  text; §7.)
+- **Built-ins are never written to the device.** The library merges the
+  registry's packs and starters into what it shows, marked *Built-in*: the
+  notes library tab (`NotesLibraryTab.tsx`), the picker
+  (`LibraryPickerModal.tsx`) and the adventure list (`library/page.tsx`,
+  `AdventuresLibraryTab.tsx`). Kept out of IndexedDB, they cannot be edited
+  in place, cannot sync as one duplicate per device, and are always the
+  version the app shipped with. Each built-in note has a stable id
+  (`builtin:blood-and-bone:core`) so an import can be traced and deduped.
+- **Two packs** (decisions 63, 75): *Blood & Bone — Rules* and *Blood &
+  Bone — Europe by Night*, each shown as a built-in folder. Importing copies
+  the notes into the adventure or story: the Designer through
+  `importFromLibrary` (`useDesignerSession.ts`), the in-story lore editor
+  through its picker (`LoreEditor.tsx`). Importing the rules pack into a
+  Designer draft also sets the adventure's sheet template and meter and
+  track sets, when the draft has none, and tells the Designer so through
+  `summarizeDraft()`.
+- **A starter adventure:** *The Hollow Hour*, built on both packs, in the
+  adventure list. *Play* starts it through the existing
+  `startAdventureLocally`; *Open in Designer* makes an ordinary local copy
+  first, since a built-in cannot be edited.
+- **Updates.** A newer app ships newer built-ins. Notes already imported
+  into an adventure or a story are copies and never change underneath the
+  author or the player.
 - **The Designer** learns that built-in packs exist and what each contains,
   so it can offer one when an author's adventure needs rules.
 
-*To be completed when the code exploration reports back: how the notes
-library stores notes and folders, whether a seed hook exists, and how a
-built-in adventure would appear in the library.*
+Two existing import paths behave differently, and the implementation plan
+must pick one rule for both: the Designer dedupes on `libraryNoteId` *or* a
+case-insensitive title match and then overwrites the existing note
+(`useDesignerSession.ts` `importFromLibrary`, whose docstring claims
+`libraryNoteId` only), while the lore editor appends with no dedupe at all.
 
 ## 4. The engine: meters, progress tracks, tallies, sessions
 
@@ -157,17 +187,18 @@ A **meter** is a named number owned by a character or by the world.
 | field | meaning | Blood & Bone example |
 |---|---|---|
 | `name` | unique per owner | "Stress" |
-| `owner` | a character, or the world | the player's character; "world" for Heat |
+| `owner` | a character's name, or `world` | "Mira"; `world` for Heat |
 | `min`, `max` | the full range | 0, 6 |
 | `cap` | the current ceiling, ≤ `max` | 6, then 5 at Beast 6, 4 at Beast 9 |
 | `floor` | the current floor, ≥ `min` | 0, then 1 at Beast 9 |
 | `value` | | 2 at creation |
 | `thresholds` | labels at values, reported when crossed | Exposure 3 "Attention", 4 "Pressure"… |
-| `resets` | optional: back to a value at each scene or session | a once-per-night ability: 1 → 0 |
+| `resets` | optional: back to a value at each scene or session | none in Blood & Bone yet (§5.5); for a system with per-scene pools |
 | `onlyUp` | optional: the value may never fall | Beast |
 
-One tool, **`manage_meter`**, with actions `create`, `adjust` (by an
-amount), `set`, `set_cap`, `set_floor` and `remove`. The engine:
+One tool, **`manage_meter`**, with actions `create`, `create_set` (below),
+`adjust` (by an amount), `set`, `set_cap`, `set_floor` and `remove`. The
+engine:
 
 - clamps every change to `[floor, cap]` and reports `old → new`, including
   how much of a change was clamped away;
@@ -180,6 +211,21 @@ amount), `set`, `set_cap`, `set_floor` and `remove`. The engine:
   This is how decision 70 (+1, each trigger once a scene) and the book's
   "each XP trigger pays once per session" are enforced by code;
 - refuses an unknown meter name with the list of the owner's meters.
+
+**Owners are names.** `StoryData` has no list of characters: a character is
+a `character_sheet` note (one per player in a party, titled
+"Character: *name*"), plus `player_name` when solo and the couch roster
+(`multiplayer.couchPlayers`) in multiplayer, and every tool that targets a
+player does it by name (`ask_for_roll`'s `player_name`, `ask_question`'s
+`target_player_name`). Meters and tracks follow suit: the owner is the
+character's name, matched case-insensitively, or `world`.
+
+**Sets, so the GM never types a range.** A pack defines named sets ("Blood &
+Bone character": Stress 0–6 starting at 2, Beast 0–10 only rising, Exposure
+0–6 with its thresholds, XP; "Witch": the Ledger; "Wendigo": the Slipping
+Mask). The adventure carries them, and `manage_meter`'s `create_set` action
+makes a whole set for one owner in one call. A meter the GM creates by hand
+remains possible for anything a set doesn't cover.
 
 ### 4.3 Progress tracks
 
@@ -223,6 +269,15 @@ holds the tally between turns, and the M2 roll gate, which already forces a
 roll on every turn a challenge is active, makes each of the three turns roll
 exactly once.
 
+Today the active challenge is invisible: no screen shows it, and the GM sees
+its count only by calling `get_game_state` or in the result of the last
+check. A three-turn fight needs the tally in front of both, so the active
+challenge joins the GM's state block and the player's view (§4.6). There are
+also two `start_challenge` implementations and two schemas (`gmExecutor.ts`
+and `toolExecutor.ts`; `gmTools.ts` and `toolSchemas.ts`). The GM
+executor's path wins today, and the implementation plan removes the other
+before extending it.
+
 ### 4.5 Sessions
 
 The app has scenes (`increment_scene`) and turns, but no session. Blood &
@@ -236,6 +291,14 @@ the per-session dedup keys (§4.2), and returns the system's end-of-session
 checklist from the core rules as a reminder. *When* to call it is the
 system's to say: Blood & Bone's core says "at dawn".
 
+**What "a scene" is.** The once-a-scene keys count scenes with
+`agmtState.sceneCount`, which only `increment_scene` advances. They do not
+use `computeSceneKey` (the key behind the tier-3 cap), which buckets every
+20 story parts and has nothing to do with the GM's scenes. So "once a scene"
+is only as good as the GM's habit of calling `increment_scene`; Blood &
+Bone's core tells it to call it at every scene change, and playtests watch
+for it (§6).
+
 The Reckoning itself stays a GM procedure with existing tools:
 `formula_roll(["4d6"])` for Stress 4 reports every die, the GM counts the 1s,
 and `manage_meter` raises Beast by that many. Automating the count is an
@@ -248,13 +311,15 @@ open question (§7).
   (Rumour)"; "Vow: Find who is taking the bodies — dangerous, 3 boxes"). It
   costs a few tokens per line, which is far cheaper than the prose it
   replaces.
-- **The player:** the same numbers on the character sheet during play, as
-  bars and boxes.
-- **Online guests:** they receive `StoryData` already, meters included.
-
-*File-level details (which component shows the sheet, how characters are
-identified for `owner`, every place a new tool is wired) follow the code
-exploration.*
+- **The player:** the same numbers as bars and boxes, with the active
+  challenge's tally, in a panel beside the pinned character sheet on the
+  Lore page (`app/story/lore.tsx`, which already pins `character_sheet`
+  notes). There is no player-facing display of engine state today, not even
+  for timers; the only one is the debug `ContextViewer.tsx`.
+- **Online guests:** they receive the whole `StoryData` already
+  (`multiplayer/session.ts` `state_snapshot`), meters included. Local save,
+  sync and story export also write the whole `StoryData`, so new optional
+  fields ride along with no field list to update.
 
 ### 4.7 Cost
 
@@ -264,6 +329,29 @@ request of every adventure, Blood & Bone or not. The recommendation (an open
 question in §7) is to offer `manage_meter`, `manage_track` and `end_session`
 only to stories whose adventure declares it uses them, which a pack sets when
 imported and the Designer can set by hand.
+
+### 4.8 Where it lives in the code
+
+The implementation plan turns this into signatures and slices; these are the
+files it touches, found by tracing `manage_timer` and the challenge tools
+through every place a GM tool is wired.
+
+| what | where |
+|---|---|
+| Shapes: `Meter`, `ProgressTrack`, the sets, `sessionCount`, the dedup keys, and the challenge's `mode`, `rounds` and `tally` | `app/misc/structs.ts` (new optional fields on `StoryData`; `SceneChallenge`); no backfill needed in `storyDataDefaults.ts`, which fills only required arrays |
+| The arithmetic: clamps, caps, dedup, ticks by rank, `progress_roll` | a new pure module, `app/misc/metersAndTracks.ts`, so it is testable without the executor |
+| Schemas for `manage_meter`, `manage_track`, `end_session`; the wider `start_challenge` and `record_challenge_result` | `app/misc/gmTools.ts` (`GM_TOOL_SCHEMAS`, `GM_TOOL_NAMES`, `GM_TOOL_MAP`) |
+| Offering them, conditionally (§4.7) | `app/misc/ai_staged.ts`, the `legacyToolNames` whitelist in `buildGMStagePrompt` |
+| Executing them | `app/misc/gmExecutor.ts` (the tool switch); the duplicate challenge path in `toolExecutor.ts` removed |
+| The GM's view: the *Meters & tracks* section and the active challenge | `app/misc/ai_staged.ts`, beside `formatTimersState` |
+| The lists a new tool must join | `gmToolLabels.ts`; `GOOGLE_ESSENTIAL_TOOLS` in `providerCall.ts`; `STATE_CHANGE_TOOLS` in `toolExecutor.ts`; `DICE_TOOLS` in `generation.ts` (a progress roll's miss is a valid outcome, not a tool error); the Observer's `OUTCOME_CHECK_TOOL_NAMES` for tally outcomes |
+| Surviving compaction | `storyCompaction.ts` `buildCondensedStorySeed`, which resets transient state (it resets `activeChallenge` and `timers`); meters and tracks must be kept |
+| The adventure carrying sets, the sheet template and the pack it came from | `designer_executor.ts` (`AdventureDraft`, `draftToAdventure`, `adventureToDraft`) and `localStoryManager.ts` `startAdventureLocally` |
+| The player's panel | a new `app/story/MetersPanel.tsx`, shown from `app/story/lore.tsx` |
+| Built-ins | `app/misc/systems/`; the library merges in `NotesLibraryTab.tsx`, `LibraryPickerModal.tsx`, `library/page.tsx`, `AdventuresLibraryTab.tsx`; import in `useDesignerSession.ts` and `LoreEditor.tsx` |
+
+Every slice that touches `app/misc/` gets a test baseline first and the
+`engine-review` agent after (`CLAUDE.md`).
 
 ## 5. Blood & Bone: the AI edition
 
@@ -459,9 +547,13 @@ which was not true of these passages before the rewrite.
 
 ### 5.9 The character sheet
 
-A Blood & Bone preset in `CHARACTER_SHEET_PRESET_TEMPLATES`, built from
-Appendix B: name, Kind, Archetype, Path, the five stats, the Kind's Stress
-triggers, Recover move and Weakness, Connections with ranks, Burdens, assets
+A sheet template the rules pack carries and sets as the adventure's
+`characterSheetTemplate`, which is what the live character-creation form
+fills (`create-character/form.tsx`). The nine shipped
+`CHARACTER_SHEET_PRESET_TEMPLATES` reach no live screen (their only reader,
+`CharacterSheetTemplateEditor.tsx`, is imported nowhere), so a preset alone
+would never be seen. Built from Appendix B: name, Kind, Archetype, Path,
+the five stats, the Kind's Stress triggers, Recover move and Weakness, Connections with ranks, Burdens, assets
 with their bought abilities, gear, the three background answers, the XP
 triggers in play (Archetype, Alternate or both, chosen at session zero), and
 a "used tonight" line for once-per-night abilities. The numbers (Stress,
@@ -474,8 +566,10 @@ The app's session zero (the GM asks questions, writes the campaign plan,
 calls `start_game`) carries the book's Step Zero and steps 1–8: the GM reads
 *B&B — Character creation*, offers the Cohorts, walks the steps, rolls the
 Kind's creation prompts when the player wants them, writes the sheet, and
-creates the meters and the Vow tracks. *The Hollow Hour* is a starter
-adventure on top of that: its premise, its three NPCs (Runa Sandhu, Callum
+creates each character's meter sets and Vow tracks with `create_set` and
+`manage_track`. In a party, that is one sheet and one set per player, as the
+existing Players & Preferences note already asks. *The Hollow Hour* is a
+starter adventure on top of that: its premise, its three NPCs (Runa Sandhu, Callum
 Reyes, Margot Severin) as NPCs and secrets, Heat starting at 3, its three
 progress tracks, and its four endings as the campaign plan's spine. Session
 zero still builds the characters.
@@ -492,15 +586,21 @@ zero still builds the characters.
   Watch for drift; decision 74 says what to do about it.
 - **Tool rounds.** A missed roll uses about half of the GM's ten rounds
   (§5.6). Watch for turns that hit the cap.
+- **Scene changes.** "Once a scene" depends on the GM calling
+  `increment_scene` (§4.5). If it rarely does, triggers cap far too low.
+- **Gemini.** The stale Google tool filter (§6.14) leaves out the timer and
+  challenge tools today and would leave out the new ones; Blood & Bone does
+  not work on Google models until §6.14 is fixed.
 - **The director.** Its pressure moves come with a rolled complication seed;
   Blood & Bone has its own complication oracle and miss tables. Two sources
   of complications may pile up.
 - **The Observer's oracle check** flags turns that use none of
   `fate_question`, `roll_table` or `roll_portent`. Blood & Bone's tables are
   rolled with `formula_roll`, so expect advisory flags; they don't block.
-- **Secrets.** Hidden notes reach the narrator (§6.16). Blood & Bone's
-  starter keeps who turned Runa as a secret; until §6.16 is fixed, the
-  narrator can see it.
+- **Secrets.** Hidden notes reach the narrator (§6.16). *The Hollow Hour*
+  keeps the truth about Runa (an abandoned fledgling, not a monster) as a
+  secret the players should uncover; until §6.16 is fixed, the narrator can
+  see it once the GM reads it.
 
 ## 7. Open questions for the author
 
@@ -511,8 +611,10 @@ zero still builds the characters.
 3. **Should the engine count the Reckoning's 1s** (an option on
    `end_session`), or the GM? Recommendation: the GM for now; it is a handful
    of dice once a night.
-4. **Built-in packs in the library: read-only, or editable copies?**
-   Recommendation: read-only in the library, editable once imported.
+4. **Built-ins kept in memory and merged into the library** (§3.3), or
+   written into the device's library on first run? Recommendation: in
+   memory. Written rows would be editable in place, drift from the app's
+   version, and sync as one duplicate per device.
 5. **Publishing.** Shipping Blood & Bone in the app puts the AI edition's
    text in this public repository. Confirm that is wanted.
 6. **The proposals in §5.4 and the renames in §5.7.**

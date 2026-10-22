@@ -748,8 +748,11 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 - `app/library/` — folder-first browsing (`LibraryHome.tsx`,
   `FolderDetailView.tsx`), stories, adventures and the notes library.
 - `app/components/` — shared UI: the dice tray (`DiceThrowModal.tsx`,
-  `ManualRollModal.tsx`), the character sheet renderer, TTS/STT controls, the
-  API key modal, `PDFImporter.tsx`, the Settings tabs.
+  `ManualRollModal.tsx`), TTS/STT controls, the API key modal,
+  `PDFImporter.tsx`, the Settings tabs. `CharacterSheetEditor.tsx` and
+  `CharacterSheetTemplateEditor.tsx` are imported nowhere; during play the
+  sheet is a pinned note on the Lore page (`app/story/lore.tsx`), and the
+  nine `CHARACTER_SHEET_PRESET_TEMPLATES` reach no live screen.
 - `src-tauri/`, `android/`, `ios/` — the native shells. `sync-worker/` — the
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
