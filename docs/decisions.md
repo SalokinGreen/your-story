@@ -140,6 +140,42 @@ been taken by the time it landed.
 | 28 | Build party mode | **Yes, starting with PR P1** ("Yes, start with PR P1"): `docs/party-mode-implementation-plan.md` as written, beginning with the S0 spike with the author and a phone. Each PR needs its own yes to merge (decision 5). |
 | 31 | The S0 phone test had to wait | **Build S2 first, stop before S1** ("Build S2 meanwhile"): the pure-TypeScript protocol, host state machine, redaction boundary and turn-text extraction went ahead while the author had no phone to hand. Nothing in Rust, no UI and nothing that opens a port until S0 passes. |
 
+### Interview — tokens, history and compaction (2026-10-22)
+
+After #213 merged, the author asked to "discuss how to improve our
+notes/memory system and save on tokens. One thing that we for sure need is
+the compaction tool of claude code." The measurements and the design are
+[`token-savings-design.md`](token-savings-design.md).
+
+| # | question | decision |
+|---|---|---|
+| 90 | What happens to old tool results (notes read, edits made), which are replayed in full every later turn | **Cleared once, as the turn ends** ("Once, as the turn ends"), after the author asked whether clearing would break caching ("won't it fuck with caching?") and was shown that clearing a turn's results once, when it becomes history, is cache-safe while a rolling "keep the last N turns" is not. Later turns see a one-line stub per long result; short results (dice, oracle, confirmations) stay. |
+| 91 | Rearranging the prompt so each request mostly matches the previous one | **A stable prefix** ("Stable prefix"): the per-turn lines move next to the player's latest action, and history keeps a fixed start between summaries instead of sliding by one turn each turn. |
+| 92 | The 15.8k tokens of tool descriptions sent every round | **One stable list, trimmed** ("One stable list, trimmed"): every tool in every round so the list caches, with shorter descriptions. |
+| 93 | What goes wrong with memory beyond cost | **"Mostly just cost."** The memory half of the work is about history and summaries, not recall quality. |
+| 94 | When history is summarised | **When the real history passes the budget** ("When real history passes the budget"): count everything actually sent, summarise the oldest chunk down to a target, and between summaries let history grow only at the end. |
+| 95 | How summaries are written and steered | **All four** ("Fixed sections, A 'Compact now' action, Summary instructions per adventure, Summarise tool use too"): fixed headings; a story-menu "Compact now" with optional focus text; a per-adventure note of summary instructions; and what the GM learned from tools folded into the summary. |
+| 96 | A size limit on always-loaded notes | **Warn, then cap the total** ("Warn, then cap the total"): a warning when one always-loaded note passes about 3,000 tokens; past a total of about 10,000 the GM prompt keeps the first part of each and points to `read_notes` for the rest. |
+| 97 | This work or the approved default-systems plan first | **Token savings first** ("Token savings first"). Default systems' PR A follows on the new prompt layout. |
+| 98 | What next | **Write the design document** ("Write the design doc"), with these decisions, the measurements and the bugs found; nothing built until the author has read it and said yes. |
+
+### Interview — tokens, continued: the design's open calls (2026-10-22)
+
+The author read [`token-savings-design.md`](token-savings-design.md) and
+answered the calls the session had made inside decisions 90–98, and the
+design's open questions.
+
+| # | question | decision |
+|---|---|---|
+| 99 | Whether an old turn's private `<thinking>` text goes with its tool results | **Drop it** ("Drop it"). The prose the player saw stays. |
+| 100 | Where the always-loaded character sheet sits, since the GM edits it often | **Next to the action** ("Next to the action"), in the live block, so an edit no longer breaks the cache for the history. |
+| 101 | How far a summary folds history back | **To half the budget** ("Half the budget"), so a summary runs every few dozen turns. |
+| 102 | What "Compact now" keeps word for word | **The last two turns** ("The last two turns"). |
+| 103 | The stub threshold (~150 tokens) and the summary target (~2,000) | **Defaults, tuned in playtests** ("Defaults, tune in playtests"): set as constants in code. |
+| 104 | Claude's 5-minute or 1-hour cache | **Measure first** ("Measure first"): 5 minutes, cache hits recorded in the ledger, and the stable prefix moved to 1 hour if Claude players keep missing between turns. |
+| 105 | When to confirm the caching on a real model | **One session after the build** ("One session after the build"), once the ledger records cached tokens, on the default models; a pending test until the author says go. |
+| 106 | Is the design approved | **Approved; write the implementation plan** ("Approved: write the plan"). Building waits for the author's yes on the plan. |
+
 ### Interview seven — model catalog and defaults (2026-10-21)
 
 The model catalog was checked against OpenRouter's live list and each
