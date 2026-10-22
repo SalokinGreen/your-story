@@ -10,6 +10,85 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-21 — Party mode (PR P1): the checks that need real phones
+
+What was verified here: the Rust server's checks (`cargo test`, including a
+real WebSocket relay on loopback), the whole TypeScript table
+(`tests/party.*.test.ts`), the phone page in a browser against the real
+runtime (two players, a steal and its cooldown ring, Go, a roll and a question
+routed to the right player, a reconnect, nothing secret on the wire), and,
+on the author's own phone and PC before the build, that a phone on this Wi-Fi
+reaches a server on this PC (plan §7). What follows needs people, phones or a
+live key. Run it from the built app: `RUSTUP_TOOLCHAIN=1.99.1 npx tauri build`,
+then `src-tauri/target/release/app.exe`.
+
+- **A real party from the installed app.** Menu → Party Mode → "Open the
+  table". The lobby should show a QR code, a `http://192.168.x.x:8787/party?t=…`
+  link and the network picker (on this PC the choices include a Tailscale
+  address and a VPN-ish adapter; the default should be the wired
+  `192.168.0.85`). Scan the QR with a phone on the same Wi-Fi: the join form
+  appears. *Failure looks like:* a timeout on the phone (firewall, Public
+  network or client isolation: see the lobby's help), or the phone page loading
+  unstyled (a `/_next/static/...` path the bundle doesn't have: look at the
+  failing request).
+- **The Windows Firewall prompt on a fresh install.** The first "Open the
+  table" from an installed copy should raise the prompt, once. The lobby's
+  note says to allow Private networks only. The spike's rule was created for
+  Private and Public together, so check which boxes the prompt really ticks.
+  Decline it once and confirm the lobby's "A phone can't connect?" help covers
+  it.
+- **Two or more phones.** Join with two, a different colour each. Each phone
+  should see both names. Take the spotlight on one, then on the other: the
+  first should show the amber ring counting 15 s down, and a tap to take it
+  back inside that time should be refused with a toast. Move the cooldown
+  slider in the Menu and steal again: the next ring should follow it.
+- **Lines need the spotlight.** On a phone without it, the text box, the
+  suggestion chips and "Add to the queue" should be dead. With it, a typed line
+  and a chip both appear in the queue on every phone and on the desktop strip.
+- **Go from a phone, and Go from the desktop.** Either should send the queue as
+  one turn; the desktop log (Debug Logs → context) should show it as
+  `> Name: line` lines, one per queued line, and the strip and every phone
+  should show "The GM is working…" until the turn ends. Needs a key, so it
+  waits for the author's go.
+- **A roll and a question go to the right phone.** Set the adventure to
+  manual dice, have the GM ask player A for a roll and put a question to
+  player B, by name. Each prompt should appear only on that player's phone; the
+  desktop strip should say it is waiting, with "Answer here". A's answer
+  ("17", or "Roll for me") and B's picks should reach the GM, and the turn
+  should continue. Also tap "Answer here" on the desktop and confirm the phone's
+  prompt disappears. Needs a key.
+- **The GM writes each player a sheet.** Join a phone to a story that began
+  solo. After a turn or two the GM should create `Character: <name>` and the
+  phone's "Character" section should fill in. If it doesn't, the "Party
+  Table" note (Menu → Notes, GM instructions) isn't reaching the GM. Needs a
+  key.
+- **A phone sleeps and wakes.** Lock a phone for a minute, unlock it: it should
+  show "Reconnecting…" and then its own seat again, with its queue and sheet,
+  without the join form. Then close the table and open it again: the phone
+  should say it can't reach the table, and after rescanning show the join form
+  with the open seat.
+- **A secret never reaches a phone.** Put a `secret` note, a `gm_plan` note and
+  a `hidden` note in a story and join a phone. In the phone browser's dev tools
+  (Network → WS → Messages, or `chrome://inspect` on Android) read every
+  message: none of those notes' text should appear. The redaction test proves
+  the builder; this proves nothing else sends around it.
+- **A guest Wi-Fi.** Put the phone on a guest network with client isolation:
+  the page should simply fail to load, and the lobby's help names that case.
+- **The table closes with the story, and with a reload.** Open the table, go
+  to the library, and confirm the phone says it can't reach the table and that
+  `netstat -ano | findstr 8787` shows nothing listening. Then open it again and
+  reload the app window (Ctrl+R): the same should hold, and the Menu should show
+  the table as closed. *Failure looks like:* a listener still on the port after
+  a reload (the `on_page_load` hook in `src-tauri/src/lib.rs`).
+- **Removing a player mid-prompt.** In manual dice mode, have the GM ask a
+  player on a phone for a roll, then remove that player from the strip. The
+  roll prompt should open on the desktop, and answering it should continue the
+  turn. The removed phone should say "You were removed from the table" and
+  offer "Join again" without reconnecting by itself. Needs a key.
+- **Not built yet (PR P2):** the Android app's scanner and "Open in app",
+  voice from a phone, and the native WebSocket. A phone cannot speak a line in
+  PR P1; the transcription path is wired and tested but has no client.
+
 ## 2026-10-21 — Claude on the subscription (Route B of the Claude GM plan)
 
 The author gave the go on 2026-10-21 and the checks were run in the built

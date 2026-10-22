@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-party-kick"
+description = "Enables the party_kick command without any pre-configured scope."
+commands.allow = ["party_kick"]
+
+[[permission]]
+identifier = "deny-party-kick"
+description = "Denies the party_kick command without any pre-configured scope."
+commands.deny = ["party_kick"]
