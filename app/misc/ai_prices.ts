@@ -21,6 +21,7 @@ export const AI_MODELS = {
     bannerUrl: undefined,
     inputPrice: 2,
     outputPrice: 6,
+    cachedInputPrice: 0.3, // xAI docs, 2026-10-21
     finetunes: [],
   },
 
@@ -42,6 +43,7 @@ export const AI_MODELS = {
     bannerUrl: undefined,
     inputPrice: 2,
     outputPrice: 6,
+    cachedInputPrice: 0.5, // xAI docs, 2026-10-21
     finetunes: [],
   },
 
@@ -341,6 +343,7 @@ export const AI_MODELS = {
     maxOutputTokens: 128000,
     inputPrice: 1.4,
     outputPrice: 4.4,
+    cachedInputPrice: 0.26, // docs.z.ai, 2026-10-21
     provider: "zai",
     supportsToolCalling: true,
     finetunes: [],
@@ -359,6 +362,7 @@ export const AI_MODELS = {
     maxOutputTokens: 128000,
     inputPrice: 0.15,
     outputPrice: 0.5,
+    cachedInputPrice: 0.03, // docs.z.ai, 2026-10-21
     provider: "zai",
     supportsToolCalling: true,
     finetunes: [],
@@ -810,6 +814,7 @@ export const AI_MODELS = {
     supportsToolCalling: true,
     inputPrice: 1.36,
     outputPrice: 4.18,
+    cachedInputPrice: 0.14, // docs.mistral.ai, 2026-10-21
     finetunes: [],
     strengths: ["long context", "tool calling", "latest"],
     weaknesses: ["public preview", "price", "little benchmark data"],
@@ -1407,6 +1412,12 @@ export interface AIModelConfig {
   reasoningMandatory?: boolean;
   inputPrice: number;
   outputPrice: number;
+  /**
+   * $ per 1M input tokens served from the provider's prompt cache, filled
+   * only where a dated provider price is known. Without one the cost
+   * estimate prices cached tokens at inputPrice (turnCost.ts says so).
+   */
+  cachedInputPrice?: number;
   finetunes: readonly string[];
   strengths: readonly string[];
   weaknesses: readonly string[];
