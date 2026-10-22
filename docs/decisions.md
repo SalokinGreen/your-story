@@ -119,3 +119,22 @@ renames (§5.7).
 | 87 | The renames for names the book uses twice (§5.7) | **All four accepted**: the Rite *The Reckoning* becomes *The Calling Due*, the Rite *The Vigil* becomes *The Wake*, the Haven *The Hollow* becomes *The Forgotten Room*, and the Werewolf's Beast track *The Turning* becomes *The Wild*. |
 | 88 | Is the design approved | **Approved; write the implementation plan** ("Approved: write the plan"). Building still waits for the author's yes on that plan. |
 | 89 | How the rulebook reaches a build session, since it existed only as an upload | **Committed to the repository** ("Commit the book to the repo"), as `docs/blood-and-bone/rulebook.md`, with decision 69's rewrites applied and the credits completed, as the source the AI edition is written from. |
+
+### Interview — tokens, history and compaction (2026-10-22)
+
+After #213 merged, the author asked to "discuss how to improve our
+notes/memory system and save on tokens. One thing that we for sure need is
+the compaction tool of claude code." The measurements and the design are
+[`token-savings-design.md`](token-savings-design.md).
+
+| # | question | decision |
+|---|---|---|
+| 90 | What happens to old tool results (notes read, edits made), which are replayed in full every later turn | **Cleared once, as the turn ends** ("Once, as the turn ends"), after the author asked whether clearing would break caching ("won't it fuck with caching?") and was shown that clearing a turn's results once, when it becomes history, is cache-safe while a rolling "keep the last N turns" is not. Later turns see a one-line stub per long result; short results (dice, oracle, confirmations) stay. |
+| 91 | Rearranging the prompt so each request mostly matches the previous one | **A stable prefix** ("Stable prefix"): the per-turn lines move next to the player's latest action, and history keeps a fixed start between summaries instead of sliding by one turn each turn. |
+| 92 | The 15.8k tokens of tool descriptions sent every round | **One stable list, trimmed** ("One stable list, trimmed"): every tool in every round so the list caches, with shorter descriptions. |
+| 93 | What goes wrong with memory beyond cost | **"Mostly just cost."** The memory half of the work is about history and summaries, not recall quality. |
+| 94 | When history is summarised | **When the real history passes the budget** ("When real history passes the budget"): count everything actually sent, summarise the oldest chunk down to a target, and between summaries let history grow only at the end. |
+| 95 | How summaries are written and steered | **All four** ("Fixed sections, A 'Compact now' action, Summary instructions per adventure, Summarise tool use too"): fixed headings; a story-menu "Compact now" with optional focus text; a per-adventure note of summary instructions; and what the GM learned from tools folded into the summary. |
+| 96 | A size limit on always-loaded notes | **Warn, then cap the total** ("Warn, then cap the total"): a warning when one always-loaded note passes about 3,000 tokens; past a total of about 10,000 the GM prompt keeps the first part of each and points to `read_notes` for the rest. |
+| 97 | This work or the approved default-systems plan first | **Token savings first** ("Token savings first"). Default systems' PR A follows on the new prompt layout. |
+| 98 | What next | **Write the design document** ("Write the design doc"), with these decisions, the measurements and the bugs found; nothing built until the author has read it and said yes. |

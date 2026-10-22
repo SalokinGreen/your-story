@@ -333,6 +333,15 @@ Ranked by severity (sections below are numbered in the order they were found):
 > | 6.15 | Rules notes are titles only, though prompts, comments and docs say pinned; `alwaysOn` and keyword triggers do nothing | Medium (confusing) | Small (decide) |
 > | 6.17 | `calculate` strips letters and commas: `min(12,10)` evaluates as 1210 | Medium | Small |
 > | 6.18 | `search_notes` ignores `enabled`, returning disabled notes | Low | Trivial |
+>
+> And three more from the token-cost measurements the same day
+> ([`token-savings-design.md`](token-savings-design.md)), §6.19–6.21:
+>
+> | # | Bug | Severity | Effort |
+> |---|---|---|---|
+> | 6.19 | A turn whose GM rounds write only `<thinking>` saves an empty story, with no narrator fallback | Medium | Small |
+> | 6.20 | Story that has left the history window but is under the 1,500-token summary batch is in neither | Medium (continuity) | Fixed by the token-savings design |
+> | 6.21 | Memory trimming shifts entries off the front while reflection tracks progress by index | Low (the trim rarely fires) | Small |
 
 ### 6.1 Timer auto-advance never fires
 
@@ -631,6 +640,53 @@ the code and measured.
   (`app/misc/toolExecutor.ts:392-399`), so excerpts of disabled notes come
   back, while `read_notes` refuses the same notes (`gmExecutor.ts:3182-3185`).
 - **Fix:** skip `enabled === false` in the search loop, with a test.
+
+### 6.19 A thinking-only GM turn saves an empty story
+
+**Severity: medium (a blank turn).** Found 2026-10-22; reproduced in a
+measurement harness, and the path checked in the code.
+
+- When any GM round wrote text, the accumulated text becomes the story
+  (`gmFinalStoryContent`, `app/misc/generation.ts:3026-3028`) and the
+  narrator is skipped (`:3064`). The text is then reduced to its
+  player-visible part with `extractVisibleText` (`:3077`).
+- If every round wrote only `<thinking>…</thinking>`, the check passes on
+  the thinking text, the visible part is empty, and the turn is saved with
+  no story and no narrator fallback.
+- **Fix:** decide on the *visible* text: if `extractVisibleText` of the
+  accumulated content is empty, fall through to the narrator stage, with a
+  test.
+
+### 6.20 Story that has left the window but is not yet summarised
+
+**Severity: medium (continuity).** Found 2026-10-22; verified in the code.
+
+- The history window keeps the most recent parts within the budget
+  (`getPartsWithinTokenBudget`, `ai_staged.ts:208`). `planCompaction`
+  (`app/misc/compaction.ts:207-247`) summarises the parts between the last
+  summary and the window's start, but returns `null` while that stretch is
+  under `MIN_UNCOVERED_TOKENS_TO_SUMMARIZE` (1,500 tokens, `:23`).
+- Until it reaches 1,500 tokens, that stretch is in neither the history nor
+  the summary; the same holds for as long as summarisation keeps failing.
+- **Fix:** the token-savings design (decision 94) gives history a fixed
+  start at the summary's end, so everything after the summary is always
+  sent and nothing can fall between the two.
+
+### 6.21 Memory trimming and reflection's index disagree
+
+**Severity: low (the trim rarely fires).** Found 2026-10-22; read in the
+code, not run.
+
+- `updateStoryData` (`app/story/page.tsx:1695-1730`) trims memory by
+  `shift()`ing entries off the front once it passes a cap of 25% of the
+  model's input window (about 935k characters with the default model). It
+  runs only from the lore and NPC editors.
+- Reflection records its progress as an index, `memoryReflectedThroughIndex`
+  (`app/misc/reflection.ts:62, 113`). A trim from the front shifts every
+  entry down, so the index then points past entries that were never
+  reflected on.
+- **Fix:** move the index back by the number of entries trimmed (or track
+  reflection by entry timestamp), with a test.
 
 ---
 

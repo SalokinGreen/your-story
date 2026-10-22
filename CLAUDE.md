@@ -39,7 +39,10 @@ stale Google tool filter, which leaves session zero unable to end on Gemini
 (6.14). Four more were found on 2026-10-22 (decision 65): rules notes listed
 by title only while the prompt, comments and docs say pinned (6.15), hidden
 note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
-as 1210 (6.17), and `search_notes` returning disabled notes (6.18). There is
+as 1210 (6.17), and `search_notes` returning disabled notes (6.18); and
+three from the token measurements: a thinking-only turn saving an empty
+story (6.19), story falling between the history window and the summary
+(6.20), and memory trimming upsetting reflection's index (6.21). There is
 still no CI on pull requests.
 
 **The product is the native apps (decision 1).** Tauri desktop and Capacitor
