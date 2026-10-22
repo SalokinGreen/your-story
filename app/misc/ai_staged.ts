@@ -28,6 +28,10 @@ import { cleanString } from "@/app/misc/textUtils";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { estimateTokens } from "@/app/misc/tokenCounter";
+import {
+  estimateRenderedPartTokens,
+  renderHistoryPart,
+} from "@/app/misc/historyStubs";
 import { ChatMessage } from "@/app/misc/chatMessage";
 
 export type { ChatMessage };
@@ -203,11 +207,17 @@ export function computeGMStageBudget(
  * Get scene parts that fit within a token budget, taking most recent first
  * @param parts - Array of scene parts
  * @param tokenBudget - Maximum tokens to include
+ * @param measure - "prose" (default) counts the part's text plus a flat amount
+ *   per tool call, which is what the choices/narration prompts send. "rendered"
+ *   counts what the GM's history actually replays (historyStubs.ts: stubs, no
+ *   <thinking>), so the window budgets what is sent. Rendered mode never skips
+ *   a part, so the result is always a contiguous tail of `parts`.
  * @returns Array of parts that fit, preserving chronological order
  */
 export function getPartsWithinTokenBudget(
   parts: StoryData["scene"]["parts"],
   tokenBudget: number,
+  measure: "prose" | "rendered" = "prose",
 ): StoryData["scene"]["parts"] {
   if (!parts || parts.length === 0) return [];
 
@@ -219,19 +229,24 @@ export function getPartsWithinTokenBudget(
     const part = parts[i];
     const partText = part.raw || part.content;
 
-    // Comment-only user parts have empty content; never include them in AI context.
-    if (part.user && !cleanString(partText).trim()) {
-      continue;
+    let totalPartTokens: number;
+    if (measure === "rendered") {
+      totalPartTokens = estimateRenderedPartTokens(part, i);
+    } else {
+      // Comment-only user parts have empty content; never include them in AI context.
+      if (part.user && !cleanString(partText).trim()) {
+        continue;
+      }
+
+      const partTokens = estimateTokens(partText);
+
+      // Include tool call/response overhead if present
+      const toolOverhead =
+        (part.toolCalls?.length || 0) * 50 +
+        (part.toolResponses?.length || 0) * 30;
+
+      totalPartTokens = partTokens + toolOverhead;
     }
-
-    const partTokens = estimateTokens(partText);
-
-    // Include tool call/response overhead if present
-    const toolOverhead =
-      (part.toolCalls?.length || 0) * 50 +
-      (part.toolResponses?.length || 0) * 30;
-
-    const totalPartTokens = partTokens + toolOverhead;
 
     if (totalTokens + totalPartTokens > tokenBudget) {
       break; // Can't fit any more
@@ -242,6 +257,46 @@ export function getPartsWithinTokenBudget(
   }
 
   return selectedParts;
+}
+
+/**
+ * The GM's history (token-savings plan, slice 3; decision 94): every part after
+ * `scene.summarizedThroughIndex`, a FIXED start, so between summaries the
+ * history only grows at its end and the cached prefix survives. If that is over
+ * `historyBudget` (a summary failed this turn, or none has run yet) it falls
+ * back to the sliding window over the rendered sizes, for this turn only.
+ * `startIndex` is the first returned part's position in `scene.parts`.
+ */
+export function getHistoryParts(
+  storyData: StoryData,
+  historyBudget: number,
+): {
+  parts: StoryData["scene"]["parts"];
+  startIndex: number;
+  slidingFallback: boolean;
+} {
+  const all = storyData.scene.parts || [];
+  const startIndex = Math.min(
+    Math.max(0, storyData.scene.summarizedThroughIndex || 0),
+    all.length,
+  );
+  const fixed = all.slice(startIndex);
+
+  let total = 0;
+  for (let i = 0; i < fixed.length; i++) {
+    total += estimateRenderedPartTokens(fixed[i], startIndex + i);
+    if (total > historyBudget) break;
+  }
+  if (total <= historyBudget) {
+    return { parts: fixed, startIndex, slidingFallback: false };
+  }
+
+  const slid = getPartsWithinTokenBudget(all, historyBudget, "rendered");
+  return {
+    parts: slid,
+    startIndex: all.length - slid.length,
+    slidingFallback: true,
+  };
 }
 
 // cleanString moved to textUtils.ts (shared with ai.ts) - re-exported here
@@ -475,7 +530,8 @@ export function buildInfoMessage(
       // the GM Stage prompt. The narrator has no use for a list of tables it
       // can't roll, and mixing them into World Lore just spends context.
       type === "table" ||
-      type === "story_instructions" // Excluded - only for Story Stage
+      type === "story_instructions" || // Excluded - only for Story Stage
+      type === "summary_instructions" // Excluded - only the summariser reads it
     );
   };
 
@@ -1090,11 +1146,14 @@ export function buildGMStagePrompt({
   const { historyBudget, infoBudget, totalContextBudget } =
     computeGMStageBudget(customMaxContext, modelName, customMaxOutput);
 
-  // Get recent story parts for context - now uses the calculated history budget
-  const recentParts = getPartsWithinTokenBudget(
-    storyData.scene.parts,
-    historyBudget,
-  );
+  // History is every part after the summary (a fixed start, so the prefix only
+  // grows at its end between summaries); only if that overflows the budget
+  // (a summary failed this turn) does it fall back to a sliding window.
+  const {
+    parts: recentParts,
+    startIndex: historyStartIndex,
+    slidingFallback: historySlidingFallback,
+  } = getHistoryParts(storyData, historyBudget);
 
   // ============================================
   // AGENTIC NOTE SYSTEM for GM Stage
@@ -1147,6 +1206,7 @@ export function buildGMStagePrompt({
     for (const l of notes || []) {
       if (l.enabled === false) continue;
       if (isPinnedType(l.type)) continue; // Skip pinned types
+      if (l.type === "summary_instructions") continue; // The summariser's, never the GM's
       const type = l.type || "lore";
       if (type === "secret") {
         categories.secret.push(l);
@@ -1978,17 +2038,13 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     }
   }
 
+  // Each past part is rendered by renderHistoryPart (historyStubs.ts): long
+  // tool results and arguments become one-line stubs, <thinking> is dropped.
   // Reasoning/thought-signature replay (Gemini's `reasoning.encrypted` in
-  // particular) is only meaningful for the round immediately being
-  // continued - not for every past round concatenated into history.
-  // Re-sending an old encrypted reasoning blob from an already-completed
-  // round is exactly the failure mode reported against OpenRouter's own
-  // Gemini integration: stale `reasoning.encrypted` replayed from history
-  // causes a 400 on a later, unrelated request (OpenRouterTeam/ai-sdk-
-  // provider#491). So only the LAST assistant part in history keeps its
-  // reasoning/reasoning_details; everything older keeps its content and
-  // tool_calls (needed for narrative/tool-call continuity) but drops the
-  // reasoning metadata.
+  // particular) is only meaningful for the round immediately being continued;
+  // re-sending an older blob causes a 400 on OpenRouter's Gemini integration
+  // (OpenRouterTeam/ai-sdk-provider#491), so only the LAST assistant part keeps
+  // its reasoning/reasoning_details - see RenderHistoryOptions.
   let lastAssistantPartIndex = -1;
   for (let j = partsToInclude.length - 1; j >= 0; j--) {
     if (!partsToInclude[j].user) {
@@ -1997,207 +2053,12 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     }
   }
 
-  // Process parts in pairs: user choice followed by assistant story
-  // We need to reconstruct the full GM conversation flow
   for (let i = 0; i < partsToInclude.length; i++) {
-    const part = partsToInclude[i];
-    const isMostRecentRound = i === lastAssistantPartIndex;
-
-    if (part.user) {
-      // User action - simple format, story context comes after GM response
-      messages.push({
-        role: "user",
-        content: cleanString(`> ${part.content.replace(/^>\s*/, "")}`),
-      });
-    } else {
-      // Assistant (story) part - reconstruct GM's conversation
-      // NEW: Use gmConversation if available (has actual tool_calls and tool role messages)
-      if (part.gmConversation && part.gmConversation.length > 0) {
-        // Use the actual saved conversation - this preserves exact tool_calls and tool responses
-        for (const msg of part.gmConversation) {
-          if (msg.role === "assistant") {
-            const hasToolCalls = !!(msg.tool_calls && msg.tool_calls.length > 0);
-            const assistantMsg: ChatMessage = {
-              role: "assistant",
-              content: cleanString(msg.content),
-              ...(isMostRecentRound
-                ? {
-                    reasoning: msg.reasoning,
-                    reasoning_details: msg.reasoning_details,
-                  }
-                : // An older round that made tool calls keeps its plain-text
-                  // reasoning: DeepSeek's thinking mode 400s on any assistant
-                  // message carrying tool_calls without its reasoning_content
-                  // (api-docs.deepseek.com/guides/thinking_mode), whatever
-                  // turn it came from. Only `reasoning_details` is dropped -
-                  // that is where the stale `reasoning.encrypted` signature
-                  // this scoping was written for lives.
-                  hasToolCalls
-                  ? { reasoning: msg.reasoning }
-                  : {}),
-            };
-            if (hasToolCalls) {
-              assistantMsg.tool_calls = msg.tool_calls;
-            }
-            messages.push(assistantMsg);
-          } else if (msg.role === "tool") {
-            messages.push({
-              role: "tool",
-              content: msg.content,
-              tool_call_id: msg.tool_call_id,
-            });
-          }
-        }
-      } else if (part.gmThinking && part.gmThinking.length > 0) {
-        // LEGACY FALLBACK: Synthesize conversation from gmThinking + gmToolCalls
-        // This is for backward compatibility with stories saved before gmConversation was added
-
-        // gmToolCalls contains GMToolResult[] objects, not raw tool_calls
-        // Each entry has: toolName, toolCallId, success, contextForStory
-        const gmToolResults = (part.gmToolCalls || []) as Array<{
-          toolName: string;
-          toolCallId: string;
-          success: boolean;
-          contextForStory: string;
-        }>;
-
-        // If we have tool results, reconstruct the conversation properly
-        if (gmToolResults.length > 0) {
-          const thinkingEntries = part.gmThinking;
-
-          // Simple approach: One assistant message per GM round, with its tool responses
-          for (
-            let roundIdx = 0;
-            roundIdx < thinkingEntries.length;
-            roundIdx++
-          ) {
-            const thinking = thinkingEntries[roundIdx];
-            const toolResult = gmToolResults[roundIdx];
-
-            if (toolResult) {
-              // Create synthetic tool_call object for this round
-              const syntheticToolCall = {
-                id:
-                  toolResult.toolCallId ||
-                  `call_${i}_${roundIdx}_${toolResult.toolName}`,
-                type: "function",
-                function: {
-                  name: toolResult.toolName,
-                  arguments: "{}", // We don't have the original args, but this is for context
-                },
-              };
-
-              // Assistant message with this round's thinking and tool call
-              messages.push({
-                role: "assistant",
-                content: cleanString(thinking),
-                tool_calls: [syntheticToolCall],
-              });
-
-              // Tool response with matching ID
-              messages.push({
-                role: "tool",
-                content:
-                  toolResult.contextForStory ||
-                  `[Tool: ${toolResult.toolName}] ${
-                    toolResult.success ? "Success" : "Failed"
-                  }`,
-                tool_call_id: syntheticToolCall.id,
-              });
-            } else {
-              // No tool result for this thinking entry - just add as assistant
-              messages.push({
-                role: "assistant",
-                content: cleanString(`<thinking>\n${thinking}\n</thinking>`),
-              });
-            }
-          }
-
-          // Handle any remaining tool results that didn't have matching thinking
-          for (
-            let toolIdx = thinkingEntries.length;
-            toolIdx < gmToolResults.length;
-            toolIdx++
-          ) {
-            const toolResult = gmToolResults[toolIdx];
-            const syntheticToolCall = {
-              id:
-                toolResult.toolCallId ||
-                `call_${i}_${toolIdx}_${toolResult.toolName}`,
-              type: "function",
-              function: {
-                name: toolResult.toolName,
-                arguments: "{}",
-              },
-            };
-
-            messages.push({
-              role: "assistant",
-              content: `Executing ${toolResult.toolName}`,
-              tool_calls: [syntheticToolCall],
-            });
-
-            messages.push({
-              role: "tool",
-              content:
-                toolResult.contextForStory ||
-                `[Tool: ${toolResult.toolName}] ${
-                  toolResult.success ? "Success" : "Failed"
-                }`,
-              tool_call_id: syntheticToolCall.id,
-            });
-          }
-        } else {
-          // Just thinking, no tool calls - combine into single assistant message
-          // This happens when GM produces final content with <thinking> tags
-          const thinkingText = part.gmThinking.join("\n\n");
-          messages.push({
-            role: "assistant",
-            content: cleanString(`<thinking>\n${thinkingText}\n</thinking>`),
-          });
-        }
-      } else if (part.gmStoryContext) {
-        // No thinking but has GM context - include as assistant summary
-        messages.push({
-          role: "assistant",
-          content: cleanString(
-            `<thinking>\n${part.gmStoryContext}\n</thinking>`,
-          ),
-        });
-      }
-
-      // Add the story output as assistant response AFTER GM thinking
-      // This shows the GM what narrative was generated from their decisions
-      // Skip if gmConversation was used (story is already in there)
-      // Also skip if this is a GM-direct output (gmThinking exists but no gmToolCalls)
-      const hasGmConversation =
-        part.gmConversation && part.gmConversation.length > 0;
-      const isGMDirectOutput =
-        part.gmThinking?.length && !part.gmToolCalls?.length;
-      if (
-        part.content &&
-        part.content.trim() &&
-        !hasGmConversation &&
-        !isGMDirectOutput
-      ) {
-        messages.push({
-          role: "assistant",
-          content: cleanString(`[STORY OUTPUT]\n${part.content}`),
-        });
-      } else if (
-        part.content &&
-        part.content.trim() &&
-        !hasGmConversation &&
-        isGMDirectOutput
-      ) {
-        // GM wrote the story directly - just add it without the [STORY OUTPUT] marker
-        // since it's a continuation of the GM's response
-        messages.push({
-          role: "assistant",
-          content: cleanString(part.content),
-        });
-      }
-    }
+    messages.push(
+      ...renderHistoryPart(partsToInclude[i], historyStartIndex + i, {
+        isMostRecentRound: i === lastAssistantPartIndex,
+      }),
+    );
   }
 
   // Add the current player action as the final user message
@@ -2255,7 +2116,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
   console.log(`  - State message: ${estimateTokens(stateMessage)} tokens`);
   console.log(
-    `  - Chat history: ${recentParts.length} parts (${partsWithGMHistory} with GM data, ${partsWithNewFormat} with new gmConversation format)`,
+    `  - Chat history: ${recentParts.length} parts from #${historyStartIndex}${historySlidingFallback ? " (sliding-window fallback)" : ""} (${partsWithGMHistory} with GM data, ${partsWithNewFormat} with new gmConversation format)`,
   );
   console.log(`  - Available tools: ${toolsToUse.length}`);
 

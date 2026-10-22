@@ -42,7 +42,8 @@ note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
 as 1210 (6.17), and `search_notes` returning disabled notes (6.18); and
 three from the token measurements: a thinking-only turn saving an empty
 story (6.19), story falling between the history window and the summary
-(6.20), and memory trimming upsetting reflection's index (6.21); and one
+(6.20, fixed by the token-savings PR T1: history has a fixed start at the
+summary's end), and memory trimming upsetting reflection's index (6.21); and one
 while planning that build: `story_instructions` notes, documented as the
 narrator's style guide, never reaching the narrator (6.22). There is still
 no CI on pull requests.
@@ -386,6 +387,26 @@ always runs **before** the story stage:
    (localStorage `customMaxContext`, default `GM_STAGE_DEFAULT_BUDGET` =
    36,000), capped so the input plus one round's reply fits the model's
    window, and never below 4,000; split 60% story history / 40% info. The
+   history is every story part after `scene.summarizedThroughIndex` (a fixed
+   start, `getHistoryParts()`), so between summaries it only grows at its end.
+   Each past turn is replayed by `renderHistoryPart()` (`historyStubs.ts`,
+   decisions 90, 99, 103): a tool result over 150 tokens becomes a one-line
+   stub ("read_notes "X": 2,029 tokens, cleared from history. Read it again if
+   you need it."), a long tool-call argument becomes a size marker, the GM's
+   old `<thinking>` is dropped, and dice and oracle results stay whole; the
+   full `gmConversation` stays on the part for the summary and the debug
+   views, and the current turn's rounds are never stubbed. When that history,
+   counted as rendered, passes the history budget, `planCompaction()` folds
+   the oldest parts into `scene.summary` until about half the budget remains
+   (decisions 94, 101); if the summary fails, that turn falls back to a
+   sliding window (`slidingFallback`, logged) and it is retried next turn. The
+   summariser (`compaction.ts`) is given the folded turns' tool calls and
+   results too, writes seven fixed sections (`SUMMARY_SECTIONS`, about
+   `SUMMARY_TARGET_TOKENS` = 2,000), and follows the adventure's
+   `summary_instructions` note (read only by the summariser, never by the GM
+   or the narrator) and a "Compact now" focus; the story menu's Compact Story
+   dialog has *Summarise Now* (`summarizeNow()`, keeps the last two turns and
+   removes nothing). The choices prompt keeps its own prose window. The
    reply reserved is the Response Length setting (localStorage
    `customMaxOutput`, 8,000 by default in the UI, which gameplay passes in)
    capped by the model's own maximum; `GM_STAGE_DEFAULT_OUTPUT` (12,000) is

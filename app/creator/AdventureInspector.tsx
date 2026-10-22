@@ -34,6 +34,7 @@ const NOTE_TYPE_LABELS: Partial<Record<LoreType, string>> = {
   character_sheet: "Character",
   dm_instructions: "GM guidance",
   story_instructions: "Narrator style",
+  summary_instructions: "Summary rules",
   gm_plan: "Campaign plan",
 };
 
@@ -44,6 +45,7 @@ const NOTE_TYPE_COLORS: Partial<Record<LoreType, string>> = {
   character_sheet: "bg-emerald-500/15 text-emerald-300",
   dm_instructions: "bg-purple-500/15 text-purple-300",
   story_instructions: "bg-purple-500/15 text-purple-300",
+  summary_instructions: "bg-purple-500/15 text-purple-300",
   gm_plan: "bg-cyan-500/15 text-cyan-300",
 };
 

@@ -175,6 +175,7 @@ export type LoreType =
   | "story_instructions" // 📌 Story Stage only - narrator guidance for prose style
   | "mechanics" // 📌 GM Stage only - Game rules for dice/checks
   | "character_sheet" // 📌 Both stages - Player character details for voice and mechanics
+  | "summary_instructions" // 📌 Summariser only - standing instructions for every story-so-far summary (decision 95); never shown to the GM or the narrator
   | "gm_plan" // 📌 GM Stage - campaign spine + per-player arcs, one beat ahead (docs/gm-plan-notes-design.md)
   // Legacy types (backward compat - treated as "lore" for display)
   | "gm_notes" // Alias for dm_instructions (deprecated)

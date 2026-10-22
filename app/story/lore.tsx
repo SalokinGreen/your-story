@@ -123,6 +123,12 @@ const TYPE_CONFIG: Record<
     color: "text-rose-300",
     bgColor: "bg-rose-500/20",
   },
+  summary_instructions: {
+    label: "Summary Rules",
+    icon: "Feather",
+    color: "text-rose-300",
+    bgColor: "bg-rose-500/20",
+  },
   secrets: {
     label: "Secrets",
     icon: "Lock",
@@ -148,6 +154,7 @@ const FILTER_ORDER: (LoreType | "all" | "secrets")[] = [
   "gm_notes",
   "dm_instructions",
   "story_instructions",
+  "summary_instructions",
   "secret",
   "secrets",
 ];
@@ -1005,6 +1012,9 @@ export default function LorePage(props: LorePageProps) {
                         <option value="story_instructions">
                           📝 Story Instructions
                         </option>
+                        <option value="summary_instructions">
+                          📝 Summary Instructions
+                        </option>
                         <option value="mechanics">⚙️ Mechanics</option>
                         <option value="character_sheet">
                           👤 Character Sheet
@@ -1213,6 +1223,9 @@ export default function LorePage(props: LorePageProps) {
                   <option value="gm_notes">📋 GM Instructions</option>
                   <option value="story_instructions">
                     📝 Story Instructions
+                  </option>
+                  <option value="summary_instructions">
+                    📝 Summary Instructions
                   </option>
                   <option value="mechanics">⚙️ Mechanics</option>
                   <option value="character_sheet">👤 Character Sheet</option>

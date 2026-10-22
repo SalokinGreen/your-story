@@ -118,6 +118,7 @@ const LORE_TYPES = [
   "character_sheet",
   "dm_instructions",
   "story_instructions",
+  "summary_instructions",
   "gm_plan",
 ];
 
@@ -132,6 +133,7 @@ export const write_note: ToolDefinition = {
     "- 'character_sheet': who the player is — freeform notes, not a stat block. Skills, gear, ties, and whatever numbers the mechanics note references.\n" +
     "- 'dm_instructions': private pacing/tone guidance for the GM stage.\n" +
     "- 'story_instructions': prose-style guidance for the narrator stage.\n" +
+    "- 'summary_instructions': standing instructions for the summaries that replace old turns in a long story ('always keep Exposure and Heat changes'). Read only by the summariser, never by the GM.\n" +
     "- 'gm_plan': the campaign spine and where things are heading.",
   parameters: {
     type: "object",

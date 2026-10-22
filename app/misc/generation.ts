@@ -42,6 +42,7 @@ import {
   GM_STAGE_DEFAULT_BUDGET,
   computeGMStageBudget,
   getGMStageOutputTokens,
+  getHistoryParts,
   CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
 import {
@@ -2255,6 +2256,16 @@ async function generateStoryTurnOnce(
             if (compactionResult.summary) {
               callbacks.onCompaction?.(compactionResult.summary);
             }
+          }
+          // History runs from the summary's end (a fixed start). If it is still
+          // over budget - a summary was due and failed - this turn's prompt
+          // falls back to the sliding window (getHistoryParts), so say so in
+          // the Debug Logs; the summary is retried next turn.
+          if (getHistoryParts(storyData, gmHistoryBudget).slidingFallback) {
+            logger.action("History over budget with no summary; using the sliding window this turn", {
+              slidingFallback: true,
+              summarizedThroughIndex: storyData.scene.summarizedThroughIndex || 0,
+            });
           }
         } catch (compactionError) {
           // Non-fatal: compaction is a nice-to-have, not required for the

@@ -677,6 +677,13 @@ measurement harness, and the path checked in the code.
 - **Fix:** the token-savings design (decision 94) gives history a fixed
   start at the summary's end, so everything after the summary is always
   sent and nothing can fall between the two.
+- **Update 2026-10-22: fixed** by the token-savings PR T1 (decisions 94, 101).
+  `getHistoryParts` (`ai_staged.ts`) starts history at
+  `scene.summarizedThroughIndex` and sends everything after it;
+  `planCompaction` no longer has a minimum batch and folds back to half the
+  budget once the history, as sent, passes it. If a summary fails, that turn
+  falls back to the sliding window and the Debug Logs say so. Tests:
+  `tests/compaction.trigger.test.ts`.
 
 ### 6.21 Memory trimming and reflection's index disagree
 

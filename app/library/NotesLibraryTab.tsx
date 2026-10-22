@@ -44,6 +44,7 @@ const NOTE_TYPE_OPTIONS: { value: LoreType; label: string }[] = [
   { value: "character_sheet", label: "🧙 Character Sheet" },
   { value: "dm_instructions", label: "📌 GM Instructions" },
   { value: "story_instructions", label: "📌 Story Instructions" },
+  { value: "summary_instructions", label: "📌 Summary Instructions" },
 ];
 
 function noteTypeLabel(type?: LoreType): string {

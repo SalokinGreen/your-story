@@ -175,6 +175,7 @@ design's open questions.
 | 104 | Claude's 5-minute or 1-hour cache | **Measure first** ("Measure first"): 5 minutes, cache hits recorded in the ledger, and the stable prefix moved to 1 hour if Claude players keep missing between turns. |
 | 105 | When to confirm the caching on a real model | **One session after the build** ("One session after the build"), once the ledger records cached tokens, on the default models; a pending test until the author says go. |
 | 106 | Is the design approved | **Approved; write the implementation plan** ("Approved: write the plan"). Building waits for the author's yes on the plan. |
+| 107 | Build the token-savings plan | **Approved** (2026-10-22, to the coordinating session: "Approved. Also pull from origin and do the token saving + default system plans."). `token-savings-implementation-plan.md` is built in three PRs, T1 (slices 1-4) first; each merge still waits for the author (decision 5). |
 
 ### Interview seven — model catalog and defaults (2026-10-21)
 
