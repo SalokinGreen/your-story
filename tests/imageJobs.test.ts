@@ -288,8 +288,8 @@ describe("cost", () => {
     const report = getTurnCostReport(turn)!;
     const image = report.byStage.find((s) => s.stage === "image")!;
     expect(image.calls).toBe(1);
-    expect(image.costUsd).toBeCloseTo(0.0024, 6);
-    expect(report.entries[0].modelKey).toBe("FLUX.1 schnell");
+    expect(image.costUsd).toBeCloseTo(0.03, 6);
+    expect(report.entries[0].modelKey).toBe("FLUX.2 [pro]");
     expect(report.hasUnpricedCalls).toBe(false);
   });
 
@@ -310,8 +310,8 @@ describe("cost", () => {
       storyId: "story-1",
       subject: "scene",
       provider: "fal",
-      model: "FLUX.1 schnell",
-      costUsd: 0.0024,
+      model: "FLUX.2 [pro]",
+      costUsd: 0.03,
     });
     expect(h.saved[0].prompt).toContain("Dawn light on the harbour");
     expect(h.saved[0].prompt).toContain("Style: painterly digital illustration");
@@ -537,7 +537,7 @@ describe("engine review: a blocked picture is still billed", () => {
     const id = enqueueImageJob(request({ costTurnId: turn }), h.deps);
     expect((await untilSettled(id)).status).toBe("declined");
     const report = getTurnCostReport(turn)!;
-    expect(report.byStage.find((s) => s.stage === "image")?.costUsd).toBeCloseTo(0.0024, 6);
+    expect(report.byStage.find((s) => s.stage === "image")?.costUsd).toBeCloseTo(0.03, 6);
     expect(h.saved).toHaveLength(0);
   });
 });

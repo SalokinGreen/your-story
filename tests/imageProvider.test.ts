@@ -30,12 +30,12 @@ describe("pickImageProvider", () => {
   });
 });
 
-describe("pickImageModel (decision 61)", () => {
+describe("pickImageModel (decisions 61 and 111)", () => {
   const s = DEFAULT_IMAGE_SETTINGS;
 
-  it("fal: schnell for scenes and places, FLUX.2 pro for portraits", () => {
-    expect(pickImageModel({ subject: "scene", portraitedCharacters: 0 }, "fal", s).model).toBe("fal-ai/flux/schnell");
-    expect(pickImageModel({ subject: "location", portraitedCharacters: 0 }, "fal", s).model).toBe("fal-ai/flux/schnell");
+  it("fal: FLUX.2 pro for scenes, places and portraits (decision 111)", () => {
+    expect(pickImageModel({ subject: "scene", portraitedCharacters: 0 }, "fal", s).model).toBe("fal-ai/flux-2-pro");
+    expect(pickImageModel({ subject: "location", portraitedCharacters: 0 }, "fal", s).model).toBe("fal-ai/flux-2-pro");
     expect(pickImageModel({ subject: "npc", portraitedCharacters: 0 }, "fal", s).model).toBe("fal-ai/flux-2-pro");
     expect(pickImageModel({ subject: "player", portraitedCharacters: 0 }, "fal", s).model).toBe("fal-ai/flux-2-pro");
   });
@@ -69,7 +69,7 @@ describe("pickImageModel (decision 61)", () => {
 
   it("prices come from the catalog", () => {
     expect(pickImageModel({ subject: "scene", portraitedCharacters: 0 }, "fal", s).pricePerImage).toBe(
-      FAL_IMAGE_MODELS["FLUX.1 schnell"].pricePerImage,
+      FAL_IMAGE_MODELS["FLUX.2 [pro]"].pricePerImage,
     );
   });
 
@@ -114,7 +114,7 @@ describe("imageSettings", () => {
       }),
     );
     const s = getImageSettings();
-    expect(s.sceneModel).toBe("FLUX.1 schnell");
+    expect(s.sceneModel).toBe("FLUX.2 [pro]");
     expect(s.portraitModel).toBe("FLUX.2 [pro]");
     expect(s.deepinfraModel).toBe(resolveImageModelKey("deepinfra", "Gone Model"));
     expect(s.openrouterModel).toBe("Nano Banana");
@@ -124,6 +124,29 @@ describe("imageSettings", () => {
   it("survives corrupt JSON", () => {
     localStorage.setItem(IMAGE_SETTINGS_KEY, "{not json");
     expect(getImageSettings()).toEqual(DEFAULT_IMAGE_SETTINGS);
+  });
+
+  // Decision 111: the Images tab saves the whole object, so a save from before
+  // the change holds schnell whether or not the player chose it.
+  it("reads an old save's schnell scene model as the new default", () => {
+    localStorage.setItem(IMAGE_SETTINGS_KEY, JSON.stringify({ sceneModel: "FLUX.1 schnell" }));
+    expect(getImageSettings().sceneModel).toBe("FLUX.2 [pro]");
+  });
+
+  it("keeps schnell when it was picked after the change", () => {
+    setImageSettings({ sceneModel: "FLUX.1 schnell" });
+    expect(JSON.parse(localStorage.getItem(IMAGE_SETTINGS_KEY)!).settingsVersion).toBe(2);
+    expect(getImageSettings().sceneModel).toBe("FLUX.1 schnell");
+  });
+
+  it("an old save's other choices survive the migration's first save", () => {
+    localStorage.setItem(
+      IMAGE_SETTINGS_KEY,
+      JSON.stringify({ sceneModel: "FLUX.1 schnell", gmImagesPerScene: 4 }),
+    );
+    setImageSettings({ defaultStyle: "ink and watercolour" });
+    const s = getImageSettings();
+    expect(s).toMatchObject({ sceneModel: "FLUX.2 [pro]", gmImagesPerScene: 4, defaultStyle: "ink and watercolour" });
   });
 });
 

@@ -1389,7 +1389,7 @@ Use it sparingly, at moments that matter:
 - a reveal or a set piece (subject "scene")
 Never on routine turns. The engine caps how many pictures you may make per scene and refuses the rest; the refusal tells you the limit.
 
-Write \`description\` as what a camera would see: who is there, where, the light, the mood. No text, captions or lettering in the picture. Keep it non-explicit: nothing sexual, and no gore beyond what a fantasy book cover would show. Under 400 characters.
+Write \`description\` as what a camera would see: who is there, where, the light, the mood. The painter never reads the story, so say how each person looks and name telling traits plainly (a missing arm, a scar, grey hair). No text, captions or lettering in the picture. Keep it non-explicit: nothing sexual, and no gore beyond what a fantasy book cover would show. Under 400 characters.
 
 - subject "scene": a moment. Put NPC ids and/or "player" in \`featuring\` for anyone who appears in it.
 - subject "npc": a portrait. \`npc_id\` is required; an NPC that already has a portrait is refused.
