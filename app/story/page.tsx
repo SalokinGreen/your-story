@@ -1947,16 +1947,25 @@ function StoryPageContent() {
     addNotification("Painting a picture of this moment…", "info", 3000);
     try {
       const costTurnId = getActiveTurnId() ?? undefined;
-      const description = await writeSceneDescription(part.content, sd, {
-        keys: imageSideCallKeys(),
-        costTurnId,
-      });
+      const featuring = findMentionedNpcIds(sd, part.content);
+      const before = sd.scene.parts[partIndex - 1];
+      const description = await writeSceneDescription(
+        part.content,
+        sd,
+        { keys: imageSideCallKeys(), costTurnId },
+        {
+          // The player's looks go to the brief writer, which decides whether
+          // they are in frame; the job's character lines stay the named NPCs.
+          featuring: [...featuring, "player"],
+          previous: before?.content,
+        },
+      );
       enqueueImageJob(
         {
           storyId: storyDbId,
           subject: "scene",
           description,
-          featuring: findMentionedNpcIds(sd, part.content),
+          featuring,
           target: { kind: "scenePart", partId },
           requestedBy: "player",
           costTurnId,

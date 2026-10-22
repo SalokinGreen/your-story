@@ -88,6 +88,7 @@ function imageHarness(keys: ImageJobDeps["keys"] = { falKey: "fal-key" }): Harne
         gmImagesPerScene: 2,
         provider: "auto",
         sceneModel: "FLUX.1 schnell",
+        settingsVersion: 2,
         portraitModel: "FLUX.2 [pro]",
         referenceModel: "FLUX.2 [pro] edit",
         deepinfraModel: "P-Image",

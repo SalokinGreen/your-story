@@ -38,4 +38,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Voice input: the WebView asks for these when the mic button calls
+         getUserMedia (Capacitor's BridgeWebChromeClient); undeclared, Android
+         denies the request without ever showing a prompt. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>

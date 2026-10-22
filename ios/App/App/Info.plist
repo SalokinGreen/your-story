@@ -4,6 +4,8 @@
 <dict>
     <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Your Story uses the microphone for voice input: you speak your action and it is typed for you.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>

@@ -49,6 +49,34 @@ or wait for PR C and run all five below.
 - **Phone width.** The panel's two columns collapse to one on a phone and the
   track boxes stay on one row; check on the Android app.
 
+## 2026-10-22 — Better scene pictures (`claude/image-quality`, decision 111)
+
+Needs a fal key and costs a few cents a picture, so it waits for the author.
+
+- **The new default model.** With no scene model chosen (or one saved before
+  this change), press Illustrate this on a turn. The caption under the picture
+  should say FLUX.2 [pro] and about $0.03, not FLUX.1 schnell.
+- **The brief keeps telling traits.** In The Hollow Seat, illustrate the turn
+  where Bryn taps the table with his stump. The Debug Logs' "Picture
+  description" line should name a missing arm, and the picture should show one.
+  Failure: a brief that says only "two figures at a table" means the writer is
+  not getting the NPC notes (check the NPC is named in the turn's text).
+
+## 2026-10-22 — Microphone and TTS on Android (`claude/android-mic-tts`)
+
+No phone was connected to this PC, so the APK was built but not run.
+
+- **Microphone prompt.** On a fresh install, open a story and tap the mic
+  button. Android should ask "Allow Your Story to record audio?"; allow it,
+  speak, and the words should appear in the action box (needs a Mistral key).
+  Failure: no prompt and a "microphone not allowed" message means the
+  manifest permissions did not reach the build.
+- **TTS plays.** With a Cartesia or ElevenLabs key and TTS on, play a story
+  part. It should be read aloud. Failure: silence, or a decode error in the
+  Debug Logs, means the audio still comes through the patched fetch as text.
+- **iOS microphone prompt** (needs a Mac or `build-apps.yml`): the same mic
+  check should show the system prompt with the usage text from `Info.plist`.
+
 ## 2026-10-22 — Default systems PR A: the engine (`claude/default-systems-a`)
 
 The suite covers every tool through `executeGMTools`, the state sections, the
