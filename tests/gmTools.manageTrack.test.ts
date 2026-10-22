@@ -79,6 +79,7 @@ describe("manage_track", () => {
     let story = await withVow("formidable");
     story = {
       ...story,
+      diceMode: "manual",
       progressTracks: [{ ...story.progressTracks![0], ticks: 20 }], // 5 boxes
     };
     const args = { action: "progress_roll", owner: "Mira", track: "Find the thief", reason: "x" };
@@ -90,11 +91,25 @@ describe("manage_track", () => {
     const tie = await run(story, "manage_track", { ...args, dice: [5, 5] });
     expect(tie.result.contextForStory).toContain("MISS");
     expect(tie.result.contextForStory).toContain("MATCH");
-    expect(tie.result.success).toBe(true); // a miss is an answer, not a failed call
+    expect(tie.result.success).toBe(false); // a miss is a failed check, not an engine error (like action_roll)
+    expect(tie.result.contextForStory).not.toContain("[ERROR");
+  });
+
+  it("progress_roll refuses dice faces outside manual dice mode", async () => {
+    const story = await withVow();
+    const { result } = await run(story, "manage_track", {
+      action: "progress_roll",
+      owner: "Mira",
+      track: "Find the thief",
+      dice: [1, 1],
+      reason: "x",
+    });
+    expect(result.success).toBe(false);
+    expect(result.contextForStory).toContain("manual dice mode");
   });
 
   it("progress_roll rejects bad dice and rolls two d10 when none are given", async () => {
-    const story = await withVow();
+    const story = { ...(await withVow()), diceMode: "manual" as const };
     const bad = await run(story, "manage_track", {
       action: "progress_roll",
       owner: "Mira",
@@ -110,8 +125,8 @@ describe("manage_track", () => {
       track: "Find the thief",
       reason: "x",
     });
-    expect(rolled.result.success).toBe(true);
     expect(rolled.result.contextForStory).toContain("0 boxes vs");
+    expect(rolled.result.contextForStory).not.toContain("[ERROR");
   });
 
   it("set_status closes a track, which can then no longer be marked", async () => {

@@ -23,6 +23,8 @@ describe("end_session", () => {
     expect(after.systemState!.sessionCount).toBe(1);
     expect(after.meters!.find((m) => m.name === "Resolve")!.value).toBe(3);
     expect(after.meters!.find((m) => m.name === "Stress")!.value).toBe(2);
+    expect(result.contextForStory).toContain("Session 1 ended");
+    expect(result.contextForStory).toContain("Session 2 begins");
     expect(result.contextForStory).toContain("Run the Reckoning.");
     expect(result.contextForStory).toContain("Mira: Resolve → 3");
   });

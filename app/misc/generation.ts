@@ -109,6 +109,7 @@ import {
   AskQuestionAnswer,
   GMExecutionResult,
   resolveCheckPerTurnVisibility,
+  rollAwareToolName,
 } from "@/app/misc/gmExecutor";
 import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
 import { logger } from "@/app/misc/logger";
@@ -1227,7 +1228,7 @@ export async function generateStoryTurn(
           narration: result.content,
           replyLength: options.replyLength,
           rollResults: (result.gmResults || []).map((r) => ({
-            toolName: r.toolName,
+            toolName: rollAwareToolName(r),
             success: r.success,
             contextForStory: r.contextForStory,
           })),
@@ -1371,7 +1372,7 @@ export async function generateStoryTurn(
           replyLength: options.replyLength,
           toolNames: turnToolNames,
           rollResults: (result.gmResults || []).map((r) => ({
-            toolName: r.toolName,
+            toolName: rollAwareToolName(r),
             success: r.success,
             contextForStory: r.contextForStory,
           })),
@@ -1650,7 +1651,7 @@ export async function generateStoryTurn(
             replyLength: options.replyLength,
             toolNames: turnToolNames,
             rollResults: (result.gmResults || []).map((r) => ({
-              toolName: r.toolName,
+              toolName: rollAwareToolName(r),
               success: r.success,
               contextForStory: r.contextForStory,
             })),
@@ -3080,7 +3081,7 @@ async function generateStoryTurnOnce(
             // prose alone.
             const sceneIsGated = isSceneGatedForRoll(storyData);
             const rollToolCalledThisTurn = hasSatisfiedRollGate(
-              gmResults.map((r) => r.toolName)
+              gmResults.map((r) => rollAwareToolName(r))
             );
 
             if (

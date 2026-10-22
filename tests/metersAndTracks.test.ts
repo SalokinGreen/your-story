@@ -210,6 +210,10 @@ describe("actionScore", () => {
     expect(r.score).toBe(4);
     expect(r.capped).toBe(false);
   });
+  it("clamps a negative penalty to zero", () => {
+    // 3 + 2 + 2 (adds cap) = 7; a -5 penalty must not make it 12
+    expect(actionScore(3, 2, 2, -5).score).toBe(7);
+  });
   it("ignores negative adds", () => {
     expect(actionScore(3, 2, -4, 0).addsApplied).toBe(0);
   });

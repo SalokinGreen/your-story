@@ -367,7 +367,9 @@ export function actionScore(
   penalty: number,
 ): { score: number; addsApplied: number; capped: boolean } {
   const addsApplied = clamp(Math.floor(adds || 0), 0, ACTION_ADDS_CAP);
-  const raw = die + stat + addsApplied - (penalty || 0);
+  // A negative penalty would be a bonus that bypasses the adds cap.
+  const penaltyApplied = Math.max(0, penalty || 0);
+  const raw = die + stat + addsApplied - penaltyApplied;
   return {
     score: Math.min(raw, ACTION_SCORE_CAP),
     addsApplied,

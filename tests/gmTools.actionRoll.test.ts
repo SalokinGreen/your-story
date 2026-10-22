@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hasSatisfiedRollGate } from "@/app/misc/reasoningTiers";
-import { executeGMTools } from "@/app/misc/gmExecutor";
+import { executeGMTools, rollAwareToolName } from "@/app/misc/gmExecutor";
 import type { GMActionRollResult } from "@/app/misc/gmExecutor";
 import { mockStory, run } from "./helpers/systemsHarness";
 
 afterEach(() => vi.restoreAllMocks());
 
+const MANUAL = () => mockStory({ diceMode: "manual" });
 const base = { stat_name: "Heart", stat_value: 2, reason: "Face danger" };
 
 async function roll(action: number, challenge: [number, number], extra: Record<string, unknown> = {}) {
-  return run(mockStory(), "action_roll", { ...base, dice: { action, challenge }, ...extra });
+  return run(MANUAL(), "action_roll", { ...base, dice: { action, challenge }, ...extra });
 }
 
 describe("action_roll", () => {
@@ -45,7 +46,7 @@ describe("action_roll", () => {
   it("subtracts the penalty and caps the score at 10", async () => {
     const pen = await roll(4, [9, 9], { penalty: 3 });
     expect((pen.result.result as GMActionRollResult).score).toBe(3);
-    const cap = await run(mockStory(), "action_roll", {
+    const cap = await run(MANUAL(), "action_roll", {
       ...base,
       stat_value: 5,
       adds: 2,
@@ -67,13 +68,13 @@ describe("action_roll", () => {
     expect(bad.result.contextForStory).toContain("ERROR");
     const bad2 = await roll(3, [0, 11]);
     expect(bad2.result.success).toBe(false);
-    const none = await run(mockStory(), "action_roll", { stat_name: "Heart", reason: "x" });
+    const none = await run(MANUAL(), "action_roll", { stat_name: "Heart", reason: "x" });
     expect(none.result.success).toBe(false);
   });
 
   it("rolls a d6 and two d10 digitally when no dice are given", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const { result } = await run(mockStory(), "action_roll", base);
+    const { result } = await run(MANUAL(), "action_roll", base);
     const res = result.result as GMActionRollResult;
     expect(res.actionDie).toBeGreaterThanOrEqual(1);
     expect(res.actionDie).toBeLessThanOrEqual(6);
@@ -90,7 +91,7 @@ describe("action_roll", () => {
     );
     const out = await executeGMTools(
       [{ id: "a", function: { name: "action_roll", arguments: JSON.stringify(base) } }],
-      mockStory(),
+      MANUAL(),
       {},
       { requestDiceThrow } as never,
     );
@@ -112,5 +113,39 @@ describe("action_roll", () => {
   it("satisfies the M2 roll gate", () => {
     expect(hasSatisfiedRollGate(["action_roll"])).toBe(true);
     expect(hasSatisfiedRollGate(["manage_meter"])).toBe(false);
+  });
+
+  it("refuses model-supplied dice faces outside manual dice mode", async () => {
+    for (const diceMode of [undefined, "ai", "physical"] as const) {
+      const { result } = await run(mockStory({ diceMode }), "action_roll", {
+        ...base,
+        dice: { action: 6, challenge: [1, 1] },
+      });
+      expect(result.success).toBe(false);
+      expect(result.contextForStory).toContain("[ERROR");
+      expect(result.contextForStory).toContain("manual dice mode");
+    }
+  });
+
+  it("clamps a negative penalty to zero so it cannot beat the adds cap", async () => {
+    // d6 3 + stat 2 + adds 2 (cap) = 7; a -5 penalty must not add 5
+    const { result } = await roll(3, [9, 9], { adds: 2, penalty: -5 });
+    expect(result.contextForStory).toContain("= 7");
+    expect(result.contextForStory).not.toContain("penalty");
+    expect((result.result as GMActionRollResult).penalty).toBe(0);
+  });
+
+  it("a progress_roll counts as a roll for the M2 gate, via rollAwareToolName", async () => {
+    const created = await run(mockStory({ diceMode: "manual" }), "manage_track", {
+      action: "create", owner: "Mira", track: "V", kind: "vow", rank: "dangerous", reason: "x",
+    });
+    const { result } = await run(created.story, "manage_track", {
+      action: "progress_roll", owner: "Mira", track: "V", dice: [9, 9], reason: "x",
+    });
+    expect(hasSatisfiedRollGate([result.toolName])).toBe(false);
+    expect(rollAwareToolName(result)).toBe("progress_roll");
+    expect(hasSatisfiedRollGate([rollAwareToolName(result)])).toBe(true);
+    expect(result.success).toBe(false); // a miss reads as a failure to the Observer
+    expect(rollAwareToolName({ toolName: "manage_track", result: { type: "manage_track", action: "mark" } })).toBe("manage_track");
   });
 });

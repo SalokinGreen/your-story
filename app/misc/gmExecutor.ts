@@ -919,6 +919,7 @@ const ORACLE_TOOL_NAMES = new Set([
  * the same line for the retry logic.
  */
 const OUTCOME_BEARING_TOOL_NAMES = new Set([
+  "progress_roll",
   "calculate",
   "record_challenge_result",
   "action_roll",
@@ -935,6 +936,29 @@ const OUTCOME_BEARING_TOOL_NAMES = new Set([
  * conceal. Every result for these tools is stamped on the way out.
  */
 const HIDDEN_FROM_PLAYER_TOOL_NAMES = new Set(["gm_roll"]);
+
+/**
+ * The name the M2 roll gate and the Observer's outcome check see for a
+ * result: a manage_track progress_roll is a roll with an engine verdict, so it
+ * counts as "progress_roll"; every other result keeps its tool name.
+ */
+export function rollAwareToolName(r: {
+  toolName: string;
+  result?: unknown;
+}): string {
+  const res = r.result as
+    | { type?: string; action?: string; outcome?: string }
+    | undefined;
+  if (
+    r.toolName === "manage_track" &&
+    res?.type === "manage_track" &&
+    res.action === "progress_roll" &&
+    res.outcome !== undefined
+  ) {
+    return "progress_roll";
+  }
+  return r.toolName;
+}
 
 function isHiddenFromPlayerTool(toolName: string): boolean {
   return HIDDEN_FROM_PLAYER_TOOL_NAMES.has(toolName);
@@ -1674,6 +1698,22 @@ function executeStartChallenge(
   }
 
   const mode = params.mode === "tally" ? "tally" : "first_to";
+  if (mode === "tally" && !resolveSystem(storyData).usesSystemTools) {
+    return {
+      toolName: "start_challenge",
+      toolCallId,
+      success: false,
+      result: {
+        type: "start_challenge",
+        name: params.name,
+        description: params.description,
+        mode,
+        primaryStat: params.primary_stat,
+        difficulty: params.difficulty,
+      } as GMChallengeResult,
+      contextForStory: `[ERROR: tally mode needs the system's own action roll, which this story doesn't have. Use first_to (required_successes and max_failures) instead.]`,
+    };
+  }
   const invalid = (message: string): GMToolResult => ({
     toolName: "start_challenge",
     toolCallId,
@@ -5867,7 +5907,42 @@ function describeMeterChange(meter: Meter, change: MeterChange): string {
   return `[Meter: ${line}]`;
 }
 
+/**
+ * A hidden meter never reaches the player's tool log, whatever the call did
+ * to it: a successful change, a repeat refusal, a remove, create_set making a
+ * hidden meter, or an error that names the owner's meters.
+ */
 function executeManageMeter(
+  toolCallId: string,
+  params: ManageMeterParams,
+  storyData: StoryData
+): GMToolResult {
+  const owner = typeof params.owner === "string" ? params.owner.trim() : "";
+  const before = (storyData.meters ?? []).filter(
+    (m) => normalizeKey(m.owner) === normalizeKey(owner)
+  );
+  const named = typeof params.meter === "string" ? params.meter.trim() : "";
+  const result = executeManageMeterInner(toolCallId, params, storyData);
+  if (result.hiddenFromPlayer) return result;
+  let hidden = false;
+  if (!result.success) {
+    hidden = before.some((m) => m.hidden);
+  } else if (params.action === "create_set") {
+    const created = (result.result as GMManageMeterResult).created ?? [];
+    hidden = (storyData.meters ?? []).some(
+      (m) =>
+        m.hidden &&
+        normalizeKey(m.owner) === normalizeKey(owner) &&
+        created.includes(m.name)
+    );
+  } else {
+    hidden = !!findMeter(before, owner, named)?.hidden;
+  }
+  if (hidden) result.hiddenFromPlayer = true;
+  return result;
+}
+
+function executeManageMeterInner(
   toolCallId: string,
   params: ManageMeterParams,
   storyData: StoryData
@@ -6154,6 +6229,11 @@ async function executeManageTrack(
         }
         let faces: [number, number];
         if (params.dice !== undefined) {
+          if (storyData.diceMode !== "manual") {
+            return fail(
+              `"dice" is only for manual dice mode, where the player reports their physical roll. Leave it out and the engine rolls.`
+            );
+          }
           if (!Array.isArray(params.dice) || params.dice.length !== 2 || !isD10Face(params.dice[0]) || !isD10Face(params.dice[1])) {
             return fail(`dice must be two whole numbers from 1 to 10`);
           }
@@ -6173,7 +6253,13 @@ async function executeManageTrack(
         let ctx = `[Progress roll: ${existing.kind} "${existing.name}", ${boxes} boxes vs ${faces[0]} and ${faces[1]} → ${word}]`;
         if (match) ctx += `\n[MATCH: both challenge dice show ${faces[0]}. Something unexpected enters: a complication on a hit, a turn for the worse on a miss.]`;
         ctx += `\n[The track stays active until you set its status.]`;
-        return trackResult({ outcome, dice: faces, match, ticks: existing.ticks, boxes }, ctx);
+        // Like action_roll, success carries the engine's verdict (a miss is a
+        // failed check, not a failed call).
+        return trackResult(
+          { outcome, dice: faces, match, ticks: existing.ticks, boxes },
+          ctx,
+          outcome !== "miss"
+        );
       }
       case "set_status": {
         const st = params.status;
@@ -6235,7 +6321,7 @@ function executeEndSession(
   });
 
   const reminder = resolveSystem(storyData).endOfSessionReminder;
-  let ctx = `[Session ${sys.sessionCount - 1} ended${params.reason ? `: ${params.reason}` : ""}. Session ${sys.sessionCount} begins; once-per-session triggers are available again.]`;
+  let ctx = `[Session ${sys.sessionCount} ended${params.reason ? `: ${params.reason}` : ""}. Session ${sys.sessionCount + 1} begins; once-per-session triggers are available again.]`;
   if (reset.length > 0) ctx += `\n[Reset at session end: ${reset.join("; ")}]`;
   if (reminder) ctx += `\n[End-of-session reminder: ${reminder}]`;
   return {
@@ -6264,11 +6350,19 @@ async function executeActionRoll(
     return fail(`action_roll needs "stat_value", the number from the character sheet`);
   }
   const adds = typeof params.adds === "number" ? params.adds : 0;
-  const penalty = typeof params.penalty === "number" ? params.penalty : 0;
+  const penalty =
+    typeof params.penalty === "number" && Number.isFinite(params.penalty)
+      ? Math.max(0, params.penalty)
+      : 0;
 
   let actionDie: number;
   let challengeDice: [number, number];
   if (params.dice !== undefined) {
+    if (storyData.diceMode !== "manual") {
+      return fail(
+        `"dice" is only for manual dice mode, where the player reports their physical roll. Leave it out and the engine rolls.`
+      );
+    }
     const d = params.dice;
     const okAction =
       !!d && typeof d.action === "number" && Number.isInteger(d.action) && d.action >= 1 && d.action <= 6;

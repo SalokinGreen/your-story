@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { StoryData } from "@/app/misc/structs";
-import { installTestSystem, mockStory, run, systemStory } from "./helpers/systemsHarness";
+import { installTestSystem, mockStory, run, systemStory, TEST_SYSTEM } from "./helpers/systemsHarness";
 
 let uninstall: () => void;
 beforeEach(() => {
@@ -211,5 +211,49 @@ describe("manage_meter", () => {
       reason: "x",
     });
     expect(after.meters!.map((m) => m.name)).toEqual(["Stress", "Beast"]);
+  });
+
+  describe("hidden meters stay out of the player's tool log", () => {
+    async function withHidden(): Promise<StoryData> {
+      const story = await withHero();
+      return {
+        ...story,
+        meters: story.meters!.map((m) => (m.name === "Beast" ? { ...m, hidden: true } : m)),
+      };
+    }
+
+    it("stamps a repeat refusal, a remove and an error naming a hidden meter", async () => {
+      const story = await withHidden();
+      const args = { action: "adjust", owner: "Mira", meter: "Beast", by: 1, once_per: "scene", key: "moon", reason: "x" };
+      const first = await run(story, "manage_meter", args);
+      expect(first.result.hiddenFromPlayer).toBe(true);
+      const again = await run(first.story, "manage_meter", args);
+      expect(again.result.contextForStory).toContain("no change");
+      expect(again.result.hiddenFromPlayer).toBe(true);
+      const err = await run(story, "manage_meter", { action: "adjust", owner: "Mira", meter: "Nope", by: 1, reason: "x" });
+      expect(err.result.success).toBe(false);
+      expect(err.result.hiddenFromPlayer).toBe(true);
+      const removed = await run(story, "manage_meter", { action: "remove", owner: "Mira", meter: "Beast", reason: "x" });
+      expect(removed.result.hiddenFromPlayer).toBe(true);
+    });
+
+    it("leaves a visible meter's results visible", async () => {
+      const story = await withHidden();
+      const { result } = await run(story, "manage_meter", { action: "adjust", owner: "Mira", meter: "Stress", by: 1, reason: "x" });
+      expect(result.hiddenFromPlayer).toBeUndefined();
+    });
+
+    it("stamps create_set when the set creates a hidden meter", async () => {
+      const hiddenSet = { name: "Secret", meters: [{ name: "Doom", min: 0, max: 5, start: 0, hidden: true }] };
+      TEST_SYSTEM.meterSets.push(hiddenSet);
+      try {
+        const { result } = await run(systemStory(), "manage_meter", { action: "create_set", owner: "Mira", set: "Secret", reason: "x" });
+        expect(result.hiddenFromPlayer).toBe(true);
+        const plain = await run(systemStory(), "manage_meter", { action: "create_set", owner: "Mira", set: "Hero", reason: "x" });
+        expect(plain.result.hiddenFromPlayer).toBeUndefined();
+      } finally {
+        TEST_SYSTEM.meterSets.pop();
+      }
+    });
   });
 });

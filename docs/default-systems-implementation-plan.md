@@ -903,3 +903,33 @@ Approval is decision 108.
 - **Tests.** Tally tests are a new file (`gmTools.tallyChallenge.test.ts`)
   rather than an extension of `challengeParity`; a shared
   `tests/helpers/systemsHarness.ts` holds the story and test-system helpers.
+
+### 2026-10-22: engine-review fixes (PR A)
+
+- **Dice faces are manual-only.** `action_roll` `dice` and `manage_track`
+  `progress_roll` `dice` return an `[ERROR]` unless `storyData.diceMode ===
+  "manual"`; the tool descriptions already said "manual dice", so no schema
+  text changed.
+- **Penalty is clamped to >= 0** in `actionScore`; a negative penalty can no
+  longer act as a bonus past the +2 adds cap. The result line and
+  `GMActionRollResult.penalty` show the applied value.
+- **Tally mode needs the system tools.** `start_challenge` with `mode:
+  "tally"` is refused (pointing at `first_to`) when
+  `resolveSystem(...).usesSystemTools` is false. The schema text is unchanged;
+  `record_challenge_result`'s tally error is accurate as it stands, since a
+  tally challenge can now only exist where `action_roll` is offered.
+- **progress_roll counts as a roll.** `rollAwareToolName()` (gmExecutor.ts)
+  names a `manage_track` progress_roll result "progress_roll"; that name is in
+  `ROLL_OR_ORACLE_TOOL_NAMES` (M2 gate) and `OUTCOME_CHECK_TOOL_NAMES`
+  (Observer), and `generation.ts` maps the gate's and the Observer's results
+  through it (four call sites). The executor's `success` is now `outcome !==
+  "miss"`, as for `action_roll`, and "progress_roll" joined
+  `OUTCOME_BEARING_TOOL_NAMES`, so a miss is not logged as an engine failure.
+  Not done: the Context Viewer's gate indicator still reads tool names only.
+- **Session numbering.** `end_session` now says "Session N ended. Session N+1
+  begins" with N = the new `sessionCount`, matching the state block's
+  `Session ${sessionCount + 1}` (the count starts at 0 meaning "Session 1").
+- **Hidden meters.** `executeManageMeter` is now a wrapper that stamps
+  `hiddenFromPlayer` on any result involving a hidden meter: repeat refusals,
+  `remove`, `create_set` that created a hidden meter, and errors for an owner
+  who has a hidden meter.

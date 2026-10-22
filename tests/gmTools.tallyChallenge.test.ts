@@ -3,8 +3,11 @@ import type { SceneChallenge } from "@/app/misc/structs";
 import { formatActiveChallengeState } from "@/app/misc/ai_staged";
 import { mockStory, run } from "./helpers/systemsHarness";
 
+const TALLY_STORY = () =>
+  mockStory({ systemState: { sessionCount: 0, dedupKeys: [], usesSystemTools: true } });
+
 async function startTally(rounds = 3) {
-  return run(mockStory(), "start_challenge", {
+  return run(TALLY_STORY(), "start_challenge", {
     name: "Skirmish",
     description: "Escape the tunnels",
     mode: "tally",
@@ -19,8 +22,21 @@ async function record(story: Awaited<ReturnType<typeof startTally>>["story"], ou
 }
 
 describe("tally challenges", () => {
-  it("start_challenge in tally mode needs rounds", async () => {
+  it("is refused in a story without the system tools", async () => {
     const { result } = await run(mockStory(), "start_challenge", {
+      name: "Skirmish",
+      description: "d",
+      mode: "tally",
+      rounds: 3,
+      primary_stat: "Edge",
+      difficulty: "x",
+    });
+    expect(result.success).toBe(false);
+    expect(result.contextForStory).toContain("first_to");
+  });
+
+  it("start_challenge in tally mode needs rounds", async () => {
+    const { result } = await run(TALLY_STORY(), "start_challenge", {
       name: "Skirmish",
       description: "d",
       mode: "tally",
@@ -100,7 +116,7 @@ describe("tally challenges", () => {
   });
 
   it("a first_to challenge accepts hits and misses as successes and failures", async () => {
-    let r = await run(mockStory(), "start_challenge", {
+    let r = await run(TALLY_STORY(), "start_challenge", {
       name: "Chase",
       description: "d",
       required_successes: 2,
