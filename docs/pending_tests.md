@@ -10,6 +10,19 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-22 — Better scene pictures (`claude/image-quality`, decision 111)
+
+Needs a fal key and costs a few cents a picture, so it waits for the author.
+
+- **The new default model.** With no scene model chosen (or one saved before
+  this change), press Illustrate this on a turn. The caption under the picture
+  should say FLUX.2 [pro] and about $0.03, not FLUX.1 schnell.
+- **The brief keeps telling traits.** In The Hollow Seat, illustrate the turn
+  where Bryn taps the table with his stump. The Debug Logs' "Picture
+  description" line should name a missing arm, and the picture should show one.
+  Failure: a brief that says only "two figures at a table" means the writer is
+  not getting the NPC notes (check the NPC is named in the turn's text).
+
 ## 2026-10-22 — Microphone and TTS on Android (`claude/android-mic-tts`)
 
 No phone was connected to this PC, so the APK was built but not run.

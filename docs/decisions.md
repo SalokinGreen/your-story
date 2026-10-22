@@ -179,6 +179,18 @@ design's open questions.
 | 107 | Build the token-savings plan | **Approved** (2026-10-22, to the coordinating session: "Approved. Also pull from origin and do the token saving + default system plans."). `token-savings-implementation-plan.md` is built in three PRs, T1 (slices 1-4) first; each merge still waits for the author (decision 5). |
 | 110 | How the cap shortens always-loaded notes ("When always-loaded notes go over the 10k budget, the cap keeps the start of each note (decision 96). But the campaign plan grows at the end, so its current beat is the part that gets cut. How should the cap shorten notes?") | **Keep the current beat.** Every note keeps its start; the campaign plan also keeps its last `## Current beat` section whole, after the kept front and the pointer. Revises how decision 96 shortens the plan. |
 
+### Interview — picture quality (2026-10-22)
+
+The author tried Illustrate this on the phone and was "not very happy with the
+image output". The picture came from FLUX.1 schnell, and the one-armed Bryn of
+the prose was painted with two arms: schnell follows a prompt loosely, and the
+button's brief writer saw only the turn's prose, with no setting and no notes on
+how anyone looks.
+
+| # | question | decision |
+|---|---|---|
+| 111 | "Which model should paint scenes by default? (This revises decision 61's 'Mixed' setup; portraits already use FLUX.2 [pro].)" and "Should I improve the brief the Illustrate button writes?" | **"FLUX.2 [pro] (Recommended)"** and **"Yes, richer brief (Recommended)."** Scenes and places now default to FLUX.2 [pro] on fal (about $0.03 a picture at the in-play size, against $0.0024); a save from before the change that holds schnell reads as the old default (`settingsVersion` in `imageSettings.ts`), and a schnell picked afterwards is kept. The Illustrate brief writer gets the premise, the looks of the NPCs named in the turn and of the player, and the turn before, writes up to about 90 words, and states telling traits (age, build, clothing, a missing limb, a scar) plainly; the GM's `generate_image` description says the same in one sentence. Revises decision 61 for scenes. |
+
 ### Interview seven — model catalog and defaults (2026-10-21)
 
 The model catalog was checked against OpenRouter's live list and each

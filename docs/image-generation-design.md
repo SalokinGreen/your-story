@@ -120,7 +120,7 @@ The engine picks the model by job, not the GM:
 
 | job | fal model | about |
 |---|---|---|
-| scene with nobody who has a portrait, and location | FLUX.1 schnell `fal-ai/flux/schnell` | $0.003 per megapixel |
+| scene with nobody who has a portrait, and location | FLUX.2 [pro] `fal-ai/flux-2-pro` since decision 111 (was FLUX.1 schnell `fal-ai/flux/schnell`, $0.003 per megapixel) | $0.03 first megapixel, $0.015 each further |
 | NPC or player portrait | FLUX.2 [pro] `fal-ai/flux-2-pro` | $0.03 for the first megapixel |
 | scene featuring characters who have portraits | FLUX.2 [pro] edit `fal-ai/flux-2-pro/edit`, the portraits as `image_urls` (at most 3), named `@image1…` in the prompt | $0.03 for the first megapixel |
 

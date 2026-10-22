@@ -22,7 +22,7 @@ export interface ImageSettings {
   /** Cap on GM pictures per scene; the player's own button is not counted. */
   gmImagesPerScene: number;
   provider: ImageProviderChoice;
-  /** fal catalog keys, per job (decision 61: schnell / FLUX.2 pro / FLUX.2 pro edit). */
+  /** fal catalog keys, per job (decision 61, scenes revised by decision 111: FLUX.2 pro / FLUX.2 pro / FLUX.2 pro edit). */
   sceneModel: string;
   portraitModel: string;
   referenceModel: string;
@@ -30,19 +30,29 @@ export interface ImageSettings {
   deepinfraModel: string;
   openrouterModel: string;
   defaultStyle: string;
+  /**
+   * 2 since decision 111 moved the scene default off FLUX.1 schnell. The tab
+   * saves the whole object, so a version-1 save holding schnell is the old
+   * default, not a choice; a schnell picked after that is kept.
+   */
+  settingsVersion: number;
 }
 
 export const DEFAULT_IMAGE_SETTINGS: ImageSettings = {
   gmImagesEnabled: true,
   gmImagesPerScene: DEFAULT_GM_IMAGES_PER_SCENE,
   provider: "auto",
-  sceneModel: "FLUX.1 schnell",
+  sceneModel: "FLUX.2 [pro]",
   portraitModel: "FLUX.2 [pro]",
   referenceModel: "FLUX.2 [pro] edit",
   deepinfraModel: "P-Image",
   openrouterModel: "Nano Banana",
   defaultStyle: DEFAULT_IMAGE_STYLE,
+  settingsVersion: 2,
 };
+
+/** The scene default before decision 111, read as unset in a version-1 save. */
+const LEGACY_SCENE_DEFAULT = "FLUX.1 schnell";
 
 const PROVIDER_CHOICES: ImageProviderChoice[] = [
   "auto",
@@ -90,7 +100,10 @@ export function getImageSettings(): ImageSettings {
     provider: PROVIDER_CHOICES.includes(raw.provider as ImageProviderChoice)
       ? (raw.provider as ImageProviderChoice)
       : d.provider,
-    sceneModel: fal(raw.sceneModel, d.sceneModel),
+    sceneModel:
+      raw.sceneModel === LEGACY_SCENE_DEFAULT && (raw.settingsVersion ?? 1) < 2
+        ? d.sceneModel
+        : fal(raw.sceneModel, d.sceneModel),
     portraitModel: fal(raw.portraitModel, d.portraitModel),
     referenceModel: fal(raw.referenceModel, d.referenceModel),
     deepinfraModel: resolveImageModelKey(
@@ -102,6 +115,7 @@ export function getImageSettings(): ImageSettings {
       typeof raw.openrouterModel === "string" ? raw.openrouterModel : d.openrouterModel,
     ),
     defaultStyle: style,
+    settingsVersion: d.settingsVersion,
   };
 }
 
