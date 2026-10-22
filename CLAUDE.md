@@ -589,6 +589,10 @@ report's §11.3. The ones that shape play:
 - `gm_roll` — a roll behind the GM's screen, for checks where the player
   knowing a roll happened is itself the spoiler. Always digital, and filtered
   out of the player-visible tool log and timeline via `hiddenFromPlayer`.
+- `generate_image` — paints a picture (a scene, an NPC or player portrait, a
+  place) in the background. Offered only when pictures are on and a
+  fal.ai/DeepInfra/OpenRouter key exists (`imageToolAvailable`); the engine caps
+  it per scene and refuses with a reason (see "Pictures in play" below).
 - `ask_question` / `ask_for_roll` — the GM asks the player a question, or
   asks them to roll (dice modes `ai` / `manual` / `physical`, with the 3D
   tray).
@@ -694,6 +698,39 @@ The old creator — a 12-step wizard, a staged batch generator,
 `CreatorAIChat` sidebar — is **deleted**. Don't restore it. `jsonRepair.ts`
 survives because the OCR pipeline uses it.
 
+## Pictures in play
+
+Built in PR I1 (`docs/image-generation-design.md`, the plan, decisions 54–61
+and 109). **The bytes never go in `StoryData`**: they live in their own
+IndexedDB database (`imageStore.ts`, the `ttsAudioCache.ts` precedent,
+decision 59), and `StoryData` holds only ids (`ScenePart.images`,
+`NPC.portraitImageId`, `StoryLore.imageId`, `playerPortraitImageId`). Pictures
+do not sync; another device shows a placeholder with Regenerate, and an online
+guest sees "Picture on the host's screen" (decision 60; guests are PR I2).
+
+- **One queue, one store, one card.** Every picture is a job on
+  `imageJobs.ts` (one at a time, FIFO, one retry on a busy fal), whoever asked:
+  the GM's `generate_image`, the Illustrate this button, the portrait buttons,
+  Regenerate. A job writes its result against the *current* StoryData
+  (`deps.patchStoryData`), logs a Debug Logs line for every terminal state and
+  bills the turn that asked (the `image` stage, recorded at the catalog price,
+  since fal returns none). `StoryImage.tsx` shows it; `useStoredImage()` is the
+  hook for portraits and notes.
+- **The engine disposes.** `executeGenerateImage` (`gmExecutor.ts`) checks the
+  key, the per-scene cap (`StoryData.imageState`, reset by `computeSceneKey`),
+  that the NPC or note exists and has no picture yet, and trims `featuring`;
+  the call answers at once. The turn's part does not exist yet, so the card
+  reaches the page through `onSceneImageRequested` and the part's id is
+  allocated up front (`scenePartId`).
+- **Providers.** fal (`falImageCall.ts`: `POST https://fal.run/<model>`,
+  `sync_mode`, through `getProviderFetch`; the desktop allowlist has
+  `https://fal.run/*`), else DeepInfra, else OpenRouter through the lore-image
+  path (`generateImageCall.ts`, `plainPrompt`). `imageProvider.ts` picks the
+  provider and, by job, the model (decision 61). Settings: `imageSettings.ts`
+  (synced), the Images tab, and the Story Editor's Pictures block.
+- **Not built yet: reference pictures (S7).** `resolveReferencePictures` is the
+  stub; it waits on the live fal checks in `docs/pending_tests.md`.
+
 ## Data model
 
 `app/misc/structs.ts` is the single source of truth for all shapes —
@@ -740,8 +777,9 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   only `NotificationProvider` and `APIKeysProvider`.
 - **AI is BYOK, always.** Keys live in the player's storage, read through
   `useAPIKeys()` (`APIKeysContext.tsx`): six LLM keys (OpenRouter, DeepSeek,
-  Google, Mistral, DeepInfra, Z.ai) plus Brave Search, Cartesia and
-  ElevenLabs. **The Z.ai key is for Z.ai's general pay-as-you-go API only**
+  Google, Mistral, DeepInfra, Z.ai) plus Brave Search, Cartesia, ElevenLabs
+  and fal.ai (pictures in play; kept on the device, sent only to fal, never
+  synced and not in `pickProviderKeys`, decision 58). **The Z.ai key is for Z.ai's general pay-as-you-go API only**
   (decision 18): `providerCall.ts` calls `ZAI_CHAT_COMPLETIONS_URL`
   (`/api/paas/v4`) and nothing else, and the desktop allowlist admits only
   `https://api.z.ai/api/paas/*`. Never add the GLM Coding Plan's endpoints

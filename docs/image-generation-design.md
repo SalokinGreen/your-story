@@ -1,7 +1,9 @@
 # Image generation in play — design
 
-**Status:** design, waiting for the author's yes. Nothing is built.
-Decisions 54–61 in [`decisions.md`](decisions.md) ("Interview six").
+**Status:** approved (decision 109). PR I1 builds it for the host's screen,
+except the reference pictures (slice S7), which wait for the live fal checks in
+§10; see the implementation plan's "Decisions made during implementation".
+Decisions 54–61 in [`decisions.md`](decisions.md) ("Interview eight").
 Implementation plan: [`image-generation-implementation-plan.md`](image-generation-implementation-plan.md).
 Sources: a fal.ai docs pass and a code map of master at `8869b88`, both
 2026-10-21.

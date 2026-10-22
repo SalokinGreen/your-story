@@ -376,4 +376,88 @@ pill.
 
 ## Decisions made during implementation
 
-(empty until the build)
+**2026-10-22, PR I1 (slices S1–S6, S8, S9; S7 not built).** Judgment calls,
+in the order the slices met them.
+
+- **Branch base.** Built on master after the catalog refresh (#216), party
+  mode (#214) and token savings T1 (#217) landed; the plan's line numbers were
+  re-checked against that code. The design's "Interview six" is
+  "Interview eight" in `decisions.md`, and decision 109 records the go-ahead.
+- **S7 is a stub with a hook, not a gap.** `imageJobs.resolveReferencePictures`
+  returns no references, so the picker is told no character has a portrait and
+  never selects the edit model (which would be called with no pictures);
+  characters go into the prompt as text lines. The "Scenes with a known face"
+  model setting exists and says it is not active yet. S7 fills the one function
+  in and the `portraitedCharacters` count follows.
+- **The turn's part does not exist when the GM calls the tool.** The GM stage
+  runs before the story stage, and the page builds the part (`partialPart`) and
+  publishes it on the first streamed text. So `generate_image` cannot attach to
+  a part. Instead: the page gives the part an id up front (`ScenePart.id`,
+  created in the handler, passed as `scenePartId`), the executor reports the
+  card through a new `GenerationCallbacks.onSceneImageRequested`, and the page
+  puts the ref on `partialPart.images`. `handleObserverReset` clears them, and
+  `generateStoryTurn` calls `cancelImageJobsForTurn` on a reset. The plan's
+  "write it when the job finishes" is therefore only true for portraits, places
+  and the buttons; a GM scene picture needs no finish-time write, because the
+  card finds its picture by the ref's id.
+- **`skipInitialAttach`.** The GM executor works on `structuredClone(storyData)`
+  and sets the pending id (NPC, player, note) on that clone, which the turn then
+  commits; the live StoryData must not also be patched mid-turn. The buttons
+  patch it at once so the NPC page shows "Painting…". **Replace** on an NPC or
+  the player skips the early patch, so the old portrait stays until the new one
+  lands.
+- **`SceneImageRef.description`** (not in the plan) keeps what the picture was
+  asked to show, so Regenerate works on a device that holds no stored picture.
+- **`lore_title`, not `lore_id`.** Notes have no id; the whole codebase names
+  them by exact title (`read_notes`, `edit_note`). The job's target is
+  `{ kind: "lore", loreTitle }`.
+- **Failure detaches.** A portrait, player or note picture that is declined,
+  fails or is cancelled takes its pending id back off the target, so the GM may
+  ask again (the per-scene cap still bounds it). If the failure lands before the
+  turn commits the clone's pending id, the id stays and points at nothing; the UI
+  treats that as no portrait, and the orphan sweep ignores it.
+- **`cancelled` is a fifth failure kind** in `falImageCall` (the plan listed
+  four); the queue shows it as a failed card reading "Cancelled" with Retry.
+  Stop needed no call of its own: the turn's `abortSignal` is linked to each
+  job, and `cancelImageJobsForTurn` is used for the Observer reset.
+- **`https://*.fal.media/*` is on the allowlist** as well as `https://fal.run/*`.
+  `sync_mode: true` should return a `data:` URI, but a model that ignores it
+  returns a CDN URL and `falImageCall` fetches it once; without the entry that
+  fetch would fail only in the desktop build. The live check (pending tests)
+  decides whether to drop it.
+- **In-play DeepInfra/OpenRouter pictures** go through the existing
+  `creatorImageFetch`, with two new optional request fields (`plainPrompt`,
+  `size`) so the story's own style line is the only style and the size fits the
+  subject. The lore-cover buttons are unchanged.
+- **Image settings shape.** `sceneModel`, `portraitModel` and `referenceModel`
+  are fal catalog keys; `deepinfraModel` and `openrouterModel` are the one model
+  each of those providers paints with (neither takes references). One synced
+  `imageSettings` object; the fal key stays out of it (decision 58).
+- **Compression** is a new `imageShrink.ts` (`createImageBitmap` +
+  `OffscreenCanvas`, falling back to the original bytes), not
+  `imageCompression.ts`, which imports `compressorjs` (a DOM-only import) and
+  works on `File`s. `imageCompression.ts` is still unused.
+- **Lightbox.** `FullScreenView` is a menu surface (title bar, tabs), so a tapped
+  picture opens in a small fixed overlay inside `StoryImage` instead.
+- **Settings placement.** The global half is a new **Images** tab in the
+  Settings modal (`ImageSettingsTab.tsx`); the per-story half (art style, space
+  used, Clear) is a block at the bottom of the Story Editor's Story section
+  (`PictureSettings.tsx`), because the Settings modal knows no open story. It is
+  not a new Story Editor tab: every section registers a ref during render, which
+  the React lint rule already flags 70 times.
+- **Failure toasts.** A scene card shows its own failure; a portrait or place
+  picture has no card, so the page toasts a decline or failure for those.
+- **Retry (reword) keeps its pictures.** The legacy no-snapshot reword path
+  reuses the popped part's GM conversation, so it also keeps the part's id and
+  `images`. A reset inside it runs a fresh GM stage and clears them.
+- **The Illustrate button** sits on the latest finished GM turn only (beside the
+  voice controls), as the plan said. Older turns can still **Regenerate** a
+  picture they already have; a done card now has a small Regenerate button too.
+- **Tests.** One more turn-level test than the plan lists
+  (`tests/imageGeneration.turn.test.ts`, on the T1 turn harness's mock fetch)
+  because the wiring between the page, `generateStoryTurn` and the executor is
+  where this feature could break without a unit test noticing. The whitelist
+  cases were added to `tests/aiStaged.gmStageToolWhitelist.test.ts` as planned.
+- **Not done, deliberately:** nothing in `estimateTurnCost` (the pre-turn
+  prediction) knows about pictures; the "Pictures" row shows in the actual
+  cost only. Story export drops nothing new (ids only).
