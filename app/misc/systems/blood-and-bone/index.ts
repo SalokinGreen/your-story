@@ -66,5 +66,5 @@ export const BLOOD_AND_BONE: BuiltinSystem = {
   sheetTemplate: BLOOD_AND_BONE_SHEET_TEMPLATE,
   meterSets: BLOOD_AND_BONE_METER_SETS,
   endOfSessionReminder:
-    "Dawn. Run the Reckoning for each character now: formula_roll [\"<Stress>d6\"], count the 1s, manage_meter adjust Beast by that count. Then: Wendigo Slipping Mask +1 (+2 Graverobber) for a foodless night; Heat -1 if nobody breached and someone suppressed attention; offer two downtime actions; clear every \"used tonight\" on the sheets.",
+    "Dawn. Run the Reckoning for each character now: formula_roll [\"<Stress>d6\"] (skip it at Stress 0: no 1s), count the 1s, manage_meter adjust Beast by that count. Then: Wendigo Slipping Mask +1 (+2 Graverobber) for a foodless night; Heat -1 if nobody breached and someone suppressed attention; offer two downtime actions; clear every \"used tonight\" on the sheets.",
 };

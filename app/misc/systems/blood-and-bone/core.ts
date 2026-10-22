@@ -43,7 +43,7 @@ The engine reports each threshold crossed. Apply it at once and narrate the Kind
 ## 5. The night
 A session is one night. When dawn comes in the fiction:
 1. Call end_session (reason).
-2. The Reckoning, per character, before anything else: formula_roll ["<their Stress>d6"], count the 1s yourself, manage_meter adjust Beast by that count. Never skip it, never roll it mid-scene.
+2. The Reckoning, per character, before anything else: formula_roll ["<their Stress>d6"] (skip the roll at Stress 0: no 1s), count the 1s yourself, manage_meter adjust Beast by that count. Never skip it, never roll it mid-scene.
 3. Wendigo: if no feed this night, Slipping Mask +1 (+2 for the Graverobber); a Predator who killed living prey this night holds it. Check "starving" (Wendigo note).
 4. Heat -1 if nobody breached the masquerade and someone worked to suppress attention.
 5. Offer each player two downtime actions (B&B — Progress, vows and XP). Clear every "used tonight" on the sheets.

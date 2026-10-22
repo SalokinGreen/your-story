@@ -1080,3 +1080,26 @@ read the core (see `pending_tests.md`).
   *Running it* 548, so the DM instructions total 2,677 (cap 4,000); filled
   sheet 273 (cap 1,000); largest mechanics notes: Progress 2,156, Character
   creation 2,018, Witch/Warlock 1,914 (cap 2,500).
+
+
+### 2026-10-22: PR C engine review
+
+Fixed: the Google tool list (five tools added, §6.14 partly fixed); `merge_lore`
+merges into an existing note titled `targetTitle` (exact title,
+case-insensitive; one source is enough then, the target is never its own
+source, never two notes with one title); `duplicate_lore` and `edit_lore_insert`
+read the schema's argument names (`sourceTitle`/`newTitle`, `pattern` and
+`isRegex`), `duplicate_lore` copies `visibility` and not `libraryNoteId`; the
+Reckoning is skipped at Stress 0. Checked the other lore tools against their
+schemas: `edit_lore_replace`, `_append`, `_prepend` and `toggle_lore` already
+match.
+
+Left as is, on purpose:
+
+- A merged note keeps the first linked source's `libraryNoteId` though it now
+  holds other text, so a later Pull or pack re-import replaces it. That only
+  happens by an explicit player action.
+- The Vampire's Held Line re-create resets a Beast-lowered Stress cap.
+- The DM-instructions cap is shared (4,000 tokens), so a Designer adventure
+  with about 2,000 or more tokens of the author's own DM instructions
+  truncates the core's last sections; the pointer line keeps them reachable.

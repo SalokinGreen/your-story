@@ -35,8 +35,9 @@ native apps (#198, #201). **Still open from §6:** `auto_advance` timers never
 tick (6.1), Fronts never linked to their clocks (6.2), random ids and keys
 during render (6.3–6.5), the dead Embeddings toggle (6.9), tools the GM
 cannot call (6.10), online guests receiving the GM's secrets (6.12), and the
-stale Google tool filter, which leaves session zero unable to end on Gemini
-(6.14). Four more were found on 2026-10-22 (decision 65): rules notes listed
+stale Google tool filter (6.14, partly fixed 2026-10-22: `start_game` and the
+challenge and scene tools now reach Gemini, the rest of the list is still
+dropped). Four more were found on 2026-10-22 (decision 65): rules notes listed
 by title only while the prompt, comments and docs say pinned (6.15), hidden
 note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
 as 1210 (6.17), and `search_notes` returning disabled notes (6.18); and
@@ -428,7 +429,8 @@ OpenRouter, Mistral, DeepInfra, Google AI Studio, Z.ai) and normalise each
 provider's response into one shape. They know nothing about `StoryData`, prompts or tools. **The
 standalone build has no API routes**: `providerFetch()` calls the provider
 in-process when `isStandalone()`. Google gets a filtered tool list
-(`GOOGLE_ESSENTIAL_TOOLS`), which is stale (§6.14).
+(`GOOGLE_ESSENTIAL_TOOLS`), which is still stale (§6.14: it has `start_game`
+and the challenge tools now, not the plan, timer, thread or goal tools).
 
 **Claude reaches the app through OpenRouter** (Haiku, Sonnet and Opus 5.5,
 `anthropic/…` ids; decision 10) and has its own branch in `providerCall.ts`,
