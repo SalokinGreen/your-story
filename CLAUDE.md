@@ -612,11 +612,28 @@ report's §11.3. The ones that shape play:
   One comparison per call, and no functions: letters and commas are stripped
   before evaluating, so `min(12,10)` silently becomes 1210 (§6.17).
 - `start_challenge` / `record_challenge_result` / `cancel_challenge` —
-  multi-roll "best of X successes" challenges (`StoryData.activeChallenge`,
-  one at a time). `record_challenge_result` banks an outcome and closes the
-  challenge when it is decided; there is no live `resolve_challenge`. A check
-  inside one is three calls: `formula_roll` → `calculate` →
-  `record_challenge_result`.
+  multi-roll challenges (`StoryData.activeChallenge`, one at a time), in two
+  modes. `first_to` (the default) is "first to N successes, or M failures";
+  `tally` takes exactly `rounds` results (strong hit +1, weak hit 0, miss −1)
+  and ends `won` at +1 or more, `even` at 0, `lost` at −1 or less.
+  `record_challenge_result` banks an outcome and closes the challenge when it
+  is decided; there is no live `resolve_challenge`. A check inside one is
+  three calls: `formula_roll` → `calculate` → `record_challenge_result` (or
+  `action_roll` → `record_challenge_result`). The active challenge, the
+  meters and the tracks are shown to the GM every turn in the live block
+  (`formatActiveChallengeState`, `formatMetersAndTracksState`); the second
+  `start_challenge` implementation in `toolExecutor.ts` is gone.
+- **System tools — offered only to stories that use a system** (decision 79:
+  `resolveSystem()` in `app/misc/systems/resolve.ts`, true when the story's
+  lore holds a built-in system's notes, or `systemState.usesSystemTools` says
+  so; none exist until Blood & Bone, PR C): `manage_meter` (named numbers
+  owned by a character or `world`, clamped to floor and cap, thresholds
+  reported, `once_per` scene/session dedup, `create_set` from the system's
+  meter sets), `manage_track` (Ironsworn-style ten-box progress tracks, with
+  an engine-decided `progress_roll`), `end_session` (session count, session
+  resets, the system's reminder) and `action_roll` (d6 + stat against two
+  d10s, adds capped at +2, score at 10, ties to the dice; `success` is false
+  on a miss). Shapes in `structs.ts`, arithmetic in `metersAndTracks.ts`.
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9
   chaos factor) and the 45 **built-in** Mythic element tables. The
   adventure's own tables are `StoryLore` notes with `type: "table"` that name
@@ -679,8 +696,9 @@ are live** (see `docs/game-mechanics.md` "What Changed"):
 - Momentum (reroll/guarantee-success currency) — gone.
 - The eight-system RPG picker and its client-side advantage/disadvantage —
   gone from play. `rpgSystems.ts` is still 1,941 lines exporting every system
-  definition, but live code uses only `parseChallengeRoundsValue`; tests use
-  the rest.
+  definition, but no live code uses any of it any more (the last caller of
+  `parseChallengeRoundsValue` went with the duplicate `start_challenge`); tests
+  use it.
 - Structured `Stat[]`/`Resource[]` editors and `InventoryItem[]` — gone;
   describe these in the character sheet note. `Choice.item_used` still reads
   legacy `inventory` on old saves.
@@ -890,6 +908,10 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 
 ## Directory map
 
+- `app/misc/systems/` — the built-in default systems registry
+  (`BUILTIN_SYSTEMS`, empty until Blood & Bone), `resolveSystem()`, and the
+  `BuiltinSystem` shapes. `app/misc/metersAndTracks.ts` is the pure meter,
+  track and action-roll arithmetic.
 - `app/misc/` — nearly all core logic: prompt builders (`ai_staged.ts`,
   `designer_ai.ts`; `ai.ts` holds only text helpers), the turn
   (`generation.ts`), tool schemas and execution (`gmTools.ts`,

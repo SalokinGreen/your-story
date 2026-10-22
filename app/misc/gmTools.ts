@@ -11,6 +11,7 @@
  */
 
 import { ToolSchema } from "./toolSchemas";
+import type { TrackKind, TrackRank, TrackStatus } from "./structs";
 
 // ============================================
 // GM TOOL INTERFACES
@@ -19,8 +20,12 @@ import { ToolSchema } from "./toolSchemas";
 export interface StartChallengeParams {
   name: string;
   description: string;
-  required_successes: number;
-  max_failures: number;
+  // "first_to" (default): required_successes and max_failures are required.
+  // "tally": rounds (2-10) is required; each result adds +1, 0 or -1.
+  mode?: "first_to" | "tally";
+  rounds?: number;
+  required_successes?: number;
+  max_failures?: number;
   primary_stat: string;
   difficulty: string;
   victory_consequence?: string;
@@ -160,7 +165,9 @@ export interface OpposedFormulaParams {
  * whole resolution.
  */
 export interface RecordChallengeResultParams {
-  outcome: "success" | "failure";
+  // strong_hit / weak_hit / miss: tally challenges (+1 / 0 / -1). In a
+  // first_to challenge strong_hit and weak_hit count as a success, miss as a failure.
+  outcome: "success" | "failure" | "strong_hit" | "weak_hit" | "miss";
   description: string; // What this check represented, e.g. "Vault over the gap"
   // Hardness dimensions for a failure's narration - see
   // FormulaRollParams.target/forces_choice. Ignored on a success.
@@ -551,6 +558,73 @@ export interface ManageTimerParams {
 }
 
 // ============================================
+// METERS, PROGRESS TRACKS, SESSIONS, ACTION ROLLS
+// Offered only to stories that use a system (decision 79).
+// ============================================
+
+export type ManageMeterAction =
+  | "create"
+  | "create_set"
+  | "adjust"
+  | "set"
+  | "set_cap"
+  | "set_floor"
+  | "remove";
+
+export interface ManageMeterParams {
+  action: ManageMeterAction;
+  owner: string; // character name, or "world"
+  meter?: string; // every action but create_set
+  set?: string; // create_set: a set name from the story's system
+  by?: number; // adjust: signed integer
+  value?: number; // set / set_cap / set_floor; create: start value
+  min?: number; // create
+  max?: number; // create
+  only_up?: boolean; // create
+  thresholds?: { at: number; label: string; note?: string }[]; // create
+  once_per?: "scene" | "session"; // adjust only
+  key?: string; // adjust with once_per: the trigger's name
+  reason: string;
+}
+
+export type ManageTrackAction =
+  | "create"
+  | "mark"
+  | "progress_roll"
+  | "set_status"
+  | "halve"
+  | "set_rank"
+  | "remove";
+
+export interface ManageTrackParams {
+  action: ManageTrackAction;
+  owner: string;
+  track: string;
+  kind?: TrackKind; // create
+  rank?: TrackRank; // create, set_rank
+  times?: number; // mark, default 1
+  status?: Exclude<TrackStatus, "active">; // set_status
+  dice?: [number, number]; // progress_roll: faces the player reported (manual dice mode)
+  reason: string;
+}
+
+export interface EndSessionParams {
+  reason: string; // "Dawn over Prague"
+}
+
+export interface ActionRollParams {
+  stat_name: string; // "Heart"
+  stat_value: number; // from the character sheet
+  adds?: number; // bonuses claimed; the engine applies at most +2
+  penalty?: number; // conditions and the like, subtracted, uncapped
+  move?: string; // "Face Danger"
+  owner?: string; // whose roll, for the log and party play
+  dice?: { action: number; challenge: [number, number] }; // manual dice mode
+  stakes?: "low" | "medium" | "high" | "deadly";
+  reason: string;
+}
+
+// ============================================
 // NPC MANAGEMENT INTERFACES
 // ============================================
 
@@ -684,6 +758,11 @@ export type GMToolParams =
   | { name: "end_gm_thinking"; params: RespondToPlayerParams }
   // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
   | { name: "manage_timer"; params: ManageTimerParams }
+  // System tools (meters, tracks, sessions, action rolls)
+  | { name: "manage_meter"; params: ManageMeterParams }
+  | { name: "manage_track"; params: ManageTrackParams }
+  | { name: "end_session"; params: EndSessionParams }
+  | { name: "action_roll"; params: ActionRollParams }
   // Combat tools
   | { name: "start_combat"; params: StartCombatParams }
   | { name: "add_combatant"; params: AddCombatantUnifiedParams }
@@ -714,7 +793,7 @@ const startChallengeTool: ToolSchema = {
   type: "function",
   function: {
     name: "start_challenge",
-    description: `Start a multi-roll "best of X" challenge for a dangerous fight, chase or complex task (3 successes for a dangerous one, 4-5 for a boss, 6+ for an epic). Simple tasks are one formula_roll. Only one challenge can be active at a time.`,
+    description: `Start a multi-roll challenge for a dangerous fight, chase or complex task. mode "first_to" (default): first to required_successes wins, max_failures loses (3 for a dangerous one, 4-5 for a boss, 6+ for an epic). mode "tally": exactly \`rounds\` results (2-10), each strong hit +1, weak hit 0, miss -1, decided by the total. Simple tasks are one formula_roll. Only one challenge can be active at a time.`,
     parameters: {
       type: "object",
       properties: {
@@ -727,16 +806,27 @@ const startChallengeTool: ToolSchema = {
           type: "string",
           description: "Context and stakes",
         },
+        mode: {
+          type: "string",
+          enum: ["first_to", "tally"],
+          description: "Default first_to",
+        },
+        rounds: {
+          type: "number",
+          description: "tally: how many results the challenge takes (required)",
+          minimum: 2,
+          maximum: 10,
+        },
         required_successes: {
           type: "number",
-          description: "Successes to win (typically 3-6)",
+          description: "first_to: successes to win (typically 3-6; required)",
           minimum: 2,
           maximum: 10,
         },
         max_failures: {
           type: "number",
           description:
-            "Failures before losing (usually equals required_successes)",
+            "first_to: failures before losing (usually equals required_successes; required)",
           minimum: 2,
           maximum: 10,
         },
@@ -760,8 +850,6 @@ const startChallengeTool: ToolSchema = {
       required: [
         "name",
         "description",
-        "required_successes",
-        "max_failures",
         "primary_stat",
         "difficulty",
       ],
@@ -1115,15 +1203,15 @@ const recordChallengeResultTool: ToolSchema = {
   type: "function",
   function: {
     name: "record_challenge_result",
-    description: `Record one resolved check against the active challenge; closes it when a threshold is reached. It rolls nothing. A check is three calls: \`formula_roll\`, \`calculate\` (against the target), then this, reporting what the comparison said. Use \`cancel_challenge\` if the challenge stopped mattering.`,
+    description: `Record one resolved check against the active challenge; closes it when a threshold is reached. It rolls nothing. A check is three calls: \`formula_roll\`, \`calculate\` (against the target), then this, reporting what the comparison said. Tally challenges take strong_hit, weak_hit or miss (an \`action_roll\` result); first_to takes success or failure. Use \`cancel_challenge\` if the challenge stopped mattering.`,
     parameters: {
       type: "object",
       properties: {
         outcome: {
           type: "string",
-          enum: ["success", "failure"],
+          enum: ["success", "failure", "strong_hit", "weak_hit", "miss"],
           description:
-            "Which way this check went, per your `calculate` comparison",
+            "Which way this check went, per your `calculate` comparison or action_roll",
         },
         description: {
           type: "string",
@@ -1888,6 +1976,149 @@ const manageTimerTool: ToolSchema = {
 };
 
 // ============================================
+// SYSTEM TOOL SCHEMAS (meters, tracks, sessions, action rolls)
+// ============================================
+
+const manageMeterTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "manage_meter",
+    description: `Change a named number owned by a character or "world" (Stress, Heat, a Ledger). The engine clamps to the meter's floor and cap, reports old to new, any threshold crossed and reaching the cap, and refuses a fall on an only-rises meter. Actions: create_set (owner, set: a set name from the rules), create (owner, meter, min, max, value), adjust (by, signed), set, set_cap, set_floor (value), remove. adjust may carry once_per "scene" or "session" with a key naming the trigger; a repeat is refused with no change.`,
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["create", "create_set", "adjust", "set", "set_cap", "set_floor", "remove"],
+        },
+        owner: { type: "string", description: 'Character name, or "world"' },
+        meter: { type: "string", description: "Meter name (all but create_set)" },
+        set: { type: "string", description: "create_set: the set's name" },
+        by: { type: "number", description: "adjust: signed whole number" },
+        value: {
+          type: "number",
+          description: "set / set_cap / set_floor: the number. create: the start value.",
+        },
+        min: { type: "number", description: "create" },
+        max: { type: "number", description: "create" },
+        only_up: { type: "boolean", description: "create: the value never falls" },
+        thresholds: {
+          type: "array",
+          description: "create: labels that apply at and above a value",
+          items: {
+            type: "object",
+            properties: {
+              at: { type: "number" },
+              label: { type: "string" },
+              note: { type: "string" },
+            },
+            required: ["at", "label"],
+          },
+        },
+        once_per: {
+          type: "string",
+          enum: ["scene", "session"],
+          description: "adjust: allow this key once per scene or session",
+        },
+        key: { type: "string", description: "adjust with once_per: the trigger's name" },
+        reason: { type: "string", description: "Why, in a few words" },
+      },
+      required: ["action", "owner", "reason"],
+    },
+  },
+};
+
+const manageTrackTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "manage_track",
+    description: `Keep a progress track: ten boxes of four ticks (a vow, a condition, an enemy, a journey). mark adds ticks by rank (troublesome 12, dangerous 8, formidable 4, extreme 2, epic 1; max 40). progress_roll rolls two d10 against the filled boxes; ties go to the dice; it returns strong hit, weak hit or miss and whether the dice matched. Actions: create (kind, rank), mark (times, default 1), progress_roll, set_status (fulfilled/forsaken/cleared), halve (half the boxes, rounded down), set_rank, remove.`,
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["create", "mark", "progress_roll", "set_status", "halve", "set_rank", "remove"],
+        },
+        owner: { type: "string", description: 'Character name, or "world"' },
+        track: { type: "string", description: "Track name" },
+        kind: {
+          type: "string",
+          enum: ["vow", "condition", "enemy", "journey", "other"],
+          description: "create",
+        },
+        rank: {
+          type: "string",
+          enum: ["troublesome", "dangerous", "formidable", "extreme", "epic"],
+          description: "create, set_rank",
+        },
+        times: { type: "number", description: "mark: how many times (default 1)" },
+        status: {
+          type: "string",
+          enum: ["fulfilled", "forsaken", "cleared"],
+          description: "set_status",
+        },
+        dice: {
+          type: "array",
+          items: { type: "number" },
+          minItems: 2,
+          maxItems: 2,
+          description: "progress_roll: the two d10 faces the player reported (manual dice)",
+        },
+        reason: { type: "string", description: "Why, in a few words" },
+      },
+      required: ["action", "owner", "track", "reason"],
+    },
+  },
+};
+
+const endSessionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "end_session",
+    description: `End the current session (one night, one sitting). Adds one to the session count, resets meters that reset at session end, clears the once-per-session keys, and returns the rules' end-of-session reminder. The rules say when to call it.`,
+    parameters: {
+      type: "object",
+      properties: {
+        reason: { type: "string", description: 'What closes the session ("Dawn over Prague")' },
+      },
+      required: ["reason"],
+    },
+  },
+};
+
+const actionRollTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "action_roll",
+    description: `Roll an action die (d6) plus a stat against two challenge dice (d10). The engine adds at most +2 for adds, subtracts penalty, caps the score at 10, and compares: the score must beat a challenge die (ties go to the dice). Two beaten is a strong hit, one a weak hit, none a miss; matching challenge dice are reported. Report that outcome; on a miss, pay the price as the rules say.`,
+    parameters: {
+      type: "object",
+      properties: {
+        stat_name: { type: "string", description: "e.g. Heart" },
+        stat_value: { type: "number", description: "From the character sheet" },
+        adds: { type: "number", description: "Bonuses claimed; at most +2 apply" },
+        penalty: { type: "number", description: "Subtracted from the score" },
+        move: { type: "string", description: "The move being made" },
+        owner: { type: "string", description: "Whose roll (party play)" },
+        dice: {
+          type: "object",
+          description: "Manual dice: the faces the player reported",
+          properties: {
+            action: { type: "number" },
+            challenge: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 },
+          },
+          required: ["action", "challenge"],
+        },
+        stakes: { type: "string", enum: ["low", "medium", "high", "deadly"] },
+        reason: { type: "string", description: "What the roll is for" },
+      },
+      required: ["stat_name", "stat_value", "reason"],
+    },
+  },
+};
+
+// ============================================
 // NPC MANAGEMENT TOOL SCHEMAS
 // ============================================
 
@@ -2286,6 +2517,11 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   requestContinuationTool,
   // Countdown timer tool (create/advance/toggle_pause/cancel/trigger via `action`)
   manageTimerTool,
+  // System tools: offered only to stories that use a system (decision 79, see buildGMStagePrompt)
+  manageMeterTool,
+  manageTrackTool,
+  endSessionTool,
+  actionRollTool,
   // Combat tools
   startCombatTool,
   addCombatantTool,

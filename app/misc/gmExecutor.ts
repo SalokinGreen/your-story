@@ -26,7 +26,35 @@ import {
   ReactionCategory,
   IncidentalReaction,
   StoryLore,
+  Meter,
+  ProgressTrack,
+  SystemState,
 } from "./structs";
+import {
+  ACTION_ADDS_CAP,
+  MeterError,
+  TICKS_PER_MARK,
+  actionScore,
+  adjustMeter,
+  createMeter,
+  createMeterSet,
+  createTrack,
+  filledBoxes,
+  findMeter,
+  findTrack,
+  halveTrack,
+  isDuplicate,
+  markProgress,
+  normalizeKey,
+  pruneDedupKeys,
+  resolveAgainstChallengeDice,
+  setMeterCap,
+  setMeterFloor,
+  setMeterValue,
+  type MeterChange,
+  type RollOutcome,
+} from "./metersAndTracks";
+import { resolveSystem } from "./systems/resolve";
 import {
   StartChallengeParams,
   CancelChallengeParams,
@@ -57,6 +85,12 @@ import {
   CancelTimerParams,
   TriggerTimerParams,
   ManageTimerParams,
+  ManageMeterParams,
+  ManageMeterAction,
+  ManageTrackParams,
+  ManageTrackAction,
+  EndSessionParams,
+  ActionRollParams,
   // Combat tools
   StartCombatParams,
   AddCombatantParams,
@@ -188,6 +222,11 @@ export interface GMToolResult {
     | GMToggleTimerPauseResult
     | GMCancelTimerResult
     | GMTriggerTimerResult
+    // System results
+    | GMManageMeterResult
+    | GMManageTrackResult
+    | GMEndSessionResult
+    | GMActionRollResult
     // Combat results
     | GMStartCombatResult
     | GMAddCombatantResult
@@ -218,8 +257,10 @@ export interface GMChallengeResult {
   type: "start_challenge";
   name: string;
   description: string;
-  requiredSuccesses: number;
-  maxFailures: number;
+  mode?: "first_to" | "tally";
+  rounds?: number;
+  requiredSuccesses?: number;
+  maxFailures?: number;
   primaryStat: string;
   difficulty: string;
   victoryConsequence?: string;
@@ -356,7 +397,7 @@ export interface GMOpposedFormulaResult {
 
 export interface GMChallengeResultRecord {
   type: "record_challenge_result";
-  outcome: "success" | "failure";
+  outcome: "success" | "failure" | "strong_hit" | "weak_hit" | "miss";
   description: string;
   target?: string; // Hardness dimension: who the failure consequence lands on
   forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
@@ -368,6 +409,12 @@ export interface GMChallengeResultRecord {
     maxFailures: number;
     completed?: boolean;
     won?: boolean;
+    // Tally mode
+    mode?: "first_to" | "tally";
+    tally?: number;
+    recorded?: number;
+    rounds?: number;
+    result?: "won" | "lost" | "even";
   };
 }
 
@@ -599,6 +646,52 @@ export interface GMCancelTimerResult {
   ticksRemaining: number;
 }
 
+export interface GMManageMeterResult {
+  type: "manage_meter";
+  action: ManageMeterAction;
+  owner: string;
+  meter?: string;
+  change?: MeterChange;
+  created?: string[];
+  skipped?: string[];
+  refusedAsRepeat?: boolean;
+}
+
+export interface GMManageTrackResult {
+  type: "manage_track";
+  action: ManageTrackAction;
+  owner: string;
+  track: string;
+  ticks?: number;
+  boxes?: number;
+  outcome?: RollOutcome;
+  dice?: [number, number];
+  match?: boolean;
+}
+
+export interface GMEndSessionResult {
+  type: "end_session";
+  sessionCount: number;
+  reset: string[];
+}
+
+export interface GMActionRollResult {
+  type: "action_roll";
+  statName: string;
+  statValue: number;
+  adds: number;
+  addsApplied: number;
+  penalty: number;
+  actionDie: number;
+  challengeDice: [number, number];
+  score: number;
+  capped: boolean;
+  outcome: RollOutcome;
+  match: boolean;
+  move?: string;
+  owner?: string;
+}
+
 export interface GMTriggerTimerResult {
   type: "trigger_timer";
   timer: string;
@@ -826,8 +919,10 @@ const ORACLE_TOOL_NAMES = new Set([
  * the same line for the retry logic.
  */
 const OUTCOME_BEARING_TOOL_NAMES = new Set([
+  "progress_roll",
   "calculate",
   "record_challenge_result",
+  "action_roll",
   "ask_for_roll",
 ]);
 
@@ -841,6 +936,29 @@ const OUTCOME_BEARING_TOOL_NAMES = new Set([
  * conceal. Every result for these tools is stamped on the way out.
  */
 const HIDDEN_FROM_PLAYER_TOOL_NAMES = new Set(["gm_roll"]);
+
+/**
+ * The name the M2 roll gate and the Observer's outcome check see for a
+ * result: a manage_track progress_roll is a roll with an engine verdict, so it
+ * counts as "progress_roll"; every other result keeps its tool name.
+ */
+export function rollAwareToolName(r: {
+  toolName: string;
+  result?: unknown;
+}): string {
+  const res = r.result as
+    | { type?: string; action?: string; outcome?: string }
+    | undefined;
+  if (
+    r.toolName === "manage_track" &&
+    res?.type === "manage_track" &&
+    res.action === "progress_roll" &&
+    res.outcome !== undefined
+  ) {
+    return "progress_roll";
+  }
+  return r.toolName;
+}
 
 function isHiddenFromPlayerTool(toolName: string): boolean {
   return HIDDEN_FROM_PLAYER_TOOL_NAMES.has(toolName);
@@ -1222,6 +1340,37 @@ export async function executeGMTools(
             modified
           );
           break;
+        // System tools (meters, tracks, sessions, action rolls)
+        case "manage_meter":
+          result = executeManageMeter(
+            call.id,
+            params as ManageMeterParams,
+            modified
+          );
+          break;
+        case "manage_track":
+          result = await executeManageTrack(
+            call.id,
+            params as ManageTrackParams,
+            modified,
+            interaction
+          );
+          break;
+        case "end_session":
+          result = executeEndSession(
+            call.id,
+            params as EndSessionParams,
+            modified
+          );
+          break;
+        case "action_roll":
+          result = await executeActionRoll(
+            call.id,
+            params as ActionRollParams,
+            modified,
+            interaction
+          );
+          break;
         // NPC management tools
         case "add_npc":
           result = executeAddNPC(call.id, params as AddNPCParams, modified);
@@ -1548,29 +1697,98 @@ function executeStartChallenge(
     };
   }
 
-  // rounds is a display-only "best of X" figure - the actual win/loss
-  // thresholds are requiredSuccesses/maxFailures below, kept independent so
-  // a deliberately asymmetric challenge doesn't collapse into one symmetric
-  // majority derived from this number.
-  const rounds =
-    Math.max(params.required_successes, params.max_failures) * 2 - 1;
+  const mode = params.mode === "tally" ? "tally" : "first_to";
+  if (mode === "tally" && !resolveSystem(storyData).usesSystemTools) {
+    return {
+      toolName: "start_challenge",
+      toolCallId,
+      success: false,
+      result: {
+        type: "start_challenge",
+        name: params.name,
+        description: params.description,
+        mode,
+        primaryStat: params.primary_stat,
+        difficulty: params.difficulty,
+      } as GMChallengeResult,
+      contextForStory: `[ERROR: tally mode needs the system's own action roll, which this story doesn't have. Use first_to (required_successes and max_failures) instead.]`,
+    };
+  }
+  const invalid = (message: string): GMToolResult => ({
+    toolName: "start_challenge",
+    toolCallId,
+    success: false,
+    result: {
+      type: "start_challenge",
+      name: params.name,
+      description: params.description,
+      mode,
+      primaryStat: params.primary_stat,
+      difficulty: params.difficulty,
+    } as GMChallengeResult,
+    contextForStory: `[ERROR: ${message}]`,
+  });
 
-  const challenge: SceneChallenge = {
-    id: `challenge_${Date.now()}`,
-    name: params.name,
-    description: params.description,
-    rounds,
-    currentSuccesses: 0,
-    currentFailures: 0,
-    requiredSuccesses: params.required_successes,
-    maxFailures: params.max_failures,
-    active: true,
-    createdAt: Date.now(),
-  };
+  let rounds: number;
+  let challenge: SceneChallenge;
+  let contextForStory: string;
+  if (mode === "tally") {
+    const r = params.rounds;
+    if (typeof r !== "number" || !Number.isInteger(r) || r < 2 || r > 10) {
+      return invalid(
+        `start_challenge in tally mode needs "rounds", a whole number from 2 to 10 (got ${String(r)})`
+      );
+    }
+    rounds = r;
+    challenge = {
+      id: `challenge_${Date.now()}`,
+      name: params.name,
+      description: params.description,
+      rounds,
+      currentSuccesses: 0,
+      currentFailures: 0,
+      active: true,
+      createdAt: Date.now(),
+      mode: "tally",
+      tally: 0,
+      recorded: 0,
+    };
+    contextForStory = `[Challenge Started: "${params.name}" - Tally of ${rounds} results (strong hit +1, weak hit 0, miss -1) | Primary Stat: ${params.primary_stat} | Difficulty: ${params.difficulty}]`;
+  } else {
+    const need = params.required_successes;
+    const lose = params.max_failures;
+    if (typeof need !== "number" || typeof lose !== "number") {
+      const missing = [
+        typeof need !== "number" ? "required_successes" : "",
+        typeof lose !== "number" ? "max_failures" : "",
+      ]
+        .filter(Boolean)
+        .join(" and ");
+      return invalid(
+        `start_challenge needs ${missing} (or mode "tally" with rounds)`
+      );
+    }
+    // rounds is a display-only "best of X" figure - the actual win/loss
+    // thresholds are requiredSuccesses/maxFailures below, kept independent so
+    // a deliberately asymmetric challenge doesn't collapse into one symmetric
+    // majority derived from this number.
+    rounds = Math.max(need, lose) * 2 - 1;
+    challenge = {
+      id: `challenge_${Date.now()}`,
+      name: params.name,
+      description: params.description,
+      rounds,
+      currentSuccesses: 0,
+      currentFailures: 0,
+      requiredSuccesses: need,
+      maxFailures: lose,
+      active: true,
+      createdAt: Date.now(),
+    };
+    contextForStory = `[Challenge Started: "${params.name}" - Best of ${rounds} (need ${need} successes) | Primary Stat: ${params.primary_stat} | Difficulty: ${params.difficulty}]`;
+  }
 
   storyData.activeChallenge = challenge;
-
-  const contextForStory = `[Challenge Started: "${params.name}" - Best of ${rounds} (need ${params.required_successes} successes) | Primary Stat: ${params.primary_stat} | Difficulty: ${params.difficulty}]`;
 
   return {
     toolName: "start_challenge",
@@ -1580,8 +1798,10 @@ function executeStartChallenge(
       type: "start_challenge",
       name: params.name,
       description: params.description,
-      requiredSuccesses: params.required_successes,
-      maxFailures: params.max_failures,
+      mode,
+      rounds,
+      requiredSuccesses: challenge.requiredSuccesses,
+      maxFailures: challenge.maxFailures,
       primaryStat: params.primary_stat,
       difficulty: params.difficulty,
       victoryConsequence: params.victory_consequence,
@@ -2748,6 +2968,105 @@ async function executeOpposedFormula(
 }
 
 /**
+ * A tally challenge: exactly `rounds` results, strong hit +1, weak hit 0,
+ * miss -1, decided by the sum (+1 or more won, 0 even, -1 or less lost).
+ */
+function recordTallyResult(
+  toolCallId: string,
+  params: RecordChallengeResultParams,
+  challenge: SceneChallenge
+): GMToolResult {
+  const delta =
+    params.outcome === "strong_hit"
+      ? 1
+      : params.outcome === "weak_hit"
+        ? 0
+        : params.outcome === "miss"
+          ? -1
+          : null;
+  if (delta === null) {
+    return {
+      toolName: "record_challenge_result",
+      toolCallId,
+      success: false,
+      result: {
+        type: "record_challenge_result",
+        outcome: params.outcome,
+        description: params.description,
+      } as GMChallengeResultRecord,
+      contextForStory: `[ERROR: "${challenge.name}" is a tally challenge: record strong_hit, weak_hit or miss (the action_roll outcome), not "${params.outcome}"]`,
+    };
+  }
+
+  challenge.tally = (challenge.tally ?? 0) + delta;
+  challenge.recorded = (challenge.recorded ?? 0) + 1;
+  if (delta > 0) challenge.currentSuccesses = (challenge.currentSuccesses || 0) + 1;
+  if (delta < 0) challenge.currentFailures = (challenge.currentFailures || 0) + 1;
+
+  const completed = challenge.recorded >= challenge.rounds;
+  let result: "won" | "lost" | "even" | undefined;
+  if (completed) {
+    result = challenge.tally >= 1 ? "won" : challenge.tally <= -1 ? "lost" : "even";
+    challenge.result = result;
+    challenge.active = false;
+    challenge.resolvedAt = Date.now();
+  }
+
+  const label =
+    params.outcome === "strong_hit"
+      ? "STRONG HIT"
+      : params.outcome === "weak_hit"
+        ? "WEAK HIT"
+        : "MISS";
+  let contextForStory = `[Challenge Check ${label}: ${params.description}]`;
+  contextForStory += `\n[Challenge "${challenge.name}": round ${challenge.recorded} of ${challenge.rounds}, tally ${formatSigned(challenge.tally)}]`;
+  if (completed) {
+    const band =
+      result === "won"
+        ? "+1 or more"
+        : result === "lost"
+          ? "-1 or less"
+          : "0";
+    contextForStory += `\n[Challenge ENDED at tally ${formatSigned(challenge.tally)} (${band}): ${result === "won" ? "WON" : result === "lost" ? "LOST" : "EVEN"}]`;
+  }
+  if (delta < 0) {
+    contextForStory += describeHardness(params.target, params.forces_choice);
+  }
+
+  return {
+    toolName: "record_challenge_result",
+    toolCallId,
+    success: delta >= 0,
+    result: {
+      type: "record_challenge_result",
+      outcome: params.outcome,
+      description: params.description,
+      target: params.target,
+      forcesChoice: params.forces_choice,
+      challengeProgress: {
+        name: challenge.name,
+        successes: challenge.currentSuccesses,
+        failures: challenge.currentFailures,
+        required: 0,
+        maxFailures: 0,
+        completed,
+        won: result === "won",
+        mode: "tally",
+        tally: challenge.tally,
+        recorded: challenge.recorded,
+        rounds: challenge.rounds,
+        result,
+      },
+    } as GMChallengeResultRecord,
+    contextForStory,
+  };
+}
+
+function formatSigned(n: number): string {
+  return n > 0 ? `+${n}` : String(n);
+}
+
+/**
  * Record one resolved check against the active challenge. Rolls nothing: the
  * GM rolls with formula_roll, compares with calculate, and reports the
  * verdict here. (This replaced formula_challenge_check, which bundled roll +
@@ -2775,7 +3094,16 @@ function executeRecordChallengeResult(
     };
   }
 
-  const succeeded = params.outcome === "success";
+  if (challenge.mode === "tally") {
+    return recordTallyResult(toolCallId, params, challenge);
+  }
+
+  // In a first_to challenge a strong or weak hit is a success and a miss a
+  // failure, so an action_roll-style GM cannot break it.
+  const succeeded =
+    params.outcome === "success" ||
+    params.outcome === "strong_hit" ||
+    params.outcome === "weak_hit";
 
   // Update challenge progress
   if (succeeded) {
@@ -3464,10 +3792,14 @@ function executeGetGameState(
     if (ch && ch.active) {
       const needWin = ch.requiredSuccesses ?? Math.ceil(ch.rounds / 2);
       const needLose = ch.maxFailures ?? Math.ceil(ch.rounds / 2);
+      const progress =
+        ch.mode === "tally"
+          ? `- Tally challenge: round ${(ch.recorded ?? 0) + 1} of ${ch.rounds}, tally ${formatSigned(ch.tally ?? 0)} (strong hit +1, weak hit 0, miss -1)`
+          : `- Successes: ${ch.currentSuccesses}/${needWin} needed to WIN\n` +
+            `- Failures: ${ch.currentFailures}/${needLose} needed to LOSE`;
       blocks.push(
         `### ⚔️ Active Challenge: ${ch.name}\n` +
-          `- Successes: ${ch.currentSuccesses}/${needWin} needed to WIN\n` +
-          `- Failures: ${ch.currentFailures}/${needLose} needed to LOSE` +
+          progress +
           (ch.description ? `\n- ${ch.description}` : "")
       );
       includedSections.push("challenge");
@@ -5513,6 +5845,609 @@ function executeManageTimer(
   }
 
   return { ...result, toolName: "manage_timer" };
+}
+
+// ============================================
+// SYSTEM TOOL EXECUTION (meters, tracks, sessions, action rolls)
+// docs/default-systems-implementation-plan.md slices 2 and 3
+// ============================================
+
+function systemErrorResult(
+  toolName: string,
+  toolCallId: string,
+  message: string
+): GMToolResult {
+  return {
+    toolName,
+    toolCallId,
+    success: false,
+    result: { type: "state_change", message, command: toolName },
+    contextForStory: `[ERROR: ${message}]`,
+  };
+}
+
+function ensureSystemState(storyData: StoryData): SystemState {
+  if (!storyData.systemState) {
+    storyData.systemState = { sessionCount: 0, dedupKeys: [] };
+  }
+  if (!Array.isArray(storyData.systemState.dedupKeys)) {
+    storyData.systemState.dedupKeys = [];
+  }
+  return storyData.systemState;
+}
+
+function ownerMeterNames(meters: Meter[] | undefined, owner: string): string {
+  const own = (meters || []).filter(
+    (m) => normalizeKey(m.owner) === normalizeKey(owner)
+  );
+  return own.length > 0
+    ? `${owner} has: ${own.map((m) => m.name).join(", ")}`
+    : `${owner} has no meters`;
+}
+
+function describeMeterChange(meter: Meter, change: MeterChange): string {
+  const label = `${meter.owner}: ${meter.name}`;
+  const delta = change.after - change.before;
+  const signed = delta > 0 ? `+${delta}` : String(delta);
+  let line = `${label} ${change.before} → ${change.after}`;
+  if (delta !== 0) line += ` (${signed})`;
+  if (change.clampedBy > 0) {
+    line += `, ${change.clampedBy} clamped away (range ${meter.floor}-${meter.cap})`;
+  }
+  const parts: string[] = [];
+  for (const t of change.crossedUp) {
+    parts.push(`reached "${t.label}"${t.note ? ` (${t.note})` : ""}`);
+  }
+  for (const t of change.crossedDown) {
+    parts.push(`fell below "${t.label}"`);
+  }
+  if (delta > 0 && change.atCap) parts.push("now at its cap");
+  if (delta < 0 && change.atFloor) parts.push("now at its floor");
+  if (parts.length > 0) line += ` · ${parts.join("; ")}`;
+  return `[Meter: ${line}]`;
+}
+
+/**
+ * A hidden meter never reaches the player's tool log, whatever the call did
+ * to it: a successful change, a repeat refusal, a remove, create_set making a
+ * hidden meter, or an error that names the owner's meters.
+ */
+function executeManageMeter(
+  toolCallId: string,
+  params: ManageMeterParams,
+  storyData: StoryData
+): GMToolResult {
+  const owner = typeof params.owner === "string" ? params.owner.trim() : "";
+  const before = (storyData.meters ?? []).filter(
+    (m) => normalizeKey(m.owner) === normalizeKey(owner)
+  );
+  const named = typeof params.meter === "string" ? params.meter.trim() : "";
+  const result = executeManageMeterInner(toolCallId, params, storyData);
+  if (result.hiddenFromPlayer) return result;
+  let hidden = false;
+  if (!result.success) {
+    hidden = before.some((m) => m.hidden);
+  } else if (params.action === "create_set") {
+    const created = (result.result as GMManageMeterResult).created ?? [];
+    hidden = (storyData.meters ?? []).some(
+      (m) =>
+        m.hidden &&
+        normalizeKey(m.owner) === normalizeKey(owner) &&
+        created.includes(m.name)
+    );
+  } else {
+    hidden = !!findMeter(before, owner, named)?.hidden;
+  }
+  if (hidden) result.hiddenFromPlayer = true;
+  return result;
+}
+
+function executeManageMeterInner(
+  toolCallId: string,
+  params: ManageMeterParams,
+  storyData: StoryData
+): GMToolResult {
+  const fail = (message: string) =>
+    systemErrorResult("manage_meter", toolCallId, message);
+
+  const owner = typeof params.owner === "string" ? params.owner.trim() : "";
+  if (!owner) {
+    return fail(`manage_meter needs an "owner" (a character's name, or "world")`);
+  }
+  const meters: Meter[] = storyData.meters ?? [];
+  const named = typeof params.meter === "string" ? params.meter.trim() : "";
+
+  try {
+    if (params.action === "create_set") {
+      const setName = typeof params.set === "string" ? params.set.trim() : "";
+      const sets = resolveSystem(storyData).meterSets;
+      const set = sets.find((s) => normalizeKey(s.name) === normalizeKey(setName));
+      if (!set) {
+        return fail(
+          `Unknown meter set "${setName}". Sets available: ${
+            sets.length > 0 ? sets.map((s) => s.name).join(", ") : "none (use action create)"
+          }`
+        );
+      }
+      const { created, skipped } = createMeterSet(set, owner, meters);
+      storyData.meters = [...meters, ...created];
+      const lines = created.map(
+        (m) => `${m.name} ${m.value}/${m.cap}`
+      );
+      let ctx = `[Meter set "${set.name}" created for ${owner}: ${lines.join(", ") || "nothing new"}]`;
+      if (skipped.length > 0) ctx += `\n[Already had: ${skipped.join(", ")}]`;
+      return {
+        toolName: "manage_meter",
+        toolCallId,
+        success: true,
+        result: {
+          type: "manage_meter",
+          action: "create_set",
+          owner,
+          created: created.map((m) => m.name),
+          skipped,
+        } as GMManageMeterResult,
+        contextForStory: ctx,
+      };
+    }
+
+    if (!named) {
+      return fail(`manage_meter action "${params.action}" needs "meter"`);
+    }
+
+    if (params.action === "create") {
+      if (findMeter(meters, owner, named)) {
+        return fail(`${owner} already has a meter named "${named}"`);
+      }
+      const meter = createMeter(
+        {
+          name: named,
+          min: params.min as number,
+          max: params.max as number,
+          start: params.value as number,
+          thresholds: params.thresholds,
+          onlyUp: params.only_up,
+        },
+        owner
+      );
+      storyData.meters = [...meters, meter];
+      return {
+        toolName: "manage_meter",
+        toolCallId,
+        success: true,
+        result: {
+          type: "manage_meter",
+          action: "create",
+          owner,
+          meter: meter.name,
+        } as GMManageMeterResult,
+        contextForStory: `[Meter created: ${owner}: ${meter.name} ${meter.value}/${meter.cap} (range ${meter.min}-${meter.max}${meter.onlyUp ? ", only rises" : ""})]`,
+      };
+    }
+
+    const existing = findMeter(meters, owner, named);
+    if (!existing) {
+      return fail(
+        `No meter "${named}" for ${owner}. ${ownerMeterNames(meters, owner)}`
+      );
+    }
+
+    if (params.action === "remove") {
+      storyData.meters = meters.filter((m) => m.id !== existing.id);
+      return {
+        toolName: "manage_meter",
+        toolCallId,
+        success: true,
+        result: {
+          type: "manage_meter",
+          action: "remove",
+          owner,
+          meter: existing.name,
+        } as GMManageMeterResult,
+        contextForStory: `[Meter removed: ${existing.owner}: ${existing.name}]`,
+      };
+    }
+
+    let next: { meter: Meter; change: MeterChange };
+    if (params.action === "adjust") {
+      if (typeof params.by !== "number") {
+        return fail(`manage_meter action "adjust" needs "by" (a signed whole number)`);
+      }
+      if (params.once_per) {
+        if (params.once_per !== "scene" && params.once_per !== "session") {
+          return fail(`once_per must be "scene" or "session"`);
+        }
+        const key = typeof params.key === "string" ? params.key.trim() : "";
+        if (!key) {
+          return fail(`once_per needs a "key" naming the trigger (e.g. "sunlight")`);
+        }
+        const sys = ensureSystemState(storyData);
+        const sceneCount = storyData.agmtState?.sceneCount ?? 0;
+        const at = params.once_per === "scene" ? sceneCount : sys.sessionCount;
+        sys.dedupKeys = pruneDedupKeys(sys.dedupKeys, sceneCount, sys.sessionCount);
+        if (isDuplicate(sys.dedupKeys, existing.id, key, params.once_per, at)) {
+          return {
+            toolName: "manage_meter",
+            toolCallId,
+            success: true,
+            result: {
+              type: "manage_meter",
+              action: "adjust",
+              owner,
+              meter: existing.name,
+              refusedAsRepeat: true,
+            } as GMManageMeterResult,
+            contextForStory: `[Meter: no change - "${key}" already counted this ${params.once_per} for ${existing.owner}: ${existing.name} (still ${existing.value})]`,
+          };
+        }
+        next = adjustMeter(existing, params.by);
+        sys.dedupKeys = [
+          ...sys.dedupKeys,
+          {
+            meterId: existing.id,
+            key: normalizeKey(key),
+            scope: params.once_per,
+            at,
+          },
+        ];
+      } else {
+        next = adjustMeter(existing, params.by);
+      }
+    } else if (
+      params.action === "set" ||
+      params.action === "set_cap" ||
+      params.action === "set_floor"
+    ) {
+      if (typeof params.value !== "number") {
+        return fail(`manage_meter action "${params.action}" needs "value"`);
+      }
+      next =
+        params.action === "set"
+          ? setMeterValue(existing, params.value)
+          : params.action === "set_cap"
+            ? setMeterCap(existing, params.value)
+            : setMeterFloor(existing, params.value);
+    } else {
+      return fail(
+        `manage_meter called with unknown action "${String(params.action)}" (expected create/create_set/adjust/set/set_cap/set_floor/remove)`
+      );
+    }
+
+    storyData.meters = meters.map((m) => (m.id === existing.id ? next.meter : m));
+    let ctx = describeMeterChange(next.meter, next.change);
+    if (params.action === "set_cap") ctx += `\n[Cap is now ${next.meter.cap}]`;
+    if (params.action === "set_floor") ctx += `\n[Floor is now ${next.meter.floor}]`;
+    return {
+      toolName: "manage_meter",
+      toolCallId,
+      success: true,
+      hiddenFromPlayer: existing.hidden ? true : undefined,
+      result: {
+        type: "manage_meter",
+        action: params.action,
+        owner: existing.owner,
+        meter: existing.name,
+        change: next.change,
+      } as GMManageMeterResult,
+      contextForStory: ctx,
+    };
+  } catch (e) {
+    if (e instanceof MeterError) return fail(e.message);
+    throw e;
+  }
+}
+
+function isD10Face(n: unknown): n is number {
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 10;
+}
+
+function describeProgressTrack(t: ProgressTrack): string {
+  return `${t.kind} "${t.name}" (${t.owner}), ${t.rank}, ${filledBoxes(t.ticks)} of 10 boxes${
+    t.ticks % 4 > 0 ? ` + ${t.ticks % 4} ticks` : ""
+  }`;
+}
+
+async function executeManageTrack(
+  toolCallId: string,
+  params: ManageTrackParams,
+  storyData: StoryData,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
+  const fail = (message: string) =>
+    systemErrorResult("manage_track", toolCallId, message);
+
+  const owner = typeof params.owner === "string" ? params.owner.trim() : "";
+  const name = typeof params.track === "string" ? params.track.trim() : "";
+  if (!owner || !name) {
+    return fail(`manage_track needs "owner" and "track"`);
+  }
+  const tracks: ProgressTrack[] = storyData.progressTracks ?? [];
+  const trackResult = (
+    extra: Partial<GMManageTrackResult>,
+    contextForStory: string,
+    success = true
+  ): GMToolResult => ({
+    toolName: "manage_track",
+    toolCallId,
+    success,
+    result: {
+      type: "manage_track",
+      action: params.action,
+      owner,
+      track: name,
+      ...extra,
+    } as GMManageTrackResult,
+    contextForStory,
+  });
+
+  try {
+    if (params.action === "create") {
+      if (findTrack(tracks, owner, name)) {
+        return fail(`${owner} already has a track named "${name}"`);
+      }
+      if (!params.rank) {
+        return fail(
+          `manage_track action "create" needs "rank" (troublesome, dangerous, formidable, extreme or epic)`
+        );
+      }
+      const track = createTrack(owner, name, params.kind ?? "other", params.rank);
+      storyData.progressTracks = [...tracks, track];
+      return trackResult(
+        { ticks: 0, boxes: 0 },
+        `[Track created: ${describeProgressTrack(track)}]`
+      );
+    }
+
+    const existing = findTrack(tracks, owner, name);
+    if (!existing) {
+      const own = tracks.filter((t) => normalizeKey(t.owner) === normalizeKey(owner));
+      return fail(
+        `No track "${name}" for ${owner}. ${
+          own.length > 0 ? `${owner} has: ${own.map((t) => t.name).join(", ")}` : `${owner} has no tracks`
+        }`
+      );
+    }
+    const write = (next: ProgressTrack) => {
+      storyData.progressTracks = tracks.map((t) => (t.id === existing.id ? next : t));
+    };
+
+    switch (params.action) {
+      case "mark": {
+        if (existing.status !== "active") {
+          return fail(`"${existing.name}" is ${existing.status}, not active`);
+        }
+        const m = markProgress(existing, params.times ?? 1);
+        write(m.track);
+        return trackResult(
+          { ticks: m.track.ticks, boxes: m.boxesAfter },
+          `[Track: ${existing.kind} "${existing.name}" - ${existing.rank}, ${m.boxesBefore} → ${m.boxesAfter} boxes (+${m.ticksAdded} ticks, ${m.track.ticks}/40)]`
+        );
+      }
+      case "progress_roll": {
+        if (existing.status !== "active") {
+          return fail(`"${existing.name}" is ${existing.status}, not active`);
+        }
+        let faces: [number, number];
+        if (params.dice !== undefined) {
+          if (storyData.diceMode !== "manual") {
+            return fail(
+              `"dice" is only for manual dice mode, where the player reports their physical roll. Leave it out and the engine rolls.`
+            );
+          }
+          if (!Array.isArray(params.dice) || params.dice.length !== 2 || !isD10Face(params.dice[0]) || !isD10Face(params.dice[1])) {
+            return fail(`dice must be two whole numbers from 1 to 10`);
+          }
+          faces = [params.dice[0], params.dice[1]];
+        } else {
+          const [r] = await rollFormulasMaybePhysical(
+            ["2d10"],
+            { reason: params.reason || `Progress roll: ${existing.name}` },
+            interaction
+          );
+          const f = flattenRolls(r.rolls);
+          faces = [f[0], f[1]];
+        }
+        const boxes = filledBoxes(existing.ticks);
+        const { outcome, match } = resolveAgainstChallengeDice(boxes, faces[0], faces[1]);
+        const word = outcome === "strong_hit" ? "STRONG HIT" : outcome === "weak_hit" ? "WEAK HIT" : "MISS";
+        let ctx = `[Progress roll: ${existing.kind} "${existing.name}", ${boxes} boxes vs ${faces[0]} and ${faces[1]} → ${word}]`;
+        if (match) ctx += `\n[MATCH: both challenge dice show ${faces[0]}. Something unexpected enters: a complication on a hit, a turn for the worse on a miss.]`;
+        ctx += `\n[The track stays active until you set its status.]`;
+        // Like action_roll, success carries the engine's verdict (a miss is a
+        // failed check, not a failed call).
+        return trackResult(
+          { outcome, dice: faces, match, ticks: existing.ticks, boxes },
+          ctx,
+          outcome !== "miss"
+        );
+      }
+      case "set_status": {
+        const st = params.status;
+        if (st !== "fulfilled" && st !== "forsaken" && st !== "cleared") {
+          return fail(`manage_track set_status needs "status": fulfilled, forsaken or cleared`);
+        }
+        write({ ...existing, status: st });
+        return trackResult({}, `[Track: ${existing.kind} "${existing.name}" is now ${st}]`);
+      }
+      case "halve": {
+        const next = halveTrack(existing);
+        write(next);
+        return trackResult(
+          { ticks: next.ticks, boxes: filledBoxes(next.ticks) },
+          `[Track: "${existing.name}" progress halved, ${filledBoxes(existing.ticks)} → ${filledBoxes(next.ticks)} boxes]`
+        );
+      }
+      case "set_rank": {
+        if (!params.rank || !(params.rank in TICKS_PER_MARK)) {
+          return fail(`manage_track set_rank needs "rank"`);
+        }
+        write({ ...existing, rank: params.rank });
+        return trackResult(
+          {},
+          `[Track: "${existing.name}" is now ${params.rank} (marks add ${TICKS_PER_MARK[params.rank]} ticks); existing progress is unchanged]`
+        );
+      }
+      case "remove": {
+        storyData.progressTracks = tracks.filter((t) => t.id !== existing.id);
+        return trackResult({}, `[Track removed: "${existing.name}"]`);
+      }
+      default:
+        return fail(
+          `manage_track called with unknown action "${String(params.action)}" (expected create/mark/progress_roll/set_status/halve/set_rank/remove)`
+        );
+    }
+  } catch (e) {
+    if (e instanceof MeterError) return fail(e.message);
+    throw e;
+  }
+}
+
+function executeEndSession(
+  toolCallId: string,
+  params: EndSessionParams,
+  storyData: StoryData
+): GMToolResult {
+  const sys = ensureSystemState(storyData);
+  sys.sessionCount += 1;
+  const sceneCount = storyData.agmtState?.sceneCount ?? 0;
+  sys.dedupKeys = pruneDedupKeys(sys.dedupKeys, sceneCount, sys.sessionCount);
+
+  const reset: string[] = [];
+  storyData.meters = (storyData.meters ?? []).map((m) => {
+    if (m.resetsAtSessionEnd === undefined) return m;
+    const value = Math.min(m.cap, Math.max(m.floor, m.resetsAtSessionEnd));
+    reset.push(`${m.owner}: ${m.name} → ${value}`);
+    return { ...m, value };
+  });
+
+  const reminder = resolveSystem(storyData).endOfSessionReminder;
+  let ctx = `[Session ${sys.sessionCount} ended${params.reason ? `: ${params.reason}` : ""}. Session ${sys.sessionCount + 1} begins; once-per-session triggers are available again.]`;
+  if (reset.length > 0) ctx += `\n[Reset at session end: ${reset.join("; ")}]`;
+  if (reminder) ctx += `\n[End-of-session reminder: ${reminder}]`;
+  return {
+    toolName: "end_session",
+    toolCallId,
+    success: true,
+    result: {
+      type: "end_session",
+      sessionCount: sys.sessionCount,
+      reset,
+    } as GMEndSessionResult,
+    contextForStory: ctx,
+  };
+}
+
+async function executeActionRoll(
+  toolCallId: string,
+  params: ActionRollParams,
+  storyData: StoryData,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
+  const fail = (message: string) =>
+    systemErrorResult("action_roll", toolCallId, message);
+
+  if (typeof params.stat_value !== "number" || !Number.isFinite(params.stat_value)) {
+    return fail(`action_roll needs "stat_value", the number from the character sheet`);
+  }
+  const adds = typeof params.adds === "number" ? params.adds : 0;
+  const penalty =
+    typeof params.penalty === "number" && Number.isFinite(params.penalty)
+      ? Math.max(0, params.penalty)
+      : 0;
+
+  let actionDie: number;
+  let challengeDice: [number, number];
+  if (params.dice !== undefined) {
+    if (storyData.diceMode !== "manual") {
+      return fail(
+        `"dice" is only for manual dice mode, where the player reports their physical roll. Leave it out and the engine rolls.`
+      );
+    }
+    const d = params.dice;
+    const okAction =
+      !!d && typeof d.action === "number" && Number.isInteger(d.action) && d.action >= 1 && d.action <= 6;
+    const okChallenge =
+      !!d &&
+      Array.isArray(d.challenge) &&
+      d.challenge.length === 2 &&
+      isD10Face(d.challenge[0]) &&
+      isD10Face(d.challenge[1]);
+    if (!okAction || !okChallenge) {
+      return fail(
+        `dice must be {action: 1-6, challenge: [1-10, 1-10]}, the faces the player reported`
+      );
+    }
+    actionDie = d.action;
+    challengeDice = [d.challenge[0], d.challenge[1]];
+  } else {
+    try {
+      const [dieRoll, challengeRoll] = await rollFormulasMaybePhysical(
+        ["1d6", "2d10"],
+        { reason: params.reason || "Action roll" },
+        interaction
+      );
+      const a = flattenRolls(dieRoll.rolls);
+      const c = flattenRolls(challengeRoll.rolls);
+      actionDie = a[0];
+      challengeDice = [c[0], c[1]];
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : "The dice could not be rolled");
+    }
+  }
+
+  const { score, addsApplied, capped } = actionScore(
+    actionDie,
+    params.stat_value,
+    adds,
+    penalty
+  );
+  const { outcome, match } = resolveAgainstChallengeDice(
+    score,
+    challengeDice[0],
+    challengeDice[1]
+  );
+  const word = outcome === "strong_hit" ? "STRONG HIT" : outcome === "weak_hit" ? "WEAK HIT" : "MISS";
+  const who = params.owner ? `${params.owner}: ` : "";
+  const parts = [`d6 ${actionDie}`, `+ ${params.stat_name} ${params.stat_value}`];
+  if (addsApplied > 0) parts.push(`+ adds ${addsApplied}`);
+  if (penalty > 0) parts.push(`- penalty ${penalty}`);
+  let ctx = `[Action roll - ${who}${params.move ? `${params.move} ` : ""}+${params.stat_name}: ${parts.join(" ")} = ${score}${capped ? " (capped at 10)" : ""} vs ${challengeDice[0]} and ${challengeDice[1]} → ${word}]`;
+  if (adds > ACTION_ADDS_CAP) {
+    ctx += `\n[Only +${ACTION_ADDS_CAP} of the ${adds} adds claimed applies.]`;
+  }
+  if (match) {
+    ctx += `\n[MATCH: both challenge dice show ${challengeDice[0]}. Something unexpected enters the scene: a complication on a hit, a turn for the worse on a miss.]`;
+  }
+  ctx += `\n[Reason: ${params.reason}]`;
+  if (params.stakes) {
+    ctx += `\n[Stakes: ${params.stakes}]`;
+    ctx += applyStakesEscalation(storyData, params.stakes);
+  }
+
+  return {
+    toolName: "action_roll",
+    toolCallId,
+    // Like record_challenge_result, success carries the outcome: a miss is
+    // a failed check, not a failed call.
+    success: outcome !== "miss",
+    result: {
+      type: "action_roll",
+      statName: params.stat_name,
+      statValue: params.stat_value,
+      adds,
+      addsApplied,
+      penalty,
+      actionDie,
+      challengeDice,
+      score,
+      capped,
+      outcome,
+      match,
+      move: params.move,
+      owner: params.owner,
+    } as GMActionRollResult,
+    contextForStory: ctx,
+  };
 }
 
 // ============================================

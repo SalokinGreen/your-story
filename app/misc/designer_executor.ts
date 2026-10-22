@@ -18,7 +18,9 @@ import {
   StartingChoice,
   StoryData,
   StoryLore,
+  SystemState,
 } from "@/app/misc/structs";
+import { resolveSystem } from "@/app/misc/systems/resolve";
 import { createCharacterSheetTemplate } from "@/app/misc/characterSheetTemplate";
 import { migrateCustomTablesToNotes } from "@/app/misc/tableNotes";
 
@@ -48,6 +50,9 @@ export interface AdventureDraft {
   startingChoices: StartingChoice[];
   presets: Preset[];
   characterSheetTemplate?: CharacterSheetTemplate;
+  // The hand switch for the meter, track, session and action-roll tools
+  // (decision 79). Unset means "derive it from the notes imported".
+  systemState?: Pick<SystemState, "usesSystemTools">;
 }
 
 /** A trailing warning for the Designer when a note sent to the GM in full every turn is long (decision 96). */
@@ -560,6 +565,15 @@ export function draftToAdventure(draft: AdventureDraft): Partial<Adventure> {
     npcs: draft.npcs.length > 0 ? draft.npcs : undefined,
     goals: draft.goals,
     presets: draft.presets,
+    ...(draft.systemState?.usesSystemTools !== undefined
+      ? {
+          systemState: {
+            usesSystemTools: draft.systemState.usesSystemTools,
+            sessionCount: 0,
+            dedupKeys: [],
+          },
+        }
+      : {}),
   };
 
   return {
@@ -608,6 +622,9 @@ export function adventureToDraft(adventure: Partial<Adventure>): AdventureDraft 
     startingChoices: adventure.startingChoices ?? [],
     presets: adventure.presets ?? story.presets ?? [],
     characterSheetTemplate: adventure.characterSheetTemplate,
+    ...(story.systemState?.usesSystemTools !== undefined
+      ? { systemState: { usesSystemTools: story.systemState.usesSystemTools } }
+      : {}),
   };
 }
 
@@ -687,6 +704,24 @@ export function summarizeDraft(draft: AdventureDraft): string {
       draft.characterSheetTemplate?.template ? "set" : "not set"
     }`,
   );
+
+  const resolved = resolveSystem({
+    lore: draft.lore,
+    systemState: {
+      sessionCount: 0,
+      dedupKeys: [],
+      usesSystemTools: draft.systemState?.usesSystemTools,
+    },
+  });
+  if (resolved.system || draft.systemState?.usesSystemTools !== undefined) {
+    lines.push(
+      `Built-in system: ${resolved.system ? `"${resolved.system.title}"` : "(none found in the notes)"}; meter, track, session and action-roll tools ${resolved.usesSystemTools ? "ON" : "OFF"}${
+        resolved.meterSets.length
+          ? `; meter sets: ${resolved.meterSets.map((m) => `"${m.name}"`).join(", ")}`
+          : ""
+      }`,
+    );
+  }
 
   return lines.join("\n");
 }

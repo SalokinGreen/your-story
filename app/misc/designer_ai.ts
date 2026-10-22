@@ -15,6 +15,8 @@ import {
   draftReadiness,
   summarizeDraft,
 } from "@/app/misc/designer_executor";
+import { BUILTIN_SYSTEMS } from "@/app/misc/systems";
+import type { BuiltinSystem } from "@/app/misc/systems/types";
 
 const DESIGNER_SYSTEM_PROMPT = `You are a game designer and story writer. You work with an author to build a playable interactive-fiction adventure, one conversation at a time.
 
@@ -64,11 +66,29 @@ Call tools to write into the adventure. Everything you write through a tool is i
 
 Never claim to have written something without calling the matching tool. If you say you'll add it, add it.`;
 
+/**
+ * One paragraph naming the built-in rules packs the author can import from
+ * the library, so the Designer points to them instead of rewriting a system
+ * that already exists. Empty while there are none, which keeps the system
+ * prompt byte-identical for now.
+ */
+export function builtinSystemsParagraph(
+  systems: BuiltinSystem[] = BUILTIN_SYSTEMS,
+): string {
+  if (systems.length === 0) return "";
+  const list = systems
+    .map((s) => `**${s.title}** (${s.description})`)
+    .join(" ");
+  return `## Built-in rules packs\n\nThe library ships ready-made rules the author can import with the library picker: ${list} Importing a pack adds its notes to the adventure and turns on the engine's meters, progress tracks and action rolls. If the author wants one of these systems, tell them to import the pack rather than rewriting its rules, and design the setting, people and opening around it.`;
+}
+
 export interface BuildDesignerMessagesOptions {
   /** Full chat history so far, oldest first. Excludes the system prompt. */
   history: ChatMessage[];
   /** Current draft, injected so the model always sees live state. */
   draft: AdventureDraft;
+  /** Built-in systems to mention; defaults to the registry. */
+  systems?: BuiltinSystem[];
 }
 
 /**
@@ -82,7 +102,9 @@ export interface BuildDesignerMessagesOptions {
 export function buildDesignerMessages({
   history,
   draft,
+  systems,
 }: BuildDesignerMessagesOptions): ChatMessage[] {
+  const builtins = builtinSystemsParagraph(systems);
   const readiness = draftReadiness(draft);
 
   const stateBlock = [
@@ -98,7 +120,12 @@ export function buildDesignerMessages({
   ].join("\n");
 
   return [
-    { role: "system", content: DESIGNER_SYSTEM_PROMPT },
+    {
+      role: "system",
+      content: builtins
+        ? `${DESIGNER_SYSTEM_PROMPT}\n\n${builtins}`
+        : DESIGNER_SYSTEM_PROMPT,
+    },
     ...history,
     { role: "system", content: stateBlock },
   ];

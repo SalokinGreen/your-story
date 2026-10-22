@@ -10,6 +10,34 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-22 — Default systems PR A: the engine (`claude/default-systems-a`)
+
+The suite covers every tool through `executeGMTools`, the state sections, the
+offered tool list and its token bound. No model was called, and nothing is
+offered to a GM until PR C ships a system (the registry is empty), so none of
+this is reachable in play yet except by the hand switch.
+
+- **The system tools through a real model.** In the Game Designer, set the
+  hand switch (not exposed in the inspector until PR B; edit
+  `storyTemplate.systemState.usesSystemTools` to `true` in a saved
+  adventure, or wait for PR B), start the adventure, and tell the GM to
+  create a Stress meter for you and raise it twice, make a vow, mark it and
+  roll its progress. *Expected:* `manage_meter`/`manage_track` calls with
+  valid arguments, results in the tool log, the "Meters & tracks" lines in
+  the Debug Logs context. *Failure looks like:* an "invalid arguments" error
+  on a tool; the schema description to fix is the one named.
+- **A tally fight on a default model.** Ask the GM to start a three-round
+  tally challenge and play three turns. *Expected:* one `action_roll` per
+  turn, `record_challenge_result` with `strong_hit`/`weak_hit`/`miss`, the
+  "Active challenge" line in the context each turn, and a close at round 3.
+  *Failure looks like:* the GM using `success`/`failure` (the engine refuses
+  and says why) or rolling twice a turn.
+- **The physical dice tray with `action_roll`.** With physical dice on, an
+  `action_roll` should throw one d6 and two d10s in one toss and use their
+  faces. Only the request shape is tested (one throw of `1d6` and `2d10`).
+- **Gemini.** The challenge tools are still dropped by the stale Google
+  filter (status report 6.14); the new tools were added to it.
+
 ## 2026-10-22 — Token savings PR T3: the trimmed tool list and the note limits (`claude/token-savings-t3`)
 
 The suite checks the list's size and stability and the cap's arithmetic; no

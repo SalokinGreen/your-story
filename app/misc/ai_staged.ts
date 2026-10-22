@@ -9,6 +9,7 @@
   CombatState,
   Combatant,
   CountdownTimer,
+  SceneChallenge,
   PendingDirectorMove,
 } from "@/app/misc/structs";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
@@ -25,6 +26,8 @@ import {
   SETUP_REMINDER_URGENT_TURNS,
 } from "@/app/misc/campaignPlan";
 import { cleanString } from "@/app/misc/textUtils";
+import { currentThreshold, filledBoxes } from "@/app/misc/metersAndTracks";
+import { resolveSystem, SYSTEM_TOOL_NAMES } from "@/app/misc/systems/resolve";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import {
   PINNED_TOTAL_CAP_TOKENS,
@@ -426,6 +429,69 @@ export function formatTimersState(
   }
 
   return lines.join("\n");
+}
+
+/**
+ * The GM's view of meters, progress tracks and the session count: one line
+ * per owner for meters (hidden ones included, this is the GM's view), one
+ * line per active track. Goes in the live block beside the timers, never the
+ * stable prefix, so a meter tick does not re-price the cached history.
+ */
+export function formatMetersAndTracksState(
+  storyData: Pick<StoryData, "meters" | "progressTracks" | "systemState">,
+): string {
+  const meters = storyData.meters || [];
+  const tracks = (storyData.progressTracks || []).filter(
+    (t) => t.status === "active",
+  );
+  const session = storyData.systemState?.sessionCount ?? 0;
+  if (meters.length === 0 && tracks.length === 0) return "";
+
+  const lines: string[] = ["## 📊 METERS & TRACKS"];
+  if (session > 0) lines.push(`Session ${session + 1}`);
+
+  const owners: string[] = [];
+  for (const m of meters) {
+    if (!owners.includes(m.owner)) owners.push(m.owner);
+  }
+  for (const owner of owners) {
+    const parts = meters
+      .filter((m) => m.owner === owner)
+      .map((m) => {
+        const t = currentThreshold(m);
+        const notes: string[] = [];
+        if (m.cap < m.max) notes.push(`cap ${m.cap}`);
+        if (m.floor > m.min) notes.push(`floor ${m.floor}`);
+        if (t) notes.push(t.label);
+        if (m.hidden) notes.push("hidden");
+        return `${m.name} ${m.value}/${m.max}${notes.length > 0 ? ` (${notes.join(", ")})` : ""}`;
+      });
+    lines.push(`${owner} - ${parts.join(" · ")}`);
+  }
+  for (const t of tracks) {
+    const kind = t.kind.charAt(0).toUpperCase() + t.kind.slice(1);
+    const boxes = filledBoxes(t.ticks);
+    const extra = t.ticks % 4;
+    lines.push(
+      `${kind}: ${t.name} (${t.owner}) - ${t.rank}, ${boxes} box${boxes === 1 ? "" : "es"}${extra > 0 ? ` + ${extra} tick${extra === 1 ? "" : "s"}` : ""}`,
+    );
+  }
+  return lines.join("\n");
+}
+
+/** The active challenge as the GM sees it each turn (it used to need get_game_state). */
+export function formatActiveChallengeState(
+  challenge: SceneChallenge | undefined,
+): string {
+  if (!challenge || !challenge.active) return "";
+  const head = `## ⚔️ ACTIVE CHALLENGE\n"${challenge.name}" - `;
+  if (challenge.mode === "tally") {
+    const tally = challenge.tally ?? 0;
+    return `${head}tally, round ${(challenge.recorded ?? 0) + 1} of ${challenge.rounds}, tally ${tally > 0 ? `+${tally}` : tally} (strong hit +1, weak hit 0, miss -1)`;
+  }
+  const need = challenge.requiredSuccesses ?? Math.floor(challenge.rounds / 2) + 1;
+  const lose = challenge.maxFailures ?? Math.floor(challenge.rounds / 2) + 1;
+  return `${head}first to ${need}: ${challenge.currentSuccesses} success${challenge.currentSuccesses === 1 ? "" : "es"}, ${challenge.currentFailures} of ${lose} failures`;
 }
 
 // Strips markdown formatting from text to save tokens in older messages
@@ -1113,6 +1179,10 @@ export interface LiveBlockInput {
   oracleSection: string;
   combatSection: string;
   timersSection: string;
+  // Meters, tracks and the active challenge (default-systems slices 2 and 4);
+  // per-turn state, so they live here and never in the stable block.
+  metersSection?: string;
+  challengeSection?: string;
   pendingEventsSection: string;
   pendingMovesSection: string;
   freshStorySetupBlock: string;
@@ -1137,6 +1207,8 @@ export function buildLiveBlock(input: LiveBlockInput): string {
   if (input.oracleSection) out += input.oracleSection + "\n\n";
   if (input.combatSection) out += input.combatSection + "\n";
   if (input.timersSection) out += input.timersSection + "\n";
+  if (input.metersSection) out += input.metersSection + "\n";
+  if (input.challengeSection) out += input.challengeSection + "\n";
   // Pending random events / director moves - must be addressed
   if (input.pendingEventsSection) out += input.pendingEventsSection + "\n\n";
   if (input.pendingMovesSection) out += input.pendingMovesSection + "\n\n";
@@ -1456,6 +1528,11 @@ export function buildGMStagePrompt({
 
   // Format timers state for context
   const timersSection = formatTimersState(storyData.timers);
+
+  // Meters, tracks and the active challenge: shown whenever there is
+  // something to show, whether or not the system tools are offered.
+  const metersSection = formatMetersAndTracksState(storyData);
+  const challengeSection = formatActiveChallengeState(storyData.activeChallenge);
 
   // Pending random events and director moves - must be surfaced here (the
   // live GM stage, which is what actually calls resolve_random_event/
@@ -1932,6 +2009,9 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "gm_roll",
     // Manual dice mode: player rolls real dice, GM asks for the result
     ...(manualDiceMode ? ["ask_for_roll"] : []),
+    // Meters, tracks, sessions and action rolls: only for stories that use a
+    // system (decision 79), so other adventures do not pay for four schemas
+    ...(resolveSystem(storyData).usesSystemTools ? SYSTEM_TOOL_NAMES : []),
     // Pause and ask the player(s) a predefined-choice + free-text question
     "ask_question",
     // Report a resolved check against the active challenge (rolls nothing)
@@ -2055,6 +2135,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     oracleSection: gmOracleSection,
     combatSection,
     timersSection,
+    metersSection,
+    challengeSection,
     pendingEventsSection: gmStagePendingEventsSection,
     pendingMovesSection: gmStagePendingDirectorMovesSection,
     freshStorySetupBlock,

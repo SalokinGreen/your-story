@@ -119,6 +119,7 @@ renames (§5.7).
 | 87 | The renames for names the book uses twice (§5.7) | **All four accepted**: the Rite *The Reckoning* becomes *The Calling Due*, the Rite *The Vigil* becomes *The Wake*, the Haven *The Hollow* becomes *The Forgotten Room*, and the Werewolf's Beast track *The Turning* becomes *The Wild*. |
 | 88 | Is the design approved | **Approved; write the implementation plan** ("Approved: write the plan"). Building still waits for the author's yes on that plan. |
 | 89 | How the rulebook reaches a build session, since it existed only as an upload | **Committed to the repository** ("Commit the book to the repo"), as `docs/blood-and-bone/rulebook.md`, with decision 69's rewrites applied and the credits completed, as the source the AI edition is written from. |
+| 108 | Build the default-systems plan (2026-10-22, to the coordinating session) | **Approved** ("Approved. Also pull from origin and do the token saving + default system plans."; later "Yes merge everything"). `default-systems-implementation-plan.md` is built in three PRs, A (slices 1-5, the engine) first, on top of the token-savings prompt layout; each merge still waits for the author's word (decision 5). |
 
 ### Interview six — party mode on the desktop (2026-10-21)
 

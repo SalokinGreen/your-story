@@ -994,6 +994,14 @@ noted.
 
 ### 11.3 GM tool catalogue
 
+> **Update 2026-10-22 (default systems PR A):** `GM_TOOL_SCHEMAS` gains four
+> tools offered only to stories that use a system, `manage_meter`,
+> `manage_track`, `end_session` and `action_roll`; `start_challenge` gains a
+> `tally` mode and `record_challenge_result` the outcomes `strong_hit`,
+> `weak_hit` and `miss`. The second `start_challenge` schema and executor in
+> `toolSchemas.ts` and `toolExecutor.ts` are removed. See
+> [`default-systems-implementation-plan.md`](default-systems-implementation-plan.md).
+
 Two schema sources: `app/misc/gmTools.ts` (`GM_TOOL_SCHEMAS`, 37 tools) and
 `app/misc/toolSchemas.ts` (`TOOL_SCHEMAS`, 41). The whitelist is in
 `buildGMStagePrompt()` (`ai_staged.ts` — `legacyToolNames` ~l.1708 filtered from

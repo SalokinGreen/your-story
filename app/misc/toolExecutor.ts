@@ -56,7 +56,6 @@ import {
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
-import { parseChallengeRoundsValue } from "@/app/misc/rpgSystems";
 import { initializeAbility } from "@/app/misc/abilitySystem";
 
 /**
@@ -2328,84 +2327,8 @@ export function executeTools(
 
       // === SCENE CHALLENGE (PROGRESS CLOCK) TOOL HANDLERS ===
 
-      // Start a new challenge
-      if (toolCall.function.name === "start_challenge") {
-        const name = args.name?.trim();
-        const description = args.description?.trim();
-        // Rounds can be a tier string or number - convert using tier system
-        let rounds = parseChallengeRoundsValue(args.rounds ?? "standard");
-        const initialSuccesses = Math.min(args.initialSuccesses ?? 0, 3);
-        const initialFailures = Math.min(args.initialFailures ?? 0, 3);
-
-        // Ensure rounds is odd and within bounds (3, 5, 7, or 9)
-        if (rounds < 3) rounds = 3;
-        if (rounds > 9) rounds = 9;
-        if (rounds % 2 === 0) rounds += 1; // Make odd
-
-        if (!name || name.length < 3) {
-          const errorMsg = "Challenge name must be at least 3 characters";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/start_challenge: ${name || ""}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Check if there's already an active challenge
-        if (storyData.activeChallenge?.active) {
-          const errorMsg = `Cannot start new challenge: "${storyData.activeChallenge.name}" is still active`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/start_challenge: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const majority = Math.ceil(rounds / 2);
-
-        // Create the new challenge
-        storyData.activeChallenge = {
-          id: crypto.randomUUID(),
-          name,
-          description,
-          rounds,
-          currentSuccesses: initialSuccesses,
-          currentFailures: initialFailures,
-          active: true,
-          createdAt: Date.now(),
-        };
-
-        logger.action("Challenge started via tool", {
-          toolCallId: toolId,
-          name,
-          rounds,
-          majority,
-          initialSuccesses,
-          initialFailures,
-        });
-        responses.push({
-          command: `/start_challenge: ${name}`,
-          success: true,
-          message: `🎯 CHALLENGE STARTED: ${name} (Best of ${rounds} - first to ${majority}) [Score: ${initialSuccesses}-${initialFailures}]`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
+      // (start_challenge lives only in gmExecutor.ts: the GM switch handles it
+      // before anything reaches here, and its schema was never offered here.)
 
       // Update challenge progress
       if (toolCall.function.name === "update_challenge") {
