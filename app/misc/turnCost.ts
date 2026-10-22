@@ -366,7 +366,11 @@ export function recordAICall(params: RecordAICallParams): void {
       completionTokens: params.completionTokens || 0,
       ...(params.cachedTokens ? { cachedTokens: params.cachedTokens } : {}),
       ...(params.cacheWriteTokens ? { cacheWriteTokens: params.cacheWriteTokens } : {}),
-      ...(params.cachedTokens && price.cachedInputPrice === undefined
+      // Only when the dollar figure that counts is our own: a provider-reported
+      // cost (OpenRouter's usage.cost) already reflects the cache discount.
+      ...(params.cachedTokens &&
+      price.cachedInputPrice === undefined &&
+      params.providerReportedUsd === undefined
         ? { cachedAtFullPrice: true }
         : {}),
       costUsd: priceCall(

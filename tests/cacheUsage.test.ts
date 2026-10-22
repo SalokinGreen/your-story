@@ -107,8 +107,19 @@ describe("the ledger", () => {
       cachedTokens: 5000,
       cacheWriteTokens: 1000,
     });
+    recordAICall({
+      stage: "gm",
+      label: "GM round 3",
+      modelKey: "Claude Haiku 5.5",
+      promptTokens: 10_000,
+      completionTokens: 100,
+      cachedTokens: 5000,
+      providerReportedUsd: 0.002,
+    });
     const report = getTurnCostReport(turnId)!;
-    expect(report.cachedTokens).toBe(13_000);
+    // A provider-reported cost already includes the discount: no flag.
+    expect(report.entries[2].cachedAtFullPrice).toBeUndefined();
+    expect(report.cachedTokens).toBe(18_000);
     expect(report.entries[0].cachedAtFullPrice).toBeUndefined();
     expect(report.entries[1].cachedAtFullPrice).toBe(true);
     expect(report.entries[1].cacheWriteTokens).toBe(1000);

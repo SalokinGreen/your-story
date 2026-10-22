@@ -523,16 +523,14 @@ describe("Claude prompt caching on the GM stage (A3)", () => {
     const marks1 = breakpointIndexes(sent1.messages);
     const marks2 = breakpointIndexes(sent2.messages);
     // Round 1 has no round history yet: system, the end of history (here the
-    // acknowledgement after the stable block) and the action. Round 2 adds
-    // the round mark on its latest message, so its marks are a superset.
+    // acknowledgement after the stable block) and the action. Round 1 here
+    // made a tool call with no text, and a round mark never lands on a tool
+    // message (or an empty one), so round 2 carries the same three.
     expect(marks1).toHaveLength(3);
-    expect(marks2.slice(0, 3)).toEqual(marks1);
-    expect(marks2).toHaveLength(4);
+    expect(marks2).toEqual(marks1);
     expect(marks1[0]).toBe(0);
     expect(sent1.messages[0].role).toBe("system");
     expect(sent1.messages[marks1[1]].role).toBe("assistant");
-    // The round mark is the last message of round 2's request.
-    expect(marks2[3]).toBe(sent2.messages.length - 1);
 
     // marks1[2] is the action; keep the older names below.
     marks1.splice(1, 1);

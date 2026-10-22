@@ -599,6 +599,25 @@ it on the diff.
 - `callSideModel` gained an optional `cacheKey` but no caller passes one (the
   side agents are not a conversation to keep warm).
 
+### 2026-10-22 - after the engine review (PR T2)
+
+- **The round mark never lands on a `tool` message** (the earlier decision
+  that it could is withdrawn). `markRoundBreakpoint` walks back to the last
+  non-tool message with text and puts no mark if that one is already marked
+  or there is none; a tool-only round therefore gets no round mark.
+- **`cachedAtFullPrice` is set only without a provider-reported cost**, since
+  `effectiveUsd` prefers OpenRouter's `usage.cost`, which already has the
+  discount.
+- Anthropic's cache lookback is about 20 content blocks. After a turn with
+  about 10 or more tool calls, the next turn's `prefix` mark will miss, so the
+  history is re-written at 1.25x; the harness's shared-token count overstates
+  Claude's saving on tool-heavy turns. A possible fix later is an intermediate
+  history mark.
+- The Mistral retry can fire once on an unrelated 400 whose body echoes
+  `prompt_cache_key`. That is accepted.
+- `ai_staged.ts`: the `get_game_state` line said "the state shown above"; it
+  now says "the state in the live block".
+
 ### 2026-10-22 - PR T2, slice 7 (cached tokens in the ledger), added after the first report
 
 Tests 2,283 to 2,291 (+8: `cacheUsage` 8; `claudeCli.fetch` and `turnCost`

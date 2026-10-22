@@ -35,13 +35,15 @@ for the last turn, and the Debug Logs' "AI generation complete" line logs
   everything but the live block and the action). *Failure looks like:* 0
   cached on every first round, which means the prefix is still changing;
   compare two turns' requests in the Debug Logs.
-- **Claude's round mark on a tool result (Claude via OpenRouter, if played).**
-  A turn with at least one tool call. *Expected:* round 2 onwards shows cache
-  reads. *Failure looks like:* a 400 from OpenRouter on the round after a
-  tool call that names `cache_control` or the tool message's content: the
-  third mark lands on a `tool` message, whose content is sent as a list of
-  parts, and OpenRouter may not forward that. The fix is to mark the
-  preceding assistant message instead.
+- **Claude's round mark and tool results (Claude via OpenRouter, if played).**
+  The round mark never lands on a `tool` message (OpenRouter types a tool
+  message's content as a string); it walks back to the last assistant or
+  user message with text, or is left off. A turn with tool calls and some
+  assistant text. *Expected:* round 2 onwards shows cache reads for the part
+  up to that text. *Open question, a possible later gain and not a crash
+  risk:* would OpenRouter accept `cache_control` on a tool message's content
+  parts? If it does, the mark could sit on the latest tool result and cache
+  the whole round.
 - **Claude, five minutes apart.** Turns more than five minutes apart should
   not read cache (decision 104 decides whether to move to the 1-hour cache).
 - **The subscription route.** On the desktop, one turn on a Claude

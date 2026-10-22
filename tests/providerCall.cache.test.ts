@@ -163,16 +163,17 @@ describe("Claude's four cache breakpoints", () => {
         { role: "user", content: "live and action", cacheBreakpoint: "turn" },
         {
           role: "assistant",
-          content: "",
+          content: "Checking.",
+          cacheBreakpoint: "round",
           tool_calls: [{ id: "c1", type: "function", function: { name: "calculate", arguments: "{}" } }],
         },
-        { role: "tool", content: "result", tool_call_id: "c1", cacheBreakpoint: "round" },
+        { role: "tool", content: "result", tool_call_id: "c1" },
       ],
       tools: TOOLS,
       model: "Claude Sonnet 5.5",
       openRouterKey: "k",
     });
-    expect(cachedIndexes(bodyOf(fetchMock).messages)).toEqual([0, 4, 5, 7]);
+    expect(cachedIndexes(bodyOf(fetchMock).messages)).toEqual([0, 4, 5, 6]);
   });
 
   it("never marks an empty message, and collapses marks that land together", async () => {

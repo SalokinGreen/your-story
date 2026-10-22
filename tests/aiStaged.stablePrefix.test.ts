@@ -159,15 +159,32 @@ describe("cache marks and keys", () => {
     markRoundBreakpoint(round1, false);
     expect(round1[0].cacheBreakpoint).toBe("turn");
 
-    const round2 = [...base, { role: "tool", content: "result", tool_call_id: "x" } as ChatMessage];
+    const round2 = [
+      ...base,
+      { role: "assistant", content: "Let me check.", tool_calls: [{ id: "x" }] } as ChatMessage,
+      { role: "tool", content: "result", tool_call_id: "x" } as ChatMessage,
+    ];
     markRoundBreakpoint(round2, true);
+    // Never on the tool message: the mark walks back to the assistant text.
+    expect(round2[2].cacheBreakpoint).toBeUndefined();
     expect(round2[1].cacheBreakpoint).toBe("round");
     expect(base).toHaveLength(1);
     expect(base[0].cacheBreakpoint).toBe("turn");
   });
 
+  it("puts no round mark when only tool or empty messages follow the action", () => {
+    const m: ChatMessage[] = [
+      { role: "user", content: "action", cacheBreakpoint: "turn" },
+      { role: "assistant", content: "", tool_calls: [{ id: "x" }] } as ChatMessage,
+      { role: "tool", content: "result", tool_call_id: "x" } as ChatMessage,
+    ];
+    markRoundBreakpoint(m, true);
+    expect(m.some((x) => x.cacheBreakpoint === "round")).toBe(false);
+    expect(m[0].cacheBreakpoint).toBe("turn");
+  });
+
   it("never marks an empty message", () => {
-    const m: ChatMessage[] = [{ role: "tool", content: "", tool_call_id: "x" }];
+    const m: ChatMessage[] = [{ role: "assistant", content: "" }];
     markRoundBreakpoint(m, true);
     expect(m[0].cacheBreakpoint).toBeUndefined();
   });
