@@ -59,13 +59,17 @@ describe("planCompaction", () => {
     expect(plan!.priorSummary).toBeUndefined();
   });
 
-  it("returns null when the newly-dropped content is too small to bother with", () => {
+  it("folds even a small amount once the history is past the budget (no minimum any more)", () => {
     const parts = [part("a short early line"), part("recent short line")];
     const storyData = createMockStoryData({ scene: { parts } });
 
-    // Budget tiny enough to exclude part 0, but part 0's content is tiny too.
+    // Slice 3 of the token-savings plan: MIN_UNCOVERED_TOKENS_TO_SUMMARIZE is
+    // gone, because a fold is always at least half the budget. Past a
+    // (here absurdly small) budget the early part is folded and the latest
+    // part stays live.
     const plan = planCompaction(storyData, 1);
-    expect(plan).toBeNull();
+    expect(plan).not.toBeNull();
+    expect(plan!.cutoffIndex).toBe(1);
   });
 
   it("does not re-plan parts already covered by a prior summary", () => {

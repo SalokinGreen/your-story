@@ -31,6 +31,7 @@ const LORE_TYPE_MENTION_COLORS: Record<string, string> = {
   secret: "text-amber-300",
   dm_instructions: "text-indigo-300",
   story_instructions: "text-rose-300",
+  summary_instructions: "text-rose-300",
 };
 
 // NPC records have no `type` field (see structs.ts), so they get one fixed
