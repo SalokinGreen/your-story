@@ -514,39 +514,37 @@ real WebSocket relay on loopback), the whole TypeScript table
 (`tests/party.*.test.ts`), the phone page in a browser against the real
 runtime (two players, a steal and its cooldown ring, Go, a roll and a question
 routed to the right player, a reconnect, nothing secret on the wire), and,
-on the author's own phone and PC before the build, that a phone on this Wi-Fi
-reaches a server on this PC (plan §7). What follows needs people, phones or a
-live key. Run it from the built app: `RUSTUP_TOOLCHAIN=1.99.1 npx tauri build`,
+on the author's own phone and PC, that a phone on this Wi-Fi reaches a server on
+this PC (plan §7). **On 2026-10-22 the author ran the built `app.exe` with one
+real phone:** the QR opened the join form, joining worked and showed a seat, the
+spotlight and a typed line queued on the phone and on the desktop, and Go
+reached the desktop (no key, so no real turn). Windows Firewall asked once for
+`app.exe` and the author allowed Private. What follows is what that run did not
+cover: more than one phone, a live key, and a few edges. Run it from the built app: `RUSTUP_TOOLCHAIN=1.99.1 npx tauri build`,
 then `src-tauri/target/release/app.exe`.
 
-- **A real party from the installed app.** Menu → Party Mode → "Open the
-  table". The lobby should show a QR code, a `http://192.168.x.x:8787/party?t=…`
-  link and the network picker (on this PC the choices include a Tailscale
-  address and a VPN-ish adapter; the default should be the wired
-  `192.168.0.85`). Scan the QR with a phone on the same Wi-Fi: the join form
-  appears. *Failure looks like:* a timeout on the phone (firewall, Public
-  network or client isolation: see the lobby's help), or the phone page loading
-  unstyled (a `/_next/static/...` path the bundle doesn't have: look at the
-  failing request).
-- **The Windows Firewall prompt on a fresh install.** The first "Open the
-  table" from an installed copy should raise the prompt, once. The lobby's
-  note says to allow Private networks only. The spike's rule was created for
-  Private and Public together, so check which boxes the prompt really ticks.
-  Decline it once and confirm the lobby's "A phone can't connect?" help covers
-  it.
+- **The Windows Firewall prompt from an installed copy.** The built
+  `app.exe` raised the prompt once and the author allowed Private (2026-10-22).
+  Still to check: which boxes the prompt ticks by default (the spike's rule was
+  created for Private and Public together), that a copy installed from the MSI
+  or NSIS, which has a different path, raises its own prompt, and that
+  declining it once leaves the lobby's "A phone can't connect?" help
+  covering it.
 - **Two or more phones.** Join with two, a different colour each. Each phone
   should see both names. Take the spotlight on one, then on the other: the
   first should show the amber ring counting 15 s down, and a tap to take it
   back inside that time should be refused with a toast. Move the cooldown
   slider in the Menu and steal again: the next ring should follow it.
-- **Lines need the spotlight.** On a phone without it, the text box, the
-  suggestion chips and "Add to the queue" should be dead. With it, a typed line
-  and a chip both appear in the queue on every phone and on the desktop strip.
-- **Go from a phone, and Go from the desktop.** Either should send the queue as
-  one turn; the desktop log (Debug Logs → context) should show it as
-  `> Name: line` lines, one per queued line, and the strip and every phone
-  should show "The GM is working…" until the turn ends. Needs a key, so it
-  waits for the author's go.
+- **Lines need the spotlight.** With the spotlight, a typed line appeared in
+  the queue on the phone and the desktop strip (2026-10-22). Still to check: on
+  a phone without it, the text box, the suggestion chips and "Add to the queue"
+  should be dead, and a tapped chip should queue like a typed line.
+- **Go sends a real turn.** Go from a phone reached the desktop with no key
+  (2026-10-22). Still to check, with a key: the desktop log (Debug Logs →
+  context) should show the turn as `> Name: line` lines, one per queued line,
+  and the strip and every phone should show "The GM is working…" until the
+  turn ends; and Go from the desktop strip should do the same. Needs a key, so
+  it waits for the author's go.
 - **A roll and a question go to the right phone.** Set the adventure to
   manual dice, have the GM ask player A for a roll and put a question to
   player B, by name. Each prompt should appear only on that player's phone; the

@@ -567,3 +567,14 @@ producing. Triaged against correctness and the stated requirements; fixed in
 - **Not changed (nits):** the 16-client cap is counted after the upgrade, so
   a burst of token holders can pass it; and the Party Table note stays in the
   story after the table closes (the author can delete it under Notes).
+
+### 2026-10-22, the first real-phone run
+
+The author ran the merged build's `app.exe` with one phone on the home Wi-Fi:
+the QR opened the join form, joining showed a seat, the spotlight and a queued
+line showed on the phone and on the desktop strip, and Go reached the desktop.
+Windows Firewall asked once for `app.exe` and the author allowed Private
+networks. Nothing needed changing. The table took port 8787 (nothing else held
+it), and the lobby showed no network picker because this PC has one
+home-network address (the Tailscale, Bluetooth and VPN-style addresses are
+filtered out). The checks this did not reach stay in `pending_tests.md`.
