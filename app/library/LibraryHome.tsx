@@ -9,6 +9,7 @@ import { LocalFolder } from "@/app/misc/localFolderManager";
 import { getRelativeTime } from "@/app/misc/relativeTime";
 import { LibraryScope } from "./libraryScope";
 import type { NoteCounts } from "./NotesLibraryTab";
+import BuiltinSystemsSection from "./BuiltinSystemsSection";
 
 /** How many stories the quick-play rail offers before "See all". */
 const RECENT_STORY_COUNT = 8;
@@ -25,6 +26,8 @@ interface LibraryHomeProps {
   onContinueStory: (storyId: string) => void;
   onNewFolder: () => void;
   onImportFolder: () => void;
+  onPlayBuiltin: (adventure: LocalAdventure) => void;
+  onOpenBuiltinCopy: (adventure: LocalAdventure) => void;
 }
 
 export default function LibraryHome({
@@ -39,6 +42,8 @@ export default function LibraryHome({
   onContinueStory,
   onNewFolder,
   onImportFolder,
+  onPlayBuiltin,
+  onOpenBuiltinCopy,
 }: LibraryHomeProps) {
   const recentStories = useMemo(
     () =>
@@ -126,6 +131,12 @@ export default function LibraryHome({
           </DraggableScroll>
         </section>
       )}
+
+      {/* Built-in systems live in memory, outside the folders (decision 81). */}
+      <BuiltinSystemsSection
+        onPlay={onPlayBuiltin}
+        onOpenCopy={onOpenBuiltinCopy}
+      />
 
       {/* ---------------------------------------------------------------
           Folders - the primary way into everything else.

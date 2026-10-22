@@ -626,7 +626,7 @@ report's §11.3. The ones that shape play:
 - **System tools — offered only to stories that use a system** (decision 79:
   `resolveSystem()` in `app/misc/systems/resolve.ts`, true when the story's
   lore holds a built-in system's notes, or `systemState.usesSystemTools` says
-  so; none exist until Blood & Bone, PR C): `manage_meter` (named numbers
+  so, set by hand in the Designer inspector; none exist until Blood & Bone, PR C): `manage_meter` (named numbers
   owned by a character or `world`, clamped to floor and cap, thresholds
   reported, `once_per` scene/session dedup, `create_set` from the system's
   meter sets), `manage_track` (Ironsworn-style ten-box progress tracks, with
@@ -742,12 +742,21 @@ improvises from. The prompt is `app/misc/designer_ai.ts`.
   starts or loads.
 - `useDesignerSession.ts` — the bounded tool loop (`MAX_TOOL_ROUNDS = 5`), the
   chat transcript, the IndexedDB save, and `importFromLibrary()`, which merges
-  notes picked from the notes library (`LibraryPickerModal`) into the draft,
-  deduped on `libraryNoteId`. The Designer learns about imported material
+  notes picked from the notes library (`LibraryPickerModal`) into the draft
+  by `importLibraryNotesIntoDraft()` (designer_executor.ts). Every import
+  path (this one, the lore editor, a started adventure) uses the one rule
+  `mergeImportedLore()` in `localNotesLibraryManager.ts`: match by
+  `libraryNoteId`, else by title against unlinked notes. The picker also
+  lists the **built-in rules packs** (`app/misc/systems/`) as virtual
+  folders, and importing one into a draft with no sheet template adopts the
+  system's. A draft carries `meters`/`progressTracks` through untouched so
+  a built-in starter opened as a copy (Library home, "Open a copy in the
+  Designer") keeps them. The Designer learns about imported material
   through `summarizeDraft()`, not the transcript. It calls the model through
   `callSideModel()`, so it works in the native apps. The Google filter strips
   its tools (§6.14).
-- `AdventureInspector.tsx` — hand editing. The AI's tools and the inspector
+- `AdventureInspector.tsx` — hand editing (its Rules section also holds
+  the three-way switch for the system tools: automatic, on, off). The AI's tools and the inspector
   write to the same draft, and `summarizeDraft()` re-injects live state each
   turn, so the Designer treats the author's manual edits as authoritative.
 
@@ -909,8 +918,12 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 ## Directory map
 
 - `app/misc/systems/` — the built-in default systems registry
-  (`BUILTIN_SYSTEMS`, empty until Blood & Bone), `resolveSystem()`, and the
-  `BuiltinSystem` shapes. `app/misc/metersAndTracks.ts` is the pure meter,
+  (`BUILTIN_SYSTEMS`, empty until Blood & Bone), `resolveSystem()`, the
+  `BuiltinSystem` shapes, and the converters the library uses
+  (`builtinPackToLibraryNotes`, `builtinAdventureToLocal`). Built-ins live
+  in memory and are never stored; `app/story/MetersPanel.tsx` is the
+  player's panel at the top of the Lore page, and
+  `app/library/BuiltinSystemsSection.tsx` lists them on the Library home. `app/misc/metersAndTracks.ts` is the pure meter,
   track and action-roll arithmetic.
 - `app/misc/` — nearly all core logic: prompt builders (`ai_staged.ts`,
   `designer_ai.ts`; `ai.ts` holds only text helpers), the turn

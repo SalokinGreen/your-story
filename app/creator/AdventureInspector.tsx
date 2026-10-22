@@ -13,6 +13,7 @@ import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { AdventureDraft, draftReadiness } from "@/app/misc/designer_executor";
 import { pinnedNoteWarning } from "@/app/misc/contextLimits";
 import { LoreType, NPC, StoryLore } from "@/app/misc/structs";
+import { resolveSystem } from "@/app/misc/systems/resolve";
 
 interface AdventureInspectorProps {
   draft: AdventureDraft;
@@ -92,6 +93,12 @@ export default function AdventureInspector({
   const [editingNote, setEditingNote] = useState<string | null>(null);
 
   const readiness = draftReadiness(draft);
+  // The derived answer, for the "Automatic" option's label (the hand switch
+  // is left out so it shows what automatic would do).
+  const resolvedSystem = resolveSystem({
+    lore: draft.lore,
+    systemState: { sessionCount: 0, dedupKeys: [] },
+  });
 
   const mechanicsNotes = draft.lore.filter((l) => l.type === "mechanics");
   const sheetNotes = draft.lore.filter((l) => l.type === "character_sheet");
@@ -413,6 +420,44 @@ export default function AdventureInspector({
 
         {openSection === "rules" && (
           <>
+            <div>
+              <Field label="Use meters, tracks and action rolls">
+                <select
+                  className={inputClass}
+                  value={
+                    draft.systemState?.usesSystemTools === undefined
+                      ? "auto"
+                      : draft.systemState.usesSystemTools
+                        ? "on"
+                        : "off"
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onChange({
+                      systemState:
+                        v === "auto"
+                          ? undefined
+                          : { usesSystemTools: v === "on" },
+                    });
+                  }}
+                >
+                  <option value="auto">
+                    Automatic (
+                    {resolvedSystem.system
+                      ? `on: ${resolvedSystem.system.title} notes found`
+                      : "off: no built-in system's notes here"}
+                    )
+                  </option>
+                  <option value="on">On</option>
+                  <option value="off">Off</option>
+                </select>
+              </Field>
+              <p className="text-[11px] text-white/30 mt-1">
+                Offers the GM meters, progress tracks, session ends and the
+                action roll. Automatic turns them on when this adventure
+                carries a built-in system&apos;s rules notes.
+              </p>
+            </div>
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-[11px] uppercase tracking-wide text-white/40">

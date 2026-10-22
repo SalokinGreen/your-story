@@ -18,6 +18,7 @@ import {
   createEmptyDraft,
   draftToAdventure,
   executeDesignerTools,
+  importLibraryNotesIntoDraft,
 } from "@/app/misc/designer_executor";
 import { buildDesignerMessages, getDesignerGreeting } from "@/app/misc/designer_ai";
 import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
@@ -26,10 +27,7 @@ import {
   getLocalAdventure,
   saveLocalAdventure,
 } from "@/app/misc/localAdventureManager";
-import {
-  LibraryNote,
-  libraryNoteToStoryLore,
-} from "@/app/misc/localNotesLibraryManager";
+import type { LibraryNote } from "@/app/misc/localNotesLibraryManager";
 import { APIKeys } from "@/app/misc/APIKeysContext";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 import { getRequiredKeyForModel } from "@/app/misc/ai_prices";
@@ -213,6 +211,10 @@ export function useDesignerSession({
    * Notes keep their `libraryNoteId`, which is also what dedupes them: bringing
    * the same note in twice updates the copy that's already here instead of
    * stacking duplicates the Designer would then see as two conflicting notes.
+   * `mergeImportedLore` is the rule (shared with the lore editor): a match is
+   * by `libraryNoteId`, else by case-insensitive title against notes that have
+   * no `libraryNoteId`. Importing a built-in rules pack into a draft with no
+   * sheet template also adopts the system's.
    * Mechanics and character-sheet notes arrive pinned on (libraryNoteToStoryLore
    * handles that), matching what the Designer's own tools do.
    */
@@ -220,23 +222,16 @@ export function useDesignerSession({
     (notes: LibraryNote[]) => {
       if (notes.length === 0) return;
 
-      const incomingLore = notes.map(libraryNoteToStoryLore);
-
       const current = draftRef.current;
-      const lore = [...current.lore];
-      for (const note of incomingLore) {
-        const index = lore.findIndex(
-          (l) =>
-            (note.libraryNoteId && l.libraryNoteId === note.libraryNoteId) ||
-            l.title.trim().toLowerCase() === note.title.trim().toLowerCase(),
-        );
-        if (index >= 0) lore[index] = { ...lore[index], ...note };
-        else lore.push(note);
-      }
+      const {
+        draft: next,
+        replaced,
+        added,
+        sheetFrom,
+      } = importLibraryNotesIntoDraft(current, notes);
 
       // The tool loop reads draftRef synchronously, so keep it in step with
       // the state update rather than waiting for the mirroring effect.
-      const next = { ...current, lore };
       draftRef.current = next;
       setDraft(next);
       setDirty(true);
@@ -245,13 +240,20 @@ export function useDesignerSession({
       // summary rather than this message, but the author should see what
       // landed and what it means for the adventure.
       const parts = [`${notes.length} note${notes.length === 1 ? "" : "s"}`];
-      const titles = incomingLore.map((l) => l.title);
+      const titles = [...added, ...replaced];
+      if (replaced.length > 0) {
+        parts.push(`(${replaced.length} replaced a note already here)`);
+      }
       setMessages((prev) => [
         ...prev,
         {
           id: newMessageId(),
           role: "assistant",
-          content: `Brought in ${parts.join(" and ")} from your library. Tell me what you want built around this material — or ask me what it still needs.`,
+          content: `Brought in ${parts.join(" ")} from your library.${
+            sheetFrom
+              ? ` The draft had no character sheet template, so it now uses ${sheetFrom}'s.`
+              : ""
+          } Tell me what you want built around this material — or ask me what it still needs.`,
           changes: titles,
         },
       ]);

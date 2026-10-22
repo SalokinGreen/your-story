@@ -5,7 +5,8 @@
  * from PDFs). Stored in IndexedDB, independent of any single story/adventure.
  */
 
-import { LoreType, StoryLore } from "./structs";
+import { LoreType, LoreVisibility, StoryLore } from "./structs";
+import { getBuiltinLibraryNote, isBuiltinId } from "./systems";
 
 const DB_NAME = "YourStoryNotesLibraryDB";
 const STORE_NAME = "notes_library";
@@ -26,6 +27,14 @@ export interface LibraryNote {
   keys: string[];
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set only by `builtinPackToLibraryNotes` (systems/index.ts) and never
+   * stored: the note belongs to a built-in rules pack, not the player's
+   * library. Handlers that write to the library refuse a note with this.
+   */
+  builtIn?: { systemId: string; packId: string };
+  /** Built-in notes only; a stored note has none and reads as always_reveal. */
+  visibility?: LoreVisibility;
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -173,7 +182,52 @@ export function libraryNoteToStoryLore(note: LibraryNote): StoryLore {
     on: true,
     tags: note.tags,
     libraryNoteId: note.id,
+    ...(note.visibility ? { visibility: note.visibility } : {}),
   };
+}
+
+/**
+ * Merge notes brought in from the library into a story's or draft's lore, the
+ * one rule for every import path (the Designer, the lore editor, a started
+ * adventure). A note matches an existing one by `libraryNoteId`, else by
+ * case-insensitive title against existing notes that have no `libraryNoteId`
+ * (a note linked to a different library note is a different note that
+ * happens to share a title). A match is overwritten field by field, so the
+ * flags the existing note carries (`on`, `pinned`, ...) survive unless the
+ * incoming note sets them.
+ */
+export function mergeImportedLore(
+  existing: StoryLore[],
+  incoming: StoryLore[],
+): { lore: StoryLore[]; replaced: string[]; added: string[] } {
+  const lore = [...existing];
+  const replaced: string[] = [];
+  const added: string[] = [];
+  for (const note of incoming) {
+    const title = note.title.trim().toLowerCase();
+    const index = lore.findIndex((l) =>
+      note.libraryNoteId && l.libraryNoteId === note.libraryNoteId
+        ? true
+        : !l.libraryNoteId && l.title.trim().toLowerCase() === title,
+    );
+    if (index >= 0) {
+      lore[index] = { ...lore[index], ...note };
+      replaced.push(note.title);
+    } else {
+      lore.push(note);
+      added.push(note.title);
+    }
+  }
+  return { lore, replaced, added };
+}
+
+/** A stored library note, or a built-in one for a `builtin:` id (decision 81). */
+export async function getLibraryNoteOrBuiltin(
+  noteId: string,
+): Promise<LibraryNote | undefined> {
+  return isBuiltinId(noteId)
+    ? getBuiltinLibraryNote(noteId)
+    : getLibraryNote(noteId);
 }
 
 /**

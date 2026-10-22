@@ -6,6 +6,7 @@ import {
   StoryLore,
 } from "./structs";
 import { customTableToNote } from "./tableNotes";
+import { mergeImportedLore } from "./localNotesLibraryManager";
 import { ensureStoryDataArrays } from "./storyDataDefaults";
 import { ARCHETYPE_INFO } from "./gmAdvice";
 import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
@@ -196,9 +197,14 @@ export async function startAdventureLocally(
     // An adventure saved before tables became notes still carries them in
     // the old structured shape; they're rendered into notes here rather than
     // being copied into a fresh story as legacy data.
+    // Notes the player attached at the start merge into the template's by
+    // the library import rule (a built-in starter already holds copies of its
+    // rules packs, so attaching the pack again replaces them, not doubles).
     lore: [
-      ...(adventure.storyTemplate?.lore || []),
-      ...(initialLore || []),
+      ...mergeImportedLore(
+        adventure.storyTemplate?.lore || [],
+        initialLore || [],
+      ).lore,
       ...(adventure.storyTemplate?.customTables || []).map(customTableToNote),
     ],
   } as unknown as StoryData);

@@ -2,8 +2,8 @@
 
 **Status:** written 2026-10-22; **approved by decision 108** (the author,
 2026-10-22: "Approved. Also pull from origin and do the token saving + default
-system plans."). PR A (slices 1-5) is built on `claude/default-systems-a`;
-B and C are not started. It implements
+system plans."). PR A (slices 1-5) is merged (652433b); PR B (slices 6-7) is built
+on `claude/default-systems-b`; C is not started. It implements
 [`default-systems-design.md`](default-systems-design.md), approved by
 decision 88; decisions 62–89 are in [`decisions.md`](decisions.md). The
 source text for the content slice is
@@ -933,3 +933,54 @@ Approval is decision 108.
   `hiddenFromPlayer` on any result involving a hidden meter: repeat refusals,
   `remove`, `create_set` that created a hidden meter, and errors for an owner
   who has a hidden meter.
+
+### 2026-10-22 - PR B (slices 6-7), `claude/default-systems-b`
+
+Built on master at 652433b (baseline: 162 files, 2,509 tests; after: 164
+files, 2,530 tests: `mergeImportedLore.test.ts` 5, `systems.builtins.test.tsx`
+16). tsc clean; the standalone build compiles. No part of the UI was seen
+running (see pending_tests.md); the registry is empty until PR C, so the
+Library section, the picker group and the Lore panel show nothing in a real
+app yet. The components are rendered to static markup in the tests, with a
+test system installed.
+
+- **"Open a copy" and the draft.** `AdventureDraft` gained optional
+  `meters` and `progressTracks`, carried through `adventureToDraft` and
+  `draftToAdventure` untouched (no Designer tool edits them). Without this a
+  starter's world Heat and cohort vows were dropped the first time the author
+  saved the copy. "Open a copy" itself saves the starter's whole adventure
+  with `saveLocalAdventure` under a fresh `local:` id (title "... (copy)"),
+  then opens `/creator?edit=<id>`, so nothing else on the starter is lost
+  before the first Designer save. Other `storyTemplate` fields the draft has no
+  slot for (e.g. `agmtState`) are still dropped by the Designer's save, as they
+  were before; PR C's starter must not rely on them.
+- **`mergeImportedLore` is also used by `startAdventureLocally`.** The plan
+  named only the Designer and the lore editor. A built-in starter's template
+  already holds copies of its packs' notes (with built-in `libraryNoteId`s),
+  and the Play flow lets the player attach notes from the same picker, so
+  without the rule attaching the pack again duplicated every rules note. It
+  now merges the template's lore with the attached notes (a side effect: an
+  attached library note replaces a same-titled unlinked template note instead
+  of sitting beside it).
+- **Library-note helpers.** `LibraryNote` gained `builtIn` (never stored) and
+  `visibility` (only built-in notes set it; `libraryNoteToStoryLore` copies it
+  when present, so a hidden pack note stays hidden). `getLibraryNoteOrBuiltin`
+  is what pull reads, in both the lore editor and the Lore page.
+- **The Lore page (`app/story/lore.tsx`) has its own push/pull handlers**
+  beside `LoreEditor.tsx`'s, so the built-in guard (`isBuiltinId`, a warning
+  toast) is in both. The plan named only `LoreEditor`.
+- **Picker.** Built-in packs appear as chips, "Built-in: <pack title>", at the
+  front of the folder row, one virtual folder (`builtin:<packId>`) per pack
+  with "Select whole pack". "All" and the user's folders never list built-in
+  notes. The `folderNotes` memo was dropped (React Compiler could not preserve
+  it with the union source); it is a cheap filter.
+- **The panel's placement and shape.** It sits above the Lore page header
+  (hidden on mobile while a note is open, as the header is), collapsible, open
+  by default. Hidden meters are left out; closed tracks are shown dimmed with
+  their status; a lowered cap or a raised floor dims that part of the bar.
+- **The hand switch** is a three-way select (Automatic / On / Off) at the top of
+  the inspector's Rules section; "Automatic" says what it would resolve to.
+  A plain checkbox cannot hold three states.
+- **Library home** shows the built-in section only when the registry has a
+  system, between "Jump back in" and "Folders". Built-ins are not in the
+  Adventures/Notes tabs or folders (as planned, section 13).

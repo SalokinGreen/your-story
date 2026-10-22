@@ -10,6 +10,19 @@ import {
   listLibraryNotes,
 } from "@/app/misc/localNotesLibraryManager";
 import { LocalFolder, listLocalFolders } from "@/app/misc/localFolderManager";
+import {
+  BUILTIN_SYSTEMS,
+  builtinPackToLibraryNotes,
+} from "@/app/misc/systems";
+
+/** The built-in packs, listed as virtual folders (one per pack), in memory only. */
+const BUILTIN_PACKS = BUILTIN_SYSTEMS.flatMap((system) =>
+  system.packs.map((pack) => ({
+    folderId: `builtin:${pack.id}`,
+    title: pack.title,
+    notes: builtinPackToLibraryNotes(pack),
+  })),
+);
 
 const NOTE_TYPE_OPTIONS: { value: LoreType; label: string }[] = [
   { value: "lore", label: "📜 Lore" },
@@ -86,11 +99,19 @@ export default function LibraryPickerModal({
     })();
   }, [isOpen]);
 
+  const builtinPack = BUILTIN_PACKS.find((p) => p.folderId === selectedFolder);
+
   const filteredNotes = useMemo(() => {
-    return notes
+    // A built-in pack is its own virtual folder; the user's folders and "All"
+    // never list built-in notes.
+    const source =
+      BUILTIN_PACKS.find((p) => p.folderId === selectedFolder)?.notes ?? notes;
+    return source
       .filter((n) => {
         if (filterType && n.type !== filterType) return false;
-        if (selectedFolder === "uncategorized") {
+        if (n.builtIn) {
+          // already narrowed to the pack above
+        } else if (selectedFolder === "uncategorized") {
           if (n.folderId) return false;
         } else if (selectedFolder && n.folderId !== selectedFolder) {
           return false;
@@ -134,20 +155,24 @@ export default function LibraryPickerModal({
 
   const totalSelected = selectedIds.size;
 
-  const folderNotes = useMemo(() => {
-    if (selectedFolder === null) return [];
-    return notes.filter((n) => {
-      if (filterType && n.type !== filterType) return false;
-      return selectedFolder === "uncategorized"
-        ? !n.folderId
-        : n.folderId === selectedFolder;
-    });
-  }, [notes, filterType, selectedFolder]);
+  // Cheap, so not memoised: a built-in pack's notes, else the user's folder's.
+  const folderNotes: LibraryNote[] =
+    selectedFolder === null
+      ? []
+      : (builtinPack?.notes ?? notes).filter((n) => {
+          if (filterType && n.type !== filterType) return false;
+          if (builtinPack) return true;
+          return selectedFolder === "uncategorized"
+            ? !n.folderId
+            : n.folderId === selectedFolder;
+        });
 
   const folderLabel =
     selectedFolder === "uncategorized"
       ? "Uncategorized"
-      : folders.find((f) => f.id === selectedFolder)?.name || "";
+      : builtinPack
+        ? builtinPack.title
+        : folders.find((f) => f.id === selectedFolder)?.name || "";
 
   const folderAllSelected =
     folderNotes.length > 0 && folderNotes.every((n) => selectedIds.has(n.id));
@@ -165,7 +190,11 @@ export default function LibraryPickerModal({
   };
 
   const handleConfirm = () => {
-    onImport(notes.filter((n) => selectedIds.has(n.id)));
+    // Built-in notes are picked by id from their packs, not from the stored list.
+    const picked = [...notes, ...BUILTIN_PACKS.flatMap((p) => p.notes)].filter(
+      (n) => selectedIds.has(n.id),
+    );
+    onImport(picked);
   };
 
   if (!isOpen) return null;
@@ -229,6 +258,7 @@ export default function LibraryPickerModal({
 
           {!filterType &&
             (folders.length > 0 ||
+              BUILTIN_PACKS.length > 0 ||
               notes.some((n) => n.folderId) ||
               false) && (
               <DraggableScroll className="pb-1" innerClassName="gap-2">
@@ -242,6 +272,20 @@ export default function LibraryPickerModal({
                 >
                   All
                 </button>
+                {BUILTIN_PACKS.map((pack) => (
+                  <button
+                    key={pack.folderId}
+                    onClick={() => setSelectedFolder(pack.folderId)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                      selectedFolder === pack.folderId
+                        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+                        : "bg-white/5 text-amber-200/80 hover:bg-white/10"
+                    }`}
+                  >
+                    <DynamicIcon name="Package" className="w-3 h-3" />
+                    Built-in: {pack.title}
+                  </button>
+                ))}
                 <button
                   onClick={() => setSelectedFolder("uncategorized")}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
@@ -285,7 +329,9 @@ export default function LibraryPickerModal({
                 />
                 {folderAllSelected
                   ? `Deselect All from "${folderLabel}"`
-                  : `Select All from "${folderLabel}" (${folderNotes.length} note${folderNotes.length === 1 ? "" : "s"})`}
+                  : builtinPack
+                    ? `Select whole pack (${folderNotes.length} note${folderNotes.length === 1 ? "" : "s"})`
+                    : `Select All from "${folderLabel}" (${folderNotes.length} note${folderNotes.length === 1 ? "" : "s"})`}
               </button>
             )}
         </div>

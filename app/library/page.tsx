@@ -186,6 +186,25 @@ export default function LibraryPage() {
     }
   };
 
+  // A built-in starter is read-only and never stored, so "Open a copy" saves
+  // it as a normal adventure under a fresh local id (its notes keep their
+  // built-in ids, so the system is still found) and opens that in the
+  // Designer. It runs in a click handler, never during render.
+  const handleOpenBuiltinCopy = async (adventure: LocalAdventure) => {
+    try {
+      const id = `local:${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      await saveLocalAdventure(id, {
+        ...adventure.adventureData,
+        title: `${adventure.title} (copy)`,
+      });
+      router.push(`/creator?edit=${encodeURIComponent(id)}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Error copying built-in adventure:", error);
+      addNotification(`Failed to open a copy: ${message}`, "failure");
+    }
+  };
+
   // ============================================
   // Folders
   // ============================================
@@ -424,6 +443,10 @@ export default function LibraryPage() {
             }
             onNewFolder={() => setShowNewFolderDialog(true)}
             onImportFolder={() => importFolderInputRef.current?.click()}
+            onPlayBuiltin={(adventure) =>
+              setPendingPlay({ kind: "adventure", adventure })
+            }
+            onOpenBuiltinCopy={handleOpenBuiltinCopy}
           />
         ) : view.kind === "folder" ? (
           <FolderDetailView

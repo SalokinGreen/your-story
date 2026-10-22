@@ -10,6 +10,45 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-22 — Default systems PR B: the screens and the library (`claude/default-systems-b`)
+
+No session had a display, so none of this was seen running. The tests render
+the panel and the Library section to static markup and run the import rule,
+the converters and the starter through `startAdventureLocally`. **The
+registry is empty until PR C, so on the author's machine none of these screens
+show anything until Blood & Bone lands** (a Library section with no system
+renders nothing, by design). To check them before PR C, push a test system
+into `BUILTIN_SYSTEMS` temporarily (see `tests/helpers/systemsHarness.ts`),
+or wait for PR C and run all five below.
+
+- **The panel.** Open a Blood & Bone story in the desktop app, Lore page.
+  *Expected:* a "Meters and tracks" card above "Story Notes": Stress, Beast,
+  Exposure and XP bars for the character, Heat for the world, the vow's ten
+  boxes, and during a skirmish the round and tally. A lowered Stress cap dims
+  the part of the bar above it; a threshold shows its label under the bar;
+  collapsing works. *Failure looks like:* the card missing on a system story
+  (the story has no `meters`), or an empty gap above the notes on a story
+  with no system (it should leave no gap).
+- **Built-ins in the library.** Library home. *Expected:* a "Built-in systems"
+  section with Blood & Bone, its packs (collapsible note titles) and *The
+  Hollow Hour*. *Play* opens the "Bring a Character or Notes" picker and
+  starts the story with the meters and the vow. *Open a copy in the Designer*
+  creates "The Hollow Hour (copy)" under Adventures and opens it in the
+  Designer with its notes, the rules switch showing "Automatic (on: ...)".
+  Save it again and play it: the world Heat and the vows must still be there.
+- **The picker.** From Play, or the Designer's import, or the in-game lore
+  editor's import: *Expected:* chips "Built-in: Blood & Bone - Rules" and so
+  on at the front of the row; selecting one shows its notes and "Select whole
+  pack". Importing into a Designer draft with no sheet template says so in the
+  transcript and the draft gets the Blood & Bone template. Importing the same
+  pack twice leaves one copy of each note.
+- **The guard.** In a story that has a built-in note, open the Lore page,
+  select it and press Push to library (and the same in the in-game lore
+  editor). *Expected:* a warning toast, "Built-in notes can't be changed in the
+  library", and nothing written; Pull refreshes it from the built-in text.
+- **Phone width.** The panel's two columns collapse to one on a phone and the
+  track boxes stay on one row; check on the Android app.
+
 ## 2026-10-22 — Default systems PR A: the engine (`claude/default-systems-a`)
 
 The suite covers every tool through `executeGMTools`, the state sections, the

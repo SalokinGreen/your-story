@@ -5,6 +5,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useState, useMemo } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
+import MetersPanel from "./MetersPanel";
+import { isBuiltinId } from "../misc/systems";
 import FullScreenView from "../components/FullScreenView";
 import { StoredPortrait } from "../components/StoryImage";
 import LoreImageGenerator from "../components/LoreImageGenerator";
@@ -13,7 +15,7 @@ import { useNotification } from "../misc/NotificationContext";
 import {
   createLibraryNote,
   updateLibraryNote,
-  getLibraryNote,
+  getLibraryNoteOrBuiltin,
   libraryNoteToStoryLore,
   storyLoreToLibraryNoteFields,
 } from "../misc/localNotesLibraryManager";
@@ -272,6 +274,13 @@ export default function LorePage(props: LorePageProps) {
 
   const handlePushToLibrary = async () => {
     if (!selectedLore?.libraryNoteId || syncingLibrary) return;
+    if (isBuiltinId(selectedLore.libraryNoteId)) {
+      addNotification(
+        "Built-in notes can't be changed in the library - save this as a new library note instead",
+        "warning",
+      );
+      return;
+    }
     setSyncingLibrary(true);
     try {
       await updateLibraryNote(
@@ -291,7 +300,7 @@ export default function LorePage(props: LorePageProps) {
     if (!selectedLore?.libraryNoteId || !onUpdateLore || syncingLibrary) return;
     setSyncingLibrary(true);
     try {
-      const note = await getLibraryNote(selectedLore.libraryNoteId);
+      const note = await getLibraryNoteOrBuiltin(selectedLore.libraryNoteId);
       if (!note) {
         addNotification("That library note no longer exists", "failure");
         return;
@@ -452,6 +461,16 @@ export default function LorePage(props: LorePageProps) {
 
   return (
     <div className="w-full space-y-4">
+      {/* Meters, tracks and the live challenge of a system story (renders
+          nothing otherwise); hidden on mobile while a note is open, like the
+          header below. */}
+      <div className={selectedLore ? "hidden lg:block empty:hidden" : "empty:hidden"}>
+        <MetersPanel
+          meters={storyData.meters}
+          progressTracks={storyData.progressTracks}
+          activeChallenge={storyData.activeChallenge}
+        />
+      </div>
       {/* Header Section - collapsed away on mobile while reading a note so the
           note starts at the top of the screen */}
       <div
