@@ -36,7 +36,11 @@ export const STUB_RESULT_THRESHOLD_TOKENS = 150;
  * naming them keeps a rare long one (a roll echoing both consequence branches)
  * whole instead of losing the outcome to a stub.
  */
+// What an assistant part is replayed as when nothing else of it survives.
+export const EMPTY_TURN_PLACEHOLDER = "(no narration was saved for this turn)";
+
 const KEEP_WHOLE_TOOLS = new Set([
+  "increment_scene",
   "formula_roll",
   "opposed_formula",
   "gm_roll",
@@ -77,14 +81,19 @@ export function stubToolResult(
   const tokens = estimateTokens(content);
   if (tokens <= STUB_RESULT_THRESHOLD_TOKENS) return content;
 
+  // An error keeps its first line, so the GM still knows the call failed and why.
+  const errorLine = content.startsWith("**ERROR**")
+    ? `${content.split("\n")[0].slice(0, 240)} `
+    : "";
+
   if (toolName === "read_notes") {
     const titles = titlesOf(args);
     if (titles.length > 0) {
       const label = titles.map((t) => `"${t}"`).join(", ");
-      return `[read_notes ${label}: ${formatTokens(tokens)} tokens, cleared from history. Read it again if you need it.]`;
+      return `${errorLine}[read_notes ${label}: ${formatTokens(tokens)} tokens, cleared from history. Read it again if you need it.]`;
     }
   }
-  return `[${toolName}: ${formatTokens(tokens)}-token result cleared from history.]`;
+  return `${errorLine}[${toolName}: ${formatTokens(tokens)}-token result cleared from history.]`;
 }
 
 function stubLongStrings(value: unknown): { value: unknown; changed: boolean } {
@@ -338,6 +347,25 @@ export function renderHistoryPart(
         ? cleanString(part.content)
         : cleanString(`[STORY OUTPUT]\n${part.content}`),
     });
+  } else if (part.content && part.content.trim() && hasGmConversation) {
+    // A turn where the GM only called tools and the narration call wrote the
+    // prose: the prose is in part.content, not in the conversation. Unless the
+    // conversation already ends on visible prose, replay it.
+    const last = messages[messages.length - 1];
+    const endsOnProse =
+      !!last &&
+      last.role === "assistant" &&
+      !(last.tool_calls && last.tool_calls.length > 0) &&
+      !!last.content.trim();
+    if (!endsOnProse) {
+      messages.push({ role: "assistant", content: cleanString(part.content) });
+    }
+  }
+
+  // An assistant part that renders to nothing (a thinking-only turn, status
+  // report 6.19) would leave two user messages in a row.
+  if (messages.length === 0) {
+    messages.push({ role: "assistant", content: EMPTY_TURN_PLACEHOLDER });
   }
 
   return messages;
@@ -356,7 +384,10 @@ export function estimateRenderedPartTokens(
     tokens += 4; // per-message framing
     tokens += estimateTokens(m.content || "");
     if (m.tool_calls?.length) tokens += estimateTokens(JSON.stringify(m.tool_calls));
-    if (m.reasoning) tokens += estimateTokens(m.reasoning);
+    // Reasoning is deliberately not counted: whether it is replayed at all is
+    // per provider (providerCall.ts never replays plain `reasoning` to Claude,
+    // and slice 6 narrows the rest), so counting it would overstate the history
+    // for the default models. Decision 94 counts what is sent.
   }
   return tokens;
 }

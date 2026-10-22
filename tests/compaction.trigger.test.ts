@@ -76,17 +76,21 @@ describe("planCompaction (the real-size trigger)", () => {
     expect(plan!.cutoffIndex).toBeLessThanOrEqual(s.scene.parts.length - 1);
   });
 
-  it("snaps to a scene boundary only forward, and only within the window", () => {
+  it("snaps to a scene boundary only forward, and never between an action and its reply", () => {
     const parts = turns(20);
     const base = planCompaction(story(parts), 2000)!.cutoffIndex;
+    expect(parts[base].user).toBe(true);
 
-    const ahead = planCompaction(story(parts, { lastSceneBoundaryIndex: base + 3 }), 2000)!;
-    expect(ahead.cutoffIndex).toBe(base + 3);
+    // lastSceneBoundaryIndex points at a reply (odd index here): the cut goes
+    // before that reply's action, so the pair stays together.
+    const ahead = planCompaction(story(parts, { lastSceneBoundaryIndex: base + 5 }), 2000)!;
+    expect(ahead.cutoffIndex).toBe(base + 4);
+    expect(parts[ahead.cutoffIndex].user).toBe(true);
 
     const behind = planCompaction(story(parts, { lastSceneBoundaryIndex: base - 3 }), 2000)!;
     expect(behind.cutoffIndex).toBe(base);
 
-    const tooFar = planCompaction(story(parts, { lastSceneBoundaryIndex: base + 12 }), 2000)!;
+    const tooFar = planCompaction(story(parts, { lastSceneBoundaryIndex: base + 15 }), 2000)!;
     expect(tooFar.cutoffIndex).toBe(base);
   });
 
@@ -163,5 +167,33 @@ describe("the history start (getHistoryParts)", () => {
     );
     expect(tokens).toBeLessThanOrEqual(2000);
     expect(history.parts.length).toBeGreaterThan(0);
+  });
+});
+
+// At run time page.tsx has already pushed the current player action as the
+// last part, and buildGMStagePrompt pops it from the history.
+function action(text = "I act"): ScenePart {
+  return { content: `> ${text}`, imageUrl: "", user: true, role: "user" } as unknown as ScenePart;
+}
+
+describe("planCompaction with the current action as the last part", () => {
+  it("keeps the previous action and reply live even when they alone pass the target", () => {
+    const parts = [...turns(6, 300), ...turns(1, 1500), action()];
+    const plan = planCompaction(story(parts), 2000)!;
+    expect(plan).not.toBeNull();
+    // [..., user, big reply, current action]: the pair stays, the cut is before it.
+    expect(plan.cutoffIndex).toBe(parts.length - 3);
+    expect(parts[plan.cutoffIndex].user).toBe(true);
+  });
+
+  it("treats the trailing action as the action, not as history", () => {
+    const parts = [...turns(20), action()];
+    const s = story(parts);
+    const plan = planCompaction(s, 2000)!;
+    expect(plan.cutoffIndex).toBeLessThanOrEqual(parts.length - 3);
+    applyCompaction(s, plan, "summary");
+    const history = getHistoryParts(s, 2000);
+    expect(history.slidingFallback).toBe(false);
+    expect(history.parts[history.parts.length - 1]).toBe(parts[parts.length - 1]);
   });
 });

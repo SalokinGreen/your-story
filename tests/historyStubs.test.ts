@@ -197,6 +197,54 @@ describe("renderHistoryPart", () => {
   });
 });
 
+describe("after the engine review", () => {
+  it("replays narrator-written prose when the GM only called tools", () => {
+    const toolsOnly = [
+      { role: "assistant" as const, content: "", tool_calls: [call("u1", "update_npc", { npc: "M" })] },
+      { role: "tool" as const, content: "ok", tool_call_id: "u1" },
+    ] as ScenePart["gmConversation"];
+    const messages = renderHistoryPart(assistantPart(toolsOnly, "The narrator's prose."), 0);
+    expect(messages[messages.length - 1]).toEqual({
+      role: "assistant",
+      content: "The narrator's prose.",
+    });
+  });
+
+  it("does not repeat prose the conversation already ends on", () => {
+    const conversation = [
+      { role: "assistant" as const, content: "<thinking>x</thinking>\nThe salon is quiet." },
+    ] as ScenePart["gmConversation"];
+    const messages = renderHistoryPart(assistantPart(conversation, "The salon is quiet."), 0);
+    expect(messages.filter((m) => m.content === "The salon is quiet.")).toHaveLength(1);
+  });
+
+  it("replays a thinking-only turn as a placeholder, not as nothing", () => {
+    const thinkingOnly = [
+      { role: "assistant" as const, content: "<thinking>only thoughts</thinking>" },
+    ] as ScenePart["gmConversation"];
+    const messages = renderHistoryPart(assistantPart(thinkingOnly, ""), 0);
+    expect(messages).toHaveLength(1);
+    expect(messages[0].role).toBe("assistant");
+    expect(messages[0].content).not.toContain("only thoughts");
+  });
+
+  it("keeps increment_scene whole and an error's first line in its stub", () => {
+    const long = `**ERROR** Note not found.\n${BIG}`;
+    expect(stubToolResult("increment_scene", {}, long)).toBe(long);
+    const stub = stubToolResult("read_notes", { titles: ["X"] }, long);
+    expect(stub.startsWith("**ERROR** Note not found. [read_notes")).toBe(true);
+  });
+
+  it("does not count reasoning that is not sent", () => {
+    const withReasoning = assistantPart([
+      { role: "assistant", content: "", reasoning: seededText(500, 3), tool_calls: [call("c1", "update_npc", {})] },
+      { role: "tool", content: "ok", tool_call_id: "c1" },
+      { role: "assistant", content: "Done." },
+    ] as ScenePart["gmConversation"]);
+    expect(estimateRenderedPartTokens(withReasoning, 0)).toBeLessThan(100);
+  });
+});
+
 describe("estimateRenderedPartTokens", () => {
   it("counts the stub, not the raw result", () => {
     const part = assistantPart([

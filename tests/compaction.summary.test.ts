@@ -6,6 +6,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  SUMMARY_INPUT_RESULT_CAP_TOKENS,
   SUMMARY_SECTIONS,
   SUMMARY_TARGET_TOKENS,
   getSummaryInstructions,
@@ -16,6 +17,7 @@ import {
 import { COMPACT_NOW_KEEP_PARTS, summarizeNow } from "@/app/misc/storyCompaction";
 import { buildGMStagePrompt, buildInfoMessage } from "@/app/misc/ai_staged";
 import type { ScenePart, StoryData, StoryLore } from "@/app/misc/structs";
+import { estimateTokens } from "@/app/misc/tokenCounter";
 import { seededText, warmTokenizer } from "./helpers/turnHarness";
 
 beforeAll(async () => {
@@ -201,11 +203,50 @@ describe("Compact now (summarizeNow)", () => {
   });
 });
 
-describe("a long summary input is not truncated", () => {
-  it("passes a 2k note read through whole", () => {
+describe("a long tool result in the summary input", () => {
+  it("is capped at about 600 tokens with a truncation note", () => {
     const note = seededText(2000, 9);
     const part = readPart(1);
     part.gmConversation![1].content = note;
-    expect(partToCompactionText(part)).toContain(note);
+    const text = partToCompactionText(part);
+    expect(text).not.toContain(note);
+    expect(text).toContain("...(truncated)");
+    expect(estimateTokens(text)).toBeLessThan(SUMMARY_INPUT_RESULT_CAP_TOKENS + 200);
+  });
+
+  it("keeps a short result whole", () => {
+    expect(partToCompactionText(readPart(1))).toContain("SALON FACT 1: the owner owes the Guild a debt.");
+  });
+});
+
+describe("after the engine review", () => {
+  it("tells the summariser to keep unrevealed material marked as unrevealed", async () => {
+    const { system } = await promptFor(story(fiveTurns()));
+    expect(system).toMatch(/unrevealed/i);
+  });
+
+  it("checks the summary against the prose, not the tool text that repeats a note's title", async () => {
+    const parts: ScenePart[] = [];
+    for (let i = 0; i < 5; i++) {
+      parts.push(userPart(i), readPart(i));
+    }
+    // The title appears only inside tool calls and results, never in the prose.
+    const s = story(parts, [lore({ title: "Zephyrine Vault", type: "location", content: "x" })]);
+    for (const p of parts) {
+      if (p.gmConversation) {
+        p.gmConversation[0].tool_calls![0].function.arguments = '{"titles":["Zephyrine Vault"]}';
+        p.gmConversation[1].content = "## Zephyrine Vault\nZephyrine Vault holds the debt.";
+      }
+    }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "The courier reads ledgers." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const plan = planManualCompaction(s, 2)!;
+    expect(plan.textToSummarize).toContain("Zephyrine Vault");
+    const result = await runCompactionPlan(s, plan, { model: "test-model", token: "t" });
+    expect(result.warnings).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // no revision call
   });
 });

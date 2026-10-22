@@ -17,6 +17,7 @@
 import { StoryData, ScenePart } from "./structs";
 import { cleanString } from "./ai_staged";
 import { ChatMessage } from "./chatMessage";
+import { truncateToTokenBudget } from "./tokenCounter";
 import { callSideModel, ProviderKeys } from "./sideModelCall";
 import {
   estimateRenderedPartTokens,
@@ -55,7 +56,11 @@ const SCENE_BOUNDARY_SNAP_WINDOW = 6;
 
 export interface CompactionPlan {
   cutoffIndex: number; // parts[0, cutoffIndex) are the ones to fold into the summary
-  textToSummarize: string;
+  textToSummarize: string; // what the summariser reads: prose plus tool calls and results
+  // The prose alone, which validateCompactionSummary checks the summary against:
+  // a note read puts its title in the tool text three times, and the checker
+  // would demand the title in the summary. Falls back to textToSummarize.
+  proseToSummarize?: string;
   priorSummary: string | undefined;
 }
 
@@ -167,7 +172,7 @@ export function validateCompactionSummary(
   const entities = buildTrackedEntities(storyData);
 
   for (const entity of entities) {
-    const mentionsInSource = countNameMentions(plan.textToSummarize, entity.name);
+    const mentionsInSource = countNameMentions(plan.proseToSummarize ?? plan.textToSummarize, entity.name);
     const mentionsInSummary = countNameMentions(summary, entity.name);
 
     if (
@@ -219,6 +224,25 @@ function compactToolArgs(argumentsJson: string | undefined): string {
   }
 }
 
+// A single tool result goes into the summariser's input at most this long, so
+// the first fold of an old long save is not enormous (a 2k note read is still
+// mostly there; a 20k get_game_state is not).
+export const SUMMARY_INPUT_RESULT_CAP_TOKENS = 600;
+
+const TRUNCATION_MARKER = "\n\n[...truncated to fit context budget...]";
+
+function capToolResult(content: string): string {
+  const cut = truncateToTokenBudget(content, SUMMARY_INPUT_RESULT_CAP_TOKENS);
+  if (cut === content) return content;
+  return `${cut.endsWith(TRUNCATION_MARKER) ? cut.slice(0, -TRUNCATION_MARKER.length) : cut}...(truncated)`;
+}
+
+/** The prose of a part alone: what the validation checks the summary against. */
+export function partToProseText(part: ScenePart): string {
+  const text = stripThinkingForHistory(part.raw || part.content || "");
+  return part.user ? `> ${text}` : text;
+}
+
 /**
  * One part as the summariser reads it (decision 95): the prose the player saw,
  * preceded by what the GM did to produce it - every tool call with its
@@ -242,7 +266,7 @@ export function partToCompactionText(part: ScenePart): string {
         }
       } else if (msg.role === "tool") {
         const name = (msg.tool_call_id && nameById.get(msg.tool_call_id)) || "tool";
-        lines.push(`[${name} result: ${msg.content}]`);
+        lines.push(`[${name} result: ${capToolResult(msg.content)}]`);
       }
     }
   }
@@ -267,9 +291,13 @@ export function measureHistoryTokens(storyData: StoryData): number {
 /**
  * Pure decision logic. Null while the history, as sent, fits `historyBudget`.
  * Past it, the cutoff is the earliest index that leaves the remaining parts at
- * or under historyBudget * FOLD_TARGET_RATIO, moved FORWARD (never back) to
- * keep a user action with its reply and to land on a recorded scene boundary
- * within SCENE_BOUNDARY_SNAP_WINDOW. The last part always stays live.
+ * or under historyBudget * FOLD_TARGET_RATIO. At run time the last part is the
+ * CURRENT player action (page.tsx pushes it before generateStoryTurn, and
+ * buildGMStagePrompt pops it from the history), so it is the action, not
+ * history: the last full action-reply pair before it always stays live. The
+ * cutoff never splits an action from its reply, and lands on a recorded scene
+ * boundary within SCENE_BOUNDARY_SNAP_WINDOW. History starts exactly at
+ * summarizedThroughIndex, so the cutoff may move either way.
  */
 export function planCompaction(
   storyData: StoryData,
@@ -281,36 +309,48 @@ export function planCompaction(
   const alreadyCovered = Math.max(0, storyData.scene.summarizedThroughIndex || 0);
   if (measureHistoryTokens(storyData) <= historyBudget) return null;
 
+  // The trailing user part is the action being answered, not history.
+  const histEnd = parts[parts.length - 1].user ? parts.length - 1 : parts.length;
+  if (histEnd <= alreadyCovered) return null;
+
+  // The last full action-reply pair stays live whatever it weighs.
+  let pairStart = histEnd - 1;
+  if (!parts[pairStart].user && pairStart - 1 >= 0 && parts[pairStart - 1].user) {
+    pairStart -= 1;
+  }
+
   const target = historyBudget * FOLD_TARGET_RATIO;
   let kept = 0;
-  let rawCutoffIndex = parts.length;
-  for (let i = parts.length - 1; i >= alreadyCovered; i--) {
+  let cutoffIndex = histEnd;
+  for (let i = histEnd - 1; i >= alreadyCovered; i--) {
     kept += estimateRenderedPartTokens(parts[i], i);
     if (kept > target) break;
-    rawCutoffIndex = i;
+    cutoffIndex = i;
   }
-  // The latest part always stays live, even if it alone is over the target.
-  let cutoffIndex = Math.min(rawCutoffIndex, parts.length - 1);
+  cutoffIndex = Math.min(cutoffIndex, pairStart);
 
-  // Keep a reply with the action that prompted it.
-  if (
-    cutoffIndex > alreadyCovered &&
-    cutoffIndex < parts.length - 1 &&
-    !parts[cutoffIndex].user &&
-    parts[cutoffIndex - 1]?.user
-  ) {
-    cutoffIndex += 1;
+  // Never between an action and its reply: keep the pair together (back to the
+  // action; or, if that would not move past the old summary, forward past it).
+  const splitsPair = (c: number) =>
+    c > 0 && c < parts.length && !parts[c].user && !!parts[c - 1]?.user;
+  if (splitsPair(cutoffIndex)) {
+    cutoffIndex = cutoffIndex - 1 > alreadyCovered ? cutoffIndex - 1 : cutoffIndex + 1;
   }
 
   // Prefer cutting exactly at a scene boundary over an arbitrary mid-scene
   // token cutoff, when one is close by - see SCENE_BOUNDARY_SNAP_WINDOW.
-  const boundary = storyData.scene.lastSceneBoundaryIndex;
+  // lastSceneBoundaryIndex points at a reply (toolExecutor's increment_scene),
+  // so the cut goes before that reply's action.
+  let boundary = storyData.scene.lastSceneBoundaryIndex;
+  if (boundary !== undefined && boundary > 0 && parts[boundary - 1]?.user && !parts[boundary]?.user) {
+    boundary -= 1;
+  }
   if (
     boundary !== undefined &&
     boundary > alreadyCovered &&
     boundary >= cutoffIndex &&
     boundary - cutoffIndex <= SCENE_BOUNDARY_SNAP_WINDOW &&
-    boundary < parts.length
+    boundary <= pairStart
   ) {
     cutoffIndex = boundary;
   }
@@ -319,14 +359,11 @@ export function planCompaction(
     return null; // nothing to fold that is not already in the summary
   }
 
-  const textToSummarize = parts
-    .slice(alreadyCovered, cutoffIndex)
-    .map(partToCompactionText)
-    .join("\n\n");
-
+  const folded = parts.slice(alreadyCovered, cutoffIndex);
   return {
     cutoffIndex,
-    textToSummarize,
+    textToSummarize: folded.map(partToCompactionText).join("\n\n"),
+    proseToSummarize: folded.map(partToProseText).join("\n\n"),
     priorSummary: storyData.scene.summary,
   };
 }
@@ -387,7 +424,7 @@ Write a dense, factual reference for another AI (not entertainment), as these se
 ${headings}
 (People: each NPC's state, attitude to the player characters and whereabouts. Promises, debts and secrets revealed: who knows what.)
 
-The input includes the game master's tool calls and results - what it read from notes, rolled, and changed. Keep what it established or learned that later turns will depend on; skip what was only looked up. Skip prose flourishes. Rewrite the WHOLE summary every time, with every section present (write "nothing yet" for an empty one). Aim for about ${SUMMARY_TARGET_TOKENS} tokens in total.
+The input includes the game master's tool calls and results - what it read from notes, rolled, and changed. Keep what it established or learned that later turns will depend on; skip what was only looked up. Material the player has not seen - secrets, hidden lore, anything marked hidden or unrevealed - stays marked as unrevealed to the player in the summary; never state it as something the characters know. Skip prose flourishes. Rewrite the WHOLE summary every time, with every section present (write "nothing yet" for an empty one). Aim for about ${SUMMARY_TARGET_TOKENS} tokens in total.
 
 ${
   plan.priorSummary
@@ -569,10 +606,12 @@ export function planManualCompaction(
     .map(partToCompactionText)
     .join("\n\n");
   if (!textToSummarize.trim()) return null;
+  const proseToSummarize = newlyDroppedParts.map(partToProseText).join("\n\n");
 
   return {
     cutoffIndex,
     textToSummarize,
+    proseToSummarize,
     priorSummary: storyData.scene.summary,
   };
 }

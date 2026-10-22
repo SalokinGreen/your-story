@@ -514,4 +514,34 @@ Built on master `5dfea85` (PR #216 merged). Baseline before the first edit:
   `summary_instructions` note. The Designer, the lore editor and both library
   pickers can.
 - **No `engine-review` agent run from this session** (no agent tool was
-  available to the builder): the coordinating session owes it before merge.
+  available to the builder): the coordinating session ran it; its fixes are
+  below.
+
+### 2026-10-22 - after the engine review (PR T1)
+
+Tests 2,246 to 2,256 (+10). New tests use the run-time shape: the last part of
+`scene.parts` is the current player action.
+
+- **Validation runs on prose.** `CompactionPlan.proseToSummarize` (new
+  `partToProseText`) is what `validateCompactionSummary` checks; the
+  summariser still reads `textToSummarize` with the tool text.
+- **The last action-reply pair stays live.** `planCompaction` treats a
+  trailing user part as the current action, always keeps the pair before it,
+  and may move the cutoff backward (history starts at
+  `summarizedThroughIndex`) to avoid splitting an action from its reply.
+- **Thinking-only turns** render as one placeholder assistant message
+  (`EMPTY_TURN_PLACEHOLDER`), so no two user messages in a row.
+- **Narrator prose reaches history:** `part.content` is appended when a
+  `gmConversation` does not already end on visible assistant prose.
+- **Scene-boundary snap** goes to `boundary - 1` when that part is the
+  player's, so an action is not split from its reply; its test rewritten.
+- **Reasoning is not counted** by `estimateRenderedPartTokens` (chosen over
+  per-provider counting): whether reasoning is replayed is per provider and
+  slice 6's job; counting it overstated Claude's history.
+- **Hidden material:** the summary prompt says unrevealed material stays
+  marked as unrevealed.
+- **Tool results in the summary input are capped** at
+  `SUMMARY_INPUT_RESULT_CAP_TOKENS` (600) with "...(truncated)".
+- **Minor:** `increment_scene` joins `KEEP_WHOLE_TOOLS`; a stubbed `**ERROR**`
+  result keeps its first line.
+- Skipped as told: the tokenizer-load cache miss and object-shaped arguments.
