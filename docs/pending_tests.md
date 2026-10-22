@@ -10,6 +10,36 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-22 — Token savings PR T3: the trimmed tool list and the note limits (`claude/token-savings-t3`)
+
+The suite checks the list's size and stability and the cap's arithmetic; no
+model was called and no screen was looked at.
+
+- **The GM still calls every tool correctly on the trimmed descriptions.**
+  Play a real session (any default model) that uses a roll, a fate question,
+  a combat with two or more combatants added in one call, a timer and a
+  campaign-plan beat change. *Expected:* no more "invalid arguments" tool
+  errors than before, and combatants added in one `add_combatant` call.
+  *Failure looks like:* a tool called with a wrong or missing argument that
+  the old description spelled out; the Debug Logs show the call and the error.
+  The description to restore is the one named in the error. Nobody has watched a
+  model use the trimmed descriptions.
+- **The warning beside a long pinned note.** In the Adventure Inspector (the
+  Game Designer page), edit a DM instructions note and paste about 3,500
+  tokens (roughly 2,600 words) into it. *Expected:* an amber line under the
+  note, "This note is about 3,5xx tokens and is sent to the GM in full every
+  turn...". The same line under the content box in a story's lore editor for a
+  character sheet or a campaign plan, and none for an ordinary lore note.
+  *Failure looks like:* no line, or one on a note the GM reads on demand.
+- **The cap, in a real story.** Give a story DM instructions of about 9,000
+  tokens and a campaign plan of about 6,000, play one turn, and open the
+  context viewer. *Expected:* each note ends with `[… N more tokens:
+  read_notes "Title" for the rest]` and the Debug Logs (browser console) say
+  "Pinned notes over the 10000-token cap". *Failure looks like:* the whole
+  note in the prompt, or the GM editing the plan from the shortened text and
+  losing the rest (it should read the note first; if it does not, the
+  campaign-plan pointer needs a stronger line).
+
 ## 2026-10-22 — Token savings PR T2: the stable prefix and provider caching (`claude/token-savings-t2`)
 
 The suite measures the layout against a recording `fetch` (consecutive turns

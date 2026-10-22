@@ -26,6 +26,11 @@ import {
 } from "@/app/misc/campaignPlan";
 import { cleanString } from "@/app/misc/textUtils";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
+import {
+  PINNED_TOTAL_CAP_TOKENS,
+  capPinnedNotes,
+  pinnedNoteWarning,
+} from "@/app/misc/contextLimits";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { estimateTokens } from "@/app/misc/tokenCounter";
 import {
@@ -1321,17 +1326,28 @@ export function buildGMStagePrompt({
   // Pinned notes: Full content. The DM instructions rarely change, so they go
   // in the stable block (before history); the character sheet and the plan
   // are edited by the GM itself, so they ride in the live block (decision 100).
+  // Together the pinned notes are capped (decision 96): past the cap each is
+  // shortened in this prompt only, with a pointer to read_notes for the rest.
+  const pinnedForGM = [...dmInstructionsLore, ...characterSheetLore, ...gmPlanLore];
+  const cappedPinned = capPinnedNotes(pinnedForGM);
+  const cappedContentOf = new Map<unknown, string>(
+    pinnedForGM.map((l, i) => [l, cappedPinned[i].content]),
+  );
+  const pinnedCutTokens = cappedPinned.reduce((sum, n) => sum + n.cutTokens, 0);
+  const pinnedContent = (l: (typeof pinnedForGM)[number]): string =>
+    cleanString(cappedContentOf.get(l) ?? l.content);
+
   let dmInstructionsSection = "";
   if (dmInstructionsLore.length > 0) {
     dmInstructionsSection += `## 📌 DM INSTRUCTIONS\nRead these guidelines every turn. They define how to run this adventure.\n`;
     for (const l of dmInstructionsLore) {
-      dmInstructionsSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
+      dmInstructionsSection += `\n### ${l.title}.md\n${pinnedContent(l)}\n`;
     }
   }
   if (characterSheetLore.length > 0) {
     loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details - traits, background, abilities, resources.\nThis is not opening-scene set dressing: the player picked these, and they expect them to keep mattering. Every turn, let the sheet decide something concrete - which skill/stat a roll uses and at what difficulty, whether an NPC recognises a title or a reputation, what a flaw or bond costs them right now, what their background lets them notice that someone else wouldn't. If a turn could have gone the same way for any character at all, you didn't use it.\nTo update: edit_note("title", content="new content") - Keep stats, HP, XP, etc. current!\n`;
     for (const l of characterSheetLore) {
-      loreSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
+      loreSection += `\n### ${l.title}.md\n${pinnedContent(l)}\n`;
     }
   }
 
@@ -1357,7 +1373,7 @@ export function buildGMStagePrompt({
     }
     for (const l of gmPlanLore) {
       const focusMark = l.title === activeSideBeat ? " ⚡ (ACTIVE FOCUS)" : "";
-      loreSection += `\n### ${l.title}.md${focusMark}\n${cleanString(l.content)}\n`;
+      loreSection += `\n### ${l.title}.md${focusMark}\n${pinnedContent(l)}\n`;
     }
   }
 
@@ -2172,6 +2188,15 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     `  - Chat history: ${recentParts.length} parts from #${historyStartIndex}${historySlidingFallback ? " (sliding-window fallback)" : ""} (${partsWithGMHistory} with GM data, ${partsWithNewFormat} with new gmConversation format)`,
   );
   console.log(`  - Available tools: ${toolsToUse.length}`);
+  if (pinnedCutTokens > 0) {
+    console.log(
+      `  - Pinned notes over the ${PINNED_TOTAL_CAP_TOKENS}-token cap: ${pinnedCutTokens} tokens left out of the prompt (the GM can read_notes them)`,
+    );
+  }
+  for (const l of pinnedForGM) {
+    const warning = pinnedNoteWarning(l);
+    if (warning) console.log(`  - Pinned note "${l.title}": ${warning}`);
+  }
 
   return {
     messages,

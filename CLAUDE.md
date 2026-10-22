@@ -468,6 +468,23 @@ of history identical across turns, or the caches stop hitting
 turns it off for the session). OpenRouter and Google models get an earlier
 turn's `reasoning` and `reasoning_details` no longer, only the current
 turn's; DeepSeek still gets `reasoning_content` on every tool call.
+**The GM's tool list is one stable, trimmed list** (decision 92): every
+live tool in every round of every turn, in one order, so it caches with the
+prefix, and under 10,000 tokens for a default story (it was 15,841;
+`tests/toolBudget.test.ts` holds it). A tool description says what the tool
+does and how to call it; behavioural guidance lives in the system prompt, not
+per tool, and a new or longer description counts against the budget. A tool
+offered only when a story flag is set (`ask_for_roll` in Manual Dice Mode; the
+image tool and the default-systems tools when they land) is added to or
+left out of the list from a **story-level setting** that is read the same on
+every turn, never from per-turn state. **The notes the GM prompt carries in
+full every turn** (the DM instructions, the character sheets and the campaign
+plan) are warned about past about 3,000 tokens each, in the Adventure
+Inspector, the lore editor and the Designer's `write_note` result, and capped
+at 10,000 tokens together (decision 96, `contextLimits.ts`): past that the
+prompt carries the front of each, ends it with
+`[… N more tokens: read_notes "Title" for the rest]`, and the stored note is
+untouched.
 
 **The player's own Claude subscription runs through the `claude` CLI, on the
 desktop app only** (decisions 10–13, `docs/claude-gm-design.md` §4). The
