@@ -79,7 +79,7 @@ export interface SideModelRequest extends SideCallCostContext {
    * How hard the model thinks (decision 53): the slot's own effort - the
    * player's pin, the side-agent default, a tier's, the Designer's. Every
    * caller passes one; a request without sends DEFAULT_REASONING_EFFORT
-   * ("none"), the cheapest every provider has, rather than leaving the
+   * ("none"), the cheapest each model allows, rather than leaving the
    * provider's own default (Grok, for one, defaults to high) to apply.
    */
   reasoningEffort?: string;

@@ -284,6 +284,25 @@ function alwaysThinks(config: Pick<AIModelConfig, "provider" | "model">, provide
 }
 
 /**
+ * Models whose reasoning cannot be turned off, for the two rules that follow
+ * from that alone: effort "none" (or none at all) goes out as "low", and
+ * max_tokens never drops below ALWAYS_THINKING_MIN_MAX_TOKENS. That is
+ * alwaysThinks, plus the OpenRouter models flagged `reasoningMandatory` in
+ * the catalog (Grok 4.5 and 4.7, Qwen 3.8 Max, GPT-6.1 Sol, MiniMax M2),
+ * which OpenRouter says reject `effort: "none"`. The prefill handling stays
+ * on alwaysThinks: nothing says those models refuse a prefill.
+ */
+function reasoningCannotBeTurnedOff(
+  config: Pick<AIModelConfig, "provider" | "model" | "reasoningMandatory">,
+  provider: Provider,
+): boolean {
+  return (
+    alwaysThinks(config, provider) ||
+    (provider === "openrouter" && config.reasoningMandatory === true)
+  );
+}
+
+/**
  * The smallest `max_tokens` a request to a model that always thinks goes out
  * with: Claude 5.5 and GLM-5.3, neither of which can turn thinking off. Thinking counts against `max_tokens`, so the 200-300 token caps the
  * side agents use for a short verdict can be spent before any text arrives;
@@ -347,9 +366,10 @@ function applyReasoningEffort(
     return;
   }
 
-  // GLM-5.3 through OpenRouter: the same model as Z.ai's, so the same rule -
-  // never "none", and a call with no effort (the same backstop) runs at low
-  // rather than the model's own default.
+  // GLM-5.3 through OpenRouter (the same model as Z.ai's) and the OpenRouter
+  // models flagged reasoningMandatory (reasoningCannotBeTurnedOff): never
+  // "none", which they reject, and a call with no effort (the same backstop)
+  // runs at low rather than the model's own default.
   if (
     thinksAlways &&
     !isClaude &&
@@ -402,12 +422,13 @@ function applyReasoningEffort(
   // OpenRouter's reasoning.effort enum accepts an explicit "none" value that
   // actually disables reasoning - unlike simply omitting the field, which
   // falls back to whatever the model itself defaults to. Some models default
-  // to reasoning ON (e.g. Grok 4.5 defaults to "high" effort even with no
-  // reasoning param sent at all), so a tier assigned effort "none" has to
-  // send this explicitly or it silently keeps paying for reasoning tokens
-  // the tier system believes it turned off - see turnCost.ts's
+  // to reasoning ON, so a tier assigned effort "none" has to send this
+  // explicitly or it silently keeps paying for reasoning tokens the tier
+  // system believes it turned off - see turnCost.ts's
   // REASONING_OUTPUT_MULTIPLIER, which assumes "none" means no reasoning
-  // overhead at all.
+  // overhead at all. A model whose reasoning is mandatory (Grok 4.5, among
+  // others) rejects "none" instead; it never reaches this line, because the
+  // branch above sends it "low".
   if (provider === "openrouter" && reasoningEffort === "none") {
     requestBody.reasoning = { effort: "none" };
     return;
@@ -900,7 +921,7 @@ async function requestNonStreaming(
     const headers = buildHeaders(provider, apiKey);
     const isClaude = isAnthropicViaOpenRouter(config);
 
-    const thinksAlways = alwaysThinks(config, provider);
+    const thinksAlways = reasoningCannotBeTurnedOff(config, provider);
     const requestBody: any = {
       model: config.model,
       messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
@@ -934,13 +955,20 @@ async function requestNonStreaming(
     }
 
     const aiResponse = (await response.json()) as AIResponse;
-    let content = aiResponse.choices[0]?.message?.content || "";
+    // Mistral's reasoning models (Mistral Small 4, Medium 3.5) answer with
+    // `content` as a list of text and thinking chunks once reasoning_effort is
+    // set; the streaming path already unpacks that (extractContentParts), and
+    // every caller of this one expects a string.
+    const contentParts = extractContentParts(aiResponse.choices[0]?.message?.content);
+    let content = contentParts.text;
     // DeepSeek-native models put CoT in `reasoning_content`; OpenRouter/others
-    // in `reasoning`. Read whichever is present so reasoning is preserved into
-    // saved history regardless of provider.
+    // in `reasoning`; Mistral in a thinking chunk of `content`. Read whichever
+    // is present so reasoning is preserved into saved history regardless of
+    // provider.
     const reasoning =
       aiResponse.choices[0]?.message?.reasoning ||
       aiResponse.choices[0]?.message?.reasoning_content ||
+      contentParts.thinking ||
       "";
     const reasoning_details = aiResponse.choices[0]?.message?.reasoning_details || [];
     let toolCalls = aiResponse.choices[0]?.message?.tool_calls;
@@ -1102,7 +1130,7 @@ export function generateStream(
         const headers = buildHeaders(provider, apiKey);
         const isClaude = isAnthropicViaOpenRouter(config);
 
-        const thinksAlways = alwaysThinks(config, provider);
+        const thinksAlways = reasoningCannotBeTurnedOff(config, provider);
         const requestBody: any = {
           model: config.model,
           messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),

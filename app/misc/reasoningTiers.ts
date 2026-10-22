@@ -43,11 +43,13 @@ export const REASONING_EFFORTS: ReasoningEffort[] = [
 
 /**
  * The effort a slot runs at until the player picks one (decision 53). "none" is
- * the cheapest effort and is safe on every provider: providerCall.ts's
- * applyReasoningEffort sends Claude and GLM `low` (their thinking cannot be
- * turned off), Z.ai `low`, DeepSeek thinking disabled, and any other
- * OpenRouter model `reasoning: {effort: "none"}`, which really turns reasoning
- * off. Mistral gets nothing, as it has no lever.
+ * the cheapest effort each model allows: providerCall.ts's
+ * applyReasoningEffort sends Claude, GLM and the OpenRouter models whose
+ * reasoning is mandatory (`reasoningMandatory` in the catalog: Grok 4.5 and
+ * 4.7, Qwen 3.8 Max, GPT-6.1 Sol, MiniMax M2, which reject an explicit "none")
+ * `low`, Z.ai `low`, DeepSeek thinking disabled, and any other OpenRouter
+ * model `reasoning: {effort: "none"}`, which really turns reasoning off.
+ * Mistral gets nothing, as it has no lever.
  */
 export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "none";
 
@@ -328,7 +330,11 @@ export function getEffectiveNarrationEffort(): ReasoningEffort {
   } catch {
     return DEFAULT_REASONING_EFFORT;
   }
-  if (savedModel && getEffectiveNarrationModelKey() !== savedModel) {
+  // Compare against the saved voice as the app reads it (getNarrationModelOverride
+  // resolves a retired key to its successor, LEGACY_MODEL_KEY_ALIASES), not
+  // the raw stored string: a saved "Mistral Small 3.2" runs as "Mistral Small
+  // 4", and its effort must follow it rather than fall back to "none".
+  if (savedModel && getEffectiveNarrationModelKey() !== getNarrationModelOverride()) {
     return DEFAULT_REASONING_EFFORT;
   }
   return getNarrationEffortOverride() ?? DEFAULT_REASONING_EFFORT;

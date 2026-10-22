@@ -12,6 +12,7 @@ export const AI_MODELS = {
     maxTokens: 500000,
     maxOutputTokens: 100000,
     provider: "openrouter",
+    reasoningMandatory: true,
     supportsToolCalling: true,
     strengths: ["logic", "reasoning", "tool calling", "coding"],
     weaknesses: ["price"],
@@ -32,6 +33,7 @@ export const AI_MODELS = {
     maxTokens: 500000,
     maxOutputTokens: 128000,
     provider: "openrouter",
+    reasoningMandatory: true,
     supportsToolCalling: true,
     strengths: ["logic", "reasoning", "tool calling"],
     weaknesses: ["price above 200k tokens"],
@@ -420,6 +422,7 @@ export const AI_MODELS = {
     maxTokens: 1000000,
     maxOutputTokens: 128000,
     provider: "openrouter",
+    reasoningMandatory: true,
     supportsToolCalling: true,
     inputPrice: 2,
     outputPrice: 6,
@@ -462,6 +465,7 @@ export const AI_MODELS = {
     maxTokens: 1050000,
     maxOutputTokens: 128000,
     provider: "openrouter",
+    reasoningMandatory: true,
     supportsToolCalling: true,
     inputPrice: 2,
     outputPrice: 10,
@@ -498,6 +502,7 @@ export const AI_MODELS = {
     maxTokens: 204800,
     maxOutputTokens: 131072,
     provider: "openrouter",
+    reasoningMandatory: true,
     supportsToolCalling: true,
     inputPrice: 0.255,
     outputPrice: 1.02,
@@ -1391,6 +1396,15 @@ export interface AIModelConfig {
     | "zai"
     | "claude-cli";
   supportsToolCalling?: boolean; // Whether this model supports function calling
+  /**
+   * OpenRouter marks this model's reasoning `mandatory`: it cannot be turned
+   * off, and an explicit `reasoning: {effort: "none"}` is rejected (OpenRouter's
+   * reasoning-tokens docs; the model's `reasoning.mandatory` in
+   * /api/v1/models, checked 2026-10-22). providerCall.ts sends such a model
+   * "low" for "none" and gives it the always-thinking max_tokens floor.
+   * Claude 5.5 and GLM 5.3 are recognised by id there and need no flag.
+   */
+  reasoningMandatory?: boolean;
   inputPrice: number;
   outputPrice: number;
   finetunes: readonly string[];

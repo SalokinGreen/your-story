@@ -18,6 +18,20 @@ no session could do is call the new models: each needs a provider key and
 spends the author's money, so each waits for the author's go. One short
 request per item is enough.
 
+- **The Designer on Grok 4.5 at effort `none` (the second engine review,
+  2026-10-22).** With only an OpenRouter key and no Designer model saved, the
+  Designer opens on Grok 4.5, the first catalog model the key unlocks. Its
+  effort is `none`, and OpenRouter marks Grok's reasoning mandatory. Send one
+  Designer message. *Expected:* a normal reply, with the request carrying
+  `reasoning: {effort: "low"}` (the "Side call failed" warning names the
+  effort if it fails). *Failure looks like:* a 400 naming `reasoning` or
+  `effort`, which would mean the `reasoningMandatory` flag is missing on the
+  model, or OpenRouter has changed which models refuse `"none"`.
+- **A Mistral Small 4 Designer at effort `high`.** Mistral's reasoning models
+  answer with `content` as a list of chunks. Send one Designer message.
+  *Expected:* a normal reply in the chat. *Failure looks like:* an error
+  naming `trim` or `[object Object]` in the chat, which would mean the
+  non-streaming path is not unpacking the list.
 - **Does `deepseek-v4-pro` still serve V4 Pro?** DeepSeek's release post says
   it would route to V4.1 Flash from 2026-09-14; its changelog and pricing page
   say it continues at its own price. Send one tiny request on "DeepSeek V4 Pro"

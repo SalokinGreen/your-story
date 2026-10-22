@@ -481,8 +481,10 @@ reads: an unpinned Observer rewrites on the narration voice
 (`resolveObserverRewriteModel`, decision 52) while its judges stay on Haiku.
 The choices call, including the one re-run after an Observer rewrite, stays
 on the narration model. **Every call carries an explicit effort** (decision
-53), chosen alongside its model and `none` by default, which is the cheapest
-effort every provider has: a tier's and a side-agent pin's had a picker
+53), chosen alongside its model and `none` by default, the cheapest effort
+each model allows (Claude, GLM 5.3 and the OpenRouter models flagged
+`reasoningMandatory`, which reject an explicit `none`, are sent `low`;
+`reasoningCannotBeTurnedOff` in `providerCall.ts`): a tier's and a side-agent pin's had a picker
 already, and the narration voice (`narrationEffortOverride`,
 `getEffectiveNarrationEffort()`, which falls back to `none` when the voice
 does) and the Game Designer (`designerReasoningEffort`) now have one. An

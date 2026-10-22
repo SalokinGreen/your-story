@@ -4,7 +4,7 @@
  * The Designer's model is chosen on /creator and kept in localStorage
  * ("designerModel"), outside the tier ladder and the side agents; its effort
  * sits beside it so a player who puts Claude Sonnet there can choose how hard
- * it thinks. "none" until they do - the cheapest effort every provider has
+ * it thinks. "none" until they do - the cheapest effort each model allows
  * (see DEFAULT_REASONING_EFFORT in reasoningTiers.ts). Not in
  * syncableSettingsKeys.ts, like "designerModel" itself.
  */
