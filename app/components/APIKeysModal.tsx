@@ -8,6 +8,7 @@ import { DynamicIcon } from "./DynamicIcon";
 import FullScreenView from "./FullScreenView";
 import AIConfigTab from "./AIConfigTab";
 import ArchitectureSettingsTab from "./ArchitectureSettingsTab";
+import ImageSettingsTab from "./ImageSettingsTab";
 import CustomVoiceManager from "./CustomVoiceManager";
 import FontSettingsTab from "./FontSettingsTab";
 import SyncTab from "./SyncTab";
@@ -56,6 +57,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
     | "display"
     | "game"
     | "architecture"
+    | "images"
     | "sync"
   >("config");
 
@@ -195,6 +197,19 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             </span>
           </button>
           <button
+            onClick={() => setActiveTab("images")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === "images"
+                ? "border-purple-400 text-purple-300"
+                : "border-transparent text-blue-300/50 hover:text-blue-200"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <DynamicIcon name="Image" className="w-4 h-4" />
+              Images
+            </span>
+          </button>
+          <button
             onClick={() => setActiveTab("sync")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "sync"
@@ -222,6 +237,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <AIConfigTab />
           ) : activeTab === "architecture" ? (
             <ArchitectureSettingsTab />
+          ) : activeTab === "images" ? (
+            <ImageSettingsTab />
           ) : activeTab === "sync" ? (
             <SyncTab addNotification={addNotification} />
           ) : activeTab === "llm" ? (
@@ -522,6 +539,46 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       your Z.ai account. A GLM Coding Plan subscription does
                       not cover this: Z.ai limits it to its supported coding
                       tools.
+                    </p>
+                  </div>
+                </div>
+
+                {/* fal.ai - pictures made in play (decision 58) */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-fuchsia-500 to-pink-600 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">fal</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">
+                        fal.ai
+                      </span>
+                      {hasKey("falKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <a
+                        href="https://fal.ai/dashboard/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
+                      >
+                        Get key →
+                      </a>
+                    </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.falKey}
+                      onChange={(e) => setKey("falKey", e.target.value)}
+                      placeholder="..."
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                    />
+                    <p className="text-xs text-blue-300/50 mt-1">
+                      Used for pictures in play (scenes, portraits, places).
+                      The key stays on this device and is sent only to fal; it
+                      is not synced to your other devices.
                     </p>
                   </div>
                 </div>

@@ -9,6 +9,7 @@ import { customTableToNote } from "./tableNotes";
 import { ensureStoryDataArrays } from "./storyDataDefaults";
 import { ARCHETYPE_INFO } from "./gmAdvice";
 import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
+import { deleteImagesForStory } from "./imageStore";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -556,6 +557,10 @@ export async function deleteLocalStory(storyId: string): Promise<void> {
   // deleting a story doesn't leave its cached audio orphaned.
   await clearCachedTTSAudioForStory(storyId).catch((error) => {
     console.error("Failed to clear cached TTS audio for deleted story:", error);
+  });
+  // Same for the pictures made in play (imageStore.ts, decision 59).
+  await deleteImagesForStory(storyId).catch((error) => {
+    console.error("Failed to clear pictures for deleted story:", error);
   });
 }
 

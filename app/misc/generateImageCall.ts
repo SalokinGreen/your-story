@@ -26,6 +26,14 @@ export interface GenerateImageRequestBody {
   provider?: "openrouter" | "deepinfra";
   openRouterKey?: string;
   deepInfraKey?: string;
+  /**
+   * In-play pictures (imageJobs.ts): send the prompt exactly as given, without
+   * the cover-art wrapper and "game cover style" suffix the lore buttons add,
+   * so the story's own style line (StoryData.imageStyle) is the only style.
+   */
+  plainPrompt?: boolean;
+  /** Pixel size to ask for (DeepInfra); the OpenRouter models pick their own. */
+  size?: { width: number; height: number };
 }
 
 export interface GenerateImageSuccess {
@@ -102,6 +110,8 @@ async function handleOpenRouter(
   requestedModel: string | undefined,
   imageType: "thumbnail" | "banner",
   openRouterKey: string | undefined,
+  plainPrompt = false,
+  size?: { width: number; height: number },
 ): Promise<GenerateImageSuccess | GenerateImageError> {
   if (!openRouterKey) {
     return {
@@ -119,7 +129,18 @@ async function handleOpenRouter(
         ? "square or 4:3 aspect ratio cover image suitable for a thumbnail"
         : "wide landscape banner image with approximately 3:1 aspect ratio";
 
-    const fullPrompt = `Please create a ${sizeDescription} for my text adventure:\n\n${prompt}\n\nStyle: Digital art, game cover style, vibrant colors, professional quality.`;
+    // An in-play picture says its own shape, and its style is in the prompt.
+    const fullPrompt = plainPrompt
+      ? size
+        ? `Generate an image, ${
+            size.width > size.height
+              ? "landscape"
+              : size.width < size.height
+                ? "portrait"
+                : "square"
+          } orientation:\n\n${prompt}`
+        : prompt
+      : `Please create a ${sizeDescription} for my text adventure:\n\n${prompt}\n\nStyle: Digital art, game cover style, vibrant colors, professional quality.`;
 
     const providerFetch = getProviderFetch();
     const response = await providerFetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -171,6 +192,8 @@ async function handleDeepInfra(
   requestedModel: string | undefined,
   imageType: "thumbnail" | "banner",
   deepInfraKey: string | undefined,
+  plainPrompt = false,
+  size?: { width: number; height: number },
 ): Promise<GenerateImageSuccess | GenerateImageError> {
   const modelKey = requestedModel || "Bria 3.2";
   const modelConfig = getDeepInfraModelConfig(modelKey);
@@ -188,7 +211,11 @@ async function handleDeepInfra(
 
   try {
     // Note: FLUX 2 Pro has a max width of 1440px
-    const sizeDescription = imageType === "thumbnail" ? "1024x1024" : "1440x1024";
+    const sizeDescription = size
+      ? `${size.width}x${size.height}`
+      : imageType === "thumbnail"
+        ? "1024x1024"
+        : "1440x1024";
 
     const providerFetch = getProviderFetch();
     const response = await providerFetch(
@@ -200,7 +227,9 @@ async function handleDeepInfra(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: `${prompt}\n\nStyle: Digital art, game cover style, vibrant colors, professional quality.`,
+          prompt: plainPrompt
+            ? prompt
+            : `${prompt}\n\nStyle: Digital art, game cover style, vibrant colors, professional quality.`,
           model: modelConfig.model,
           size: sizeDescription,
           n: 1,
@@ -248,7 +277,16 @@ async function handleDeepInfra(
 export async function generateImage(
   body: GenerateImageRequestBody,
 ): Promise<GenerateImageSuccess | GenerateImageError> {
-  const { prompt, model: requestedModel, imageType, provider = "deepinfra", openRouterKey, deepInfraKey } = body;
+  const {
+    prompt,
+    model: requestedModel,
+    imageType,
+    provider = "deepinfra",
+    openRouterKey,
+    deepInfraKey,
+    plainPrompt,
+    size,
+  } = body;
 
   if (!prompt?.trim()) {
     return { error: "Prompt is required", status: 400 };
@@ -259,7 +297,7 @@ export async function generateImage(
   }
 
   if (provider === "openrouter") {
-    return handleOpenRouter(prompt, requestedModel, imageType, openRouterKey);
+    return handleOpenRouter(prompt, requestedModel, imageType, openRouterKey, plainPrompt, size);
   }
-  return handleDeepInfra(prompt, requestedModel, imageType, deepInfraKey);
+  return handleDeepInfra(prompt, requestedModel, imageType, deepInfraKey, plainPrompt, size);
 }

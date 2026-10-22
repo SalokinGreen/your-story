@@ -22,7 +22,15 @@ import {
   ReasoningDetail,
   ObserverFlag,
   ObserverRewriteOriginal,
+  SceneImageRef,
 } from "@/app/misc/structs";
+import {
+  enqueueImageJob,
+  cancelImageJobsForTurn,
+  type ImageJobDeps,
+  type ImageToolContext,
+} from "@/app/misc/imageJobs";
+import { getImageSettings, isImageToolAvailable } from "@/app/misc/imageSettings";
 import {
   buildChoicesPrompt,
   buildGMStagePrompt,
@@ -220,6 +228,12 @@ export interface GenerationOptions {
   mistralKey?: string;
   deepinfraKey?: string;
   zaiKey?: string;
+  // Pictures made in play (imageJobs.ts, docs/image-generation-design.md).
+  // The page supplies the queue's dependencies (keys, live StoryData access)
+  // and the id the turn's scene part will carry; without imageJobDeps the
+  // GM is never offered generate_image. Host only: guests never generate.
+  imageJobDeps?: ImageJobDeps;
+  scenePartId?: string;
   // Embedding-based context retrieval
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
@@ -287,6 +301,10 @@ export interface GenerationOptions {
   // decay-toward-baseline step that assumes each call is a new turn rather
   // than a retry of the same one.
   forcedStartingTier?: number;
+  // Set internally by generateStoryTurn from imageJobDeps and the image
+  // settings (see imageJobs.ts ImageToolContext): the GM is offered
+  // generate_image only when this is present and enabled.
+  imageToolContext?: ImageToolContext;
 }
 
 export interface GenerationCallbacks {
@@ -396,6 +414,11 @@ export interface GenerationCallbacks {
   // back to its pre-turn snapshot by the time this fires - the UI should
   // clear anything it displayed/streamed for the discarded attempt.
   onObserverReset?: (flags: ObserverFlag[], triggeringFlag: ObserverFlag) => void;
+  // The GM asked for a picture of this turn (generate_image, subject "scene").
+  // The turn's scene part does not exist yet, so the page adds the ref to the
+  // part it is building; the picture settles in the background and the card
+  // finds it by the ref's id. Cleared again by onObserverReset's page handler.
+  onSceneImageRequested?: (ref: SceneImageRef) => void;
   // Fired when the observer ran in the BACKGROUND (see generateStoryTurn's
   // resetPossible gate) and found flags after the turn had already completed
   // and handed control back to the player. Advisory only - anything the
@@ -872,6 +895,39 @@ export async function generateStoryTurn(
   // this turn and must keep billing to it after the next turn has opened.
   const costTurnId = beginTurnCost();
 
+  // Pictures (generate_image). The tool is offered only when the page gave us
+  // the queue's dependencies, the story has an id to file pictures under, and
+  // pictures are on with a key for some provider. Decided once per turn, so the
+  // GM prompt stays byte-identical across the turn's rounds (prompt cache).
+  const scenePartId = options.scenePartId ?? crypto.randomUUID();
+  const imageSettings = getImageSettings();
+  const imageJobDeps = options.imageJobDeps;
+  const imageToolContext: ImageToolContext | undefined =
+    imageJobDeps &&
+    options.storyId &&
+    isImageToolAvailable(imageJobDeps.keys, imageSettings)
+      ? {
+          enabled: true,
+          maxPerScene: imageSettings.gmImagesPerScene,
+          scenePartId,
+          enqueue: (req) =>
+            enqueueImageJob(
+              {
+                ...req,
+                storyId: options.storyId!,
+                requestedBy: "gm",
+                costTurnId,
+                signal: options.abortSignal,
+                // The executor works on the turn's clone and sets the pending
+                // id there itself; the live StoryData is not patched mid-turn.
+                skipInitialAttach: true,
+              },
+              imageJobDeps,
+            ),
+          onSceneImage: (ref) => callbacks.onSceneImageRequested?.(ref),
+        }
+      : undefined;
+
   let preTurnSnapshot: StoryData | null = null;
   try {
     preTurnSnapshot = structuredClone(storyData);
@@ -930,6 +986,8 @@ export async function generateStoryTurn(
         repetitionNote,
         knowledgeNote,
         forcedStartingTier,
+        scenePartId,
+        imageToolContext,
         // A reset discards the previous attempt's tool calls/narration - if
         // it also came with a precomputedGMConversation (manual Retry flow),
         // replaying that would just replay the flagged content, so force a
@@ -1531,6 +1589,9 @@ export async function generateStoryTurn(
           }
 
           observerNote = majorFlag.correctivePrompt;
+          // The discarded attempt's pictures are for narration nobody will
+          // read: drop the queued ones and abort the one painting.
+          cancelImageJobsForTurn(costTurnId);
           callbacks.onObserverReset?.(flags, majorFlag);
           continue;
         }
@@ -2025,6 +2086,8 @@ async function generateStoryTurnOnce(
         storyProgressNote: options.storyProgressNote,
         repetitionNote: options.repetitionNote,
         knowledgeNote: options.knowledgeNote,
+        imageToolAvailable: !!options.imageToolContext?.enabled,
+        imagesPerScene: options.imageToolContext?.maxPerScene,
       });
       gmBaseMessages = gmPrompt.messages;
       logger.action("Using precomputed GM conversation (retry flow)", {
@@ -2055,6 +2118,8 @@ async function generateStoryTurnOnce(
           storyProgressNote: options.storyProgressNote,
           repetitionNote: options.repetitionNote,
           knowledgeNote: options.knowledgeNote,
+          imageToolAvailable: !!options.imageToolContext?.enabled,
+          imagesPerScene: options.imageToolContext?.maxPerScene,
         });
         gmBaseMessages = gmPrompt.messages;
       } else {
@@ -2329,6 +2394,8 @@ async function generateStoryTurnOnce(
               storyProgressNote: options.storyProgressNote,
               repetitionNote: options.repetitionNote,
               knowledgeNote: options.knowledgeNote,
+              imageToolAvailable: !!options.imageToolContext?.enabled,
+              imagesPerScene: options.imageToolContext?.maxPerScene,
               // Skip the literal <thinking> prefill for reasoning-tier models
               // (they emit CoT natively); keep it for effort:"none" models.
               usesNativeReasoning: gmReasoningEffort !== "none",
@@ -2773,6 +2840,7 @@ async function generateStoryTurnOnce(
                 token,
                 webResearchEnabled: options.webResearchEnabled,
                 braveSearchKey: options.braveSearchKey,
+                imageJobs: options.imageToolContext,
               },
             );
 
@@ -3684,6 +3752,7 @@ async function generateStoryTurnOnce(
       content: storyContent,
       raw: rawStoryContent || undefined,
       imageUrl: "",
+      id: options.scenePartId,
       user: false,
       role: "assistant",
       reasoning: storyReasoning || undefined,

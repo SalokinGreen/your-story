@@ -1,9 +1,16 @@
 "use client";
-import { Choice, Choices, StoryData, CouchPlayer } from "../misc/structs";
+import {
+  Choice,
+  Choices,
+  StoryData,
+  CouchPlayer,
+  SceneImageRef,
+} from "../misc/structs";
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import TTSControls, { TTSRelayHandle } from "../components/TTSControls";
+import StoryImage from "../components/StoryImage";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
@@ -158,6 +165,12 @@ interface StoryProps {
   onPartyJoin?: () => void;
   onPartyRemove?: (playerId: string) => void;
   onPartyAnswerHere?: (requestId: string) => void;
+  // Pictures made in play (imageJobs.ts). `onIllustrate` is the "Illustrate
+  // this" button on the latest turn: set only on the host, and only when an
+  // image provider has a key (decisions 54, 57 and 60). `onRegenerateImage`
+  // reruns a picture that was declined, failed or is missing on this device.
+  onIllustrate?: (partIndex: number) => void;
+  onRegenerateImage?: (partIndex: number, ref: SceneImageRef) => void;
 }
 
 // Font settings interface
@@ -334,6 +347,11 @@ interface ChatMessageProps {
   isStreaming?: boolean;
   mentionMatcher?: MentionMatcher | null;
   onMentionClick?: (kind: "lore" | "npc", id: string) => void;
+  // Pictures made for this turn (ScenePart.images), shown under its prose.
+  images?: SceneImageRef[];
+  // True on an online guest, who holds no pictures (decision 60).
+  isGuest?: boolean;
+  onRegenerateImage?: (ref: SceneImageRef) => void;
 }
 
 function ChatMessage({
@@ -354,6 +372,9 @@ function ChatMessage({
   isStreaming = false,
   mentionMatcher,
   onMentionClick,
+  images,
+  isGuest = false,
+  onRegenerateImage,
 }: ChatMessageProps) {
   const opacity = isPrevious ? "opacity-50" : "opacity-100";
   const isComment = messageType === "comment";
@@ -486,6 +507,16 @@ function ChatMessage({
                     mentionMatcher,
                     onMentionClick,
                   )}
+                {images?.map((ref) => (
+                  <StoryImage
+                    key={ref.imageId}
+                    imageId={ref.imageId}
+                    isGuest={isGuest}
+                    onRegenerate={
+                      onRegenerateImage ? () => onRegenerateImage(ref) : undefined
+                    }
+                  />
+                ))}
               </>
             )}
           </div>
@@ -803,6 +834,8 @@ export default function Story({
   onPartyJoin,
   onPartyRemove,
   onPartyAnswerHere,
+  onIllustrate,
+  onRegenerateImage,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -1201,6 +1234,24 @@ export default function Story({
     };
   };
 
+  // Pictures: a guest holds none (decision 60), and Regenerate is the host's.
+  const isImageGuest = netSession?.role === "guest";
+  const regenerateImageFor = (partIndex: number) =>
+    onRegenerateImage && !isImageGuest
+      ? (ref: SceneImageRef) => onRegenerateImage(partIndex, ref)
+      : undefined;
+  // The latest finished GM turn, for the Illustrate this button.
+  const lastPartIndex = storyData.scene.parts.length - 1;
+  const lastPart = storyData.scene.parts[lastPartIndex];
+  const canIllustrateLast =
+    !!onIllustrate &&
+    !isImageGuest &&
+    !!lastPart &&
+    !lastPart.user &&
+    !!lastPart.content.trim() &&
+    !loading &&
+    !loadingStage;
+
   // State for combat display expansion
   const [showCombat, setShowCombat] = React.useState(true);
 
@@ -1374,6 +1425,9 @@ export default function Story({
                   reasoningTier={
                     getGMDataForPart(exchange.gmMsg.partIndex).reasoningTier
                   }
+                  images={storyData.scene.parts[exchange.gmMsg.partIndex]?.images}
+                  isGuest={isImageGuest}
+                  onRegenerateImage={regenerateImageFor(exchange.gmMsg.partIndex)}
                   mentionMatcher={mentionMatcher}
                   onMentionClick={handleMentionClick}
                 />
@@ -1421,6 +1475,9 @@ export default function Story({
                       getGMDataForPart(exchange.gmMsg.partIndex)
                         .reasoningTier
                     }
+                    images={storyData.scene.parts[exchange.gmMsg.partIndex]?.images}
+                    isGuest={isImageGuest}
+                    onRegenerateImage={regenerateImageFor(exchange.gmMsg.partIndex)}
                     mentionMatcher={mentionMatcher}
                     onMentionClick={handleMentionClick}
                   />
@@ -1599,6 +1656,17 @@ export default function Story({
                 back to storyText when there's nothing live yet (e.g. the
                 separate story-stage path, which already streams storyText
                 incrementally on its own). */}
+            <div className="flex items-center gap-1.5">
+            {canIllustrateLast && (
+              <button
+                onClick={() => onIllustrate?.(lastPartIndex)}
+                className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 touch-manipulation"
+                title="Paint a picture of this moment"
+              >
+                <DynamicIcon name="Image" className="w-5 h-5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Illustrate this</span>
+              </button>
+            )}
             <TTSControls
               text={
                 !storyTextReady && liveNarrationText
@@ -1613,6 +1681,7 @@ export default function Story({
               relayHandleRef={ttsRelayHandleRef}
               storyId={storyId}
             />
+            </div>
           </div>
         )}
 

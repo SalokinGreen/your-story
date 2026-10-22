@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { StoryData, NPC, NPCStatus, NPCAttitude } from "../misc/structs";
 import { DynamicIcon } from "../components/DynamicIcon";
+import { StoredPortrait } from "../components/StoryImage";
 import FullScreenView from "../components/FullScreenView";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,6 +11,9 @@ import { preprocessMarkdown } from "../misc/markdownUtils";
 
 interface NPCsPageProps extends StoryData {
   onUpdateNPCs?: (updatedNPCs: NPC[]) => void;
+  // Paints a portrait for this NPC (page.tsx); unset when no image key is set
+  // or on a guest's device.
+  onMakePortrait?: (npcId: string) => void;
   // Pre-selects an NPC by id on mount - set when the player clicks a
   // highlighted mention of this NPC in the story prose (see page.tsx).
   initialSelectedId?: string;
@@ -93,7 +97,7 @@ const ATTITUDE_CONFIG: Record<
 type FilterType = "all" | NPCStatus | NPCAttitude;
 
 export default function NPCsPage(props: NPCsPageProps) {
-  const { onUpdateNPCs, initialSelectedId, ...storyData } = props;
+  const { onUpdateNPCs, initialSelectedId, onMakePortrait, ...storyData } = props;
   const [selectedNPC, setSelectedNPC] = useState<NPC | null>(() =>
     initialSelectedId
       ? (storyData.npcs || []).find((n) => n.id === initialSelectedId) || null
@@ -493,20 +497,26 @@ export default function NPCsPage(props: NPCsPageProps) {
                 >
                   <div className="flex items-center gap-2">
                     {/* NPC Avatar */}
-                    {npc.custom_symbol_url ? (
-                      <img
-                        src={npc.custom_symbol_url}
-                        alt={npc.name}
-                        className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-white/5 border border-white/10">
-                        <DynamicIcon
-                          name={npc.symbol || "User"}
-                          className="w-5 h-5 text-blue-300/50"
+                    <StoredPortrait
+                      imageId={npc.portraitImageId}
+                      alt={npc.name}
+                      className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
+                    >
+                      {npc.custom_symbol_url ? (
+                        <img
+                          src={npc.custom_symbol_url}
+                          alt={npc.name}
+                          className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
                         />
-                      </div>
-                    )}
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-white/5 border border-white/10">
+                          <DynamicIcon
+                            name={npc.symbol || "User"}
+                            className="w-5 h-5 text-blue-300/50"
+                          />
+                        </div>
+                      )}
+                    </StoredPortrait>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -572,20 +582,44 @@ export default function NPCsPage(props: NPCsPageProps) {
               <div className="p-4 border-b border-white/10">
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
-                  {selectedNPC.custom_symbol_url ? (
-                    <img
-                      src={selectedNPC.custom_symbol_url}
+                  <div className="shrink-0 flex flex-col items-center gap-1.5">
+                    <StoredPortrait
+                      imageId={
+                        npcs.find((n) => n.id === selectedNPC.id)
+                          ?.portraitImageId ?? selectedNPC.portraitImageId
+                      }
                       alt={selectedNPC.name}
-                      className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 bg-white/5 border border-white/10">
-                      <DynamicIcon
-                        name={selectedNPC.symbol || "User"}
-                        className="w-8 h-8 text-blue-300/50"
-                      />
-                    </div>
-                  )}
+                      className="w-24 h-24 rounded-xl object-cover border border-white/10 shrink-0"
+                    >
+                      {selectedNPC.custom_symbol_url ? (
+                        <img
+                          src={selectedNPC.custom_symbol_url}
+                          alt={selectedNPC.name}
+                          className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 bg-white/5 border border-white/10">
+                          <DynamicIcon
+                            name={selectedNPC.symbol || "User"}
+                            className="w-8 h-8 text-blue-300/50"
+                          />
+                        </div>
+                      )}
+                    </StoredPortrait>
+                    {onMakePortrait && (
+                      <button
+                        type="button"
+                        onClick={() => onMakePortrait(selectedNPC.id)}
+                        className="text-[11px] px-2 py-0.5 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 text-blue-200/70 hover:text-white transition-colors"
+                        title="Paint a portrait from this character's description"
+                      >
+                        {npcs.find((n) => n.id === selectedNPC.id)
+                          ?.portraitImageId
+                          ? "Replace"
+                          : "Make portrait"}
+                      </button>
+                    )}
+                  </div>
 
                   <div className="flex-1 min-w-0">
                     <h2 className="text-xl font-bold text-white">

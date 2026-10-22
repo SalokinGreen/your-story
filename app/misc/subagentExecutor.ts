@@ -25,6 +25,8 @@ export interface SubagentContext {
   token?: string | null;
   webResearchEnabled?: boolean;
   braveSearchKey?: string;
+  // generate_image (imageJobs.ts): how the GM executor queues a picture.
+  imageJobs?: import("./imageJobs").ImageToolContext;
 }
 
 export type DelegateTaskOutcome =

@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { useState, useMemo } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
 import FullScreenView from "../components/FullScreenView";
+import { StoredPortrait } from "../components/StoryImage";
 import LoreImageGenerator from "../components/LoreImageGenerator";
 import { preprocessMarkdown } from "../misc/markdownUtils";
 import { useNotification } from "../misc/NotificationContext";
@@ -22,6 +23,9 @@ interface LorePageProps extends StoryData {
   // Pre-selects a note by title on mount - set when the player clicks a
   // highlighted mention of this note in the story prose (see page.tsx).
   initialSelectedTitle?: string;
+  // Paints the player character's portrait (page.tsx); unset when no image
+  // key is set or on a guest's device.
+  onMakePlayerPortrait?: () => void;
 }
 
 // Type configuration with icons and colors
@@ -153,7 +157,7 @@ const FILTER_ORDER: (LoreType | "all" | "secrets")[] = [
 const AUTO_PINNED_TYPES: LoreType[] = ["character_sheet", "gm_plan"];
 
 export default function LorePage(props: LorePageProps) {
-  const { onUpdateLore, initialSelectedTitle, ...storyData } = props;
+  const { onUpdateLore, initialSelectedTitle, onMakePlayerPortrait, ...storyData } = props;
   const { addNotification } = useNotification();
   const [selectedLore, setSelectedLore] = useState<StoryLore | null>(() =>
     initialSelectedTitle
@@ -654,6 +658,13 @@ export default function LorePage(props: LorePageProps) {
                       className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
                       onClick={() => selectNote(loreItem)}
                     >
+                    <StoredPortrait
+                      imageId={loreItem.imageId}
+                      alt={loreItem.title}
+                      className={`w-8 h-8 rounded object-cover border shrink-0 ${
+                        isSecret ? "border-amber-400/20" : "border-white/10"
+                      }`}
+                    >
                     {loreItem.thumbnailUrl ? (
                       <img
                         src={loreItem.thumbnailUrl}
@@ -682,6 +693,7 @@ export default function LorePage(props: LorePageProps) {
                         />
                       </div>
                     )}
+                    </StoredPortrait>
 
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm text-white truncate flex items-center gap-1.5">
@@ -878,7 +890,15 @@ export default function LorePage(props: LorePageProps) {
 
               {/* Detail Content */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Image */}
+                {/* Image: a picture made in play wins over the thumbnail */}
+                <StoredPortrait
+                  imageId={
+                    storyData.lore.find((l) => l.title === selectedLore.title)
+                      ?.imageId ?? selectedLore.imageId
+                  }
+                  alt={selectedLore.title}
+                  className="w-full h-48 sm:h-56 xl:h-64 object-cover rounded-xl border border-white/10 shadow-lg"
+                >
                 {selectedLore.thumbnailUrl && (
                   <div className="relative overflow-hidden rounded-xl border border-white/10 shadow-lg group">
                     <img
@@ -889,6 +909,38 @@ export default function LorePage(props: LorePageProps) {
                     <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
                   </div>
                 )}
+                </StoredPortrait>
+
+                {/* The player character's portrait, on their character sheet */}
+                {selectedLore.type === "character_sheet" &&
+                  !selectedLore.ownerCouchPlayerId && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/[0.03]">
+                      <StoredPortrait
+                        imageId={storyData.playerPortraitImageId}
+                        alt="Portrait of your character"
+                        className="w-24 h-24 rounded-xl object-cover border border-white/10 shrink-0"
+                      >
+                        <div className="w-24 h-24 rounded-xl flex items-center justify-center shrink-0 bg-white/5 border border-white/10">
+                          <DynamicIcon
+                            name="User"
+                            className="w-10 h-10 text-blue-300/40"
+                          />
+                        </div>
+                      </StoredPortrait>
+                      {onMakePlayerPortrait && (
+                        <button
+                          type="button"
+                          onClick={onMakePlayerPortrait}
+                          className="text-xs px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-blue-100 transition-colors"
+                          title="Paint a portrait from this character sheet"
+                        >
+                          {storyData.playerPortraitImageId
+                            ? "Replace portrait"
+                            : "Make portrait"}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                 {/* AI Image Generator */}
                 {onUpdateLore && (

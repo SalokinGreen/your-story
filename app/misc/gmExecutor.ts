@@ -43,6 +43,7 @@ import {
   RollTableParams,
   RollPortentParams,
   GenerateNameParams,
+  GenerateImageParams,
   ReadNotesParams,
   SearchMemoryParams,
   GetGameStateParams,
@@ -84,6 +85,7 @@ import {
   SubagentContext,
   DelegateTaskOutcome,
 } from "./subagentExecutor";
+import type { ImageToolContext, ImageJobTarget } from "./imageJobs";
 import { validateToolArgs, formatValidationErrors } from "./toolValidation";
 import {
   semanticSearchFallback,
@@ -171,6 +173,7 @@ export interface GMToolResult {
     | GMRollTableResult
     | GMRollPortentResult
     | GMGenerateNameResult
+    | GMGenerateImageResult
     | GMReadNotesResult
     | GMSearchMemoryResult
     | GMGetGameStateResult
@@ -408,6 +411,14 @@ export interface GMGenerateNameResult {
   type: "generate_name";
   pointers: NamePointers;
   reason?: string;
+}
+
+export interface GMGenerateImageResult {
+  type: "generate_image";
+  subject: "scene" | "npc" | "player" | "location";
+  accepted: boolean;
+  imageId?: string; // The job id, also the stored picture's id
+  reason?: string; // Why a refused call was refused
 }
 
 export interface GMReadNotesResult {
@@ -1102,6 +1113,14 @@ export async function executeGMTools(
             call.id,
             params as GenerateNameParams,
             modified
+          );
+          break;
+        case "generate_image":
+          result = executeGenerateImage(
+            call.id,
+            params as GenerateImageParams,
+            modified,
+            subagentContext.imageJobs
           );
           break;
         case "read_notes":
@@ -3110,6 +3129,164 @@ function executeGenerateName(
       reason: params.reason,
     } as GMGenerateNameResult,
     contextForStory: formatNamePointers(pointers, params.reason),
+  };
+}
+
+const IMAGE_DESCRIPTION_MAX_CHARS = 400;
+
+/**
+ * Queue a picture (docs/image-generation-design.md §3.1). The engine disposes:
+ * everything is checked before anything is spent, and a refusal comes back with
+ * a reason the GM can read. The picture itself is made in the background, so
+ * this answers at once and the turn is never held up.
+ *
+ * - pictures on and a key present (ctx.enabled), else refused;
+ * - fewer than the per-scene cap this scene (StoryData.imageState, reset when
+ *   computeSceneKey changes, the tier3CallsInScene pattern);
+ * - npc_id / lore_title name something that exists, and it has no picture yet;
+ * - `featuring` is trimmed to ids that exist.
+ */
+function executeGenerateImage(
+  toolCallId: string,
+  params: GenerateImageParams,
+  storyData: StoryData,
+  ctx: ImageToolContext | undefined
+): GMToolResult {
+  const subject = params?.subject;
+  const refuse = (reason: string): GMToolResult => ({
+    toolName: "generate_image",
+    toolCallId,
+    success: false,
+    result: {
+      type: "generate_image",
+      subject: subject ?? "scene",
+      accepted: false,
+      reason,
+    } as GMGenerateImageResult,
+    contextForStory: `[generate_image refused: ${reason}] Carry on without a picture.`,
+  });
+
+  if (!ctx || !ctx.enabled) {
+    return refuse("pictures are turned off, or no image key is set.");
+  }
+  if (
+    subject !== "scene" &&
+    subject !== "npc" &&
+    subject !== "player" &&
+    subject !== "location"
+  ) {
+    return refuse('subject must be "scene", "npc", "player" or "location".');
+  }
+  const description =
+    typeof params.description === "string"
+      ? params.description.trim().slice(0, IMAGE_DESCRIPTION_MAX_CHARS)
+      : "";
+  if (!description) {
+    return refuse("description is required: what a camera would see.");
+  }
+
+  // The per-scene cap, reset at the scene boundary.
+  const sceneKey = computeSceneKey(storyData);
+  const prior = storyData.imageState;
+  const usedThisScene =
+    prior && prior.lastSceneKey === sceneKey ? prior.gmImagesInScene : 0;
+  if (usedThisScene >= ctx.maxPerScene) {
+    return refuse(
+      `this scene has already had its ${ctx.maxPerScene} picture${
+        ctx.maxPerScene === 1 ? "" : "s"
+      }. Wait for the next scene.`
+    );
+  }
+
+  const npcs = storyData.npcs ?? [];
+  const findNpc = (ref: string) => {
+    const wanted = ref.trim().toLowerCase();
+    return npcs.find(
+      (n) => n.id === ref || n.name.trim().toLowerCase() === wanted
+    );
+  };
+
+  let target: ImageJobTarget;
+  let npcIndex = -1;
+  let loreIndex = -1;
+  const featuring: string[] = [];
+
+  if (subject === "npc") {
+    const npc = params.npc_id ? findNpc(params.npc_id) : undefined;
+    if (!npc) {
+      return refuse(
+        `npc_id "${params.npc_id ?? ""}" is not a known NPC. Add the NPC first, then ask for the portrait.`
+      );
+    }
+    if (npc.portraitImageId) {
+      return refuse(`${npc.name} already has a portrait.`);
+    }
+    npcIndex = npcs.indexOf(npc);
+    target = { kind: "npc", npcId: npc.id };
+    featuring.push(npc.id);
+  } else if (subject === "player") {
+    if (storyData.playerPortraitImageId) {
+      return refuse("the player character already has a portrait.");
+    }
+    target = { kind: "player" };
+    featuring.push("player");
+  } else if (subject === "location") {
+    const wanted = (params.lore_title ?? "").trim().toLowerCase();
+    const lore = storyData.lore ?? [];
+    loreIndex = lore.findIndex((l) => l.title.trim().toLowerCase() === wanted);
+    if (!wanted || loreIndex < 0) {
+      return refuse(
+        `lore_title "${params.lore_title ?? ""}" is not the title of a note. Use the exact title.`
+      );
+    }
+    if (lore[loreIndex].imageId || lore[loreIndex].thumbnailUrl) {
+      return refuse(`the note "${lore[loreIndex].title}" already has a picture.`);
+    }
+    target = { kind: "lore", loreTitle: lore[loreIndex].title };
+  } else {
+    target = { kind: "scenePart", partId: ctx.scenePartId };
+    for (const ref of Array.isArray(params.featuring) ? params.featuring : []) {
+      if (typeof ref !== "string") continue;
+      const id = ref.trim().toLowerCase() === "player" ? "player" : findNpc(ref)?.id;
+      if (id && !featuring.includes(id)) featuring.push(id);
+    }
+  }
+
+  const imageId = ctx.enqueue({ subject, description, featuring, target });
+
+  // Count it, and put the pending id where the picture will live, on the
+  // working copy the turn is about to commit.
+  storyData.imageState = {
+    gmImagesInScene: usedThisScene + 1,
+    lastSceneKey: sceneKey,
+  };
+  if (npcIndex >= 0) {
+    npcs[npcIndex] = { ...npcs[npcIndex], portraitImageId: imageId };
+  } else if (subject === "player") {
+    storyData.playerPortraitImageId = imageId;
+  } else if (loreIndex >= 0) {
+    storyData.lore[loreIndex] = { ...storyData.lore[loreIndex], imageId };
+  } else {
+    ctx.onSceneImage?.({ imageId, requestedBy: "gm", description });
+  }
+
+  const where =
+    subject === "scene"
+      ? "under this turn"
+      : subject === "location"
+        ? "on that note"
+        : "on their page";
+  return {
+    toolName: "generate_image",
+    toolCallId,
+    success: true,
+    result: {
+      type: "generate_image",
+      subject,
+      accepted: true,
+      imageId,
+    } as GMGenerateImageResult,
+    contextForStory: `Picture requested; it will appear ${where}. Don't describe it in the prose.`,
   };
 }
 
@@ -5659,6 +5836,7 @@ function executeNPCReaction(
     npcId: npc?.id || params.npc,
     npcName: npc?.name || params.npc,
     npcImage: npc?.custom_symbol_url,
+    npcPortraitImageId: npc?.portraitImageId,
     reaction: params.reaction,
     emoji: params.emoji,
     context: params.context,

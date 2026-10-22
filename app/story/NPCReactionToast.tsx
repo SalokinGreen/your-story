@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { NPCReaction } from "../misc/structs";
+import { StoredPortrait } from "../components/StoryImage";
 
 interface NPCReactionToastProps {
   reaction: NPCReaction;
@@ -67,19 +68,25 @@ export default function NPCReactionToast({
     >
       {/* NPC Avatar */}
       <div className="relative shrink-0">
-        {reaction.npcImage ? (
-          <img
-            src={reaction.npcImage}
-            alt={reaction.npcName}
-            className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/50"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center ring-2 ring-indigo-500/50">
-            <span className="text-white text-lg font-bold">
-              {reaction.npcName.charAt(0).toUpperCase()}
-            </span>
-          </div>
-        )}
+        <StoredPortrait
+          imageId={reaction.npcPortraitImageId}
+          alt={reaction.npcName}
+          className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/50"
+        >
+          {reaction.npcImage ? (
+            <img
+              src={reaction.npcImage}
+              alt={reaction.npcName}
+              className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/50"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center ring-2 ring-indigo-500/50">
+              <span className="text-white text-lg font-bold">
+                {reaction.npcName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+        </StoredPortrait>
         {/* Online-style indicator dot */}
         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900 dark:border-gray-800 flex items-center justify-center">
           {reaction.emoji && (
