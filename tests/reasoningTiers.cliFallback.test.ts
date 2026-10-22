@@ -20,7 +20,11 @@ import {
   getEffectiveNarrationModelKey,
   getSubscriptionFallbacks,
 } from "@/app/misc/reasoningTiers";
-import { resolveSideCallModel, getLayerSubscriptionFallbacks } from "@/app/misc/layerSettings";
+import {
+  SIDE_AGENT_DEFAULT_MODEL_KEY,
+  resolveSideCallModel,
+  getLayerSubscriptionFallbacks,
+} from "@/app/misc/layerSettings";
 import { getAvailableModelKeys } from "@/app/misc/ai_prices";
 import {
   getClaudeCliStatus,
@@ -98,10 +102,11 @@ describe("on a phone or the web build", () => {
     ]);
   });
 
-  it("swaps a side agent's synced subscription override for its fallback", () => {
-    expect(
-      resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" }, "Mistral Nemo"),
-    ).toEqual({ model: "Mistral Nemo" });
+  it("swaps a side agent's synced subscription override for the side-agent default", () => {
+    expect(resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" })).toEqual({
+      model: SIDE_AGENT_DEFAULT_MODEL_KEY,
+      reasoningEffort: "none",
+    });
   });
 
   it("does not offer the subscription models", async () => {
@@ -149,16 +154,19 @@ describe("in the desktop app", () => {
   });
 
   it("runs a side agent on the subscription only when its layer is pointed there", () => {
-    // Inherited (the narration or GM model is a subscription model): the
-    // default narration model instead, decision 12.
-    expect(resolveSideCallModel(null, SONNET)).toEqual({ model: NARRATION_MODEL_KEY });
+    // Not pointed there (the narration voice and tier 2 are subscription
+    // models here, as synced from the desktop): the side-agent default,
+    // never a subscription model and never the narration voice, decision 12.
+    expect(getEffectiveNarrationModelKey()).toBe(SONNET);
+    expect(resolveSideCallModel(null)).toEqual({
+      model: SIDE_AGENT_DEFAULT_MODEL_KEY,
+      reasoningEffort: "none",
+    });
     // Pointed there explicitly: kept.
-    expect(resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" }, "Mistral Nemo")).toEqual({
+    expect(resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" })).toEqual({
       model: SONNET,
       reasoningEffort: "low",
     });
-    // An ordinary fallback is untouched.
-    expect(resolveSideCallModel(null, "Mistral Nemo")).toEqual({ model: "Mistral Nemo" });
   });
 });
 
@@ -191,10 +199,11 @@ describe("during an online session (decision 29)", () => {
     ]);
   });
 
-  it("swaps a side agent's subscription override for its fallback", () => {
-    expect(
-      resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" }, "Mistral Nemo"),
-    ).toEqual({ model: "Mistral Nemo" });
+  it("swaps a side agent's subscription override for the side-agent default", () => {
+    expect(resolveSideCallModel({ modelKey: SONNET, reasoningEffort: "low" })).toEqual({
+      model: SIDE_AGENT_DEFAULT_MODEL_KEY,
+      reasoningEffort: "none",
+    });
   });
 
   it("gives the subscription back when the session ends", () => {

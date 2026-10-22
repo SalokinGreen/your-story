@@ -32,7 +32,7 @@ import {
 } from "@/app/misc/partialNotes";
 import ExtractionPreview from "@/app/components/pdf-import/ExtractionPreview";
 import { StoryLore } from "@/app/misc/structs";
-import { AI_MODELS } from "@/app/misc/ai_prices";
+import { AI_MODELS, resolveLegacyProviderModelId } from "@/app/misc/ai_prices";
 import { mergeExtractedContent } from "@/app/misc/ocrMerge";
 import { stripImagesFromPDF } from "@/app/misc/pdfImageStrip";
 import { PDFDocument } from "pdf-lib";
@@ -182,8 +182,10 @@ function loadPDFImporterSettings(): PDFImporterSettings {
   try {
     const raw = localStorage.getItem(PDF_IMPORTER_SETTINGS_KEY);
     if (!raw) return DEFAULT_PDF_IMPORTER_SETTINGS;
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_PDF_IMPORTER_SETTINGS, ...parsed };
+    const merged = { ...DEFAULT_PDF_IMPORTER_SETTINGS, ...JSON.parse(raw) };
+    // The picker stores the provider's model id; one a provider retired (the
+    // old Mistral small, medium, nemo and ministral ids) becomes its successor.
+    return { ...merged, aiModel: resolveLegacyProviderModelId(merged.aiModel) };
   } catch {
     return DEFAULT_PDF_IMPORTER_SETTINGS;
   }
@@ -209,11 +211,10 @@ function resolveModelSelection(settings: {
       provider: settings.customModelProvider as BYOKProvider,
     };
   }
-  const cfg = Object.values(AI_MODELS).find(
-    (m) => m.model === settings.aiModel,
-  );
+  const aiModel = resolveLegacyProviderModelId(settings.aiModel);
+  const cfg = Object.values(AI_MODELS).find((m) => m.model === aiModel);
   return {
-    model: settings.aiModel,
+    model: aiModel,
     provider: (cfg?.provider as BYOKProvider) || "openrouter",
   };
 }
@@ -3016,7 +3017,7 @@ export default function PDFImporter({
     setIsResuming(true);
     // Reflect the recovered settings in the form too, so they're visible
     // and stay in effect if the user reopens the importer later.
-    setAIModel(settings.aiModel);
+    setAIModel(resolveLegacyProviderModelId(settings.aiModel));
     setCustomModelProvider(settings.customModelProvider as BYOKProvider);
     setCustomModelId(settings.customModelId);
     setCustomInstructions(settings.customInstructions);

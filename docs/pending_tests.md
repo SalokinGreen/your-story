@@ -10,6 +10,427 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-21 — The model catalog refresh (`claude/catalog-refresh`)
+
+The catalog was checked against OpenRouter's live list and each vendor's
+pricing page, and the fallback for removed models is covered by tests. What
+no session could do is call the new models: each needs a provider key and
+spends the author's money, so each waits for the author's go. One short
+request per item is enough.
+
+- **The Designer on Grok 4.5 at effort `none` (the second engine review,
+  2026-10-22).** With only an OpenRouter key and no Designer model saved, the
+  Designer opens on Grok 4.5, the first catalog model the key unlocks. Its
+  effort is `none`, and OpenRouter marks Grok's reasoning mandatory. Send one
+  Designer message. *Expected:* a normal reply, with the request carrying
+  `reasoning: {effort: "low"}` (the "Side call failed" warning names the
+  effort if it fails). *Failure looks like:* a 400 naming `reasoning` or
+  `effort`, which would mean the `reasoningMandatory` flag is missing on the
+  model, or OpenRouter has changed which models refuse `"none"`.
+- **A Mistral Small 4 Designer at effort `high`.** Mistral's reasoning models
+  answer with `content` as a list of chunks. Send one Designer message.
+  *Expected:* a normal reply in the chat. *Failure looks like:* an error
+  naming `trim` or `[object Object]` in the chat, which would mean the
+  non-streaming path is not unpacking the list.
+- **Does `deepseek-v4-pro` still serve V4 Pro?** DeepSeek's release post says
+  it would route to V4.1 Flash from 2026-09-14; its changelog and pricing page
+  say it continues at its own price. Send one tiny request on "DeepSeek V4 Pro"
+  with a DeepSeek key and look at the reply's `model` field in the Debug Logs.
+  *Failure looks like:* a model name containing "flash", or a bill near
+  $0.15 / $0.60 per M instead of $0.66 / ## 2026-10-21 — The model catalog refresh (`claude/catalog-refresh`)
+
+The catalog was checked against OpenRouter's live list and each vendor's
+pricing page, and the fallback for removed models is covered by tests. What
+no session could do is call the new models: each needs a provider key and
+spends the author's money, so each waits for the author's go. One short
+request per item is enough.
+
+- **The Designer on Grok 4.5 at effort `none` (the second engine review,
+  2026-10-22).** With only an OpenRouter key and no Designer model saved, the
+  Designer opens on Grok 4.5, the first catalog model the key unlocks. Its
+  effort is `none`, and OpenRouter marks Grok's reasoning mandatory. Send one
+  Designer message. *Expected:* a normal reply, with the request carrying
+  `reasoning: {effort: "low"}` (the "Side call failed" warning names the
+  effort if it fails). *Failure looks like:* a 400 naming `reasoning` or
+  `effort`, which would mean the `reasoningMandatory` flag is missing on the
+  model, or OpenRouter has changed which models refuse `"none"`.
+- **A Mistral Small 4 Designer at effort `high`.** Mistral's reasoning models
+  answer with `content` as a list of chunks. Send one Designer message.
+  *Expected:* a normal reply in the chat. *Failure looks like:* an error
+  naming `trim` or `[object Object]` in the chat, which would mean the
+  non-streaming path is not unpacking the list.
+- **Does `deepseek-v4-pro` still serve V4 Pro?** DeepSeek's release post says
+  it would route to V4.1 Flash from 2026-09-14; its changelog and pricing page
+  say it continues at its own price. Send one tiny request on "DeepSeek V4 Pro"
+  with a DeepSeek key and look at the reply's `model` field in the Debug Logs.
+  *Failure looks like:* a model name containing "flash", or a bill near
+  $0.15 / $0.60 per M instead of $0.66 / $1.98 (off-peak). Then relabel or
+  remove the entry.
+- **Does a forced tool call work on Qwen 3.8?** The app sends `tool_choice`
+  `auto` to `qwen/qwen3.8…` because a gateway documents a 400 for a forced call
+  with thinking on, while OpenRouter lists the parameter as supported. In a
+  combat scene on "Qwen 3.8 Max", check that a gated round still produces a
+  roll (the gate's message does the forcing). To test the premise itself, send
+  `tool_choice: "required"` by hand once; if it works, the safeguard
+  (`modelRejectsForcedToolChoice`) can go.
+- **Do the new direct ids work on their providers?** One short chat each:
+  "Google Gemini 4 Argon" and "Google Gemini 3.8 Flash" (the `models/` prefix
+  on Google's OpenAI-compatible endpoint), and "Mistral Large 4" (`mistral-large-4`,
+  in public preview). *Failure looks like:* a 404 or "model not found". Also
+  note what Google AI Studio bills for the `gemini-flash-latest` alias, which
+  the two renamed "latest alias" entries still price from an older model.
+- **A GM turn with tools on "DeepSeek V4.1 Flash"** (`deepseek-flash`): a roll
+  and a second round, to see the `reasoning_content` replay work on the new
+  name. *Failure looks like:* a 400 mentioning `reasoning_content`.
+- **A GM turn on "GPT-6.1 Sol" or "GPT-6 Luna"** through OpenRouter. OpenRouter
+  lists no `temperature` for them; check the call is not rejected for the
+  sampling settings the app sends.
+- **The lore image generator with a saved removed model.** The Settings
+  fallback was checked in the preview (a tier, the narration voice and the
+  Observer each saved as a removed model showed and ran their defaults). The
+  image pickers were checked only as a function: with `loreImageGen_provider`
+  `openrouter` and `loreImageGen_model` `Flux 2 Flex` saved in localStorage,
+  opening a lore entry's image generator should show Nano Banana, not a blank
+  or mismatched picker.
+
+**The fixed models (2026-10-22).** Mistral's retired chat models were replaced
+(Mistral Small 4, Medium 3.5, Ministral 3 3B and 8B), image prices and ids
+were corrected, the OCR summariser and Cartesia TTS moved to their current
+names. The ids were read from the vendors' own pages and the request shapes
+are covered by tests with a faked `fetch`; none was sent to a provider.
+
+- **A turn with tools on each new Mistral id, with only a Mistral key.**
+  Save only a Mistral key, pin the narration voice to "Mistral Small 4" and
+  tier 1 to the same, and play a turn that makes the GM roll. Repeat with
+  "Mistral Medium 3.5" (`mistral-medium-3-5`), "Ministral 3 8B"
+  (`ministral-8b-2512`) and "Ministral 3 3B" (`ministral-3b-2512`). *Expected:*
+  the roll happens, the scene arrives, and the Debug Logs name the Mistral id.
+  *Failure looks like:* a 404 or "model not found" (the id), a 400 naming
+  `tool_choice`, `max_tokens` or `reasoning_effort` (Small 4 and Medium 3.5
+  reason, and Mistral may take effort differently from the one value the app
+  sends them), or a 400 about the prompt size on Ministral 3 3B (Mistral's page
+  says 256k, OpenRouter lists 128k; the catalog follows Mistral).
+- **A saved choice of a retired Mistral model.** In localStorage set
+  `narrationModelOverride` to `Mistral Small 3.2`, `reasoningTierOverrides`
+  to `[{"modelKey":"Mistral Medium 3.1","reasoningEffort":"low"},null,null,null]`,
+  `observerModelOverride` to `{"modelKey":"Mistral Nemo","reasoningEffort":"none"}`
+  and `designerModel` to `Devstral 2`, with only a Mistral key saved, and reload.
+  *Expected:* Settings → AI Config shows Mistral Small 4, Mistral Medium 3.5
+  and (Architecture) Ministral 3 8B, `/creator` opens on Mistral Medium 3.5, and
+  a turn runs without asking for an OpenRouter key. *Failure looks like:* a
+  blank picker, "No key" on a slot that has a Mistral key, or a "Model key …
+  not found" line. The PDF importer has its own saved id: set
+  `pdfImporterSettings` to `{"aiModel":"mistral-small-2506"}`; the importer's
+  model picker should open on Mistral Small 4.
+- **A narration line on Cartesia.** With a Cartesia key and a voice ID (try
+  the bundled Barbershop Man, and a Professional Voice Clone if you have one),
+  switch the voice model to Cartesia and play a narration line. The request
+  now carries `Cartesia-Version: 2026-08-14`, `model_id: "sonic-3.6"` and
+  `voice` as a string. *Expected:* audio plays. *Failure looks like:* a 400
+  with `voice_model_mismatch` on a Professional Voice Clone (Cartesia wants one
+  of the voice's own models, `sonic-3.5-2026-05-04` or `sonic-3.6-2026-08-27`,
+  and the app sends the undated `sonic-3.6`; if so, the voice needs a model
+  field), a 400 naming `voice` or `model_id`, or silence. If it fails for every
+  voice, revert `CARTESIA_VERSION` and `CARTESIA_MODEL_ID` in `ttsCall.ts`.
+- **One Nano Banana Pro image.** With an OpenRouter key, generate a lore image
+  on "Nano Banana Pro" (now `google/gemini-3-pro-image`). *Expected:* an image,
+  at about $0.13 in the OpenRouter activity page (the picker shows ~$0.134).
+  Then "Nano Banana" (now `google/gemini-3.1-flash-lite-image`, ~$0.034) and
+  "GPT-5.4 Image 2" (`openai/gpt-5.4-image-2`, ~$0.045, an estimate). *Failure
+  looks like:* "Could not extract image from AI response" (the model returns
+  the picture in a shape `extractImageFromOpenRouterResponse` does not read),
+  a 404, or a cost far from the figure shown.
+- **A DeepInfra image.** Generate a lore image on "FLUX 2 Pro" and on
+  "Bria 3.2". *Expected:* about $0.03 and $0.04 on DeepInfra's usage page.
+- **The OCR summariser on DeepSeek.** Import a short PDF with the importer's
+  model set to a DeepSeek model (its request now names `deepseek-flash`).
+  *Failure looks like:* a 400 naming the model.
+
+**The Balanced defaults (decisions 50 and 51).** The default ladder and the
+side agents' own default changed in this same branch. Every item here plays
+real turns on the author's OpenRouter key, so it waits for the author's go.
+
+- **A fresh profile, one OpenRouter key, four turns.** Clear the saved
+  overrides (Settings → AI Config → "Reset all to defaults", and every
+  Architecture toggle off), save only an OpenRouter key, and play one banter
+  turn, one ordinary check, one combat turn against two enemies (tier 2) and
+  one against a single enemy (tier 3, which counts as a boss). *Expected:*
+  tiers 0 and 1 run on Claude Haiku 5.5, tier 2 on GLM 5.3, tier 3 on Claude
+  Sonnet 5.5, narration on GLM 5.3, and the Observer's judges and the Memory
+  Keeper on Claude Haiku 5.5, all visible in the turn cost panel or the Debug
+  Logs. *Failure looks like:* a 400 from Claude naming `tool_choice` or a
+  forced tool use on a gated round, or naming thinking blocks when the GM
+  climbs from Haiku to Sonnet mid-turn; a side-agent line in the Debug Logs
+  naming DeepSeek V4 Flash or `Model key … not found`, which means a side
+  call still reaches `getModelConfig()` with a key it does not know (a missed
+  fallback path); a GLM 5.3 reply that comes back empty because its thinking
+  used the whole token cap.
+- **A climb to tier 3 in the middle of a turn, from GLM 5.3 and from Haiku.**
+  In a combat scene against two enemies (tier 2, GLM 5.3), make the GM raise
+  the tier mid-turn: a `formula_roll` with `stakes: "deadly"` raises it
+  through `applyStakesEscalation`, so the next round runs on Claude Sonnet
+  5.5. Then do the same from an ordinary scene (tier 1, Haiku). *Expected:*
+  the Sonnet round succeeds, with the GM's earlier rounds in its history.
+  *Failure looks like:* a 400 from Anthropic or OpenRouter naming
+  `reasoning_details`, thinking blocks or a signature. That would mean the
+  earlier model's reasoning must not be replayed to Claude when the model
+  changes inside a turn. The turn then errors out instead of falling back,
+  because the tier fallback does not fire for streamed rounds (a provider
+  error arrives as an in-stream `error` event; see the `REASONING_TIERS`
+  comment in `reasoningTiers.ts`).
+- **A gated combat round on GLM 5.3.** In the same two-enemy combat, provoke
+  the roll gate (M2) or the plan gate, so that round is forced to
+  `tool_choice: "required"` and goes out through OpenRouter to GLM 5.3.
+  *Expected:* the gated round calls a tool (a roll). *Failure looks like:* a
+  400 naming `tool_choice`, or the model answering in prose again so the gate
+  fires a second time.
+- **The cap on a tier 3 turn.** Against a single enemy (tier 3, Claude Sonnet
+  5.5 at `xhigh`), with the default Response Length of 8,000, read the final
+  story round in the Debug Logs. Thinking counts against `max_tokens` on
+  Claude, so `xhigh` can use up the cap. *Expected:* the round's finish
+  diagnostic shows `truncatedAtCap: false` and the scene arrives whole.
+  *Failure looks like:* `truncatedAtCap: true`, an empty final story round,
+  or a scene that stops mid-sentence; then tier 3's effort or the 4,096
+  `max_tokens` floor needs another look.
+- **Haiku's thinking on the side calls.** An unpinned side agent sends effort
+  `none` (decision 53), and Claude 5.5's thinking cannot be turned off, so
+  `applyReasoningEffort` sends Claude's `none` as `low`, as its GLM branch
+  already did. After the four turns above, read the Observer and
+  Memory Keeper lines in the turn cost panel. *Failure looks like:* a side
+  call costing several times a tenth of a cent, or taking several seconds,
+  which would mean OpenRouter is not honouring `reasoning.effort: low` for
+  Haiku.
+- **The Observer's rewrite on the narration voice (decision 52).** The
+  Observer's judges run on Claude Haiku 5.5, but an unpinned Observer's
+  rewrite runs on the narration voice (GLM 5.3 by default). In a story with
+  violence or mature themes, let the Observer flag a turn (a player-agency or
+  outcome mismatch is the easiest to provoke), and read the rewrite's line in
+  the Debug Logs. *Expected:* the judge calls name Claude Haiku 5.5 and the
+  rewrite call names GLM 5.3, and the rewritten scene keeps its tone.
+  *Failure looks like:* a rewrite call naming Haiku (a call site still on the
+  judges' options), a refusal or a softened scene, or "Observer rewrite call
+  failed, falling back to full-turn reset" every time.
+- **An existing profile with only a Mistral or DeepSeek key.** Its saved
+  overrides still apply, but a slot with none now defaults to an OpenRouter
+  model. *Expected:* a turn that stops with a message naming the missing
+  OpenRouter key, and the Settings tier cards showing "No key"; saving an
+  OpenRouter key (or picking models on the key it has) fixes it.
+- **An OpenRouter-less profile keeps its side agents.** Clear every saved
+  override and every key, save only a Mistral key, set the four tiers and the
+  narration voice to Mistral models in Settings → AI Config, and play until
+  compaction runs (a long story, or a small Memory Size). *Expected:* the turn
+  plays, and the Memory Keeper, the Observer and compaction lines in the Debug
+  Logs name the Mistral narration model (the side agents fall to the
+  narration voice when there is no key for Claude Haiku 5.5's provider), with
+  a scene summary appearing once compaction has run. *Failure looks like:* a
+  side-agent line naming Claude Haiku 5.5 followed by "No API key configured
+  for OpenRouter", or a story whose old history drops out with no summary
+  (compaction never ran). The "Compact Story" button in the story menu should
+  work on the same profile, on the same model.
+
+**Every call carries an effort (decision 53).** Built and tested against
+mocked providers only; the requests below spend the author's OpenRouter key.
+
+- **The narration voice and the Designer at a chosen effort.** In Settings →
+  AI Config set the narration voice to Claude Sonnet 5.5 and its new effort
+  picker to `high`, and play one turn that needs a separate narration call
+  (the GM's last round only calls tools) with suggested choices on. Then open
+  `/creator`, set the Designer's model to Claude Sonnet 5.5 and its Effort
+  picker to `normal`, and send one message. *Expected:* the "Story stage
+  request sent" line in the Debug Logs shows `reasoningEffort: high`; in the
+  web preview's network tab the story and choices requests carry
+  `"reasoningEffort":"high"` and the Designer's `"normal"`, while the
+  Observer's judges and the Memory Keeper carry `"none"` (OpenRouter then
+  receives `reasoning: {effort: "low"}` for them, Claude's reading of `none`,
+  and `{effort: "high"}` and `{effort: "medium"}` for the other two). A failed
+  side call's Debug Logs warning also names the effort it was sent at.
+  *Failure looks like:* every call still at `low` (the effort is not reaching
+  the request), or a 400 naming `reasoning` (a model that does not take the
+  effort the picker offered).
+.98 (off-peak). Then relabel or
+  remove the entry.
+- **Does a forced tool call work on Qwen 3.8?** The app sends `tool_choice`
+  `auto` to `qwen/qwen3.8…` because a gateway documents a 400 for a forced call
+  with thinking on, while OpenRouter lists the parameter as supported. In a
+  combat scene on "Qwen 3.8 Max", check that a gated round still produces a
+  roll (the gate's message does the forcing). To test the premise itself, send
+  `tool_choice: "required"` by hand once; if it works, the safeguard
+  (`modelRejectsForcedToolChoice`) can go.
+- **Do the new direct ids work on their providers?** One short chat each:
+  "Google Gemini 4 Argon" and "Google Gemini 3.8 Flash" (the `models/` prefix
+  on Google's OpenAI-compatible endpoint), and "Mistral Large 4" (`mistral-large-4`,
+  in public preview). *Failure looks like:* a 404 or "model not found". Also
+  note what Google AI Studio bills for the `gemini-flash-latest` alias, which
+  the two renamed "latest alias" entries still price from an older model.
+- **A GM turn with tools on "DeepSeek V4.1 Flash"** (`deepseek-flash`): a roll
+  and a second round, to see the `reasoning_content` replay work on the new
+  name. *Failure looks like:* a 400 mentioning `reasoning_content`.
+- **A GM turn on "GPT-6.1 Sol" or "GPT-6 Luna"** through OpenRouter. OpenRouter
+  lists no `temperature` for them; check the call is not rejected for the
+  sampling settings the app sends.
+- **The lore image generator with a saved removed model.** The Settings
+  fallback was checked in the preview (a tier, the narration voice and the
+  Observer each saved as a removed model showed and ran their defaults). The
+  image pickers were checked only as a function: with `loreImageGen_provider`
+  `openrouter` and `loreImageGen_model` `Flux 2 Flex` saved in localStorage,
+  opening a lore entry's image generator should show Nano Banana, not a blank
+  or mismatched picker.
+
+**The fixed models (2026-10-22).** Mistral's retired chat models were replaced
+(Mistral Small 4, Medium 3.5, Ministral 3 3B and 8B), image prices and ids
+were corrected, the OCR summariser and Cartesia TTS moved to their current
+names. The ids were read from the vendors' own pages and the request shapes
+are covered by tests with a faked `fetch`; none was sent to a provider.
+
+- **A turn with tools on each new Mistral id, with only a Mistral key.**
+  Save only a Mistral key, pin the narration voice to "Mistral Small 4" and
+  tier 1 to the same, and play a turn that makes the GM roll. Repeat with
+  "Mistral Medium 3.5" (`mistral-medium-3-5`), "Ministral 3 8B"
+  (`ministral-8b-2512`) and "Ministral 3 3B" (`ministral-3b-2512`). *Expected:*
+  the roll happens, the scene arrives, and the Debug Logs name the Mistral id.
+  *Failure looks like:* a 404 or "model not found" (the id), a 400 naming
+  `tool_choice`, `max_tokens` or `reasoning_effort` (Small 4 and Medium 3.5
+  reason, and Mistral may take effort differently from the one value the app
+  sends them), or a 400 about the prompt size on Ministral 3 3B (Mistral's page
+  says 256k, OpenRouter lists 128k; the catalog follows Mistral).
+- **A saved choice of a retired Mistral model.** In localStorage set
+  `narrationModelOverride` to `Mistral Small 3.2`, `reasoningTierOverrides`
+  to `[{"modelKey":"Mistral Medium 3.1","reasoningEffort":"low"},null,null,null]`,
+  `observerModelOverride` to `{"modelKey":"Mistral Nemo","reasoningEffort":"none"}`
+  and `designerModel` to `Devstral 2`, with only a Mistral key saved, and reload.
+  *Expected:* Settings → AI Config shows Mistral Small 4, Mistral Medium 3.5
+  and (Architecture) Ministral 3 8B, `/creator` opens on Mistral Medium 3.5, and
+  a turn runs without asking for an OpenRouter key. *Failure looks like:* a
+  blank picker, "No key" on a slot that has a Mistral key, or a "Model key …
+  not found" line. The PDF importer has its own saved id: set
+  `pdfImporterSettings` to `{"aiModel":"mistral-small-2506"}`; the importer's
+  model picker should open on Mistral Small 4.
+- **A narration line on Cartesia.** With a Cartesia key and a voice ID (try
+  the bundled Barbershop Man, and a Professional Voice Clone if you have one),
+  switch the voice model to Cartesia and play a narration line. The request
+  now carries `Cartesia-Version: 2026-08-14`, `model_id: "sonic-3.6"` and
+  `voice` as a string. *Expected:* audio plays. *Failure looks like:* a 400
+  with `voice_model_mismatch` on a Professional Voice Clone (Cartesia wants one
+  of the voice's own models, `sonic-3.5-2026-05-04` or `sonic-3.6-2026-08-27`,
+  and the app sends the undated `sonic-3.6`; if so, the voice needs a model
+  field), a 400 naming `voice` or `model_id`, or silence. If it fails for every
+  voice, revert `CARTESIA_VERSION` and `CARTESIA_MODEL_ID` in `ttsCall.ts`.
+- **One Nano Banana Pro image.** With an OpenRouter key, generate a lore image
+  on "Nano Banana Pro" (now `google/gemini-3-pro-image`). *Expected:* an image,
+  at about $0.13 in the OpenRouter activity page (the picker shows ~$0.134).
+  Then "Nano Banana" (now `google/gemini-3.1-flash-lite-image`, ~$0.034) and
+  "GPT-5.4 Image 2" (`openai/gpt-5.4-image-2`, ~$0.045, an estimate). *Failure
+  looks like:* "Could not extract image from AI response" (the model returns
+  the picture in a shape `extractImageFromOpenRouterResponse` does not read),
+  a 404, or a cost far from the figure shown.
+- **A DeepInfra image.** Generate a lore image on "FLUX 2 Pro" and on
+  "Bria 3.2". *Expected:* about $0.03 and $0.04 on DeepInfra's usage page.
+- **The OCR summariser on DeepSeek.** Import a short PDF with the importer's
+  model set to a DeepSeek model (its request now names `deepseek-flash`).
+  *Failure looks like:* a 400 naming the model.
+
+**The Balanced defaults (decisions 50 and 51).** The default ladder and the
+side agents' own default changed in this same branch. Every item here plays
+real turns on the author's OpenRouter key, so it waits for the author's go.
+
+- **A fresh profile, one OpenRouter key, four turns.** Clear the saved
+  overrides (Settings → AI Config → "Reset all to defaults", and every
+  Architecture toggle off), save only an OpenRouter key, and play one banter
+  turn, one ordinary check, one combat turn against two enemies (tier 2) and
+  one against a single enemy (tier 3, which counts as a boss). *Expected:*
+  tiers 0 and 1 run on Claude Haiku 5.5, tier 2 on GLM 5.3, tier 3 on Claude
+  Sonnet 5.5, narration on GLM 5.3, and the Observer's judges and the Memory
+  Keeper on Claude Haiku 5.5, all visible in the turn cost panel or the Debug
+  Logs. *Failure looks like:* a 400 from Claude naming `tool_choice` or a
+  forced tool use on a gated round, or naming thinking blocks when the GM
+  climbs from Haiku to Sonnet mid-turn; a side-agent line in the Debug Logs
+  naming DeepSeek V4 Flash or `Model key … not found`, which means a side
+  call still reaches `getModelConfig()` with a key it does not know (a missed
+  fallback path); a GLM 5.3 reply that comes back empty because its thinking
+  used the whole token cap.
+- **A climb to tier 3 in the middle of a turn, from GLM 5.3 and from Haiku.**
+  In a combat scene against two enemies (tier 2, GLM 5.3), make the GM raise
+  the tier mid-turn: a `formula_roll` with `stakes: "deadly"` raises it
+  through `applyStakesEscalation`, so the next round runs on Claude Sonnet
+  5.5. Then do the same from an ordinary scene (tier 1, Haiku). *Expected:*
+  the Sonnet round succeeds, with the GM's earlier rounds in its history.
+  *Failure looks like:* a 400 from Anthropic or OpenRouter naming
+  `reasoning_details`, thinking blocks or a signature. That would mean the
+  earlier model's reasoning must not be replayed to Claude when the model
+  changes inside a turn. The turn then errors out instead of falling back,
+  because the tier fallback does not fire for streamed rounds (a provider
+  error arrives as an in-stream `error` event; see the `REASONING_TIERS`
+  comment in `reasoningTiers.ts`).
+- **A gated combat round on GLM 5.3.** In the same two-enemy combat, provoke
+  the roll gate (M2) or the plan gate, so that round is forced to
+  `tool_choice: "required"` and goes out through OpenRouter to GLM 5.3.
+  *Expected:* the gated round calls a tool (a roll). *Failure looks like:* a
+  400 naming `tool_choice`, or the model answering in prose again so the gate
+  fires a second time.
+- **The cap on a tier 3 turn.** Against a single enemy (tier 3, Claude Sonnet
+  5.5 at `xhigh`), with the default Response Length of 8,000, read the final
+  story round in the Debug Logs. Thinking counts against `max_tokens` on
+  Claude, so `xhigh` can use up the cap. *Expected:* the round's finish
+  diagnostic shows `truncatedAtCap: false` and the scene arrives whole.
+  *Failure looks like:* `truncatedAtCap: true`, an empty final story round,
+  or a scene that stops mid-sentence; then tier 3's effort or the 4,096
+  `max_tokens` floor needs another look.
+- **Haiku's thinking on the side calls.** An unpinned side agent sends effort
+  `none` (decision 53), and Claude 5.5's thinking cannot be turned off, so
+  `applyReasoningEffort` sends Claude's `none` as `low`, as its GLM branch
+  already did. After the four turns above, read the Observer and
+  Memory Keeper lines in the turn cost panel. *Failure looks like:* a side
+  call costing several times a tenth of a cent, or taking several seconds,
+  which would mean OpenRouter is not honouring `reasoning.effort: low` for
+  Haiku.
+- **The Observer's rewrite on the narration voice (decision 52).** The
+  Observer's judges run on Claude Haiku 5.5, but an unpinned Observer's
+  rewrite runs on the narration voice (GLM 5.3 by default). In a story with
+  violence or mature themes, let the Observer flag a turn (a player-agency or
+  outcome mismatch is the easiest to provoke), and read the rewrite's line in
+  the Debug Logs. *Expected:* the judge calls name Claude Haiku 5.5 and the
+  rewrite call names GLM 5.3, and the rewritten scene keeps its tone.
+  *Failure looks like:* a rewrite call naming Haiku (a call site still on the
+  judges' options), a refusal or a softened scene, or "Observer rewrite call
+  failed, falling back to full-turn reset" every time.
+- **An existing profile with only a Mistral or DeepSeek key.** Its saved
+  overrides still apply, but a slot with none now defaults to an OpenRouter
+  model. *Expected:* a turn that stops with a message naming the missing
+  OpenRouter key, and the Settings tier cards showing "No key"; saving an
+  OpenRouter key (or picking models on the key it has) fixes it.
+- **An OpenRouter-less profile keeps its side agents.** Clear every saved
+  override and every key, save only a Mistral key, set the four tiers and the
+  narration voice to Mistral models in Settings → AI Config, and play until
+  compaction runs (a long story, or a small Memory Size). *Expected:* the turn
+  plays, and the Memory Keeper, the Observer and compaction lines in the Debug
+  Logs name the Mistral narration model (the side agents fall to the
+  narration voice when there is no key for Claude Haiku 5.5's provider), with
+  a scene summary appearing once compaction has run. *Failure looks like:* a
+  side-agent line naming Claude Haiku 5.5 followed by "No API key configured
+  for OpenRouter", or a story whose old history drops out with no summary
+  (compaction never ran). The "Compact Story" button in the story menu should
+  work on the same profile, on the same model.
+
+**Every call carries an effort (decision 53).** Built and tested against
+mocked providers only; the requests below spend the author's OpenRouter key.
+
+- **The narration voice and the Designer at a chosen effort.** In Settings →
+  AI Config set the narration voice to Claude Sonnet 5.5 and its new effort
+  picker to `high`, and play one turn that needs a separate narration call
+  (the GM's last round only calls tools) with suggested choices on. Then open
+  `/creator`, set the Designer's model to Claude Sonnet 5.5 and its Effort
+  picker to `normal`, and send one message. *Expected:* the "Story stage
+  request sent" line in the Debug Logs shows `reasoningEffort: high`; in the
+  web preview's network tab the story and choices requests carry
+  `"reasoningEffort":"high"` and the Designer's `"normal"`, while the
+  Observer's judges and the Memory Keeper carry `"none"` (OpenRouter then
+  receives `reasoning: {effort: "low"}` for them, Claude's reading of `none`,
+  and `{effort: "high"}` and `{effort: "medium"}` for the other two). A failed
+  side call's Debug Logs warning also names the effort it was sent at.
+  *Failure looks like:* every call still at `low` (the effort is not reaching
+  the request), or a 400 naming `reasoning` (a model that does not take the
+  effort the picker offered).
+
 ## 2026-10-21 — Party mode (PR P1): the checks that need real phones
 
 What was verified here: the Rust server's checks (`cargo test`, including a
@@ -235,6 +656,16 @@ credit, so it waits for the author's go (`claude-gm-implementation-plan.md`
 ## 2026-10-21 — side agents on the narration model (PR #204, decision 19)
 
 A played turn needs the author's keys, so it waits for their go.
+
+*Superseded in part by decision 51 (2026-10-21):* an unpinned side agent no
+longer follows the narration model, it runs on Claude Haiku 5.5. Mistral then
+retired Small 3.2 (`mistral-small-2506`), so a pin on it now runs on Mistral
+Small 4 (`mistral-small-2603`; `LEGACY_MODEL_KEY_ALIASES`). Read
+"Mistral Small 3.2" in the checks below as "the model the layer is pinned to":
+pin the layers (Settings → Architecture) to a Mistral model to run them. The
+failure they guard against, a side call naming `mistral-small-2506` and
+falling back to DeepSeek V4 Flash, is still the thing to look for, and the
+new default is checked under the catalog refresh above.
 
 - **Side agents with only a Mistral key.** Save only a Mistral key, leave
   every Settings → Architecture override off, and play a few turns. The

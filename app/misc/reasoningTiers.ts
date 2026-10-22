@@ -15,7 +15,13 @@
  * references AI_MODELS keys, never raw provider model strings.
  */
 
-import { AI_MODELS, AIModelKey, getModelConfig } from "@/app/misc/ai_prices";
+import {
+  AI_MODELS,
+  AIModelKey,
+  getModelConfig,
+  isKnownModelKey,
+  resolveModelKeyAlias,
+} from "@/app/misc/ai_prices";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 import {
   canRunClaudeCliModel,
@@ -25,6 +31,35 @@ import {
 import { StoryData, CombatState, ReasoningTierState } from "@/app/misc/structs";
 
 export type ReasoningEffort = "none" | "low" | "normal" | "high" | "xhigh";
+
+/** Every effort, cheapest first - what each effort `<select>` in Settings lists. */
+export const REASONING_EFFORTS: ReasoningEffort[] = [
+  "none",
+  "low",
+  "normal",
+  "high",
+  "xhigh",
+];
+
+/**
+ * The effort a slot runs at until the player picks one (decision 53). "none" is
+ * the cheapest effort each model allows: providerCall.ts's
+ * applyReasoningEffort sends Claude, GLM and the OpenRouter models whose
+ * reasoning is mandatory (`reasoningMandatory` in the catalog: Grok 4.5 and
+ * 4.7, Qwen 3.8 Max, GPT-6.1 Sol, MiniMax M2, which reject an explicit "none")
+ * `low`, Z.ai `low`, DeepSeek thinking disabled, and any other OpenRouter
+ * model `reasoning: {effort: "none"}`, which really turns reasoning off.
+ * Mistral gets nothing, as it has no lever.
+ */
+export const DEFAULT_REASONING_EFFORT: ReasoningEffort = "none";
+
+/** True for one of the five efforts; a junk value from storage is not. */
+export function isReasoningEffort(value: unknown): value is ReasoningEffort {
+  return (
+    typeof value === "string" &&
+    (REASONING_EFFORTS as string[]).includes(value)
+  );
+}
 
 /** An AI_MODELS key, or a user-added custom (OpenRouter BYOK) model's UUID. */
 export type AnyModelKey = AIModelKey | string;
@@ -39,13 +74,26 @@ export interface ReasoningTier {
  * The tier ladder. Every provider is BYOK now (app/misc/APIKeysContext.tsx —
  * there's no server-side key for any provider), so tiers are free to mix
  * providers per-tier rather than being constrained to a single "guaranteed
- * available" one. This ladder deliberately spans two providers as an
- * example of that: Mistral for the cheap/default tiers, OpenRouter for the
- * heavier ones. Swap any `modelKey` to any AI_MODELS entry to reconfigure —
- * whichever providers end up in use, the corresponding key (mistralKey,
- * openRouterKey, deepseekKey, googleKey, deepinfraKey) must be configured
- * in Settings for that tier to actually dispatch; a missing key fails over
- * to the next-lower tier (see fallbackTier below) rather than crashing.
+ * available" one. Swap any `modelKey` to any AI_MODELS entry to reconfigure —
+ * whichever providers end up in use, the corresponding key (openRouterKey,
+ * deepseekKey, googleKey, mistralKey, deepinfraKey, zaiKey) must be
+ * configured in Settings for that tier to actually dispatch. A missing key
+ * does NOT fail over to the next-lower tier: GM rounds are streamed, so the
+ * proxy (and providerFetch in the native apps) answers 200 with an in-stream
+ * `error` event rather than a failed status, generation.ts throws that
+ * event, and its `!gmResponse.ok` -> fallbackTier branch never fires. The turn
+ * stops with an error toast naming the provider whose key is missing. (The
+ * same holds for a provider's HTTP error on a streamed round; only a non-200
+ * from the proxy itself, or the subscription bridge's 502, takes fallbackTier.)
+ *
+ * The defaults (decision 50, "Balanced") are Claude Haiku 5.5 for the two
+ * light tiers, GLM 5.3 for combat and rules, and Claude Sonnet 5.5 for boss
+ * fights and campaign-shaping calls: all three are OpenRouter models, so one
+ * OpenRouter key runs the whole ladder. The efforts are unchanged from the
+ * Mistral/Grok/Kimi ladder these replaced, and providerCall.ts already
+ * translates each for its model: Claude's "none" is sent as "low" (its
+ * thinking cannot be turned off), GLM 5.3 always thinks and takes "high" as
+ * "high", and Sonnet's "xhigh" goes out as OpenRouter's "xhigh".
  *
  * All entries have supportsToolCalling: true in AI_MODELS — required since
  * GM adjudication calls dice/state tools mid-turn (DeepSeek R1 variants
@@ -54,29 +102,34 @@ export interface ReasoningTier {
  */
 export const REASONING_TIERS: ReasoningTier[] = [
   {
-    modelKey: "Mistral Nemo",
+    modelKey: "Claude Haiku 5.5",
     reasoningEffort: "none",
     note: "banter, descriptions, NPC chatter",
   },
   {
-    modelKey: "Mistral Small 3.2",
+    modelKey: "Claude Haiku 5.5",
     reasoningEffort: "none",
-    note: "default GM narration / skill checks",
+    note: "ordinary skill checks and everyday GM calls",
   },
   {
-    modelKey: "Grok 4.5",
+    modelKey: "GLM 5.3",
     reasoningEffort: "high",
     note: "rules adjudication, combat",
   },
   {
-    modelKey: "Kimi K3",
+    modelKey: "Claude Sonnet 5.5",
     reasoningEffort: "xhigh",
     note: "boss fights, campaign-shaping calls",
   },
 ];
 
-/** Fixed narration voice — always tier 1, regardless of adjudication tier. */
-export const NARRATION_MODEL_KEY: AIModelKey = "Mistral Small 3.2";
+/**
+ * The narration voice (decision 50): the model the story-continuation call
+ * and the choices call run on, regardless of adjudication tier. When the GM's
+ * own final round already wrote the prose, that round's tier model wrote it
+ * instead (generation.ts, gmFinalStoryContent).
+ */
+export const NARRATION_MODEL_KEY: AIModelKey = "GLM 5.3";
 
 export const SCENE_BASELINE_TIER = 1;
 export const MAX_TIER3_CALLS_PER_SCENE = 3;
@@ -111,6 +164,7 @@ export function resolveTier(tier: number): ResolvedTier {
 
 const TIER_OVERRIDES_KEY = "reasoningTierOverrides";
 const NARRATION_OVERRIDE_KEY = "narrationModelOverride";
+const NARRATION_EFFORT_KEY = "narrationEffortOverride";
 export const REASONING_CONFIG_CHANGED_EVENT = "reasoning-tier-config-changed";
 
 export interface TierOverride {
@@ -124,13 +178,26 @@ function notifyConfigChanged() {
   }
 }
 
-/** Raw overrides array, one slot per REASONING_TIERS index (null = use default). */
+/**
+ * The saved overrides, one slot per REASONING_TIERS index (null = use
+ * default). A slot whose saved model the catalog no longer has (a model its
+ * provider shut down, or a key synced from a newer build) reads as null, so it
+ * uses its default instead of reaching getModelConfig, which would swap in
+ * DeepSeek V4 Flash. A retired key that LEGACY_MODEL_KEY_ALIASES maps to a
+ * successor is returned as the successor's key instead, so the slot keeps
+ * working. The stored value is left alone; the next write replaces it.
+ */
 export function getTierOverrides(): (TierOverride | null)[] {
   if (typeof window === "undefined") return REASONING_TIERS.map(() => null);
   try {
     const raw = localStorage.getItem(TIER_OVERRIDES_KEY);
     const parsed: (TierOverride | null)[] = raw ? JSON.parse(raw) : [];
-    return REASONING_TIERS.map((_, i) => parsed[i] ?? null);
+    return REASONING_TIERS.map((_, i) => {
+      const o = parsed[i];
+      return o && isKnownModelKey(o.modelKey)
+        ? { ...o, modelKey: resolveModelKeyAlias(o.modelKey) }
+        : null;
+    });
   } catch {
     return REASONING_TIERS.map(() => null);
   }
@@ -184,9 +251,15 @@ export function getEffectiveTiers(): ReasoningTier[] {
   });
 }
 
+/**
+ * The saved narration voice; null when none, or when the catalog dropped it. A
+ * retired key with a successor (LEGACY_MODEL_KEY_ALIASES) comes back as the
+ * successor's key.
+ */
 export function getNarrationModelOverride(): AnyModelKey | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(NARRATION_OVERRIDE_KEY) || null;
+  const stored = localStorage.getItem(NARRATION_OVERRIDE_KEY);
+  return isKnownModelKey(stored) ? resolveModelKeyAlias(stored) : null;
 }
 
 export function setNarrationModelOverride(modelKey: AnyModelKey | null): void {
@@ -207,6 +280,64 @@ export function setNarrationModelOverride(modelKey: AnyModelKey | null): void {
 export function getEffectiveNarrationModelKey(): AnyModelKey {
   const override = getNarrationModelOverride();
   return override && runsOnThisDevice(override) ? override : NARRATION_MODEL_KEY;
+}
+
+/**
+ * The saved narration effort (decision 53); null when none was saved, or when
+ * the stored value is not one of the five efforts (a hand-edited or
+ * newer-build value), so a junk value reads as the default instead of being
+ * sent to a provider.
+ */
+export function getNarrationEffortOverride(): ReasoningEffort | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(NARRATION_EFFORT_KEY);
+    return isReasoningEffort(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setNarrationEffortOverride(
+  effort: ReasoningEffort | null,
+): void {
+  if (typeof window === "undefined") return;
+  if (effort && isReasoningEffort(effort)) {
+    localStorage.setItem(NARRATION_EFFORT_KEY, effort);
+  } else {
+    localStorage.removeItem(NARRATION_EFFORT_KEY);
+  }
+  notifyConfigChanged();
+}
+
+/**
+ * How hard the narration voice thinks (decision 53): the story continuation,
+ * the choices calls and the Observer's rewrite when the Observer is unpinned.
+ * DEFAULT_REASONING_EFFORT ("none") until the player picks one in Settings.
+ *
+ * It follows the voice, not the player's last pick: when the saved narration
+ * model cannot be used here - a Claude subscription voice this device cannot
+ * run (decisions 16 and 29), or one the catalog no longer has - the call falls
+ * back to NARRATION_MODEL_KEY (getEffectiveNarrationModelKey), and the effort
+ * chosen for that other model would be a guess for this one, so it falls back
+ * to "none" too.
+ */
+export function getEffectiveNarrationEffort(): ReasoningEffort {
+  if (typeof window === "undefined") return DEFAULT_REASONING_EFFORT;
+  let savedModel: string | null = null;
+  try {
+    savedModel = localStorage.getItem(NARRATION_OVERRIDE_KEY);
+  } catch {
+    return DEFAULT_REASONING_EFFORT;
+  }
+  // Compare against the saved voice as the app reads it (getNarrationModelOverride
+  // resolves a retired key to its successor, LEGACY_MODEL_KEY_ALIASES), not
+  // the raw stored string: a saved "Mistral Small 3.2" runs as "Mistral Small
+  // 4", and its effort must follow it rather than fall back to "none".
+  if (savedModel && getEffectiveNarrationModelKey() !== getNarrationModelOverride()) {
+    return DEFAULT_REASONING_EFFORT;
+  }
+  return getNarrationEffortOverride() ?? DEFAULT_REASONING_EFFORT;
 }
 
 export interface SubscriptionFallback {

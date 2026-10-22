@@ -966,6 +966,13 @@ noted.
 | T2 | Grok 4.5 | high | rules, combat |
 | T3 | Kimi K3 | xhigh | boss fights, campaign-shaping calls |
 
+> **Update 2026-10-21:** the defaults changed (decisions 50 and 51, `docs/decisions.md`).
+> T0 and T1 are now Claude Haiku 5.5, T2 GLM 5.3 (OpenRouter) and T3 Claude
+> Sonnet 5.5, with the same efforts, and the narration model is GLM 5.3 (this
+> report names Mistral Small 3.2 in several places). An unpinned side agent no
+> longer follows the narration model: it runs on `SIDE_AGENT_DEFAULT_MODEL_KEY`
+> (Claude Haiku 5.5).
+
 - **Starting tier** = max of: hard floor (session zero → T3; combat → T2, or T3
   for a single active enemy), deterministic classifier (combat 2/3, challenge 1,
   active main thread 2, else 0), last turn's tier decayed one step toward T1, and

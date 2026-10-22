@@ -5,10 +5,13 @@
  *
  * Regression: the budget used to be `min(Memory Size, window) - the model's
  * declared maxOutputTokens`. With the default 36k Memory Size that went
- * negative on every model declaring 36k+ output - including the default
- * Grok 4.5 (-38,400 history) and Kimi K3 (-55,200) tiers, which run combat
+ * negative on every model declaring 36k+ output - including the Grok 4.5
+ * (-38,400 history) and Kimi K3 (-55,200) tiers, then the defaults for combat
  * and boss fights - and getPartsWithinTokenBudget then included no story
- * history at all.
+ * history at all. The defaults are Claude and GLM models now (decision 50),
+ * which declare 128k output, so the first block below runs over whatever
+ * REASONING_TIERS holds and the literal models after it keep the old heavy
+ * tiers covered.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -65,10 +68,16 @@ describe("computeGMStageBudget defaults", () => {
 
 describe("computeGMStageBudget limits", () => {
   it("caps Memory Size at the model window minus the requested output", () => {
-    // Mistral Small 3.2: 128k window, 8k max output.
+    // Mistral Small 4: 256k window, 100k max output, so the 12k default
+    // request is what is reserved.
     expect(
-      computeGMStageBudget(200000, "Mistral Small 3.2").totalContextBudget,
-    ).toBe(128000 - 8000);
+      computeGMStageBudget(1_000_000, "Mistral Small 4").totalContextBudget,
+    ).toBe(256000 - GM_STAGE_DEFAULT_OUTPUT);
+    // DeepInfra Phi 4: 16k window, 8k max output, so the model's own maximum
+    // is what is reserved, below the 12k default.
+    expect(
+      computeGMStageBudget(200000, "DeepInfra Phi 4").totalContextBudget,
+    ).toBe(16000 - 8000);
   });
 
   it("reserves the output the round requests, not the declared max", () => {
@@ -91,7 +100,7 @@ describe("computeGMStageBudget limits", () => {
   it("never drops below the floor, even for a tiny custom Memory Size", () => {
     const { historyBudget, totalContextBudget } = computeGMStageBudget(
       500,
-      "Mistral Nemo",
+      "Ministral 3 8B",
     );
     expect(totalContextBudget).toBe(GM_STAGE_MIN_BUDGET);
     expect(historyBudget).toBeGreaterThan(0);
@@ -104,7 +113,7 @@ describe("getGMStageOutputTokens", () => {
       GM_STAGE_DEFAULT_OUTPUT,
     );
     expect(getGMStageOutputTokens(4000, "Kimi K3")).toBe(4000);
-    expect(getGMStageOutputTokens(50000, "Mistral Small 3.2")).toBe(8000);
+    expect(getGMStageOutputTokens(50000, "DeepInfra Phi 4")).toBe(8000);
   });
 });
 

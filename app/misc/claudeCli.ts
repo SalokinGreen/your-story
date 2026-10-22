@@ -49,8 +49,11 @@ type CliEffort = "low" | "medium" | "high" | "xhigh";
 
 /**
  * The tier's effort for `--effort`. Claude 5.5's thinking cannot be turned
- * off, so `none` runs at `low`. A call with no effort of its own (a side
- * agent) gets `medium`, Claude's own default on Opus and Haiku.
+ * off, so `none` runs at `low`. Every caller sends an effort (decision 53:
+ * the default is `none`, so the narration voice and the Designer on the
+ * subscription run at `low` unless the player raises their effort); a call
+ * that still arrives without one gets `medium`, Claude's own default on Opus
+ * and Haiku.
  */
 export function mapEffort(effort: string | undefined): CliEffort {
   switch (effort) {

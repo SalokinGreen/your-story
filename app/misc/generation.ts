@@ -74,6 +74,7 @@ import {
   getStoryProgressObserverModelOverride,
   getStoryProgressCheckInterval,
   resolveSideCallModel,
+  resolveObserverRewriteModel,
 } from "@/app/misc/layerSettings";
 import {
   outputToScenePart,
@@ -116,6 +117,7 @@ import {
 } from "@/app/misc/turnCost";
 import {
   SCENE_BASELINE_TIER,
+  DEFAULT_REASONING_EFFORT,
   ReasoningEffort,
   ResolvedTier,
   resolveTier,
@@ -133,6 +135,7 @@ import {
   getTierState,
   getEffectiveTiers,
   getEffectiveNarrationModelKey,
+  getEffectiveNarrationEffort,
   applyTierEscalation,
   TOP_TIER,
 } from "@/app/misc/reasoningTiers";
@@ -198,8 +201,9 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
 
 export interface GenerationOptions {
   // Not read by generateStoryTurn: the reasoning-tier router picks the GM's
-  // model, and narration, choices and every side call run on the narration
-  // model (getEffectiveNarrationModelKey, decision 19). Kept so existing
+  // model, narration and choices run on the narration model
+  // (getEffectiveNarrationModelKey), and the side agents run on their own
+  // default (SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51). Kept so existing
   // callers type-check.
   storyModel: string;
   toolsModel: string;
@@ -590,6 +594,11 @@ async function* parseSSEStream(
 interface ChoicesFetchOptions {
   token: string | null;
   model: string;
+  /**
+   * The narration voice's effort (decision 53). Required, so a new caller of
+   * the choices stage has to say what it runs at.
+   */
+  reasoningEffort: ReasoningEffort;
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;
@@ -632,6 +641,7 @@ async function generateChoicesWithRetry(
       {
         messages: choicesPrompt.messages,
         model: fetchOptions.model,
+        reasoningEffort: fetchOptions.reasoningEffort,
         maxTokens: 1500,
         temperature: 0.7,
         openRouterKey: fetchOptions.openRouterKey,
@@ -945,12 +955,18 @@ export async function generateStoryTurn(
     result.meta.costTurnId = costTurnId;
 
     // Shared by the observer and the memory agent below - both are
-    // best-effort side calls for the turn that just completed, run on the
-    // narration model (decision 19) unless the user pinned a specific
-    // model/effort for that stage in Settings > Architecture
-    // (layerSettings.ts). It has to be an AI_MODELS key (or a custom model's
-    // UUID): GenerationMeta.model is the provider's own id, which the proxy
-    // can't resolve and silently swaps for DeepSeek V4 Flash.
+    // best-effort side calls for the turn that just completed. The keys, the
+    // cost-turn id and the abort signal are common to all of them; the model
+    // is not: each side agent takes its own through resolveSideCallModel
+    // (the player's pin from Settings > Architecture, else
+    // SIDE_AGENT_DEFAULT_MODEL_KEY, decision 51, or the narration voice when
+    // the player has no key for that default's provider), which overrides the
+    // `model` here. This `model` is the narration model, which the choices
+    // re-derivation after an Observer rewrite uses, and the rewrite itself
+    // when the Observer is unpinned (decision 52). It has to be an
+    // AI_MODELS key (or a custom model's UUID): GenerationMeta.model is the
+    // provider's own id, which the proxy can't resolve and silently swaps for
+    // DeepSeek V4 Flash.
     const sideCallApiOptions = {
       model: getEffectiveNarrationModelKey(),
       token: null,
@@ -971,9 +987,26 @@ export async function generateStoryTurn(
     // DEFAULT_OBSERVER_SETTINGS, reproducing pre-existing behavior).
     const observerSettings = options.observerSettings ?? getObserverSettings();
     const observerModelOverride = getObserverModelOverride();
+    // The narration voice's effort (decision 53), read once beside its model
+    // above. Deliberately NOT on sideCallApiOptions: that bag is spread under
+    // every side agent, and a side agent that forgot to resolve its own effort
+    // would then quietly inherit the narrator's. The choices re-run and the
+    // Observer's rewrite take it by name below.
+    const narrationEffort = getEffectiveNarrationEffort();
     const observerApiOptions = {
       ...sideCallApiOptions,
-      ...resolveSideCallModel(observerModelOverride, sideCallApiOptions.model),
+      ...resolveSideCallModel(observerModelOverride, sideCallApiOptions),
+    };
+    // The rewrite writes the prose the player reads, so an unpinned Observer
+    // rewrites on the narration voice, not the side-agent default its judges
+    // use (decision 52); a pinned Observer rewrites on its pin.
+    const observerRewriteApiOptions = {
+      ...sideCallApiOptions,
+      ...resolveObserverRewriteModel(
+        observerModelOverride,
+        String(sideCallApiOptions.model),
+        narrationEffort,
+      ),
     };
 
     // Choices are parsed from the narration, so a rewrite invalidates them -
@@ -997,6 +1030,7 @@ export async function generateStoryTurn(
             {
               token: null,
               model: sideCallApiOptions.model,
+              reasoningEffort: narrationEffort,
               openRouterKey: options.openRouterKey,
               deepseekKey: options.deepseekKey,
               googleKey: options.googleKey,
@@ -1219,7 +1253,7 @@ export async function generateStoryTurn(
           const s = settingsFor(observerSettings, type);
           return s.enabled && s.triggersReset;
         }),
-        apiOptions: { ...observerApiOptions, abortSignal: speculationAbort.signal },
+        apiOptions: { ...observerRewriteApiOptions, abortSignal: speculationAbort.signal },
       })
         // Attached immediately, before anything awaits this: a speculation
         // that fails (or is aborted as unwanted) must never surface as an
@@ -1378,11 +1412,10 @@ export async function generateStoryTurn(
               // ...and what it was trying to do with them, so the fix keeps
               // the deliberate parts of the draft intact.
               narrationThoughts: result.narrationThoughts,
-              // Same model/effort the Observer was just judged with (the
-              // Architecture tab's override, if the user pinned one) - not
-              // sideCallApiOptions, or the rewrite would silently skip that
-              // override and run on the plain narration model.
-              apiOptions: observerApiOptions,
+              // The Observer's pin if the player set one, else the narration
+              // voice (decision 52) - not sideCallApiOptions, or the rewrite
+              // would silently skip that pin.
+              apiOptions: observerRewriteApiOptions,
             });
           } catch (rewriteError) {
             logger.action(
@@ -1588,7 +1621,7 @@ export async function generateStoryTurn(
                   characterContext: observerCharacterContext,
                   conversationMessages: result.gmPromptMessages,
                   narrationThoughts: result.narrationThoughts,
-                  apiOptions: observerApiOptions,
+                  apiOptions: observerRewriteApiOptions,
                 });
               } catch (rewriteError) {
                 logger.action(
@@ -1726,7 +1759,7 @@ export async function generateStoryTurn(
           ...sideCallApiOptions,
           ...resolveSideCallModel(
             getMemoryKeeperModelOverride(),
-            sideCallApiOptions.model,
+            sideCallApiOptions,
           ),
         };
         await runMemoryAgent(
@@ -1755,7 +1788,7 @@ export async function generateStoryTurn(
             ...sideCallApiOptions,
             ...resolveSideCallModel(
               getDirectorAssistantModelOverride(),
-              sideCallApiOptions.model,
+              sideCallApiOptions,
             ),
           };
           await runDirectorAssistant(
@@ -1791,7 +1824,7 @@ export async function generateStoryTurn(
           ...sideCallApiOptions,
           ...resolveSideCallModel(
             getStoryProgressObserverModelOverride(),
-            sideCallApiOptions.model,
+            sideCallApiOptions,
           ),
         };
         const progressResult = await runStoryProgressObserver(
@@ -1931,6 +1964,9 @@ async function generateStoryTurnOnce(
     // Resolved once per turn so a mid-turn override change doesn't cause the
     // narration voice to shift inconsistently within a single generation.
     const narrationModel = getEffectiveNarrationModelKey();
+    // ...and its effort (decision 53), for the story continuation and the
+    // choices call below.
+    const narrationEffort = getEffectiveNarrationEffort();
 
     // Deterministic pacing nudge (Layer 3): measure how much the player has
     // had to read over recent turns and, if it's trending away from the Reply
@@ -2049,11 +2085,15 @@ async function generateStoryTurnOnce(
 
         if (isClassificationAmbiguous(storyData, gmUserChoice)) {
           try {
-            const classifierModel = getEffectiveTiers()[0].modelKey;
+            // Tier 0's model at tier 0's effort (decision 53): the classifier
+            // is tier 0's call, so it thinks as hard as the player let tier 0.
+            const classifierTier = getEffectiveTiers()[0];
+            const classifierModel = classifierTier.modelKey;
             const classifierResult = await generateSimple(
               [{ role: "user", content: buildClassifierPrompt(gmUserChoice) }],
               {
                 model: classifierModel,
+                reasoningEffort: classifierTier.reasoningEffort,
                 maxTokens: 10,
                 temperature: 0,
                 openRouterKey: options.openRouterKey,
@@ -2127,15 +2167,18 @@ async function generateStoryTurnOnce(
             storyData,
             gmHistoryBudget,
             {
-              // The narration model, like every other side call (decision 19)
-              // - through resolveSideCallModel, which keeps a subscription
-              // narration voice off compaction (decision 12).
-              ...resolveSideCallModel(null, narrationModel),
+              // The side-agent default, like every other unpinned side call
+              // (decision 51) - through resolveSideCallModel, which can never
+              // hand compaction a subscription model (decision 12), and which
+              // runs it on the narration voice when the player has no key
+              // for the default's provider (so compaction still runs for a
+              // player with, say, only a Mistral key).
+              ...resolveSideCallModel(null, pickProviderKeys(options)),
               token,
-              // All five, not just the ones this model "usually" needs: the
-              // default narration model is a Mistral model, and leaving a
-              // provider out here is how compaction silently never ran
-              // (status report §6.13).
+              // All six, not just the ones this model "usually" needs:
+              // leaving a provider out here is how compaction silently never
+              // ran, back when the default model was a Mistral one (status
+              // report §6.13).
               ...pickProviderKeys(options),
               abortSignal: options.abortSignal,
             },
@@ -2169,7 +2212,10 @@ async function generateStoryTurnOnce(
         try {
           const reflectionModelOverride = getReflectionModelOverride();
           const reflectionApiOptions = {
-            ...resolveSideCallModel(reflectionModelOverride, narrationModel),
+            ...resolveSideCallModel(
+              reflectionModelOverride,
+              pickProviderKeys(options),
+            ),
             token,
             ...pickProviderKeys(options),
             abortSignal: options.abortSignal,
@@ -3168,6 +3214,7 @@ async function generateStoryTurnOnce(
       const storyRequestBody: GenerateRequestBody = {
         messages: storyMessages,
         model: narrationModel,
+        reasoningEffort: narrationEffort,
         maxTokens: storyMaxOutput,
         temperature:
           (options.samplingSettings?.temperature ?? 0.7) +
@@ -3198,6 +3245,7 @@ async function generateStoryTurnOnce(
       logger.action("Story stage request sent", {
         maxTokens: storyMaxOutput,
         model: narrationModel,
+        reasoningEffort: narrationEffort,
       });
 
       if (!storyResponse.ok) {
@@ -3455,6 +3503,7 @@ async function generateStoryTurnOnce(
           {
             token,
             model: narrationModel,
+            reasoningEffort: narrationEffort,
             openRouterKey: options.openRouterKey,
             deepseekKey: options.deepseekKey,
             googleKey: options.googleKey,
@@ -3718,6 +3767,8 @@ export async function generateSimple(
     maxTokens?: number;
     temperature?: number;
     tools?: any[];
+    /** The slot's effort (decision 53); "none" when a caller omits it. */
+    reasoningEffort?: ReasoningEffort;
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
@@ -3735,6 +3786,7 @@ export async function generateSimple(
     messages,
     tools: options.tools,
     model: options.model,
+    reasoningEffort: options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
     maxTokens: options.maxTokens || 4000,
     temperature: options.temperature || 0.7,
     openRouterKey: options.openRouterKey,
@@ -3770,6 +3822,8 @@ export async function* generateSimpleStream(
     maxTokens?: number;
     temperature?: number;
     tools?: any[];
+    /** The slot's effort (decision 53); "none" when a caller omits it. */
+    reasoningEffort?: ReasoningEffort;
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
@@ -3782,6 +3836,7 @@ export async function* generateSimpleStream(
     messages,
     tools: options.tools,
     model: options.model,
+    reasoningEffort: options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
     maxTokens: options.maxTokens || 4000,
     temperature: options.temperature || 0.7,
     openRouterKey: options.openRouterKey,
@@ -3807,6 +3862,8 @@ export async function generateChoicesOnly(
   storyData: StoryData,
   options: {
     choicesModel: string;
+    /** The narration voice's effort (decision 53): the choices call is the narrator's. */
+    choicesReasoningEffort: ReasoningEffort;
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
@@ -3834,6 +3891,7 @@ export async function generateChoicesOnly(
     {
       token,
       model: options.choicesModel,
+      reasoningEffort: options.choicesReasoningEffort,
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,

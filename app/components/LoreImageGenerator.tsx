@@ -8,6 +8,7 @@ import { creatorImageFetch } from "@/app/misc/creatorFetch";
 import {
   DEEPINFRA_IMAGE_MODELS,
   OPENROUTER_IMAGE_MODELS,
+  resolveImageModelKey,
   type DeepInfraImageModelKey,
   type ImageModelKey,
 } from "@/app/misc/ai_prices";
@@ -28,9 +29,12 @@ export function getSavedImageGenSettings(): {
     (localStorage.getItem(STORAGE_KEY_PROVIDER) as
       | "deepinfra"
       | "openrouter") || "deepinfra";
-  const model =
-    localStorage.getItem(STORAGE_KEY_MODEL) ||
-    (provider === "deepinfra" ? "Bria 3.2" : "Nano Banana");
+  // A saved model the catalog dropped (OpenRouter's Flux 2 Pro and Flex)
+  // becomes the provider's default, not a blank picker and a stray price.
+  const model = resolveImageModelKey(
+    provider,
+    localStorage.getItem(STORAGE_KEY_MODEL) || "",
+  );
   return { provider, model };
 }
 

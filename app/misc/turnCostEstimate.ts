@@ -34,6 +34,7 @@ import { StoryData } from "@/app/misc/structs";
 import {
   getEffectiveTiers,
   getEffectiveNarrationModelKey,
+  getEffectiveNarrationEffort,
   resolveTier,
   getTierState,
   hardRuleFloor,
@@ -45,11 +46,13 @@ import {
 import {
   getObserverModelOverride,
   getMemoryKeeperModelOverride,
+  getReflectionModelOverride,
   getDirectorAssistantModelOverride,
   getStoryProgressObserverModelOverride,
   getStoryProgressCheckInterval,
   getObserverSettings,
   resolveSideCallModel,
+  resolveObserverRewriteModel,
 } from "@/app/misc/layerSettings";
 import { ObserverSettings, settingsFor } from "@/app/misc/observer";
 import { ObserverFlagType } from "@/app/misc/structs";
@@ -334,26 +337,25 @@ export function estimateTurnCost(
   const gmTier = resolveTier(tierIndex);
   const gmModel = String(gmTier.modelKey);
   const narrationModel = String(getEffectiveNarrationModelKey());
+  const narrationEffort = getEffectiveNarrationEffort();
 
-  // Side calls run on the narration model unless the user pinned one in
-  // Settings > Architecture (decision 19) - exactly what generation.ts does
+  // Side calls run on SIDE_AGENT_DEFAULT_MODEL_KEY unless the user pinned one
+  // in Settings > Architecture (decision 51) - exactly what generation.ts does
   // at runtime.
-  const sideCallFallback = narrationModel;
-  const observerCall = resolveSideCallModel(
-    getObserverModelOverride(),
-    sideCallFallback,
-  );
-  const memoryCall = resolveSideCallModel(
-    getMemoryKeeperModelOverride(),
-    sideCallFallback,
-  );
-  const directorCall = resolveSideCallModel(
-    getDirectorAssistantModelOverride(),
-    sideCallFallback,
-  );
+  const observerCall = resolveSideCallModel(getObserverModelOverride());
+  const memoryCall = resolveSideCallModel(getMemoryKeeperModelOverride());
+  // Reflection has its own pin (generation.ts resolves it the same way).
+  const reflectionCall = resolveSideCallModel(getReflectionModelOverride());
+  const directorCall = resolveSideCallModel(getDirectorAssistantModelOverride());
   const progressCall = resolveSideCallModel(
     getStoryProgressObserverModelOverride(),
-    sideCallFallback,
+  );
+  // The rewrite writes player-facing prose, so an unpinned Observer rewrites
+  // on the narration voice (decision 52), at its effort (decision 53).
+  const rewriteCall = resolveObserverRewriteModel(
+    getObserverModelOverride(),
+    narrationModel,
+    narrationEffort,
   );
 
   // --- Context budget the GM stage will be filled to ------------------
@@ -410,6 +412,7 @@ export function estimateTurnCost(
     stage: "narration",
     label: "Narration call",
     modelKey: narrationModel,
+    reasoningEffort: narrationEffort,
     inputPerCall: gmInputTokens,
     outputPerCall: NARRATION_OUTPUT_TOKENS,
     expectedCalls: calibratedCalls(
@@ -427,6 +430,7 @@ export function estimateTurnCost(
     stage: "choices",
     label: "Choices",
     modelKey: narrationModel,
+    reasoningEffort: narrationEffort,
     inputPerCall: CHOICES_INPUT_TOKENS,
     outputPerCall: CHOICES_OUTPUT_TOKENS,
     expectedCalls: calibratedCalls(calibration, "choices", 1),
@@ -463,8 +467,8 @@ export function estimateTurnCost(
     plans.push({
       stage: "observer_rewrite",
       label: "Observer rewrite",
-      modelKey: observerCall.model,
-      reasoningEffort: observerCall.reasoningEffort,
+      modelKey: rewriteCall.model,
+      reasoningEffort: rewriteCall.reasoningEffort,
       inputPerCall: Math.round(gmInputTokens * OBSERVER_REWRITE_INPUT_FILL),
       outputPerCall: NARRATION_OUTPUT_TOKENS,
       expectedCalls: calibratedCalls(
@@ -534,8 +538,8 @@ export function estimateTurnCost(
   plans.push({
     stage: "reflection",
     label: "Reflection",
-    modelKey: memoryCall.model,
-    reasoningEffort: memoryCall.reasoningEffort,
+    modelKey: reflectionCall.model,
+    reasoningEffort: reflectionCall.reasoningEffort,
     inputPerCall: REFLECTION_INPUT_TOKENS,
     outputPerCall: REFLECTION_OUTPUT_TOKENS,
     expectedCalls: calibratedCalls(

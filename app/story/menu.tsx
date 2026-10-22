@@ -48,6 +48,7 @@ import CompactStoryModal from "./menu/CompactStoryModal";
 import FullScreenView from "../components/FullScreenView";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { pickProviderKeys } from "../misc/sideModelCall";
+import { resolveSideCallModel } from "../misc/layerSettings";
 import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import type { MPBackend } from "../misc/multiplayer/types";
 
@@ -372,13 +373,15 @@ export default function MenuPage({
     }
   };
 
+  // "Compact Story" and the spin-off are side calls like the turn's own
+  // compaction (generation.ts): the side-agent default, or the narration voice
+  // when the player has no key for its provider (decision 51). Nothing writes
+  // `aiModel`, so reading it only ever meant DeepSeek V4 Flash and a DeepSeek key.
+  const providerKeys = pickProviderKeys(apiKeys);
   const compactionApiOptions = {
-    model:
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "DeepSeek V4 Flash"
-        : "DeepSeek V4 Flash",
+    ...resolveSideCallModel(null, providerKeys),
     token: null,
-    ...pickProviderKeys(apiKeys),
+    ...providerKeys,
   };
 
   const handleStoryCompacted = async (updated: StoryData) => {

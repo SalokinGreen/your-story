@@ -13,6 +13,10 @@
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 
+// A model whose provider these tests hold the key for - not the default narration
+// model, which moves with the catalog (decision 50).
+const MISTRAL_MODEL = "Mistral Small 4";
+
 const mockPlatformFetch = vi.fn();
 vi.mock("@/app/misc/platformFetch", () => ({
   getProviderFetch: () => mockPlatformFetch,
@@ -21,10 +25,9 @@ vi.mock("@/app/misc/platformFetch", () => ({
 import { providerFetch } from "@/app/misc/providerFetch";
 import { callSideModel } from "@/app/misc/sideModelCall";
 import { logger } from "@/app/misc/logger";
-import { NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
 
 const MESSAGES = [{ role: "user" as const, content: "Go on." }];
-const BODY = { messages: MESSAGES, model: NARRATION_MODEL_KEY, mistralKey: "mistral-key" };
+const BODY = { messages: MESSAGES, model: MISTRAL_MODEL, mistralKey: "mistral-key" };
 
 /**
  * Settles with whatever `promise` settles with, or with PENDING if it is
@@ -123,7 +126,7 @@ describe("standalone non-streaming call (side calls, the Designer)", () => {
 
     const call = callSideModel({
       label: "Game Designer",
-      model: NARRATION_MODEL_KEY,
+      model: MISTRAL_MODEL,
       messages: MESSAGES,
       keys: { mistralKey: "mistral-key" },
       abortSignal: abort.signal,

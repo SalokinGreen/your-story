@@ -27,6 +27,7 @@ import { ChatMessage } from "./chatMessage";
 import { logger } from "./logger";
 import { providerFetch } from "./providerFetch";
 import { GenerateSuccess } from "./providerCall";
+import { DEFAULT_REASONING_EFFORT } from "./reasoningTiers";
 import { recordSideCall, SideCallCostContext, TurnCostStage } from "./turnCost";
 import { getCustomModelIfUUID } from "./user_settings";
 
@@ -74,6 +75,13 @@ export interface SideModelRequest extends SideCallCostContext {
   keys: ProviderKeys | undefined;
   maxTokens?: number;
   temperature?: number;
+  /**
+   * How hard the model thinks (decision 53): the slot's own effort - the
+   * player's pin, the side-agent default, a tier's, the Designer's. Every
+   * caller passes one; a request without sends DEFAULT_REASONING_EFFORT
+   * ("none"), the cheapest each model allows, rather than leaving the
+   * provider's own default (Grok, for one, defaults to high) to apply.
+   */
   reasoningEffort?: string;
   tools?: unknown[];
   abortSignal?: AbortSignal;
@@ -98,6 +106,7 @@ function logFailure(
   logger.warn(`Side call failed: ${request.label}`, {
     stage: request.stage,
     model: request.model,
+    reasoningEffort: request.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
     status: failure.status,
     code: failure.code,
     error: failure.error,
@@ -121,7 +130,7 @@ export async function callSideModel(
         temperature: request.temperature,
         ...keys,
         customModel: getCustomModelIfUUID(request.model),
-        reasoningEffort: request.reasoningEffort,
+        reasoningEffort: request.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
       },
       request.abortSignal,
     );

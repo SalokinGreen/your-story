@@ -293,6 +293,12 @@ ${
 
 export interface CompactionApiOptions extends ProviderKeys {
   model: string;
+  /**
+   * The effort the summarising call runs at (decision 53): resolveSideCallModel
+   * supplies it. Optional so a hand-built options bag still type-checks;
+   * callSideModel sends "none" for a call without one.
+   */
+  reasoningEffort?: string;
   token: string | null;
   abortSignal?: AbortSignal;
 }
@@ -315,6 +321,7 @@ async function callSummarizeApi(
     keys: apiOptions,
     maxTokens: Math.ceil(MAX_SUMMARY_TOKENS * 1.3),
     temperature: 0.2,
+    reasoningEffort: apiOptions.reasoningEffort,
     abortSignal: apiOptions.abortSignal,
   });
   if (!result.ok) return null;

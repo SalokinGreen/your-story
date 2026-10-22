@@ -3,7 +3,7 @@
 ## Overview
 
 The Your Story app features text-to-speech capabilities across two BYOK
-providers/models: **Cartesia Sonic-3** (ultra-low-latency) and **ElevenLabs
+providers/models: **Cartesia Sonic-3.6** (ultra-low-latency) and **ElevenLabs
 Flash v2.5** (best-in-class quality). Both are BYOK - the user supplies their
 own provider API key in Settings; there is no server-side "Coins" path for
 TTS. (DeepInfra's Kokoro/Orpheus models were removed - they were the older,
@@ -30,12 +30,22 @@ stumble over
 
 ## TTS Models
 
-### Cartesia Sonic-3 (Cartesia, ~1 credit/character - plan-dependent)
+### Cartesia Sonic-3.6 (Cartesia, ~1 credit/character - plan-dependent)
 
 Purpose-built for low-latency, real-time narration. Requires a Cartesia API
 key from [play.cartesia.ai](https://play.cartesia.ai/keys). Voice IDs are
 UUIDs from Cartesia's voice library - five samples are bundled, add more via
 the custom voice field.
+
+The request (`ttsCall.ts`) sends `Cartesia-Version: 2026-08-14`, model
+`sonic-3.6` (Cartesia's rolling alias for its newest stable snapshot) and the
+voice as a plain ID string
+([reference](https://docs.cartesia.ai/api-reference/tts/bytes), read
+2026-10-21). A Professional Voice Clone must be requested with one of the
+models it was trained on (the voice's `fine_tunes.public_model_id`: today
+`sonic-3.5-2026-05-04` and `sonic-3.6-2026-08-27`), or Cartesia answers 400
+`voice_model_mismatch`; the app does not send a per-voice model, so such a voice
+may fail (a pending test).
 
 ### ElevenLabs Flash v2.5 (ElevenLabs, ~0.5 credits/character - plan-dependent) — default
 
@@ -126,14 +136,14 @@ Defined in `app/misc/ai_prices.ts` (`TTS_MODELS`). These are cost *estimates*
 only, used for the optional cost-preview UI - since TTS is BYOK, the actual
 amount billed depends on the user's own plan with that provider:
 
-- **Cartesia Sonic-3**: ~$30 / 1M characters (varies by Cartesia plan tier)
+- **Cartesia Sonic-3.6**: ~$30 / 1M characters (varies by Cartesia plan tier)
 - **ElevenLabs Flash v2.5**: ~$50 / 1M characters (varies by ElevenLabs plan tier)
 
 ## Usage
 
 1. Go to **Settings** (gear icon) → **API Keys** tab, add the API key for whichever provider(s) you want to use
 2. Go to **Settings** → **Voice** tab, enable TTS
-3. Choose a model: Cartesia Sonic-3 or ElevenLabs Flash v2.5
+3. Choose a model: Cartesia Sonic-3.6 or ElevenLabs Flash v2.5
 4. Select a voice from the dropdown (or add a custom voice ID)
 5. Adjust volume as needed
 6. Optionally enable auto-generate for automatic narration
@@ -278,6 +288,6 @@ To test TTS:
 
 ## Credits
 
-- **Cartesia**: [Sonic-3](https://cartesia.ai)
+- **Cartesia**: [Sonic-3.6](https://cartesia.ai)
 - **ElevenLabs**: [Flash v2.5](https://elevenlabs.io)
 - **Integration**: Your Story - Cartesia/ElevenLabs added July 2026; DeepInfra's Kokoro/Orpheus removed July 2026

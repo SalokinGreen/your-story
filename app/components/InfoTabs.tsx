@@ -16,10 +16,10 @@ const KEY_REQUIREMENTS: KeyRequirement[] = [
     icon: "Key",
     gradient: "from-blue-500 to-purple-600",
     title: "Story Generation",
-    provider: "DeepSeek or OpenRouter",
+    provider: "OpenRouter",
     providerUrl: "https://openrouter.ai/keys",
     description:
-      "Pick any model you like and configure it in Settings - the story, GM, and choices stages are all yours to tune.",
+      "One OpenRouter key runs the default GM, narrator and helper models. Prefer another provider? Pick any model you like in Settings - every stage is yours to tune.",
   },
   {
     icon: "FileText",
@@ -37,7 +37,7 @@ const KEY_REQUIREMENTS: KeyRequirement[] = [
     provider: "Cartesia or ElevenLabs",
     providerUrl: "https://elevenlabs.io/app/settings/api-keys",
     description:
-      "Text-to-speech narration is powered by Cartesia Sonic-3 or ElevenLabs voice models.",
+      "Text-to-speech narration is powered by Cartesia Sonic-3.6 or ElevenLabs voice models.",
   },
 ];
 

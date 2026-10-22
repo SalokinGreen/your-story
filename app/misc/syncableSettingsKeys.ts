@@ -23,6 +23,7 @@ export const SYNCABLE_SETTINGS_KEYS = [
   "customModels",
   "reasoningTierOverrides",
   "narrationModelOverride",
+  "narrationEffortOverride",
   "observerModelOverride",
   "memoryKeeperModelOverride",
   "reflectionModelOverride",
