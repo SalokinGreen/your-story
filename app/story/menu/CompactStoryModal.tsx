@@ -8,6 +8,8 @@ import {
   compactStoryInPlace,
   buildCondensedStorySeed,
   estimateStoryDataSize,
+  summarizeNow,
+  COMPACT_NOW_KEEP_PARTS,
   DEFAULT_KEEP_RECENT_PARTS,
   CompactStoryResult,
 } from "../../misc/storyCompaction";
@@ -41,6 +43,7 @@ export default function CompactStoryModal({
     `${storyData.story_name} (Continued)`,
   );
   const [busy, setBusy] = useState(false);
+  const [focus, setFocus] = useState("");
 
   const currentSize = estimateStoryDataSize(storyData);
   const partCount = storyData.scene.parts.length;
@@ -71,6 +74,45 @@ export default function CompactStoryModal({
     } catch (error) {
       console.error("Error compacting story:", error);
       addNotification("Failed to compact story", "failure");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // "Compact now": summarise everything but the last two turns, steered by an
+  // optional focus. Removes nothing from the story the player reads.
+  const handleSummariseNow = async () => {
+    setBusy(true);
+    try {
+      const clone = structuredClone(storyData);
+      const sizeBeforeBytes = estimateStoryDataSize(clone);
+      const result = await summarizeNow(clone, apiOptions, {
+        focus: focus.trim() || undefined,
+      });
+      if (!result.ran) {
+        addNotification(
+          "Nothing to summarise yet, or the AI call failed",
+          "warning",
+        );
+        return;
+      }
+      onCompacted(clone, {
+        sizeBeforeBytes,
+        sizeAfterBytes: estimateStoryDataSize(clone),
+        partsPruned: 0,
+        archivedThreads: 0,
+        archivedGoals: 0,
+        narrativeSummarized: true,
+        partsRemoved: 0,
+      });
+      addNotification(
+        `Summarised ${result.partsFolded} earlier exchanges; the last ${COMPACT_NOW_KEEP_PARTS / 2} turns stay word for word`,
+        "success",
+      );
+      onClose();
+    } catch (error) {
+      console.error("Error summarising story:", error);
+      addNotification("Failed to summarise story", "failure");
     } finally {
       setBusy(false);
     }
@@ -133,6 +175,30 @@ export default function CompactStoryModal({
                   full original untouched.
                 </span>
               </label>
+            </div>
+
+            <div className="p-4 border-t border-white/10 space-y-2">
+              <p className="text-sm text-blue-200/80">
+                <span className="font-medium text-sky-300">Summarise now</span>{" "}
+                — folds everything except the last {COMPACT_NOW_KEEP_PARTS / 2}{" "}
+                turns into the story-so-far the AI reads. Nothing is removed
+                from your story. Say what to hold on to, if you like.
+              </p>
+              <input
+                type="text"
+                value={focus}
+                onChange={(e) => setFocus(e.target.value)}
+                placeholder="Focus (optional), e.g. keep everything about the Salon"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-400/40 text-sm"
+              />
+              <button
+                onClick={handleSummariseNow}
+                disabled={busy}
+                className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-sky-200 hover:text-white font-medium rounded-lg transition-all border border-white/10 flex items-center justify-center gap-2"
+              >
+                <DynamicIcon name="Minimize2" className="w-4 h-4" />
+                Summarise Now
+              </button>
             </div>
 
             <div className="p-4 border-t border-white/10 flex flex-col gap-2">

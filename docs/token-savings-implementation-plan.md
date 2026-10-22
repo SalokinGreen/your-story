@@ -1,7 +1,8 @@
 # Token savings — implementation plan
 
-**Status:** written 2026-10-22, **waiting for the author's yes** (CLAUDE.md:
-no coding without an explicit blessing on the plan). It implements
+**Status:** written 2026-10-22; **approved the same day (decision 107)**:
+"Approved. Also pull from origin and do the token saving + default system
+plans." Building has started, PR T1 first. It implements
 [`token-savings-design.md`](token-savings-design.md), approved by decision
 106; decisions 90–106 are in [`decisions.md`](decisions.md). It goes before
 default systems' PR A (decision 97).
@@ -449,4 +450,68 @@ go:
 
 ## Decisions made during implementation
 
-*None yet.*
+### 2026-10-22 - PR T1 (slices 1-4), `claude/token-savings-t1`
+
+Built on master `5dfea85` (PR #216 merged). Baseline before the first edit:
+135 files, **2,201 tests**, `tsc` clean. After: 139 files, **2,246 tests**
+(+45: `historyStubs` 17, `compaction.trigger` 11, `compaction.summary` 12,
+`tokenBudget` 5, and `compaction.test.ts` one test rewritten, net 0).
+
+- **Harness fixture carries a 120-token `<thinking>` per turn.** The design's
+  scratch fixture did not, so on master the same harness reads 1.91x / 4.98x /
+  14.22x (prose-only, a read every fourth turn, every turn) where the design
+  said 1.0 / 3.5 / 11. After slices 2-3: 1.08 / 1.21 / 1.59. The design turn's
+  round 1 went from 40,519 to 30,334 tokens (messages plus the tool list).
+  `tests/tokenBudget.test.ts` asserts the "after" numbers with loose bounds.
+- **`getPartsWithinTokenBudget` gained a `measure` argument** (`"prose"`
+  default, `"rendered"`). The choices prompt (`buildInfoMessage` path) sends
+  prose only, so it keeps the prose count; only the GM's sliding fallback
+  counts rendered sizes. Rendered mode never skips a part (so `startIndex` is
+  exact); `renderHistoryPart` returns nothing for a comment-only user part.
+- **`renderHistoryPart(part, index, options)`** takes `isMostRecentRound` as a
+  third argument (the plan's two-argument signature cannot know which
+  assistant part is last). `index` is the part's absolute position in
+  `scene.parts` (`historyStartIndex + i`), used only for legacy synthetic
+  tool-call ids.
+- **Dice and oracle results are never stubbed**, however long
+  (`KEEP_WHOLE_TOOLS` in `historyStubs.ts`: `formula_roll`, `opposed_formula`,
+  `gm_roll`, `npc_roll`, `calculate`, `fate_question`, `roll_table`,
+  `roll_portent`, `ask_for_roll`, `ask_question`). Decision 90 says dice and
+  oracle results stay; a roll echoing both consequence branches can pass 150
+  tokens and a stub would lose what the dice showed.
+- **The most recent past turn is stubbed too.** Only its `reasoning_details`
+  are kept (as before); its tool-call arguments and results are stubbed like
+  every older turn's, so a turn changes form once, when it becomes history.
+- **Thinking-only rounds and legacy thinking are dropped, not emitted empty.**
+  An assistant message with no tool calls and no visible text is skipped, and
+  the legacy `gmThinking` / `gmStoryContext` branches no longer synthesise
+  `<thinking>` messages (decision 99). A thinking-only turn (status report
+  6.19) therefore renders to nothing, which can leave two user messages in a
+  row; master could do the same for an empty part.
+- **Fold cutoff rules beyond the plan.** `planCompaction` keeps the latest part
+  live even if it alone is over the target, moves the cutoff forward one part
+  to keep a reply with its action, and takes the scene-boundary snap only when
+  the boundary is before the last part.
+- **"Compact now" removes nothing.** The plan said `summarizeOldNarrative`
+  gains `focus` / `keepRecentParts`; it did (so the old destructive checkbox
+  can use them), but *Summarise Now* calls a new `summarizeNow()` instead,
+  which folds all but the last four parts into the summary and moves
+  `summarizedThroughIndex`, leaving `scene.parts` intact. Truncating the story
+  the player scrolls through for a convenience button would be a data-loss
+  surprise; the fixed history start gives the same token effect.
+- **The summariser reads tool use from `gmConversation` only**, as
+  `[GM called name {args}]` / `[name result: ...]` lines before the prose. A
+  part pruned by the Compact Story "clear old debug data" lever has no
+  `gmConversation` and summarises as prose alone.
+- **The instructions and focus go in the summary call's system message**, so
+  the one revision call (same system message) keeps them.
+- **`summary_instructions` is kept out of the GM and narrator prompts**
+  (`categorizeNotes`, `isExcludedFromWorldLore`) but not out of `read_notes` /
+  `search_notes`: a GM that searches for the note's words can still read it.
+  It cannot find its title in any list. Not worth a tool-level filter now;
+  the note holds the author's summary rules, not secrets.
+- **`create_note` / `edit_note` enums are unchanged**: the GM cannot create a
+  `summary_instructions` note. The Designer, the lore editor and both library
+  pickers can.
+- **No `engine-review` agent run from this session** (no agent tool was
+  available to the builder): the coordinating session owes it before merge.

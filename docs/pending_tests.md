@@ -10,6 +10,34 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-22 — Token savings PR T1: history stubs, fixed start, summaries (`claude/token-savings-t1`)
+
+The suite measures the history sizes and the summary prompt against a
+recording `fetch`; no model was called. What needs a real session on the
+default models (with the author's go, decision 105):
+
+- **Recall after a stub.** Let the GM read a note, then play twenty turns.
+  *Expected:* it still acts on what the note said, or reads it again (the
+  stub tells it to). *Failure looks like:* a wrong fact stated with
+  confidence, or a `read_notes` of the same note every turn, which means the
+  150-token threshold or the summary needs tuning (decision 103).
+- **A real summary.** Play past the history budget (21.6k tokens at the
+  default Memory Size; shrink the slider to reach it sooner). *Expected:* one
+  "History summarization" call in the Debug Logs, a story-so-far with the
+  seven headings, and the next turns' history starting right after it.
+  *Failure looks like:* a "sliding-window fallback" log line every turn (the
+  summary call is failing; its error is in the Debug Logs), or headings
+  missing from the summary.
+- **Summary instructions.** Add a "Summary Instructions" note ("always keep
+  Exposure and Heat changes"), play past a summary. *Expected:* the summary
+  keeps them. The note must not appear in the GM's note lists.
+- **Summarise Now.** Story menu, Compact Story, type a focus, Summarise Now.
+  *Expected:* a success toast, the story text unchanged on screen, and the
+  next turn's context (Context Viewer) opening with the summary and the last
+  two turns only.
+- **The Compact Story dialog on a phone width.** The new Summarise Now block
+  was never seen rendered (no browser in this session).
+
 ## 2026-10-21 — The model catalog refresh (`claude/catalog-refresh`)
 
 The catalog was checked against OpenRouter's live list and each vendor's

@@ -1,38 +1,56 @@
 /**
- * Compaction: when scene history ages out of a stage's token budget
- * (getPartsWithinTokenBudget in ai_staged.ts), it's currently just dropped -
- * a pure sliding window with no memory of what fell out. For a long-running
- * campaign that silently erases earlier plot the GM never happened to write
- * down as a `memory`/lore entry.
+ * Compaction: the GM's history is every scene part after
+ * storyData.scene.summarizedThroughIndex (a fixed start - see getHistoryParts
+ * in ai_staged.ts), so between summaries it only grows at its end and the
+ * provider's prompt cache keeps hitting. When that history, measured as it is
+ * actually sent (stubs and all, historyStubs.ts), passes the history budget,
+ * the oldest parts are folded into storyData.scene.summary - extending the
+ * prior summary, not restarting it - until what is left is about half the
+ * budget (decisions 94 and 101). A summary therefore runs every few dozen
+ * turns, not every turn.
  *
- * This adds a rolling summary instead: whenever parts are about to fall
- * outside the budget for the first time, they get folded into
- * storyData.scene.summary (extending any prior summary, not restarting it),
- * and storyData.scene.summarizedThroughIndex tracks how much has already
- * been covered so re-summarizing the same parts every turn is avoided.
+ * The summariser is given the folded parts' tool calls and results as well as
+ * their prose (decision 95), writes fixed sections, and obeys the adventure's
+ * `summary_instructions` note and a "Compact now" focus, when there is one.
  */
 
 import { StoryData, ScenePart } from "./structs";
-import { getPartsWithinTokenBudget, cleanString } from "./ai_staged";
-import { estimateTokens } from "./tokenCounter";
+import { cleanString } from "./ai_staged";
 import { ChatMessage } from "./chatMessage";
 import { callSideModel, ProviderKeys } from "./sideModelCall";
+import {
+  estimateRenderedPartTokens,
+  stripThinkingForHistory,
+} from "./historyStubs";
 
-// Below this many uncovered tokens, summarizing isn't worth an extra LLM
-// call yet - wait for more to accumulate.
-const MIN_UNCOVERED_TOKENS_TO_SUMMARIZE = 1500;
+// A summary folds history back to this share of the history budget (decision
+// 101), so the next one is a few dozen turns away and the prefix stays cached
+// in between.
+export const FOLD_TARGET_RATIO = 0.5;
 
-// Keep the summary itself bounded so it can't grow without limit over a
-// very long campaign and start eating the budget it's meant to protect.
-const MAX_SUMMARY_TOKENS = 1500;
+// The summary's own size target (decision 103: a constant, tuned in
+// playtests). It is asked for in the prompt and bounds the call's output.
+export const SUMMARY_TARGET_TOKENS = 2000;
+
+// The summary's fixed headings, in order (decision 95). The whole summary is
+// rewritten each time, so every section is always present.
+export const SUMMARY_SECTIONS = [
+  "Where things stand now",
+  "What the player is pursuing",
+  "Open threads, clocks and pressures",
+  "People",
+  "Places and things",
+  "Promises, debts and secrets revealed",
+  "What the GM has established from notes and rolls",
+] as const;
 
 // If a recorded scene boundary (Scene.lastSceneBoundaryIndex, set on
 // increment_scene - see §3.2 in
 // docs/research-paper-ttrpg-theory-gap-analysis.md) falls within this many
 // parts AFTER the token-budget cutoff, extend the cutoff out to it instead
 // of cutting mid-scene. Only ever extends FORWARD (summarizes a few extra
-// still-live-budget-fitting parts) - never pulled backward, which would
-// leave a content-loss gap between the summary and the live tail.
+// parts) - never pulled backward, which would leave a content-loss gap
+// between the summary and the live tail.
 const SCENE_BOUNDARY_SNAP_WINDOW = 6;
 
 export interface CompactionPlan {
@@ -192,17 +210,66 @@ export function validateCompactionSummary(
   return warnings;
 }
 
-function partToText(part: ScenePart): string {
-  const text = part.raw || part.content || "";
-  return part.user ? `> ${text}` : text;
+function compactToolArgs(argumentsJson: string | undefined): string {
+  if (!argumentsJson) return "{}";
+  try {
+    return JSON.stringify(JSON.parse(argumentsJson));
+  } catch {
+    return argumentsJson;
+  }
 }
 
 /**
- * Pure decision logic: given the current scene state and the token budget
- * about to be used for history, decide whether compaction is needed and, if
- * so, what needs to be summarized. Returns null when nothing new needs
- * summarizing (either everything still fits, or the newly-dropped content
- * is too small to bother with yet).
+ * One part as the summariser reads it (decision 95): the prose the player saw,
+ * preceded by what the GM did to produce it - every tool call with its
+ * arguments and its full result (the notes it read, the dice it rolled, the
+ * state it changed). The GM's private <thinking> is left out: it is cost, not
+ * memory.
+ */
+export function partToCompactionText(part: ScenePart): string {
+  const text = stripThinkingForHistory(part.raw || part.content || "");
+  if (part.user) return `> ${text}`;
+
+  const lines: string[] = [];
+  if (part.gmConversation && part.gmConversation.length > 0) {
+    const nameById = new Map<string, string>();
+    for (const msg of part.gmConversation) {
+      if (msg.role === "assistant") {
+        for (const tc of msg.tool_calls || []) {
+          const name: string = tc?.function?.name ?? "?";
+          if (tc?.id) nameById.set(tc.id, name);
+          lines.push(`[GM called ${name} ${compactToolArgs(tc?.function?.arguments)}]`);
+        }
+      } else if (msg.role === "tool") {
+        const name = (msg.tool_call_id && nameById.get(msg.tool_call_id)) || "tool";
+        lines.push(`[${name} result: ${msg.content}]`);
+      }
+    }
+  }
+  lines.push(text);
+  return lines.join("\n");
+}
+
+/**
+ * Rendered tokens of every part after the summary: what the GM is sent as
+ * history (stubs, no <thinking>), counted the same way getHistoryParts counts.
+ */
+export function measureHistoryTokens(storyData: StoryData): number {
+  const parts = storyData.scene.parts || [];
+  const start = Math.max(0, storyData.scene.summarizedThroughIndex || 0);
+  let total = 0;
+  for (let i = start; i < parts.length; i++) {
+    total += estimateRenderedPartTokens(parts[i], i);
+  }
+  return total;
+}
+
+/**
+ * Pure decision logic. Null while the history, as sent, fits `historyBudget`.
+ * Past it, the cutoff is the earliest index that leaves the remaining parts at
+ * or under historyBudget * FOLD_TARGET_RATIO, moved FORWARD (never back) to
+ * keep a user action with its reply and to land on a recorded scene boundary
+ * within SCENE_BOUNDARY_SNAP_WINDOW. The last part always stays live.
  */
 export function planCompaction(
   storyData: StoryData,
@@ -211,39 +278,70 @@ export function planCompaction(
   const parts = storyData.scene.parts;
   if (!parts || parts.length === 0) return null;
 
-  const included = getPartsWithinTokenBudget(parts, historyBudget);
-  const rawCutoffIndex = parts.length - included.length;
+  const alreadyCovered = Math.max(0, storyData.scene.summarizedThroughIndex || 0);
+  if (measureHistoryTokens(storyData) <= historyBudget) return null;
 
-  const alreadyCovered = storyData.scene.summarizedThroughIndex || 0;
+  const target = historyBudget * FOLD_TARGET_RATIO;
+  let kept = 0;
+  let rawCutoffIndex = parts.length;
+  for (let i = parts.length - 1; i >= alreadyCovered; i--) {
+    kept += estimateRenderedPartTokens(parts[i], i);
+    if (kept > target) break;
+    rawCutoffIndex = i;
+  }
+  // The latest part always stays live, even if it alone is over the target.
+  let cutoffIndex = Math.min(rawCutoffIndex, parts.length - 1);
+
+  // Keep a reply with the action that prompted it.
+  if (
+    cutoffIndex > alreadyCovered &&
+    cutoffIndex < parts.length - 1 &&
+    !parts[cutoffIndex].user &&
+    parts[cutoffIndex - 1]?.user
+  ) {
+    cutoffIndex += 1;
+  }
 
   // Prefer cutting exactly at a scene boundary over an arbitrary mid-scene
   // token cutoff, when one is close by - see SCENE_BOUNDARY_SNAP_WINDOW.
   const boundary = storyData.scene.lastSceneBoundaryIndex;
-  const cutoffIndex =
+  if (
     boundary !== undefined &&
     boundary > alreadyCovered &&
-    boundary >= rawCutoffIndex &&
-    boundary - rawCutoffIndex <= SCENE_BOUNDARY_SNAP_WINDOW &&
-    boundary <= parts.length
-      ? boundary
-      : rawCutoffIndex;
+    boundary >= cutoffIndex &&
+    boundary - cutoffIndex <= SCENE_BOUNDARY_SNAP_WINDOW &&
+    boundary < parts.length
+  ) {
+    cutoffIndex = boundary;
+  }
 
   if (cutoffIndex <= alreadyCovered) {
-    return null; // nothing new has aged out since the last summary
+    return null; // nothing to fold that is not already in the summary
   }
 
-  const newlyDroppedParts = parts.slice(alreadyCovered, cutoffIndex);
-  const textToSummarize = newlyDroppedParts.map(partToText).join("\n\n");
-
-  if (estimateTokens(textToSummarize) < MIN_UNCOVERED_TOKENS_TO_SUMMARIZE) {
-    return null;
-  }
+  const textToSummarize = parts
+    .slice(alreadyCovered, cutoffIndex)
+    .map(partToCompactionText)
+    .join("\n\n");
 
   return {
     cutoffIndex,
     textToSummarize,
     priorSummary: storyData.scene.summary,
   };
+}
+
+/**
+ * Every enabled `summary_instructions` note, joined: the author's standing
+ * instructions for every summary of this adventure (decision 95). Read only
+ * here - never by the GM or the narrator.
+ */
+export function getSummaryInstructions(storyData: StoryData): string | undefined {
+  const notes = (storyData.lore || []).filter(
+    (l) => l.enabled !== false && l.type === "summary_instructions" && l.content?.trim(),
+  );
+  if (notes.length === 0) return undefined;
+  return notes.map((l) => cleanString(l.content).trim()).join("\n\n");
 }
 
 /**
@@ -270,19 +368,39 @@ export function applyCompaction(
     : undefined;
 }
 
-function buildCompactionPrompt(plan: CompactionPlan): {
+export interface CompactionOptions {
+  /** "Compact now": what this summary should keep above all else. */
+  focus?: string;
+}
+
+function buildCompactionPrompt(
+  plan: CompactionPlan,
+  extras: { instructions?: string; focus?: string } = {}
+): {
   system: string;
   user: string;
 } {
-  const system = `You maintain a running summary of an interactive story's earlier events, so later turns don't lose context once the full text ages out of the AI's context window.
+  const headings = SUMMARY_SECTIONS.map((h, i) => `${i + 1}. ${h}`).join("\n");
+  let system = `You maintain a running summary of an interactive story's earlier events, so later turns don't lose context once the full text ages out of the AI's context window.
 
-Write a dense, factual summary covering: key plot developments, decisions the player made and their consequences, important NPCs introduced and how relationships stand, locations discovered, items/quests gained or resolved, and any unresolved threads. Skip prose flourishes - this is a reference for another AI, not entertainment. Keep it under roughly ${MAX_SUMMARY_TOKENS} tokens.
+Write a dense, factual reference for another AI (not entertainment), as these sections, each under its own heading, in this order:
+${headings}
+(People: each NPC's state, attitude to the player characters and whereabouts. Promises, debts and secrets revealed: who knows what.)
+
+The input includes the game master's tool calls and results - what it read from notes, rolled, and changed. Keep what it established or learned that later turns will depend on; skip what was only looked up. Skip prose flourishes. Rewrite the WHOLE summary every time, with every section present (write "nothing yet" for an empty one). Aim for about ${SUMMARY_TARGET_TOKENS} tokens in total.
 
 ${
   plan.priorSummary
     ? "You are given the EXISTING summary plus NEW events that happened after it. Produce one updated summary that merges them - do not just append, actually integrate and re-condense so the whole thing stays compact."
     : "You are given the story's earliest events. Produce the summary from scratch."
 }`;
+
+  if (extras.instructions) {
+    system += `\n\nTHE ADVENTURE'S STANDING INSTRUCTIONS FOR EVERY SUMMARY (follow these):\n${extras.instructions}`;
+  }
+  if (extras.focus?.trim()) {
+    system += `\n\nFOCUS FOR THIS SUMMARY - keep everything about this in detail, even at the cost of other material:\n${extras.focus.trim()}`;
+  }
 
   const user = plan.priorSummary
     ? `EXISTING SUMMARY:\n${plan.priorSummary}\n\nNEW EVENTS TO FOLD IN:\n${plan.textToSummarize}\n\nWrite the updated combined summary.`
@@ -319,7 +437,7 @@ async function callSummarizeApi(
     model: apiOptions.model,
     messages,
     keys: apiOptions,
-    maxTokens: Math.ceil(MAX_SUMMARY_TOKENS * 1.3),
+    maxTokens: Math.ceil(SUMMARY_TARGET_TOKENS * 1.3),
     temperature: 0.2,
     reasoningEffort: apiOptions.reasoningEffort,
     abortSignal: apiOptions.abortSignal,
@@ -363,9 +481,13 @@ function buildRevisionUserMessage(
 export async function runCompactionPlan(
   storyData: StoryData,
   plan: CompactionPlan,
-  apiOptions: CompactionApiOptions
+  apiOptions: CompactionApiOptions,
+  options: CompactionOptions = {}
 ): Promise<CompactionResult> {
-  const { system, user } = buildCompactionPrompt(plan);
+  const { system, user } = buildCompactionPrompt(plan, {
+    instructions: getSummaryInstructions(storyData),
+    focus: options.focus,
+  });
   const messages: ChatMessage[] = [
     { role: "system", content: system },
     { role: "user", content: user },
@@ -443,7 +565,9 @@ export function planManualCompaction(
   }
 
   const newlyDroppedParts = parts.slice(alreadyCovered, cutoffIndex);
-  const textToSummarize = newlyDroppedParts.map(partToText).join("\n\n");
+  const textToSummarize = newlyDroppedParts
+    .map(partToCompactionText)
+    .join("\n\n");
   if (!textToSummarize.trim()) return null;
 
   return {

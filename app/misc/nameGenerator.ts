@@ -301,6 +301,7 @@ const NON_ENTITY_LORE_TYPES = new Set([
   "gm_plan",
   "dm_instructions",
   "story_instructions",
+  "summary_instructions",
   "gm_notes",
 ]);
 

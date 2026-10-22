@@ -24,6 +24,7 @@
 import { StoryData, ScenePart, MemoryEntry } from "./structs";
 import {
   CompactionApiOptions,
+  CompactionOptions,
   planManualCompaction,
   runCompactionPlan,
 } from "./compaction";
@@ -33,6 +34,10 @@ import {
 // Generous enough that "what just happened" and any in-flight thread stay
 // completely untouched.
 export const DEFAULT_KEEP_RECENT_PARTS = 20;
+
+// "Compact now" keeps the last two turns word for word (decision 102): four
+// parts, a player action and a reply each.
+export const COMPACT_NOW_KEEP_PARTS = 4;
 
 // Internal-only fields on ScenePart that exist purely to build AI context /
 // power the per-message "GM thinking" debug panel (see story.tsx) for
@@ -154,12 +159,13 @@ export function archiveResolvedProgress(
 export async function summarizeOldNarrative(
   storyData: StoryData,
   apiOptions: CompactionApiOptions,
-  keepRecentParts: number = DEFAULT_KEEP_RECENT_PARTS
+  keepRecentParts: number = DEFAULT_KEEP_RECENT_PARTS,
+  options: CompactionOptions = {}
 ): Promise<{ ran: boolean; partsRemoved: number }> {
   const plan = planManualCompaction(storyData, keepRecentParts);
   if (!plan) return { ran: false, partsRemoved: 0 };
 
-  const result = await runCompactionPlan(storyData, plan, apiOptions);
+  const result = await runCompactionPlan(storyData, plan, apiOptions, options);
   if (!result.ran) return { ran: false, partsRemoved: 0 };
 
   const partsRemoved = plan.cutoffIndex;
@@ -178,6 +184,31 @@ export async function summarizeOldNarrative(
   }
 
   return { ran: true, partsRemoved };
+}
+
+/**
+ * "Compact now" (decision 95, the app's `/compact <focus>`): fold everything
+ * except the last two turns (decision 102) into the story-so-far summary right
+ * away, steered by an optional focus ("keep everything about the Salon").
+ * Unlike summarizeOldNarrative this removes nothing: the parts stay in the
+ * story the player scrolls through, and the GM's history simply starts after
+ * them (`scene.summarizedThroughIndex`). Mutates storyData in place.
+ */
+export async function summarizeNow(
+  storyData: StoryData,
+  apiOptions: CompactionApiOptions,
+  options: CompactionOptions & { keepRecentParts?: number } = {}
+): Promise<{ ran: boolean; partsFolded: number }> {
+  const keep = options.keepRecentParts ?? COMPACT_NOW_KEEP_PARTS;
+  const plan = planManualCompaction(storyData, keep);
+  if (!plan) return { ran: false, partsFolded: 0 };
+
+  const alreadyCovered = storyData.scene.summarizedThroughIndex || 0;
+  const result = await runCompactionPlan(storyData, plan, apiOptions, {
+    focus: options.focus,
+  });
+  if (!result.ran) return { ran: false, partsFolded: 0 };
+  return { ran: true, partsFolded: plan.cutoffIndex - alreadyCovered };
 }
 
 export interface CompactStoryOptions {

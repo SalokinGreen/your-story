@@ -124,6 +124,7 @@ const VALID_LORE_TYPES: LoreType[] = [
   "character_sheet",
   "dm_instructions",
   "story_instructions",
+  "summary_instructions",
   "gm_plan",
 ];
 
