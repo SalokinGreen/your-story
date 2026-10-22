@@ -36,6 +36,7 @@ import {
   libraryNoteToStoryLore,
   storyLoreToLibraryNoteFields,
 } from "../../misc/localNotesLibraryManager";
+import { pinnedNoteWarning } from "../../misc/contextLimits";
 import PDFImporter from "../../components/PDFImporter";
 import LibraryPickerModal from "../../components/LibraryPickerModal";
 
@@ -367,6 +368,17 @@ export default function LoreEditor({
                   placeholder="Note content (supports Markdown)"
                   className="w-full h-32 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                 />
+                {pinnedNoteWarning({
+                  type: editLore.type,
+                  content: editLore.content || "",
+                }) && (
+                  <p role="status" className="text-xs leading-relaxed text-amber-300/90">
+                    {pinnedNoteWarning({
+                      type: editLore.type,
+                      content: editLore.content || "",
+                    })}
+                  </p>
+                )}
                 {/* Note Type Selector */}
                 <div>
                   <label className="block text-sm font-semibold text-blue-200 mb-2">

@@ -326,7 +326,7 @@ const createNoteTool: ToolSchema = {
   function: {
     name: "create_note",
     description:
-      "Add a new note entry to the game world. Notes are detailed reference entries for locations, NPCs, items, lore, or secrets. IMPORTANT: Use the 'type' field to categorize the note so it appears in the correct folder.",
+      `Add a note (location, NPC, item, lore, secret...). Set \`type\` so it files correctly.`,
     parameters: {
       type: "object",
       properties: {
@@ -359,13 +359,13 @@ const createNoteTool: ToolSchema = {
           type: "string",
           enum: ["always_reveal", "hidden", "to_be_revealed", "check_per_turn"],
           description:
-            "Two-Pass Visibility state, independent of `type`. Set 'hidden' or 'to_be_revealed' for anything the Narrator must not be able to describe until you explicitly reveal it (a trap, a hidden villain, a secret motive) - the content is stripped from the Narrator's context entirely until you flip it to 'always_reveal' via edit_note. Use 'check_per_turn' for something that might be noticed passively each turn without the player specifically looking (e.g. a nearby patrol). Omit for ordinary, immediately-narratable content.",
+            "Independent of type. 'hidden' or 'to_be_revealed': the Narrator never sees the content until you set 'always_reveal' via edit_note (a trap, a hidden villain). 'check_per_turn': may be noticed passively each turn (a nearby patrol). Omit for ordinary content.",
         },
         planSpineLength: {
           type: "string",
           enum: ["short", "medium", "long"],
           description:
-            "ONLY used when creating the gm_plan note titled \"Campaign Plan\" - picks how granular the campaign's beat spine is. 'short' (~5 beats) for a one-shot/short arc, 'medium' (~7 beats, default) for an ordinary multi-session campaign, 'long' (~15 beats, full save-the-cat-style structure) for an extended campaign. Judge this from the premise, adventure length/scope, and the player's stated intent - ignored for every other note type.",
+            "Only for the gm_plan note titled \"Campaign Plan\": 'short' (~5 beats, one-shot), 'medium' (~7, default), 'long' (~15, extended campaign). Ignored for other notes.",
         },
       },
       required: ["title", "content"],
@@ -410,7 +410,7 @@ const updateNoteTool: ToolSchema = {
   function: {
     name: "edit_note",
     description:
-      "Update an existing note entry's content, title, type, or visibility. Use this to modify notes as the story reveals more information - most importantly, to REVEAL a hidden/to_be_revealed note by setting visibility to 'always_reveal' once the player has actually discovered it.",
+      `Update a note's content, title, type or visibility. Also how you REVEAL a hidden or to_be_revealed note: set visibility to "always_reveal" once the player has discovered it.`,
     parameters: {
       type: "object",
       properties: {
@@ -420,11 +420,11 @@ const updateNoteTool: ToolSchema = {
         },
         newTitle: {
           type: "string",
-          description: "New title for the note entry (optional)",
+          description: "New title (optional)",
         },
         content: {
           type: "string",
-          description: "New content for the note entry (optional)",
+          description: "New content (optional)",
         },
         type: {
           type: "string",
@@ -459,7 +459,7 @@ const editLoreReplaceTool: ToolSchema = {
   function: {
     name: "edit_lore_replace",
     description:
-      "Replace a specific string in a lore entry's content. Use for surgical edits without rewriting the entire entry. Supports case-insensitive matching.",
+      `Replace a string in a note's content (surgical edit, case-insensitive).`,
     parameters: {
       type: "object",
       properties: {
@@ -491,7 +491,7 @@ const editLoreAppendTool: ToolSchema = {
   function: {
     name: "edit_lore_append",
     description:
-      "Append content to the end of a lore entry. Use for adding new information to existing notes.",
+      `Append content to the end of a note.`,
     parameters: {
       type: "object",
       properties: {
@@ -519,7 +519,7 @@ const editLorePrependTool: ToolSchema = {
   function: {
     name: "edit_lore_prepend",
     description:
-      "Prepend content to the beginning of a lore entry. Use for adding important updates at the top.",
+      `Prepend content to the start of a note.`,
     parameters: {
       type: "object",
       properties: {
@@ -566,7 +566,7 @@ const editLoreInsertTool: ToolSchema = {
   function: {
     name: "edit_lore_insert",
     description:
-      "Find a line matching a pattern in a lore entry and insert new content above or below it. Useful for inserting new sections or updating specific parts of structured notes.",
+      `Insert content above or below the first line matching a pattern in a note.`,
     parameters: {
       type: "object",
       properties: {
@@ -604,7 +604,7 @@ const mergeLoreTool: ToolSchema = {
   function: {
     name: "merge_lore",
     description:
-      "Merge multiple lore entries into one. The target entry receives all content from source entries, which are then deleted.",
+      `Merge several notes into the target note; the sources are deleted.`,
     parameters: {
       type: "object",
       properties: {
@@ -635,7 +635,7 @@ const duplicateLoreTool: ToolSchema = {
   function: {
     name: "duplicate_lore",
     description:
-      "Create a copy of a lore entry with a new title. Useful for creating variations or templates.",
+      `Copy a note under a new title.`,
     parameters: {
       type: "object",
       properties: {
@@ -658,14 +658,14 @@ const searchNotesTool: ToolSchema = {
   function: {
     name: "search_notes",
     description:
-      "Search through all notes (lore entries) for content matching a query. Matches individual words anywhere in a note (title, content, trigger keywords, aliases, tags, related characters/locations) - not just one exact phrase - and returns the strongest matches first with the relevant excerpt. Use to find information before updating notes.",
+      `Search all notes (title, content, keywords, aliases, tags) for a query. Words match individually, strongest matches first, with excerpts. Use to find information before updating notes.`,
     parameters: {
       type: "object",
       properties: {
         query: {
           type: "string",
           description:
-            "Text to search for (case-insensitive). Words are matched individually as well as together, so 'tavern owner' will find notes mentioning both words even if not adjacent; an exact phrase match still ranks highest.",
+            "Text to search for; words match individually, an exact phrase ranks highest",
         },
         includeHidden: {
           type: "boolean",
@@ -771,18 +771,18 @@ const createThreadTool: ToolSchema = {
         title: {
           type: "string",
           description:
-            "Short title for the thread (e.g., 'The Missing Artifact', 'Baron's Conspiracy', 'Find the Cure')",
+            "Short title (e.g., 'The Missing Artifact')",
         },
         description: {
           type: "string",
           description:
-            "1-2 sentence summary of the objective and current state. Keep concise - this is a quest tracker, not a story recap.",
+            "1-2 sentences: objective and current state",
         },
         priority: {
           type: "string",
           enum: ["main", "side", "background"],
           description:
-            "Thread importance: 'main' (central plot), 'side' (optional subplot), 'background' (ambient/world events)",
+            "main (central plot), side (optional subplot), background (ambient)",
         },
       },
       required: ["title", "description"],
@@ -806,7 +806,7 @@ const updateThreadTool: ToolSchema = {
         description: {
           type: "string",
           description:
-            "New 1-2 sentence summary replacing the old one. State CURRENT objective/situation only - history is tracked elsewhere.",
+            "New 1-2 sentence summary replacing the old one (current situation only)",
         },
         priority: {
           type: "string",
@@ -872,7 +872,7 @@ const resolveRandomEventTool: ToolSchema = {
   function: {
     name: "resolve_random_event",
     description:
-      "Confirm a pending oracle-triggered random event has been incorporated into the narrative. Random events (from fate_question or a scene check) persist and keep reappearing in context every turn until resolved this way - call it once you've woven the event into the story, or it will keep showing up as unfinished.",
+      `Confirm a pending random event (from fate_question or a scene check) is woven into the narrative. It keeps reappearing in context every turn until you do.`,
     parameters: {
       type: "object",
       properties: {
@@ -897,7 +897,7 @@ const acknowledgeDirectorMoveTool: ToolSchema = {
   function: {
     name: "acknowledge_director_move",
     description:
-      "Confirm a pending director move has been incorporated into the narrative. The engine - not you - decides when to announce future badness, tick a clock, or put someone in a spot; you only render the chosen move as prose ('make your move, but never speak its name' - never say 'the director wants me to...'). The move persists and keeps reappearing in context every turn until resolved this way.",
+      `Confirm a pending director move is woven into the narrative. The engine decides when to announce trouble, tick a clock or put someone in a spot; you render the move as prose without naming it ("the director wants me to..." is never said). It keeps reappearing until you do.`,
     parameters: {
       type: "object",
       properties: {
@@ -1183,29 +1183,29 @@ const openSideBeatTool: ToolSchema = {
   type: "function",
   function: {
     name: "open_side_beat",
-    description: `Pull focus off the main campaign spine into a self-contained side beat - a side quest, a character-focused detour, a one-off episode - and make it the active focus. Creates a \`gm_plan\` note for the side beat (its own short goal + checklist + a "return_when" condition) and marks it active; the main spine beat is paused (not lost) until you call close_side_beat. Use this instead of quietly wandering off-plan, so the detour is tracked and has a way back. Only ONE side beat is active at a time.`,
+    description: `Pull focus off the main spine into a side quest or detour: creates a gm_plan note for it (goal, checklist, return_when) and makes it active; the spine beat is paused until close_side_beat. Use this instead of quietly wandering off-plan. One side beat at a time.`,
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
           description:
-            "Short title for the side beat, e.g. 'Side Beat — The Missing Caravan'. Becomes the gm_plan note title.",
+            "Short title; becomes the gm_plan note title",
         },
         goal: {
           type: "string",
           description:
-            "What this detour is about and what it's meant to accomplish in the fiction.",
+            "What the detour is about and should accomplish",
         },
         return_when: {
           type: "string",
           description:
-            "The condition that means the side beat is done and focus should return to the main spine.",
+            "The condition that means it is done and focus returns to the spine",
         },
         owner: {
           type: "string",
           description:
-            "Optional: in co-op, the player/character this detour is focused on (matches a character's ownerCouchPlayerId). Omit for a party-wide side beat.",
+            "Co-op: the player/character it is focused on (a character's ownerCouchPlayerId). Omit for party-wide.",
         },
       },
       required: ["title", "goal"],
@@ -1217,7 +1217,7 @@ const closeSideBeatTool: ToolSchema = {
   type: "function",
   function: {
     name: "close_side_beat",
-    description: `Resolve the active side beat and return focus to the paused main campaign spine beat. Records the outcome on the side beat's gm_plan note and clears the active focus. Call this when the side beat's return_when condition is met (or the detour is otherwise done).`,
+    description: `Resolve the active side beat, record its outcome, and return focus to the paused spine beat. Call when its return_when condition is met.`,
     parameters: {
       type: "object",
       properties: {
@@ -1236,11 +1236,7 @@ const advancePlanTool: ToolSchema = {
   type: "function",
   function: {
     name: "advance_plan",
-    description: `Advance the campaign plan through its fixed dramatic spine (docs/gm-plan-notes-design.md). The spine is a PREDICTION of the drama, not a track the players must follow - use these to keep it current, rewriting the next beat to fit what actually happened rather than what was forecast. Two actions, meant to be used together the moment a beat wraps:
-- action "complete_current": mark the CURRENT beat done, once its advance-on trigger (a player ACTION, or a TIME/consequence trigger) is satisfied. After this, the turn will NOT be allowed to end until you write the next beat - so follow it with write_next this same turn.
-- action "write_next": detail the NEXT beat and move focus onto it. Provide the next beat's name and its full writeup (goal + a [ ] checklist + an advance-on block: OR'd action triggers and/or a time trigger). Ground it in what changed since the last boundary - recent reflection insights tagged [Neutralized]/[Clock]/[Goal]/[Arc], current Fronts and their clocks, and where the players actually went. This keeps the plan exactly one beat ahead - never write beats further out than the next one.
-IMPORTANT: those tags are INPUTS you read here, not reasons to call this tool. A [Neutralized]/[Clock]/[Goal]/[Arc] insight appearing mid-beat is NOT an advance trigger - do not call complete_current just because you saw one. Only advance when the current beat's own advance-on condition is met. Neutralizing a threat mid-beat is handled on the Front itself (resolve/abandon its thread, adjust its timer), not by advancing the spine.
-Beat names are fixed and advance in order: Opening Image (Session 0), Inciting Incident (Session 1), Rising Complications, Midpoint Turn, Crisis, Climax, Resolution.`,
+    description: `Keep the campaign plan's fixed spine current. Two actions, used together the moment a beat wraps: "complete_current" marks the CURRENT beat done once its own advance-on trigger is satisfied (the turn can't end until you then write the next beat); "write_next" details the NEXT beat (name, goal, a [ ] checklist, an advance-on block) grounded in what actually happened, always exactly one beat ahead. Reflection tags ([Neutralized], [Clock], [Goal], [Arc]) are inputs, not triggers: neutralising a threat is handled on the Front itself, not by advancing. Beats, in order: Opening Image, Inciting Incident, Rising Complications, Midpoint Turn, Crisis, Climax, Resolution.`,
     parameters: {
       type: "object",
       properties: {
@@ -1248,22 +1244,22 @@ Beat names are fixed and advance in order: Opening Image (Session 0), Inciting I
           type: "string",
           enum: ["complete_current", "write_next"],
           description:
-            "complete_current: mark the current beat finished. write_next: detail and move to the next beat.",
+            "complete_current or write_next",
         },
         summary: {
           type: "string",
           description:
-            "For complete_current: how the current beat resolved / what it accomplished.",
+            "For complete_current: how the beat resolved.",
         },
         next_beat: {
           type: "string",
           description:
-            "For write_next: the name of the next beat (should match the next fixed spine beat).",
+            "For write_next: the next fixed spine beat's name.",
         },
         detail: {
           type: "string",
           description:
-            "For write_next: the full writeup of the next beat - its goal, a [ ] checklist, and an advance-on block (OR'd action triggers and/or a time trigger).",
+            "For write_next: the beat's goal, a [ ] checklist and an advance-on block.",
         },
       },
       required: ["action"],

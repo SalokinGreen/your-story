@@ -7,6 +7,7 @@
  * can't corrupt the draft the user is editing.
  */
 
+import { pinnedNoteWarning } from "@/app/misc/contextLimits";
 import {
   Adventure,
   CharacterSheetTemplate,
@@ -47,6 +48,12 @@ export interface AdventureDraft {
   startingChoices: StartingChoice[];
   presets: Preset[];
   characterSheetTemplate?: CharacterSheetTemplate;
+}
+
+/** A trailing warning for the Designer when a note sent to the GM in full every turn is long (decision 96). */
+function pinnedWarningSuffix(note: StoryLore): string {
+  const warning = pinnedNoteWarning(note);
+  return warning ? ` WARNING: ${warning}` : "";
 }
 
 export function createEmptyDraft(): AdventureDraft {
@@ -303,10 +310,12 @@ export function executeDesignerTool(
 
       if (existingIndex >= 0) {
         next.lore[existingIndex] = { ...next.lore[existingIndex], ...note };
-        return ok(`Rewrote note "${title}".`);
+        return ok(`Rewrote note "${title}".${pinnedWarningSuffix(note)}`);
       }
       next.lore.push(note);
-      return ok(`Added ${type === "lore" ? "note" : type} "${title}".`);
+      return ok(
+        `Added ${type === "lore" ? "note" : type} "${title}".${pinnedWarningSuffix(note)}`,
+      );
     }
 
     case "delete_note": {

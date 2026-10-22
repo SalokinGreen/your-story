@@ -699,55 +699,47 @@ const startChallengeTool: ToolSchema = {
   type: "function",
   function: {
     name: "start_challenge",
-    description: `Start a multi-roll "best of X" challenge for complex tasks.
-
-GUIDELINES:
-- Simple tasks = regular formula_roll, not a challenge
-- Dangerous combat/chase = 3 successes needed
-- Boss fight = 4-5 successes needed
-- Epic battle = 6+ successes needed
-
-Only ONE challenge can be active at a time.`,
+    description: `Start a multi-roll "best of X" challenge for a dangerous fight, chase or complex task (3 successes for a dangerous one, 4-5 for a boss, 6+ for an epic). Simple tasks are one formula_roll. Only one challenge can be active at a time.`,
     parameters: {
       type: "object",
       properties: {
         name: {
           type: "string",
           description:
-            "Challenge name (e.g., 'Rooftop Chase', 'Negotiation with Baron')",
+            "Challenge name (e.g., 'Rooftop Chase')",
         },
         description: {
           type: "string",
-          description: "Situation context and stakes",
+          description: "Context and stakes",
         },
         required_successes: {
           type: "number",
-          description: "How many successes to win (typically 3-6)",
+          description: "Successes to win (typically 3-6)",
           minimum: 2,
           maximum: 10,
         },
         max_failures: {
           type: "number",
           description:
-            "How many failures before losing (usually equals required_successes)",
+            "Failures before losing (usually equals required_successes)",
           minimum: 2,
           maximum: 10,
         },
         primary_stat: {
           type: "string",
-          description: "Default stat for checks in this challenge",
+          description: "Default stat for its checks",
         },
         difficulty: {
           type: "string",
-          description: "Base difficulty tier for the challenge",
+          description: "Base difficulty tier",
         },
         victory_consequence: {
           type: "string",
-          description: "What happens if player wins the challenge",
+          description: "If the player wins",
         },
         defeat_consequence: {
           type: "string",
-          description: "What happens if player loses the challenge",
+          description: "If the player loses",
         },
       },
       required: [
@@ -766,7 +758,7 @@ const cancelChallengeTool: ToolSchema = {
   type: "function",
   function: {
     name: "cancel_challenge",
-    description: `Abandon the active challenge without forcing it to a win/loss result - use when it stops mattering narratively before either side reaches its threshold (the enemies flee, the scene changes, the player disengages). Without calling this, a challenge that never reaches threshold stays active forever and blocks starting a new one or resting.`,
+    description: `Abandon the active challenge without a win or loss when it stops mattering (the enemies flee, the scene changes). A challenge left unresolved blocks starting a new one and resting.`,
     parameters: {
       type: "object",
       properties: {
@@ -784,15 +776,7 @@ const calculateTool: ToolSchema = {
   type: "function",
   function: {
     name: "calculate",
-    description: `Evaluate a mathematical expression, optionally with dice. Also answers comparisons - this is how every "did it beat the target?" question gets settled.
-
-Use for:
-- **Checking a roll against a target number.** Put a comparison in the expression and you get back TRUE or FALSE: '17+3 >= 15', '4+2 > 4', '38 <= 55' (roll-under systems). The dice tools report numbers only; this is what turns them into a verdict, so you never have to eyeball it yourself.
-- **Systems that compare against several numbers.** Call it once per comparison: with a 1d6+2 action score of 6 against challenge dice 4 and 6, '6 > 4' is TRUE and '6 > 6' is FALSE - beat one, not the other.
-- **A total the player reported themselves.** They typed or said "I rolled a 17, plus 3 that's 20"? Add it up in the expression and compare: '17+3 >= 15'.
-- Damage after modifiers, resource costs, any other arithmetic worth showing.
-
-Supported comparisons: >, >=, <, <=, ==, != (one per call). Without a comparison you get the number back as usual.`,
+    description: `Evaluate a math expression, optionally with dice. Also settles comparisons, and is the only place a roll becomes a verdict: '17+3 >= 15', '4+2 > 4', '38 <= 55' come back TRUE or FALSE (one comparison per call; for systems that compare against several numbers, call once per comparison). Also use it to add up a total the player reported ("I rolled a 17, plus 3") and for damage and cost arithmetic. Operators: > >= < <= == !=.`,
     parameters: {
       type: "object",
       properties: {
@@ -819,14 +803,7 @@ const takeRestTool: ToolSchema = {
   type: "function",
   function: {
     name: "take_rest",
-    description: `Process a rest period. Handles resource recovery and ability cooldowns.
-
-CANNOT rest during an active challenge.
-
-Types:
-- quick (~30 min): Brief recovery, small resource restore
-- short (4-8 hours): Sleep, significant recovery
-- long (several days): Full recovery`,
+    description: `Process a rest: quick (~30 min), short (4-8 hours) or long (several days). Cannot rest during an active challenge.`,
     parameters: {
       type: "object",
       properties: {
@@ -855,23 +832,7 @@ const formulaRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "formula_roll",
-    description: `Throw dice and report what they showed. This is the only dice tool for player-character rolls.
-
-**It does not judge the result.** There is no DC parameter: this tool rolls, and \`calculate\` answers "did that beat the target?" ('17+3 >= 15' → TRUE). Two steps, always - do not decide success or failure yourself in narration.
-
-YOU must look up character stats and insert the actual numeric values.
-For D&D-style modifiers, calculate floor((stat-10)/2) yourself.
-
-**One pool (almost always):**
-- formulas: ["1d20+3+2"] (attack with +3 STR mod and +2 proficiency)
-- formulas: ["2d6+4"] (damage with +4 bonus)
-- formulas: ["1d100"] (percentile check)
-
-**Several pools** - only when the system rolls dissimilar dice that must NOT be added together, e.g. Starforged/Ironsworn's action die against its challenge dice:
-- formulas: ["1d6+2", "2d10"], labels: ["action score", "challenge dice"]
-Each pool is reported with its own separate total, and all the dice are thrown in one handful. Then compare with \`calculate\`, once per target ('6 > 4', '6 > 8').
-
-Never pack independent pools into one formula string ("1d6+2d10") - that adds them together into a meaningless number.`,
+    description: `Throw dice and report what they showed. It never judges the result: there is no DC. Use \`calculate\` to compare ('17+3 >= 15' gives TRUE), always as two steps. Insert the actual numeric modifiers yourself. One pool almost always: formulas ["1d20+3+2"]. Several entries only when the system rolls dissimilar dice that must not be added together (Starforged: ["1d6+2", "2d10"] with labels); each gets its own total, then compare each with \`calculate\`. Never pack independent pools into one string ("1d6+2d10").`,
     parameters: {
       type: "object",
       properties: {
@@ -880,13 +841,13 @@ Never pack independent pools into one formula string ("1d6+2d10") - that adds th
           minItems: 1,
           items: { type: "string" },
           description:
-            "One entry per independent dice pool, with actual numbers. Almost always a single entry: ['1d20+5']. Use several ONLY for systems that roll separate pools which must not be summed: ['1d6+2', '2d10'].",
+            "One entry per independent dice pool, with actual numbers: ['1d20+5'].",
         },
         labels: {
           type: "array",
           items: { type: "string" },
           description:
-            "Optional label per pool, in the same order as formulas (e.g. ['action score', 'challenge dice']). Only worth setting when there are several pools.",
+            "Optional label per pool, in order",
         },
         reason: {
           type: "string",
@@ -894,7 +855,7 @@ Never pack independent pools into one formula string ("1d6+2d10") - that adds th
         },
         display_name: {
           type: "string",
-          description: "Optional label for UI display (e.g., 'Strength Check')",
+          description: "Optional label (e.g., 'Strength Check')",
         },
         stakes: {
           type: "string",
@@ -905,17 +866,16 @@ Never pack independent pools into one formula string ("1d6+2d10") - that adds th
           type: "string",
           enum: ["self", "someone_they_love", "someone_present"],
           description:
-            "Who the failure consequence actually lands on. Independent of stakes - a low-stakes consequence landing on someone the character loves can matter more than a high-stakes one landing on the character. Omit for an ordinary consequence to the character themselves.",
+            "Who the failure lands on, independent of stakes. Omit for the character themselves.",
         },
         forces_choice: {
           type: "boolean",
-          description:
-            "If true, present the failure consequence as a dilemma between two costs the player must choose between, not a single flat cost.",
+          description: "Present the failure as a dilemma between two costs",
         },
         consequences: {
           type: "object",
           description:
-            "What you intend to happen on each outcome, decided before the dice land. Both branches are echoed back to you with the roll - narrate whichever one your `calculate` comparison came out to.",
+            "What happens on each outcome, decided before the dice land. Both are echoed back; narrate the one your `calculate` comparison selected.",
           properties: {
             success: { type: "string", description: "What happens on success" },
             failure: { type: "string", description: "What happens on failure" },
@@ -924,7 +884,7 @@ Never pack independent pools into one formula string ("1d6+2d10") - that adds th
         stat_name: {
           type: "string",
           description:
-            "Optional: name of the stat/resource the flat modifier comes from (e.g. 'Strength'). If it matches a tracked stat/resource, the modifier is cross-checked against it as an integrity check. Omit for narrative-only or character_sheet-lore-based adventures with no tracked stats/resources.",
+            "Optional: the tracked stat the modifier comes from, cross-checked as an integrity check",
         },
       },
       required: ["formulas", "reason"],
@@ -936,22 +896,7 @@ const gmRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "gm_roll",
-    description: `Roll behind your screen. Same dice as \`formula_roll\`, but the player never sees that a roll happened at all - it stays out of the roll log they can inspect, and it is never handed to them to throw.
-
-**Use this when the player knowing a roll occurred is itself a spoiler.** That's the whole test. A hidden Perception check is the classic case: if you roll it openly and the player sees a low total, they know there was something to find even though their character doesn't. The roll leaked the secret regardless of the result.
-
-Use for:
-- Checks the character would fail *without knowing they failed* - spotting an ambush, noticing a tail, sensing a lie, resisting an effect they can't feel
-- Whether an NPC's deception or persuasion lands on the player character
-- Whether something offscreen happens - does the patrol pass this way, does the poison take hold tonight, does the rival reach the site first
-- Anything where "the GM picked up dice" would tip the player off
-
-Do NOT use it for:
-- Ordinary player-character actions with a declared outcome - those are \`formula_roll\`, rolled in the open, because the player is entitled to see their own check
-- NPC combat rolls - those are \`npc_roll\`
-- Hiding a roll you simply don't want the player to argue with. Secrecy is for protecting the fiction's surprises, not for avoiding scrutiny.
-
-Like every dice tool, it reports what came up and judges nothing - no DC. Compare with \`calculate\` as usual. Then narrate only what the character would actually perceive: on a failed hidden Perception check, describe the corridor as unremarkable - do NOT write "you notice nothing unusual", which tells the player there was something to notice.`,
+    description: `Same dice as \`formula_roll\`, rolled behind your screen: the player never sees that a roll happened. Use only when the player knowing a roll occurred is itself a spoiler (a hidden Perception check, an NPC's deception on the player character, whether something happens offscreen). Not for ordinary player actions (formula_roll, in the open), NPC combat (npc_roll), or to avoid scrutiny. Judges nothing: compare with \`calculate\`. Then narrate only what the character perceives; after a failed hidden check never write "you notice nothing unusual".`,
     parameters: {
       type: "object",
       properties: {
@@ -960,7 +905,7 @@ Like every dice tool, it reports what came up and judges nothing - no DC. Compar
           minItems: 1,
           items: { type: "string" },
           description:
-            "One entry per independent dice pool, with actual numbers filled in (e.g. [\"1d20+3\"]). Same rules as formula_roll - never pack separate pools into one string.",
+            "One entry per independent pool, actual numbers, as in formula_roll",
         },
         labels: {
           type: "array",
@@ -971,7 +916,7 @@ Like every dice tool, it reports what came up and judges nothing - no DC. Compar
         reason: {
           type: "string",
           description:
-            "What this roll settles. GM-facing only - the player never sees it.",
+            "What this roll settles (GM-facing only)",
         },
         display_name: {
           type: "string",
@@ -980,7 +925,7 @@ Like every dice tool, it reports what came up and judges nothing - no DC. Compar
         secret_because: {
           type: "string",
           description:
-            "Why this roll is hidden rather than open - what the player would learn if they saw it.",
+            "What the player would learn if they saw it",
         },
       },
       required: ["formulas", "reason"],
@@ -992,15 +937,7 @@ const askForRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "ask_for_roll",
-    description: `Ask the player to roll REAL dice at the table and tell you what came up. Only available in Manual Dice Mode.
-
-Use this INSTEAD of formula_roll whenever a player character makes a roll:
-- Tell them exactly what to roll in \`formula\` (look up their modifiers yourself, e.g. "1d20+3")
-- The game pauses until they answer
-- **Their answer comes back as their own words, not a number** - "17", "4 and 6", "natural 20, so 23 total". Read it, work out what it means for the dice you asked for, and use \`calculate\` for any arithmetic or comparison ('17+3 >= 15'). Nothing is parsed or judged for you.
-- If their answer is genuinely unreadable or doesn't match what you asked for, ask them again in (round brackets) rather than guessing a number.
-
-Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_roll or npc_roll instead.`,
+    description: `Manual Dice Mode only. Ask the player to roll REAL dice and tell you what came up; use it instead of formula_roll for the player character's rolls. Give the exact formula with their modifiers worked out. The game pauses; their answer comes back as their own words ("17", "natural 20, so 23"), so work out what it means and use \`calculate\` for the arithmetic and the comparison. If the answer is unreadable, ask again in (round brackets). Not for NPC rolls (npc_roll) or secret rolls (gm_roll).`,
     parameters: {
       type: "object",
       properties: {
@@ -1011,17 +948,17 @@ Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_ro
         description: {
           type: "string",
           description:
-            "What's happening and what's at stake, shown to the player (1-2 sentences)",
+            "What's at stake, shown to the player (1-2 sentences)",
         },
         player_name: {
           type: "string",
           description:
-            "Name of the player who should roll (important in co-op so the right person rolls)",
+            "Who should roll (co-op)",
         },
         formula: {
           type: "string",
           description:
-            "What to roll, with modifiers pre-computed: '1d20+5', '2d6+3', '1d6 and 2d10'",
+            "What to roll, modifiers worked out: '1d20+5', '1d6 and 2d10'",
         },
       },
       required: ["title", "description"],
@@ -1033,9 +970,7 @@ const askQuestionTool: ToolSchema = {
   type: "function",
   function: {
     name: "ask_question",
-    description: `Pause and ask the player(s) one or more questions with predefined answer choices (the player can also always type/say something else instead). Use for meaningful decisions where a clear set of choices helps - which path to take, how to react to an NPC, a name or detail you need from them. Don't use this for every input; the player can already type freely at any time, so reserve it for moments where offering concrete options adds value.
-
-You can ask up to 3 questions in one call (e.g. two independent decisions at once). In couch co-op, set \`target_player_name\` on a question to direct it at a specific player by name - the UI will show who it's for, though anyone at the table can still answer.`,
+    description: `Pause and ask the player(s) up to 3 questions with predefined answers (they can always type something else). Use for meaningful decisions where concrete options help; not for every input. In couch co-op, \`target_player_name\` directs a question at one player.`,
     parameters: {
       type: "object",
       properties: {
@@ -1048,7 +983,7 @@ You can ask up to 3 questions in one call (e.g. two independent decisions at onc
             properties: {
               question: {
                 type: "string",
-                description: "The question text shown to the player",
+                description: "The question",
               },
               options: {
                 type: "array",
@@ -1059,12 +994,11 @@ You can ask up to 3 questions in one call (e.g. two independent decisions at onc
                   properties: {
                     label: {
                       type: "string",
-                      description: "Short answer label (shown bold)",
+                      description: "Short label",
                     },
                     description: {
                       type: "string",
-                      description:
-                        "Optional one-line elaboration of what picking this means",
+                      description: "Optional one-line elaboration",
                     },
                   },
                   required: ["label"],
@@ -1073,13 +1007,11 @@ You can ask up to 3 questions in one call (e.g. two independent decisions at onc
               },
               allow_custom: {
                 type: "boolean",
-                description:
-                  "Whether to also offer a free-text 'type something else' answer (default true)",
+                description: "Also offer a free-text answer (default true)",
               },
               target_player_name: {
                 type: "string",
-                description:
-                  "Couch co-op only: name of the player this question is directed at",
+                description: "Couch co-op: the player it is for",
               },
             },
             required: ["question", "options"],
@@ -1099,29 +1031,17 @@ const opposedFormulaTool: ToolSchema = {
   type: "function",
   function: {
     name: "opposed_formula",
-    description: `Roll both sides of a direct contest at once - the player and the NPC they're up against. Reports both totals.
-
-**It does not declare a winner.** "Higher total wins" only holds in some systems, so the comparison is yours to make with \`calculate\` ('18 > 14' → TRUE) against whatever this adventure's mechanics note actually says.
-
-Use when:
-- Player contests an NPC directly and both sides roll
-- The adventure uses custom character sheets
-
-YOU must look up character stats and insert actual numeric values.
-
-Examples:
-- Player: "1d20+4" vs Opponent: "1d20+3"
-- Player: "2d6+3" vs Opponent: "2d6+5"`,
+    description: `Roll both sides of a direct contest at once (the player and the NPC against them) and report both totals. It declares no winner: "higher wins" only holds in some systems, so compare with \`calculate\` as the mechanics note says. Insert actual numeric modifiers yourself.`,
     parameters: {
       type: "object",
       properties: {
         player_formula: {
           type: "string",
-          description: "Player's dice formula with actual numbers: '1d20+4'",
+          description: "Player's formula, actual numbers: '1d20+4'",
         },
         opponent_formula: {
           type: "string",
-          description: "Opponent's dice formula (usually fixed): '1d20+5'",
+          description: "Opponent's formula: '1d20+5'",
         },
         opponent_name: {
           type: "string",
@@ -1138,23 +1058,22 @@ Examples:
         stakes: {
           type: "string",
           enum: ["low", "medium", "high", "deadly"],
-          description: "Consequence tier if player loses",
+          description: "Consequence tier if the player loses",
         },
         target: {
           type: "string",
           enum: ["self", "someone_they_love", "someone_present"],
           description:
-            "Who the losing consequence actually lands on, independent of stakes. Omit for an ordinary consequence to the character themselves.",
+            "Who the loss lands on, independent of stakes. Omit for the character themselves.",
         },
         forces_choice: {
           type: "boolean",
-          description:
-            "If true, present the losing consequence as a dilemma between two costs, not a single flat cost.",
+          description: "Present the loss as a dilemma between two costs",
         },
         consequences: {
           type: "object",
           description:
-            "What you intend to happen on each outcome, decided before the dice land. All branches are echoed back with the totals - narrate the one your `calculate` comparison came out to.",
+            "What happens on each outcome, decided before the dice land. All are echoed back; narrate the one your `calculate` comparison selected.",
           properties: {
             player_wins: { type: "string" },
             opponent_wins: { type: "string" },
@@ -1164,7 +1083,7 @@ Examples:
         player_stat_name: {
           type: "string",
           description:
-            "Optional: name of the stat/resource the player's flat modifier comes from. Cross-checked against tracked stats/resources as an integrity check, same as formula_roll's stat_name.",
+            "Optional: the tracked stat the modifier comes from (integrity check)",
         },
       },
       required: [
@@ -1181,14 +1100,7 @@ const recordChallengeResultTool: ToolSchema = {
   type: "function",
   function: {
     name: "record_challenge_result",
-    description: `Record one resolved check against the active challenge. Advances its success/failure count and closes the challenge out when a threshold is reached.
-
-This does NOT roll. One check inside a challenge is three steps:
-1. \`formula_roll\` - throw the dice for the check
-2. \`calculate\` - compare the result against the target ('14+3 >= 15' → TRUE)
-3. \`record_challenge_result\` - report which way it went
-
-Report what the comparison actually said, not what you'd prefer. Requires an active challenge (\`start_challenge\`); use \`cancel_challenge\` if the challenge has stopped mattering instead of feeding it a made-up failure.`,
+    description: `Record one resolved check against the active challenge; closes it when a threshold is reached. It rolls nothing. A check is three calls: \`formula_roll\`, \`calculate\` (against the target), then this, reporting what the comparison said. Use \`cancel_challenge\` if the challenge stopped mattering.`,
     parameters: {
       type: "object",
       properties: {
@@ -1207,12 +1119,12 @@ Report what the comparison actually said, not what you'd prefer. Requires an act
           type: "string",
           enum: ["self", "someone_they_love", "someone_present"],
           description:
-            "On a failure: who the consequence actually lands on. Omit for an ordinary consequence to the character themselves.",
+            "On a failure: who it lands on. Omit for the character themselves.",
         },
         forces_choice: {
           type: "boolean",
           description:
-            "On a failure: if true, present the consequence as a dilemma between two costs the player must choose between, not a single flat cost.",
+            "On a failure: present a dilemma between two costs",
         },
       },
       required: ["outcome", "description"],
@@ -1228,43 +1140,8 @@ const fateQuestionTool: ToolSchema = {
   type: "function",
   function: {
     name: "fate_question",
-    description: `Ask a yes/no "fate" question using the Mythic-style oracle system. This is your primary tool for anything about the world you don't already know - reach for it often, several times a scene is normal.
-
-Use when (any of these, not just the dramatic ones):
-- Any unknown fact about the world: is the door locked, is anyone else in the room, does this shop stock what they want, has the body been found yet
-- Any hidden NPC state you haven't established: did the guard notice, does she believe the lie, is he actually working for them, will they take the deal
-- Any "does the bad thing happen" beat: does the rope hold, do reinforcements arrive, is the trail still fresh
-- The player asks "Is X true?" about something you haven't already decided
-- You need random narrative direction with weighted probability
-
-You should NOT use it for things already established in your notes, the character sheet, or earlier narration - look those up instead. Everything else that's genuinely open is fair game.
-
-The chaos factor (from agmtState) affects randomness. Higher chaos = more unexpected results.
-
-LIKELIHOODS (from least to most likely) - pick the one you honestly believe, don't fall back on 50/50 out of habit:
-- Impossible: Almost certainly no
-- No Way: Very strong no
-- Very Unlikely: Strong no
-- Unlikely: Probably no
-- 50/50: Equal chance
-- Somewhat Likely: Leaning yes
-- Likely: Probably yes
-- Very Likely: Strong yes
-- Near Sure Thing: Very strong yes
-- A Sure Thing: Almost certainly yes
-- Has To Be: Definitely yes
-
-Results are one of six, arranged from best to worst. The differences between them all matter:
-- Exceptional Yes: yes, and more than asked for - swing the fiction hard in that direction.
-- Normal Yes: yes, plainly. The thing is true / it happens, at ordinary scale. NOT a triumph.
-- Yes, but: yes - it happens - but it costs something, comes late, comes partial, or drags a complication in with it. The answer is genuinely YES; the "but" is a price, not a hedge, and you must name what the price actually is.
-- No, but: no - it doesn't happen - but something is salvageable: a consolation, a lead, a partial opening, a reason it isn't total. The answer is genuinely NO; the "but" is real compensation, not a softener.
-- Normal No: no, plainly. The thing is false / it doesn't happen, at ordinary scale. NOT a disaster.
-- Exceptional No: no, and worse than asked for - swing the fiction hard the other way.
-
-Read the result literally. "Normal Yes" is not a quiet Exceptional Yes; narrate it as the ordinary answer it is and save the big swings for the exceptional results. Likewise the two qualified results are not a way to avoid committing - a "Yes, but" that never names its cost is just a Normal Yes, and a "No, but" that offers nothing is just a Normal No.
-
-May also trigger a Random Event (check the result).`,
+    description: `Mythic-style yes/no oracle for anything about the world you have not established: is the door locked, did the guard notice, does the rope hold. Use it often; several a scene is normal. Not for facts already in your notes, the sheet or earlier narration. Pick the likelihood you honestly believe (50/50 only for truly even odds). The chaos factor raises the odds of unexpected results; a Random Event may trigger.
+Results, best to worst: Exceptional Yes (yes, and more: swing the fiction hard); Normal Yes (plainly yes, ordinary scale, not a triumph); Yes, but (it happens at a price you must name); No, but (it doesn't happen but something is salvageable, which you must name); Normal No (plainly no, not a disaster); Exceptional No (no, and worse). Read results literally: a "but" that names nothing is just a plain yes or no.`,
     parameters: {
       type: "object",
       properties: {
@@ -1289,7 +1166,7 @@ May also trigger a Random Event (check the result).`,
             "Has To Be",
           ],
           description:
-            "How likely is a 'yes' answer, in your honest estimate given what's already established? Pick the rung that actually matches - 50/50 is for genuinely even odds, not a fallback.",
+            "Your honest estimate of a 'yes'",
         },
         reason: {
           type: "string",
@@ -1305,33 +1182,15 @@ const rollTableTool: ToolSchema = {
   type: "function",
   function: {
     name: "roll_table",
-    description: `Roll on a built-in AGMT table for random content generation. Use it freely - any time you're about to invent open-ended detail, roll for it instead of going with the first idea that comes to mind.
-
-Use when (any of these, not just the dramatic ones):
-- You're inventing open-ended content: loot, an encounter, a rumor, weather, a complication, a plot twist, what a room contains
-- You're fleshing out a new NPC (appearance, personality, background, motivation) or a new location
-- You need a detail and your first instinct feels familiar - that's exactly the reflex this tool exists to break
-
-**This adventure's own tables are NOT rolled here.** They're notes (\`type: "table"\`), and you roll them yourself: find the note, roll the die it names with \`formula_roll\`, and read off the entry that came up. Always check for one of those before falling back to a built-in table - an adventure's own weather or encounter table beats a generic one. This tool covers only the built-in list below.
-
-Reserve improvising for when no table fits. A rolled result you have to work with produces a stranger, more alive world than one you picked because it was convenient.
-
-BUILT-IN TABLES (always available):
-- Character: character_appearance, character_personality, character_background, character_motivations, character_identity, character_skills, character_traits_flaws
-- Combat/Action: character_actions_combat, character_actions_general, creature_abilities, creature_descriptors
-- Locations: dungeon, dungeon_traps, forest, city, cavern, terrain, domicile
-- World: gods, legends, noble_house, civilization, army
-- Items: magic_item, scavenging_results
-- Narrative: plot_twists, cryptic_message, curses, visions_dreams
-- Atmosphere: smells, sounds, adventure_tone
-- Other: names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions`,
+    description: `Roll on a built-in table for open-ended content instead of taking your first idea: loot, encounters, rumours, weather, complications, NPC or location detail. This adventure's own tables are notes (type "table"): check for one first and roll it yourself with \`formula_roll\`.
+Built-in tables: character_appearance, character_personality, character_background, character_motivations, character_identity, character_skills, character_traits_flaws, character_actions_combat, character_actions_general, creature_abilities, creature_descriptors, dungeon, dungeon_traps, forest, city, cavern, terrain, domicile, gods, legends, noble_house, civilization, army, magic_item, scavenging_results, plot_twists, cryptic_message, curses, visions_dreams, smells, sounds, adventure_tone, names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions.`,
     parameters: {
       type: "object",
       properties: {
         table_name: {
           type: "string",
           description:
-            "Name of the built-in table to roll on (case-insensitive, partial match supported, underscores or spaces OK). Not for this adventure's own tables - those are notes you roll yourself with formula_roll.",
+            "Built-in table name (case-insensitive, partial match OK)",
         },
         reason: {
           type: "string",
@@ -1351,30 +1210,9 @@ const rollPortentTool: ToolSchema = {
   type: "function",
   function: {
     name: "roll_portent",
-    description: `Consult the Prima Materia oracle - a symbolic oracle that answers "what is actually going on here?" rather than yes/no.
-
-**How this differs from your other oracle tools.** \`fate_question\` answers a question you already know how to ask ("is the door locked?"). \`roll_table\` gives you a piece of content ("what's in the room?"). \`roll_portent\` gives you a *condition* - two loaded concepts and the relationship between them, e.g. "Knowledge against Spirit" or "Fortune within Freedom". It doesn't tell you what happens; it tells you what this moment is *about*, and you work out what happens from there.
-
-Use it when:
-- A scene feels significant but you can't say why, or you've lost the thread of what this moment means
-- You need to know an NPC's or faction's underlying motivation and nothing established covers it
-- Several plot threads seem to be converging and you want to know what the convergence *is*
-- You want foreshadowing that isn't a fixed outcome
-- You're transitioning between phases of play and want to recalibrate
-- You're about to invent a motive, a theme, or a reason and your first instinct feels familiar - same reflex-breaking purpose as \`generate_name\` and \`roll_table\`
-
-MODES:
-- \`portent\` (default, and what you want most of the time): three dice. Two concepts joined by a relation - "Body over Self", "Society within Body". The richest result and the one to reach for when you genuinely need orientation.
-- \`pinch\`: two dice, two concepts, no relation. Both are true at once; meaning comes from the friction between them. Good when a situation should feel unstable or two forces are visibly competing.
-- \`peek\`: one die, one concept. A tonal nudge, nothing more. Good for a quick cue when you don't need synthesis.
-
-WHAT COMES BACK:
-- Each concept arrives with a polarity. **Sol** is the bright reading (Fortune = a windfall, good timing, a lucky break). **Nox** is the shadowed reading of the *same* concept (Fortune = a bad bet, an unpaid cost, a curse). These are not good and bad - they're the two faces a concept genuinely has.
-- The relation comes tagged **celestial** (the two align/agree/work together) or **chthonic** (they're at odds/in tension/separate). Let that steer whether the condition is a gift or a cost.
-- A **Frame** is chosen for you by the engine - Literal (what's physically happening), Personal (what's happening inside someone), or Structural (how factions/systems/large forces are shifting). Read the result through that frame. You don't pick it and you shouldn't argue with it; it's set from what's actually live in the story right now.
-- Occasionally a **Lens Shift** fires (the dice matched). That moves the story's standing tonal register between Day / Neutral / Night. It is not an event - do not narrate "something shifted". It changes the register of everything that follows.
-
-**This is an input, not an instruction.** It describes a condition; you decide what that condition means here. Never name the dice, the symbols, the frame, or this system in your narration - the player should feel the result, not see the mechanism.`,
+    description: `Prima Materia oracle: answers "what is actually going on here?" with a condition, not a yes/no. Use when a scene feels significant and you can't say why, you need an NPC's or faction's underlying motive, threads converge, or your first idea for a motive or theme feels familiar.
+Modes: portent (default: two concepts joined by a relation, "Body over Self"), pinch (two concepts, no relation: friction), peek (one concept: a tonal nudge). Each concept has a polarity: Sol is its bright reading, Nox the shadowed reading of the same concept. A relation is celestial (they agree) or chthonic (they are at odds). The engine picks a Frame (Literal, Personal or Structural): read the result through it. A Lens Shift moves the story's tonal register; don't narrate it.
+It is an input, not an instruction. Never name the dice, symbols, frame or system in narration.`,
     parameters: {
       type: "object",
       properties: {
@@ -1382,12 +1220,12 @@ WHAT COMES BACK:
           type: "string",
           enum: ["peek", "pinch", "portent"],
           description:
-            "Which reading to take (default: portent - use it unless you specifically want something lighter)",
+            "Default: portent",
         },
         question: {
           type: "string",
           description:
-            "What you're trying to orient on, e.g. 'what is really driving the magistrate here?' or 'what is this ruined village about?'",
+            "What you're orienting on, e.g. 'what is really driving the magistrate?'",
         },
       },
       required: ["question"],
@@ -1399,21 +1237,7 @@ const generateNameTool: ToolSchema = {
   type: "function",
   function: {
     name: "generate_name",
-    description: `Roll pointers for a name you're about to invent - a starting letter, a syllable count and a few seed sounds per part. You write the actual name from those pointers.
-
-Use when:
-- You're naming a new NPC, place, faction, creature, ship, weapon, inn, etc.
-- Any time you're about to reach for a name and the first one that comes to mind feels familiar (Elara, Kael, Lyra, Thorne, Ravenwood...) - that's the reflex this tool exists to break
-
-How it works:
-- The engine rolls a starting letter per part, steering AWAY from letters already used by NPCs, locations and notes in this story, so the cast doesn't fill up with names that all start with the same few letters.
-- It also rolls how many syllables each part should have, plus seed sounds as raw inspiration.
-- The starting letters and syllable counts are BINDING - the name you write must match them. The seed sounds are NOT: reshape them freely so the name fits this world's language, culture and tone. "N, 3 syllables, sounds like ni-kor-las" can become Nicolas, Nikolai, Nemora or Ni'Khalas - whatever suits the setting.
-
-Parameters:
-- Use \`parts: 2\` for a given + family name, \`parts: 3\` when they'd have a middle name too, \`parts: 1\` for mononyms and most places/factions.
-- Use \`flavor\` to say what register the name should sit in ("Norse-ish", "Japanese", "corpo surname", "orcish", "backwater village") - it's passed back to you, it doesn't change the roll.
-- Use \`starts_with\` only when a letter genuinely must be fixed (this NPC is the brother of Nicolas; this dwarf clan all use V). Locked letters skip the avoidance check. Leave it out otherwise and let the roll surprise you.`,
+    description: `Roll pointers for a name you are about to invent; you write the name. Use for any new NPC, place, faction, creature or object, especially when your first idea is a familiar one (Elara, Kael, Thorne). The starting letter and syllable count per part are BINDING; the engine steers away from letters already used in this story. Seed sounds are inspiration only: reshape them to fit the world. parts: 2 for given + family name, 3 with a middle name, 1 for mononyms and most places. \`flavor\` names the register ("Norse-ish") and is echoed back; starts_with and syllables lock values only when they must be fixed.`,
     parameters: {
       type: "object",
       properties: {
@@ -1424,30 +1248,25 @@ Parameters:
         },
         parts: {
           type: "number",
-          description:
-            "How many parts the name has, 1-3 (default: 2 for a person, 1 otherwise)",
+          description: "1-3 (default: 2 for a person, else 1)",
         },
         flavor: {
           type: "string",
-          description:
-            "Style/culture hint for the name, echoed back to you unchanged (e.g. 'Norse-ish', 'corpo surname')",
+          description: "Style hint, echoed back (e.g. 'Norse-ish')",
         },
         starts_with: {
           type: "array",
           items: { type: "string" },
-          description:
-            "Optional locked starting letters, one per part in order. Use '?' or omit an entry to let the engine roll that part.",
+          description: "Optional locked starting letters per part; '?' lets the engine roll",
         },
         syllables: {
           type: "array",
           items: { type: "number" },
-          description:
-            "Optional locked syllable counts (1-4), one per part in order. Omit to let the engine roll them.",
+          description: "Optional locked syllable counts (1-4) per part",
         },
         reason: {
           type: "string",
-          description:
-            "What this name is for (e.g. 'the innkeeper who just spoke up')",
+          description: "What this name is for",
         },
       },
       required: [],
@@ -1555,7 +1374,7 @@ const setReasoningTierTool: ToolSchema = {
   function: {
     name: "set_reasoning_tier",
     description:
-      "Request that the NEXT reasoning step run at a higher brain-power tier. Use only when the current task genuinely exceeds your ability (complex multi-entity adjudication, tricky rules interaction, pivotal plot decision). Do not use for ordinary narration.",
+      `Request that the NEXT reasoning step run at a higher tier. Only when the task genuinely exceeds you (complex multi-entity adjudication, a tricky rules interaction, a pivotal plot decision), never for ordinary narration.`,
     parameters: {
       type: "object",
       properties: {
@@ -1579,23 +1398,19 @@ const startGameTool: ToolSchema = {
   type: "function",
   function: {
     name: "start_game",
-    description: `Call this ONCE, when session zero (premise-building, character creation, setting/tone discussion) is done and real play is about to begin.
-
-This names the story - replacing the generic placeholder it starts with - and hands off from session zero into the game proper. Do not call this while you're still working out premise/character details with the player; call it right when you're about to narrate the opening scene.
-
-PREREQUISITE (enforced): the campaign spine must exist first - a gm_plan note titled "Campaign Plan", with only its Opening Image beat detailed. Writing it is part of session zero's job, so this tool returns an error while it's missing. Order: character(s) -> Campaign Plan note -> start_game -> opening scene.`,
+    description: `Call ONCE, when session zero is done and you are about to narrate the opening scene. It names the story and hands off from session zero to real play. Requires the "Campaign Plan" gm_plan note, with only its Opening Image beat detailed, to exist already (an error otherwise). Order: character(s), Campaign Plan note, start_game, opening scene.`,
     parameters: {
       type: "object",
       properties: {
         story_name: {
           type: "string",
           description:
-            "A short, evocative title for this story (e.g. 'Ashes of the Ninth Legion'), based on the premise and setting agreed during session zero.",
+            "A short, evocative title (e.g. 'Ashes of the Ninth Legion')",
         },
         premise: {
           type: "string",
           description:
-            "Optional: a 1-3 sentence summary of the agreed premise/setup, for the story's records.",
+            "Optional 1-3 sentence premise summary",
         },
       },
       required: ["story_name"],
@@ -1607,26 +1422,7 @@ const readNotesTool: ToolSchema = {
   type: "function",
   function: {
     name: "read_notes",
-    description: `Read the content of one or more notes by their exact titles.
-
-The info message shows you available notes organized by folder:
-- 📁 World Lore - General world-building notes
-- 🔒 Secrets - GM-only notes hidden from player
-
-Use this tool to fetch the full content of notes you need for the current situation.
-
-WHEN TO USE:
-- Before an encounter, read relevant location/enemy notes
-- When an NPC is mentioned, read their note for details
-- When the player asks about something, check if there's a note about it
-- Before rolling, check creature/enemy notes for their stats
-
-TIPS:
-- Read multiple related notes at once (e.g., location + enemy for a dungeon room)
-- Note titles are shown in the info message - use exact titles
-- If a note doesn't exist, you'll get a "not found" message
-
-Example: read_notes({ titles: ["City of Thornwall", "The Shadow Guild"] })`,
+    description: `Read the full content of notes by exact title (titles are listed in your context). Read related notes together. Read before an encounter, when an NPC comes up, and before rolling against creature stats. A missing title returns "not found".`,
     parameters: {
       type: "object",
       properties: {
@@ -1646,24 +1442,7 @@ const searchMemoryTool: ToolSchema = {
   type: "function",
   function: {
     name: "search_memory",
-    description: `Search through story memory entries to recall past events, NPCs, locations, or important details.
-
-Use this when you need to remember something that happened earlier in the story.
-
-WHEN TO USE:
-- Need to recall an NPC's name, title, or relationship
-- Looking for a location the player visited before
-- Checking what happened in a past encounter
-- Finding details about items, quests, or plot points
-- Verifying consistency with established story facts
-
-The search is case-insensitive and matches partial words.
-Provide multiple patterns to search for different relevant terms.
-
-Example patterns:
-- ["tavern", "innkeeper"] - Find memories about the tavern
-- ["dragon", "cave"] - Find memories about the dragon's cave
-- ["merchant", "deal", "gold"] - Find memories about merchant dealings`,
+    description: `Search story memory for something that happened earlier: an NPC's name, a place visited, a past encounter, a promise. Case-insensitive, partial words match; give several patterns for related terms (["tavern", "innkeeper"]).`,
     parameters: {
       type: "object",
       properties: {
@@ -1688,30 +1467,7 @@ const getGameStateTool: ToolSchema = {
   type: "function",
   function: {
     name: "get_game_state",
-    description: `Re-read the CURRENT live volatile game state during your turn.
-
-The game state shown at the start of your turn is a snapshot. Once you start
-calling tools that change state - resolving a challenge check, advancing a
-combat turn, ticking a timer, completing a goal - that snapshot is stale. Call
-this to see the state as it actually is RIGHT NOW, after your own changes.
-
-Returns only fast-changing ("volatile") state:
-- Active challenge: success/failure counts vs. what's needed to win/lose
-- Combat: round, whose turn it is, and each combatant's stats/conditions
-- Timers: remaining ticks and status
-- Goals: active, unfinished objectives
-- Threads: open plotlines
-
-WHEN TO USE:
-- Mid-combat, to confirm a combatant's current HP/conditions before deciding
-- After several rolls in a challenge, to check if it's now won or lost
-- Before narrating, to make sure you're describing the real current state
-
-For lore/NPC/location notes use read_notes; for past events use search_memory.
-This tool does NOT return those - only the live volatile state above.
-
-Example: get_game_state({}) for everything, or
-get_game_state({ sections: ["combat"] }) for just combat.`,
+    description: `Re-read the CURRENT volatile state (challenge, combat, timers, goals, threads) mid-turn. The state in your context is a snapshot from the start of the turn; your own tool calls make it stale. Use it before narrating after several changes. Does not return notes (read_notes) or past events (search_memory). \`sections\` limits the output.`,
     parameters: {
       type: "object",
       properties: {
@@ -1738,26 +1494,7 @@ const startCombatTool: ToolSchema = {
   type: "function",
   function: {
     name: "start_combat",
-    description: `Initialize tactical combat tracking.
-
-Use when the story enters structured, turn-based combat.
-Only one combat can be active at a time.
-
-After starting combat:
-1. Add all combatants with add_combatant
-2. Initiative will be auto-rolled when all are added
-3. Use advance_turn to progress through rounds
-4. End with end_combat when resolved
-
-Tactical combat is for:
-- Multi-round fights with multiple participants
-- Situations where turn order and positioning matter
-- Encounters requiring detailed stat tracking
-
-NOT for:
-- Quick narrative fights (use formula_roll)
-- Single-roll conflicts (use opposed_formula)
-- Chases or non-combat challenges (use scene challenges)`,
+    description: `Start tactical combat tracking for structured, multi-round, turn-based fights where order and stat tracking matter. One at a time. Then add_combatant for everyone (initiative auto-rolls once all are added), advance_turn through rounds, and end_combat. Not for quick narrative fights (formula_roll) or single contests (opposed_formula).`,
     parameters: {
       type: "object",
       properties: {
@@ -1781,77 +1518,46 @@ const addCombatantTool: ToolSchema = {
   type: "function",
   function: {
     name: "add_combatant",
-    description: `Add one or more combatants to the active combat.
-
-For a SINGLE combatant, pass name/type/stats/initiative directly.
-For MULTIPLE combatants (2+ enemies, allies, or NPCs), pass a \`combatants\` array instead - much more efficient than calling this multiple times. Duplicate names within the batch get auto-suffixed ("Goblin" -> "Goblin B").
-
-Stats are completely custom - use whatever makes sense for the RPG system:
-- D&D-style: { HP: 30, AC: 14, Attack: 5 }
-- Simple: { Health: 100, Damage: 10 }
-- Narrative: { Stress: 0, Composure: 3 }
-
-Initiative can be:
-- A fixed number: "10"
-- A dice formula: "1d20+2"
-- System-appropriate: "2d6" (PbtA), "4dF" (Fate)
-
-For NPCs: Check if a matching lore entry exists to pull stats from.
-For the Player: Use "player" type and sync their current resources as stats.
-
-IMPORTANT: Always add the player as a combatant with type "player".
-Their stats will sync back to their character resources when combat ends.
-
-Example (batch, adding a pack of wolves):
-{ combatants: [
-  { name: "Alpha Wolf", type: "enemy", stats: { HP: 40, AC: 13, Attack: 6 }, initiative: "1d20+2" },
-  { name: "Wolf", type: "enemy", stats: { HP: 20, AC: 12, Attack: 4 }, initiative: "1d20+2" }
-]}`,
+    description: `Add combatants to the active combat. One: pass name/type/stats/initiative. Several: pass a \`combatants\` array (duplicate names get suffixed). Stats are free-form numbers for whatever system fits ({ HP: 30, AC: 14 }). Initiative is a number or a dice formula ("1d20+2"). Always add the player, with type "player". \`lore_ref\` links a note.`,
     parameters: {
       type: "object",
       properties: {
         name: {
           type: "string",
-          description:
-            "Single-combatant form: combatant name (must be unique in this combat)",
+          description: "Single form: unique combatant name",
         },
         type: {
           type: "string",
           enum: ["player", "ally", "enemy", "neutral"],
-          description:
-            "Single-combatant form: type determines behavior and victory conditions",
+          description: "Single form: combatant type",
         },
         stats: {
           type: "object",
           additionalProperties: { type: "number" },
           description:
-            "Single-combatant form: custom stats object. Keys are stat names, values are numbers. e.g., { 'HP': 30, 'AC': 14 }",
+            "Single form: stat names to numbers",
         },
         initiative: {
           type: "string",
-          description:
-            "Single-combatant form: initiative value, fixed number ('10') or dice formula ('1d20+2')",
+          description: "Single form: a number or dice formula",
         },
         lore_ref: {
           type: "string",
-          description:
-            "Single-combatant form: optional reference to a lore entry title for full NPC details",
+          description: "Single form: optional note title for full details",
         },
         notes: {
           type: "string",
-          description:
-            "Single-combatant form: behavior notes (e.g., 'Cowardly - flees below 25% HP')",
+          description: "Single form: behavior notes",
         },
         combatants: {
           type: "array",
-          description:
-            "Batch form: array of combatants to add. When provided, this takes precedence over the single-combatant fields above.",
+          description: "Batch form; takes precedence over the single-form fields",
           items: {
             type: "object",
             properties: {
               name: {
                 type: "string",
-                description: "Combatant name (duplicates get auto-suffixed)",
+                description: "Combatant name",
               },
               type: {
                 type: "string",
@@ -1861,15 +1567,15 @@ Example (batch, adding a pack of wolves):
               stats: {
                 type: "object",
                 additionalProperties: { type: "number" },
-                description: "Custom stats object { HP: 30, AC: 14 }",
+                description: "Stats, e.g. { HP: 30, AC: 14 }",
               },
               initiative: {
                 type: "string",
-                description: "Initiative: dice formula or fixed number",
+                description: "Number or dice formula",
               },
               lore_ref: {
                 type: "string",
-                description: "Optional lore entry reference",
+                description: "Optional note title",
               },
               notes: {
                 type: "string",
@@ -1889,17 +1595,7 @@ const removeCombatantTool: ToolSchema = {
   type: "function",
   function: {
     name: "remove_combatant",
-    description: `Remove a combatant from active combat.
-
-Use when a combatant:
-- Dies or is destroyed
-- Flees the combat
-- Is incapacitated but not killed
-- Is captured or restrained
-- Otherwise can no longer participate
-
-The combatant's final stats are logged for reference.
-If removing the player, combat typically ends (use end_combat).`,
+    description: `Remove a combatant from combat (dead, fled, incapacitated, captured). If it is the player, combat usually ends: call end_combat.`,
     parameters: {
       type: "object",
       properties: {
@@ -1926,21 +1622,7 @@ const updateCombatantStatTool: ToolSchema = {
   type: "function",
   function: {
     name: "update_combatant_stat",
-    description: `Modify a combatant's stat value.
-
-Value can be:
-- Number: Delta change (positive or negative). e.g., -8 for damage, +5 for healing
-- "=N": Set to absolute value. e.g., "=20" sets stat to exactly 20
-- Dice formula: Roll and apply. e.g., "1d6" rolls and subtracts from stat, "+2d6" rolls and adds
-
-Examples:
-- { stat: "HP", value: -8 } - Deal 8 damage
-- { stat: "HP", value: "+2d6" } - Heal 2d6
-- { stat: "Armor", value: "=0" } - Armor destroyed
-- { stat: "Stress", value: 1 } - Add 1 stress
-
-IMPORTANT: For damage/healing, use appropriate deltas, not absolute values.
-The combatant's stat cannot go below 0 unless the system allows negatives.`,
+    description: `Change a combatant's stat. value: a number is a delta (-8 damage, +5 healing), "=N" sets it absolutely, a dice string rolls and applies ("+2d6" adds, "1d6" subtracts). Use deltas for damage and healing.`,
     parameters: {
       type: "object",
       properties: {
@@ -1971,18 +1653,7 @@ const toggleCombatantConditionTool: ToolSchema = {
   type: "function",
   function: {
     name: "toggle_combatant_condition",
-    description: `Toggle a status condition on a combatant (add if missing, remove if present).
-
-Conditions are narrative/mechanical effects:
-- Stunned, Prone, Frightened, Poisoned
-- Blessed, Hasted, Invisible
-- On Fire, Bleeding, Cursed
-
-By default, toggles: adds if not present, removes if present.
-Use force_add=true to always add (updates duration if exists).
-Use force_remove=true to always remove.
-
-Duration is in turns (rounds of combat). Omit for permanent conditions.`,
+    description: `Toggle a status condition (Stunned, Prone, On Fire...) on a combatant: adds if missing, removes if present. force_add always adds (and updates the duration); force_remove always removes. duration is in combat rounds; omit it for a permanent condition.`,
     parameters: {
       type: "object",
       properties: {
@@ -1997,17 +1668,17 @@ Duration is in turns (rounds of combat). Omit for permanent conditions.`,
         duration: {
           type: "number",
           description:
-            "Optional: Turns until condition expires (only used when adding). Omit for permanent conditions.",
+            "Rounds until it expires (adding only); omit for permanent",
         },
         force_add: {
           type: "boolean",
           description:
-            "Force add even if condition exists (updates duration). Default: false",
+            "Add even if present (updates duration)",
         },
         force_remove: {
           type: "boolean",
           description:
-            "Force remove even if condition doesn't exist. Default: false",
+            "Remove even if absent",
         },
       },
       required: ["combatant", "condition"],
@@ -2019,37 +1690,7 @@ const npcRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "npc_roll",
-    description: `Make a roll for an NPC combatant.
-
-Use for:
-- NPC attack rolls
-- NPC damage rolls
-- NPC saving throws
-- NPC ability checks
-
-Similar to formula_roll but specifically for NPCs. Rolls are always
-resolved silently - never shown to the player as an animation.
-
-NOT for the player's own combatant, even on their turn in the initiative
-order - use formula_roll for anything the player character does, in or out
-of combat, so it's rolled visibly. Calling this on the player's combatant
-is rejected.
-
-The roll result is returned and logged to combat log.
-Use update_combatant_stat to apply damage after calculating.
-
-Only valid for the combatant whose turn it currently is - call advance_turn
-first if it's someone else's turn. (This doesn't restrict which combatant
-update_combatant_stat targets - damage/effects still apply to whichever
-combatant the action affects, e.g. the player being hit on the goblin's turn.)
-
-Reports the total only - it doesn't decide whether the roll hit. Use
-\`calculate\` for that ('18 >= 15' → TRUE), same as any other roll.
-
-Example flow:
-1. npc_roll: "1d20+5" for the goblin's attack
-2. calculate: "18 >= 15" (its total against the player's AC)
-3. If it hit: npc_roll "1d6+2" for damage, then update_combatant_stat: player HP -damage`,
+    description: `Roll for an NPC combatant (attack, damage, save), silently: the player never sees it. Only for the combatant whose turn it is (advance_turn first); never for the player's combatant, whose rolls are formula_roll. Reports the total only: compare with \`calculate\`, then apply damage with update_combatant_stat.`,
     parameters: {
       type: "object",
       properties: {
@@ -2080,20 +1721,7 @@ const advanceTurnTool: ToolSchema = {
   type: "function",
   function: {
     name: "advance_turn",
-    description: `Advance to the next combatant in initiative order.
-
-Call this after resolving the current combatant's turn.
-
-The tool automatically:
-- Moves to the next active combatant
-- Skips inactive combatants (unless skip_inactive: false)
-- Increments round counter when turn order completes
-- Decrements duration on timed conditions
-- Removes expired conditions
-
-Returns: The next combatant whose turn it is.
-
-If all combatants are inactive, signals that combat should end.`,
+    description: `Advance to the next combatant after resolving the current turn. Skips inactive combatants (skip_inactive: false to include them), counts rounds, ticks down and removes expired timed conditions, and signals when everyone is inactive.`,
     parameters: {
       type: "object",
       properties: {
@@ -2111,22 +1739,7 @@ const endCombatTool: ToolSchema = {
   type: "function",
   function: {
     name: "end_combat",
-    description: `End the active combat and optionally sync player stats.
-
-Call when combat concludes for any reason:
-- Victory: All enemies defeated
-- Defeat: Player killed or incapacitated  
-- Fled: One or more parties escaped
-- Truce: Combat ended through negotiation
-- Interrupted: External event stopped the fight
-
-If sync_player_stats is true (default):
-- Player combatant stats are copied back to character resources
-- Only stats matching resource names are synced
-- HP -> Health resource, etc.
-
-IMPORTANT: Always call this to properly close combat state.
-Don't just let combat "fade out" - explicitly end it.`,
+    description: `End the active combat (victory, defeat, fled, truce, interrupted) and, by default, copy the player's stats back to matching character resources. Always end it explicitly; don't let combat fade out.`,
     parameters: {
       type: "object",
       properties: {
@@ -2142,7 +1755,7 @@ Don't just let combat "fade out" - explicitly end it.`,
         sync_player_stats: {
           type: "boolean",
           description:
-            "Copy player combatant stats back to character resources (default: true)",
+            "Copy the player's stats back to resources (default true)",
         },
       },
       required: ["outcome", "summary"],
@@ -2158,24 +1771,7 @@ const manageTimerTool: ToolSchema = {
   type: "function",
   function: {
     name: "manage_timer",
-    description: `Create, advance, pause/resume, cancel, or trigger a countdown timer for deadlines, rituals, or timed events.
-
-Timers count down from their starting ticks toward 0. When they hit 0, they trigger.
-
-Use cases:
-- "The ritual completes in 5 rounds" (combat pacing)
-- "Reinforcements arrive in 3 turns" (tension building)
-- "The bomb explodes in 10 ticks" (urgent deadline)
-- "The sun sets in 2 ticks" (time passage)
-
-Actions:
-- "create": Start a new timer. Requires name + ticks. If auto_advance is true (default), it ticks down each GM turn; if false, you must manually call action "advance".
-- "advance": Manually tick a timer forward. Requires timer. Optional ticks (default 1). If it would reduce currentTicks to 0 or below, the timer triggers.
-- "toggle_pause": Pause an active timer, or resume a paused one. Requires timer.
-- "cancel": Remove a timer without triggering its effect (e.g. player disarmed the bomb). Requires timer, optional reason.
-- "trigger": Fire a timer's effect immediately regardless of remaining ticks. Requires timer, optional reason.
-
-Multiple timers can exist simultaneously - useful for overlapping deadlines.`,
+    description: `Create, advance, pause/resume, cancel or trigger a countdown timer (rituals, deadlines, arriving reinforcements). Timers count down to 0, then trigger. Actions: create (name + ticks; advance it yourself with the advance action, as auto_advance does not tick yet), advance (timer, optional ticks, default 1), toggle_pause, cancel (without triggering), trigger (fire now). Several timers can run at once.`,
     parameters: {
       type: "object",
       properties: {
@@ -2187,12 +1783,12 @@ Multiple timers can exist simultaneously - useful for overlapping deadlines.`,
         timer: {
           type: "string",
           description:
-            "Timer name or ID. Required for advance/toggle_pause/cancel/trigger; not used for create.",
+            "Timer name or ID (all but create)",
         },
         name: {
           type: "string",
           description:
-            "Timer display name (e.g., 'Ritual Completion', 'Reinforcements Arrive'). create only.",
+            "Display name. create only.",
         },
         description: {
           type: "string",
@@ -2201,18 +1797,18 @@ Multiple timers can exist simultaneously - useful for overlapping deadlines.`,
         ticks: {
           type: "number",
           description:
-            "create: starting tick count (counts down to 0). advance: how many ticks to advance (default 1).",
+            "create: starting ticks. advance: ticks to advance (default 1).",
         },
         auto_advance: {
           type: "boolean",
           description:
-            "Automatically tick down each GM turn? (default: true). create only.",
+            "Tick each GM turn (default true). create only.",
         },
         visibility: {
           type: "string",
           enum: ["visible", "hidden"],
           description:
-            "Show timer to player? Use 'hidden' for secret countdowns (default: visible). create only.",
+            "Default visible; hidden for secret countdowns. create only.",
         },
         reason: {
           type: "string",
@@ -2232,15 +1828,7 @@ const addNPCTool: ToolSchema = {
   type: "function",
   function: {
     name: "add_npc",
-    description: `Register a new NPC in the story's character tracker.
-
-Use when:
-- A new significant character is introduced
-- A character becomes important enough to track
-- Player asks about NPCs and you want to formalize tracking
-
-NPCs are tracked separately from lore for quick reference and reactions.
-Include enough detail for the player to remember who this character is.`,
+    description: `Register a new significant NPC in the character tracker, for quick reference and reactions. Use when a character is introduced or becomes important. Give enough detail for the player to remember who they are.`,
     parameters: {
       type: "object",
       properties: {
@@ -2252,12 +1840,12 @@ Include enough detail for the player to remember who this character is.`,
         description: {
           type: "string",
           description:
-            "Who they are - appearance, personality, background (2-3 sentences)",
+            "Appearance, personality, background (2-3 sentences)",
         },
         role: {
           type: "string",
           description:
-            "Their role in the story (e.g., 'Quest Giver', 'Antagonist', 'Love Interest', 'Mentor', 'Rival')",
+            "Their role (e.g., 'Quest Giver', 'Rival')",
         },
         status: {
           type: "string",
@@ -2267,12 +1855,12 @@ Include enough detail for the player to remember who this character is.`,
         relationship: {
           type: "string",
           description:
-            "Relationship with player as custom text (e.g., 'Trusted mentor', 'Bitter rival', 'Former lover', 'Suspicious ally')",
+            "Relationship with the player, as text",
         },
         attitude: {
           type: "string",
           enum: ["hostile", "unfriendly", "neutral", "friendly", "allied"],
-          description: "General disposition toward player (default: neutral)",
+          description: "Disposition toward the player (default: neutral)",
         },
         faction: {
           type: "string",
@@ -2284,7 +1872,7 @@ Include enough detail for the player to remember who this character is.`,
         },
         image_url: {
           type: "string",
-          description: "Image URL for reaction notifications",
+          description: "Image URL for reactions",
         },
       },
       required: ["name", "description", "role"],
@@ -2296,20 +1884,7 @@ const updateNPCTool: ToolSchema = {
   type: "function",
   function: {
     name: "update_npc",
-    description: `Update an existing NPC's details.
-
-Use when:
-- NPC's status changes (dies, goes missing, leaves)
-- Relationship with player changes
-- New information is revealed about them
-- Their role in the story evolves
-
-Only provide fields you want to change.
-
-Attitude moves at most 2 steps per call along hostile -> unfriendly ->
-neutral -> friendly -> allied (e.g. hostile to friendly in one call is
-rejected and capped to neutral) - a single dramatic moment can shift
-things a lot, but fully flipping a relationship takes more than one call.`,
+    description: `Update an existing NPC; send only the fields that change (status, relationship, role, new information). Attitude moves at most 2 steps per call along hostile, unfriendly, neutral, friendly, allied: a larger jump is capped.`,
     parameters: {
       type: "object",
       properties: {
@@ -2319,7 +1894,7 @@ things a lot, but fully flipping a relationship takes more than one call.`,
         },
         name: {
           type: "string",
-          description: "New name (if revealed/changed)",
+          description: "New name (if revealed or changed)",
         },
         description: {
           type: "string",
@@ -2365,14 +1940,7 @@ const removeNPCTool: ToolSchema = {
   type: "function",
   function: {
     name: "remove_npc",
-    description: `Remove an NPC from tracking.
-
-Use when:
-- NPC is no longer relevant to the story
-- Character was temporary/minor
-- Cleaning up the NPC list
-
-Note: For deceased NPCs, prefer update_npc with status="dead" to preserve history.`,
+    description: `Remove an NPC from tracking when they are no longer relevant. For a dead NPC prefer update_npc with status "dead".`,
     parameters: {
       type: "object",
       properties: {
@@ -2394,22 +1962,7 @@ const npcReactionTool: ToolSchema = {
   type: "function",
   function: {
     name: "npc_reaction",
-    description: `Show a social-media style reaction notification from an NPC.
-
-Creates a toast notification like "Lisa liked this 👍" or "Marcus is disappointed 😔"
-
-Use when:
-- An NPC would have a notable emotional response to player's action
-- You want to show relationship impact without exposition
-- Reinforcing NPC personality through reactions
-- Making the world feel more alive and responsive
-
-Keep reactions short and punchy. The notification includes the NPC's image if available.
-
-Examples:
-- { npc: "Elara", reaction: "appreciated that", emoji: "❤️" }
-- { npc: "The Baron", reaction: "will remember this", emoji: "👁️" }
-- { npc: "Grak", reaction: "is offended", emoji: "😤", context: "You refused his gift" }`,
+    description: `Show a short social-media-style reaction toast from an NPC ("Lisa liked this", "The Baron will remember this") to show relationship impact without exposition. Keep it short and punchy.`,
     parameters: {
       type: "object",
       properties: {
@@ -2420,7 +1973,7 @@ Examples:
         reaction: {
           type: "string",
           description:
-            "The reaction text (e.g., 'liked this', 'is disappointed', 'gained respect', 'will remember this')",
+            "Reaction text (e.g., 'liked this', 'is disappointed')",
         },
         emoji: {
           type: "string",
