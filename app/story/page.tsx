@@ -19,7 +19,9 @@ import {
   CouchPlayer,
   ObserverFlag,
   ObserverRewriteOriginal,
+  SceneImageRef,
 } from "../misc/structs";
+import { findMentionedNpcIds } from "../misc/noteMentions";
 import { useNetSession } from "../misc/multiplayer/useNetSession";
 import type { MPBackend } from "../misc/multiplayer/types";
 import type { FloorSnapshot, TurnStatus } from "../misc/multiplayer/session";
@@ -59,6 +61,23 @@ import {
 } from "../misc/reasoningTiers";
 import { migrateCustomTablesToNotes } from "../misc/tableNotes";
 import { ensureStoryDataArrays } from "../misc/storyDataDefaults";
+import {
+  enqueueImageJob,
+  type ImageJobDeps,
+  type ImageJobRequest,
+  type ImageJobState,
+} from "../misc/imageJobs";
+import { getImageSettings } from "../misc/imageSettings";
+import { applyStoryPatch } from "../misc/imagePatcher";
+import { cancelImageJobsForTurn } from "../misc/imageJobs";
+import { pickImageProvider } from "../misc/imageProvider";
+import {
+  writeSceneDescription,
+  writePortraitDescription,
+} from "../misc/imagePromptWriter";
+import { pickProviderKeys } from "../misc/sideModelCall";
+import { getActiveTurnId } from "../misc/turnCost";
+import { getImage } from "../misc/imageStore";
 import Story from "./story";
 import LorePage from "./lore";
 import GoalsPage from "./goals";
@@ -249,6 +268,8 @@ function handleObserverReset(
   partialPart.toolCalls = undefined;
   partialPart.toolResponses = undefined;
   partialPart.stateChanges = undefined;
+  // Pictures asked for by the discarded attempt (generation.ts cancels the jobs).
+  partialPart.images = undefined;
 
   setStoryText("");
   setLiveGMEntries([]);
@@ -441,6 +462,7 @@ function StoryPageContent() {
     mistralKey,
     deepinfraKey,
     zaiKey,
+    falKey,
     braveSearchKey,
   } = apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
@@ -545,6 +567,38 @@ function StoryPageContent() {
     };
   }, [currentState]);
   const [storyData, setStoryData] = useState<StoryData | null>(null);
+  // The latest StoryData for pictures that settle after the turn that asked
+  // for them (imageJobs.ts): a job writes against this, never a copy it
+  // captured when it was queued.
+  const storyDataRef = useRef<StoryData | null>(null);
+  useEffect(() => {
+    storyDataRef.current = storyData;
+  }, [storyData]);
+  // The StoryData object a turn in flight is mutating (see imagePatcher.ts),
+  // false-ish between turns; and whether this page is still on screen.
+  const turnLiveRef = useRef<StoryData | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  // The last finished turn's cost-ledger id, to cancel its pictures on Retry/Undo.
+  const lastTurnCostIdRef = useRef<string | null>(null);
+  async function generateTrackedTurn(
+    ...args: Parameters<typeof generateStoryTurn>
+  ) {
+    turnLiveRef.current = args[0];
+    try {
+      const result = await generateStoryTurn(...args);
+      lastTurnCostIdRef.current = result.meta?.costTurnId ?? null;
+      return result;
+    } finally {
+      turnLiveRef.current = null;
+    }
+  }
+  const [illustrating, setIllustrating] = useState(false);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
   const [sourceAdventureId, setSourceAdventureId] = useState<string | null>(
     null,
@@ -1427,6 +1481,16 @@ function StoryPageContent() {
         }
         setSyncStatus("local-only");
 
+        // Pictures nothing in the story points to any more (an undone or
+        // retried turn leaves some) are swept on load (imageStore.ts).
+        void import("@/app/misc/imageStore")
+          .then(({ deleteOrphans, collectImageIds }) =>
+            deleteOrphans(localStory.id, collectImageIds(localStory.storyData)),
+          )
+          .catch((sweepError) =>
+            console.error("Picture sweep failed", sweepError),
+          );
+
         if (setupUIFromStory(localStory.storyData)) return;
         setLoadingStory(false);
       } catch (error: any) {
@@ -1782,6 +1846,257 @@ function StoryPageContent() {
     setStoryData(updatedStory);
   }
 
+  // ---- Pictures made in play (imageJobs.ts, docs/image-generation-design.md) ----
+
+  // What the picture queue needs from this page. Pictures settle after the turn
+  // that asked for them, so a job reads and writes the LATEST StoryData through
+  // the ref and saves what it changed.
+  function buildImageJobDeps(): ImageJobDeps {
+    // Captured now: this closure outlives the page when a story is left while a
+    // picture paints.
+    const patchStoryId = storyDbId;
+    return {
+      keys: { falKey, deepInfraKey: deepinfraKey, openRouterKey },
+      getSettings: getImageSettings,
+      getStoryData: () => storyDataRef.current,
+      // Three paths (imagePatcher.ts): into the running turn's own object, into
+      // state plus a save, or, once this page is gone, into the stored story.
+      patchStoryData: (fn) =>
+        applyStoryPatch(
+          {
+            getLive: () => turnLiveRef.current,
+            getState: () => storyDataRef.current,
+            setState: (next) => {
+              storyDataRef.current = next;
+              setStoryData(next);
+            },
+            save: (next) => saveProgress(next),
+            isMounted: () => mountedRef.current,
+            patchStored: (patch) => {
+              if (!patchStoryId) return;
+              void (async () => {
+                try {
+                  const { getLocalStory, saveLocalStory } = await import(
+                    "@/app/misc/localStoryManager"
+                  );
+                  const stored = await getLocalStory(patchStoryId);
+                  if (!stored) return;
+                  const next = patch(stored.storyData);
+                  if (next !== stored.storyData) {
+                    await saveLocalStory(patchStoryId, next);
+                  }
+                } catch (error) {
+                  logger.error("Could not file a picture on the stored story", {
+                    error: error instanceof Error ? error.message : String(error),
+                  });
+                }
+              })();
+            },
+          },
+          fn,
+        ),
+      onSettled: (_jobId: string, state: ImageJobState, req: ImageJobRequest) => {
+        // A scene picture's card shows its own failure; a portrait has no card.
+        if (req.target.kind === "scenePart") return;
+        if (state.status === "declined") {
+          addNotification("The image service declined that picture.", "warning");
+        } else if (state.status === "failed" && state.message !== "Cancelled") {
+          addNotification(`Picture failed: ${state.message}`, "failure");
+        }
+      },
+    };
+  }
+
+  function imageSideCallKeys() {
+    return pickProviderKeys(apiKeys);
+  }
+
+  // "Illustrate this" on the latest turn: a small side call writes what a
+  // camera would see, then the picture goes on the same queue as the GM's.
+  async function handleIllustrate(partIndex: number) {
+    const sd = storyDataRef.current;
+    if (!sd || !storyDbId || illustrating) return;
+    const part = sd.scene.parts[partIndex];
+    if (!part || part.user || !part.content.trim()) return;
+    const deps = buildImageJobDeps();
+    if (!pickImageProvider(getImageSettings(), deps.keys)) {
+      addNotification(
+        "Add a fal.ai, DeepInfra or OpenRouter key in Settings to make pictures.",
+        "info",
+      );
+      return;
+    }
+
+    let partId = part.id;
+    if (!partId) {
+      // A turn from before pictures existed has no id yet; give it one now.
+      const newId = crypto.randomUUID();
+      partId = newId;
+      deps.patchStoryData((current) => ({
+        ...current,
+        scene: {
+          ...current.scene,
+          parts: current.scene.parts.map((p, i) =>
+            i === partIndex && !p.id ? { ...p, id: newId } : p,
+          ),
+        },
+      }));
+    }
+
+    setIllustrating(true);
+    addNotification("Painting a picture of this moment…", "info", 3000);
+    try {
+      const costTurnId = getActiveTurnId() ?? undefined;
+      const description = await writeSceneDescription(part.content, sd, {
+        keys: imageSideCallKeys(),
+        costTurnId,
+      });
+      enqueueImageJob(
+        {
+          storyId: storyDbId,
+          subject: "scene",
+          description,
+          featuring: findMentionedNpcIds(sd, part.content),
+          target: { kind: "scenePart", partId },
+          requestedBy: "player",
+          costTurnId,
+        },
+        deps,
+      );
+    } catch (error) {
+      logger.error("Illustrate this failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      addNotification("Could not start that picture.", "failure");
+    } finally {
+      setIllustrating(false);
+    }
+  }
+
+  // Retry / Regenerate on a scene card: runs the saved prompt again under the
+  // same id, or, on a device that holds no picture, rebuilds one from the
+  // description the turn kept.
+  async function handleRegenerateImage(partIndex: number, ref: SceneImageRef) {
+    const sd = storyDataRef.current;
+    if (!sd || !storyDbId) return;
+    const part = sd.scene.parts[partIndex];
+    if (!part?.id) return;
+    const stored = await getImage(ref.imageId).catch(() => null);
+    const description = ref.description ?? "";
+    if (!stored && !description) {
+      addNotification("There is nothing saved to regenerate that picture from.", "info");
+      return;
+    }
+    const deps = buildImageJobDeps();
+    if (!pickImageProvider(getImageSettings(), deps.keys)) {
+      addNotification(
+        "Add a fal.ai, DeepInfra or OpenRouter key in Settings to make pictures.",
+        "info",
+      );
+      return;
+    }
+    enqueueImageJob(
+      {
+        storyId: storyDbId,
+        subject: stored?.subject ?? "scene",
+        description,
+        featuring: [],
+        target: { kind: "scenePart", partId: part.id },
+        requestedBy: "player",
+        costTurnId: getActiveTurnId() ?? undefined,
+        reuseId: ref.imageId,
+        finalPrompt: stored?.prompt,
+      },
+      deps,
+    );
+  }
+
+  // "Make portrait" / "Replace" on an NPC.
+  async function handleMakeNpcPortrait(npcId: string) {
+    const sd = storyDataRef.current;
+    if (!sd || !storyDbId) return;
+    const npc = sd.npcs?.find((n) => n.id === npcId);
+    if (!npc) return;
+    const deps = buildImageJobDeps();
+    if (!pickImageProvider(getImageSettings(), deps.keys)) {
+      addNotification(
+        "Add a fal.ai, DeepInfra or OpenRouter key in Settings to make pictures.",
+        "info",
+      );
+      return;
+    }
+    addNotification(`Painting a portrait of ${npc.name}…`, "info", 3000);
+    const costTurnId = getActiveTurnId() ?? undefined;
+    const notes = [npc.description, npc.role, npc.faction]
+      .filter((s): s is string => !!s && !!s.trim())
+      .join("\n");
+    const description = await writePortraitDescription(npc.name, notes, {
+      keys: imageSideCallKeys(),
+      costTurnId,
+    });
+    enqueueImageJob(
+      {
+        storyId: storyDbId,
+        subject: "npc",
+        description,
+        featuring: [],
+        target: { kind: "npc", npcId },
+        requestedBy: "player",
+        costTurnId,
+        // Replacing: keep the old portrait on screen until the new one lands.
+        skipInitialAttach: !!npc.portraitImageId,
+      },
+      deps,
+    );
+  }
+
+  // "Make portrait" on the character sheet, from the character_sheet note.
+  async function handleMakePlayerPortrait() {
+    const sd = storyDataRef.current;
+    if (!sd || !storyDbId) return;
+    const deps = buildImageJobDeps();
+    if (!pickImageProvider(getImageSettings(), deps.keys)) {
+      addNotification(
+        "Add a fal.ai, DeepInfra or OpenRouter key in Settings to make pictures.",
+        "info",
+      );
+      return;
+    }
+    const sheet = sd.lore?.find(
+      (l) => l.type === "character_sheet" && l.content?.trim(),
+    );
+    const name = sd.player_name?.trim() || "The player character";
+    addNotification(`Painting a portrait of ${name}…`, "info", 3000);
+    const costTurnId = getActiveTurnId() ?? undefined;
+    const description = await writePortraitDescription(
+      name,
+      sheet?.content ?? sd.premise ?? "",
+      { keys: imageSideCallKeys(), costTurnId },
+    );
+    enqueueImageJob(
+      {
+        storyId: storyDbId,
+        subject: "player",
+        description,
+        featuring: [],
+        target: { kind: "player" },
+        requestedBy: "player",
+        costTurnId,
+        skipInitialAttach: !!sd.playerPortraitImageId,
+      },
+      deps,
+    );
+  }
+
+  // Whether the Illustrate / Make portrait buttons can run: a key for some provider.
+  const canMakePictures =
+    !!storyDbId &&
+    !!pickImageProvider(getImageSettings(), {
+      falKey,
+      deepInfraKey: deepinfraKey,
+      openRouterKey,
+    });
+
   // ---- Networked multiplayer: collect-all-then-generate + party voice ----
 
   // Display name for a connected seat, from the persisted couch-player roster.
@@ -2086,6 +2401,8 @@ function StoryPageContent() {
       user: false,
       role: "assistant",
       choices: [],
+      // So a picture asked for during this turn can find the part (imageJobs.ts).
+      id: crypto.randomUUID(),
     };
 
     // Set by onStoryStart (see GenerationCallbacks.onStoryStart) - true when
@@ -2162,7 +2479,7 @@ function StoryPageContent() {
       // Create abort controller for this generation
       generationAbortRef.current = new AbortController();
 
-      await generateStoryTurn(
+      await generateTrackedTurn(
         storyData,
         "", // Custom input already in storyData.scene.parts
         {
@@ -2195,6 +2512,8 @@ function StoryPageContent() {
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
           abortSignal: generationAbortRef.current.signal,
+          imageJobDeps: buildImageJobDeps(),
+          scenePartId: partialPart.id,
         },
         {
           onGMStageStart: () => {
@@ -2444,6 +2763,12 @@ function StoryPageContent() {
               addNotification,
             );
           },
+          onSceneImageRequested: (ref) => {
+            // The GM asked for a picture of this turn; the part is still being
+            // built, so the card's ref goes on it here (the picture itself
+            // settles in the background, see imageJobs.ts).
+            partialPart.images = [...(partialPart.images ?? []), ref];
+          },
           onObserverReset: (flags, triggeringFlag) => {
             handleObserverReset(
               partialPart,
@@ -2689,6 +3014,8 @@ function StoryPageContent() {
     partialPart: ScenePart,
     opts: { logLabel: string; successNotification?: string },
   ) {
+    // So a picture asked for during this turn can find the part (imageJobs.ts).
+    if (!partialPart.id) partialPart.id = crypto.randomUUID();
     const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
     const toolCallingEnabled = true;
 
@@ -2765,7 +3092,7 @@ function StoryPageContent() {
     generationAbortRef.current = new AbortController();
 
     try {
-      await generateStoryTurn(
+      await generateTrackedTurn(
         storyData,
         "", // User choice already in storyData.scene.parts
         {
@@ -2787,6 +3114,8 @@ function StoryPageContent() {
           zaiKey,
           storyId: storyDbId || undefined,
           abortSignal: generationAbortRef.current.signal,
+          imageJobDeps: buildImageJobDeps(),
+          scenePartId: partialPart.id,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
           webResearchEnabled,
@@ -3012,6 +3341,12 @@ function StoryPageContent() {
               setStoryData,
               addNotification,
             );
+          },
+          onSceneImageRequested: (ref) => {
+            // The GM asked for a picture of this turn; the part is still being
+            // built, so the card's ref goes on it here (the picture itself
+            // settles in the background, see imageJobs.ts).
+            partialPart.images = [...(partialPart.images ?? []), ref];
           },
           onObserverReset: (flags, triggeringFlag) => {
             handleObserverReset(
@@ -3467,6 +3802,8 @@ function StoryPageContent() {
       user: false,
       role: "assistant",
       choices: [],
+      // So a picture asked for during this turn can find the part (imageJobs.ts).
+      id: crypto.randomUUID(),
     };
 
     await runTurnGeneration(storyData, partialPart, { logLabel: "choice" });
@@ -3692,6 +4029,10 @@ function StoryPageContent() {
     // rerolls first.
     const snapshot = undoStackRef.current[undoStackRef.current.length - 1];
     if (snapshot) {
+      // The attempt being rerolled is thrown away: so are its pictures.
+      if (lastTurnCostIdRef.current) {
+        cancelImageJobsForTurn(lastTurnCostIdRef.current, "gm");
+      }
       const userChoiceContent = userChoicePart.content;
       const savedPlayerComment = userChoicePart.playerComment;
       const savedSpeakerIds = userChoicePart.speakerIds;
@@ -3755,6 +4096,10 @@ function StoryPageContent() {
     const savedGMStoryContext = lastAIPart.gmStoryContext;
     const savedGMToolCalls = lastAIPart.gmToolCalls;
     const savedGMConversation = lastAIPart.gmConversation;
+    // Its pictures were drawn for the same GM conversation, which this reword
+    // keeps, so they stay with the turn (same part id, same refs).
+    const savedPartId = lastAIPart.id;
+    const savedImages = lastAIPart.images;
 
     // Remove the last AI response
     storyData.scene.parts.pop();
@@ -3800,6 +4145,8 @@ function StoryPageContent() {
       gmThinking: savedGMThinking,
       gmStoryContext: savedGMStoryContext,
       gmToolCalls: savedGMToolCalls,
+      id: savedPartId ?? crypto.randomUUID(),
+      images: savedImages,
     };
 
     const maxToolLoops =
@@ -3885,7 +4232,7 @@ function StoryPageContent() {
     });
 
     try {
-      await generateStoryTurn(
+      await generateTrackedTurn(
         storyData,
         userChoiceContent, // Use the user's original choice content
         {
@@ -3927,6 +4274,8 @@ function StoryPageContent() {
           // reword-only retry and those checks silently never fired.
           precomputedGMResults: savedGMToolCalls,
           abortSignal: generationAbortRef.current.signal,
+          imageJobDeps: buildImageJobDeps(),
+          scenePartId: partialPart.id,
         },
         {
           onStoryReasoning: (delta, fullReasoning) => {
@@ -4041,6 +4390,12 @@ function StoryPageContent() {
               setStoryData,
               addNotification,
             );
+          },
+          onSceneImageRequested: (ref) => {
+            // The GM asked for a picture of this turn; the part is still being
+            // built, so the card's ref goes on it here (the picture itself
+            // settles in the background, see imageJobs.ts).
+            partialPart.images = [...(partialPart.images ?? []), ref];
           },
           onObserverReset: (flags, triggeringFlag) => {
             handleObserverReset(
@@ -4264,6 +4619,10 @@ function StoryPageContent() {
     }
 
     logger.action("User requested undo");
+    // The undone turn's GM pictures are still queued or painting: drop them.
+    if (lastTurnCostIdRef.current) {
+      cancelImageJobsForTurn(lastTurnCostIdRef.current, "gm");
+    }
 
     // Restore in place (mutate the existing object, matching this
     // codebase's storyData-mutation convention) rather than swapping to a
@@ -5156,6 +5515,15 @@ function StoryPageContent() {
             onPartyJoin={() => setPartyLobbyOpen(true)}
             onPartyRemove={party.removePlayer}
             onPartyAnswerHere={answerPartyRequestHere}
+            // Pictures are the host's (decision 60): a guest holds none.
+            onIllustrate={
+              canMakePictures && !illustrating && netSession?.role !== "guest"
+                ? handleIllustrate
+                : undefined
+            }
+            onRegenerateImage={
+              netSession?.role === "guest" ? undefined : handleRegenerateImage
+            }
           />
           </div>
         )}
@@ -5226,6 +5594,11 @@ function StoryPageContent() {
             initialSelectedTitle={
               pendingNoteOpen?.kind === "lore" ? pendingNoteOpen.id : undefined
             }
+            onMakePlayerPortrait={
+              canMakePictures && netSession?.role !== "guest"
+                ? handleMakePlayerPortrait
+                : undefined
+            }
           />
         )}
         {currentState === StoryState.NPCS && (
@@ -5233,6 +5606,11 @@ function StoryPageContent() {
             {...storyData}
             onUpdateNPCs={(updatedNPCs) =>
               updateStoryData({ npcs: updatedNPCs })
+            }
+            onMakePortrait={
+              canMakePictures && netSession?.role !== "guest"
+                ? handleMakeNpcPortrait
+                : undefined
             }
             initialSelectedId={
               pendingNoteOpen?.kind === "npc" ? pendingNoteOpen.id : undefined

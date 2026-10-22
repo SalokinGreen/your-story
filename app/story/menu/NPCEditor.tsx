@@ -27,6 +27,7 @@ import {
 import { useState, useEffect } from "react";
 import { useNotification } from "../../misc/NotificationContext";
 import { DynamicIcon } from "../../components/DynamicIcon";
+import { StoredPortrait } from "../../components/StoryImage";
 import { IconPicker } from "../../components/IconPicker";
 
 const STATUS_OPTIONS: { value: NPCStatus; label: string; icon: string }[] = [
@@ -346,20 +347,26 @@ export default function NPCEditor({
               className="flex items-start gap-3 p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 hover:border-pink-400/20 hover:bg-white/[0.05] transition-colors"
             >
               <div className="shrink-0">
-                {npc.custom_symbol_url ? (
-                  <img
-                    src={npc.custom_symbol_url}
-                    alt={npc.name}
-                    className="w-12 h-12 rounded-lg object-cover border border-pink-400/20"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-pink-500/10 border border-pink-400/20 flex items-center justify-center">
-                    <DynamicIcon
-                      name={npc.symbol || "User"}
-                      className="w-6 h-6 text-pink-400"
+                <StoredPortrait
+                  imageId={npc.portraitImageId}
+                  alt={npc.name}
+                  className="w-12 h-12 rounded-lg object-cover border border-pink-400/20"
+                >
+                  {npc.custom_symbol_url ? (
+                    <img
+                      src={npc.custom_symbol_url}
+                      alt={npc.name}
+                      className="w-12 h-12 rounded-lg object-cover border border-pink-400/20"
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-pink-500/10 border border-pink-400/20 flex items-center justify-center">
+                      <DynamicIcon
+                        name={npc.symbol || "User"}
+                        className="w-6 h-6 text-pink-400"
+                      />
+                    </div>
+                  )}
+                </StoredPortrait>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">

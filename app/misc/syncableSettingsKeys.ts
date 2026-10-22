@@ -29,6 +29,8 @@ export const SYNCABLE_SETTINGS_KEYS = [
   "reflectionModelOverride",
   "directorAssistantModelOverride",
   "observerCheckSettings",
+  // In-play pictures: toggles, cap, provider and model choices (never the fal key)
+  "imageSettings",
   // Display / font
   "storyFontSize",
   "storyFontFamily",

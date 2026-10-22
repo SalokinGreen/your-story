@@ -135,3 +135,22 @@ export function splitTextWithMentions(
   }
   return result.length ? result : [{ text }];
 }
+
+/**
+ * The ids of the NPCs a passage names (by name or alias, the same matching
+ * that highlights them in the prose), in order of first mention. The
+ * Illustrate this button uses it to say who is in the picture.
+ */
+export function findMentionedNpcIds(storyData: StoryData, text: string): string[] {
+  const npcCandidates = buildMentionCandidates(storyData).filter(
+    (c) => c.kind === "npc",
+  );
+  const matcher = buildMentionMatcher(npcCandidates);
+  if (!matcher) return [];
+  const ids: string[] = [];
+  for (const segment of splitTextWithMentions(text, matcher)) {
+    const id = segment.mention?.id;
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}

@@ -1243,6 +1243,43 @@ export const DEEPINFRA_IMAGE_MODELS = {
 // Helper type for DeepInfra image models
 export type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
 
+// fal.ai image models (BYOK - the player's own fal key; docs/image-generation-
+// design.md §3.4 and §4.1, decisions 57 and 61). fal sends no price back, so each
+// picture is recorded at pricePerImage (turnCost's providerReportedUsd). Prices are
+// per output megapixel from fal's model pages (read 2026-10-21): schnell $0.003 per
+// MP; FLUX.2 [pro] $0.03 for the first MP and $0.015 per extra. At the in-play sizes
+// (about 0.8 MP) that is $0.0024 and $0.03; the edit model also bills its input
+// pictures, which the figure below ignores.
+export const FAL_IMAGE_MODELS = {
+  "FLUX.1 schnell": {
+    name: "FLUX.1 schnell",
+    model: "fal-ai/flux/schnell",
+    description: "Fast and very cheap: plain scenes and places.",
+    provider: "fal",
+    pricePerImage: 0.0024,
+    supportsReferences: false,
+  },
+  "FLUX.2 [pro]": {
+    name: "FLUX.2 [pro]",
+    model: "fal-ai/flux-2-pro",
+    description: "Higher quality: character portraits.",
+    provider: "fal",
+    pricePerImage: 0.03,
+    supportsReferences: false,
+  },
+  "FLUX.2 [pro] edit": {
+    name: "FLUX.2 [pro] edit",
+    model: "fal-ai/flux-2-pro/edit",
+    description:
+      "Takes portraits as reference pictures, to keep faces the same across scenes.",
+    provider: "fal",
+    pricePerImage: 0.03,
+    supportsReferences: true,
+  },
+} as const;
+
+export type FalImageModelKey = keyof typeof FAL_IMAGE_MODELS;
+
 /**
  * Check if an image model is a pure image generation model (Flux) vs chat-based (Gemini/GPT)
  */
@@ -1555,12 +1592,17 @@ export function isKnownModelKey(modelKey: unknown): modelKey is string {
  * the OpenRouter route would quietly run Nano Banana at a different price.
  */
 export function resolveImageModelKey(
-  provider: "deepinfra" | "openrouter",
+  provider: "deepinfra" | "openrouter" | "fal",
   modelKey: string,
 ): string {
   const catalog: object =
-    provider === "deepinfra" ? DEEPINFRA_IMAGE_MODELS : OPENROUTER_IMAGE_MODELS;
+    provider === "fal"
+      ? FAL_IMAGE_MODELS
+      : provider === "deepinfra"
+        ? DEEPINFRA_IMAGE_MODELS
+        : OPENROUTER_IMAGE_MODELS;
   if (Object.prototype.hasOwnProperty.call(catalog, modelKey)) return modelKey;
+  if (provider === "fal") return "FLUX.1 schnell";
   return provider === "deepinfra" ? "Bria 3.2" : "Nano Banana";
 }
 

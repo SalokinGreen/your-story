@@ -7,6 +7,8 @@
  * didn't), so this locks in that they're actually sent to the model.
  */
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import { buildGMStagePrompt } from "@/app/misc/ai_staged";
 import type { StoryData } from "@/app/misc/structs";
 
@@ -121,5 +123,41 @@ describe("buildGMStagePrompt pending-state surfacing", () => {
     const combined = messages.map((m) => m.content).join("\n");
     expect(combined).toContain("move-1");
     expect(combined).toContain("acknowledge_director_move");
+  });
+});
+
+describe("buildGMStagePrompt generate_image (docs/image-generation-design.md §3.1)", () => {
+  it("does not offer generate_image, or its prompt section, by default", () => {
+    const { tools, messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    expect(tools.map((t) => t.function.name)).not.toContain("generate_image");
+    expect(messages.map((m) => m.content).join("\n")).not.toContain(
+      "### Pictures (generate_image)",
+    );
+  });
+
+  it("offers generate_image and states the per-scene cap when imageToolAvailable", () => {
+    const { tools, messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+      imageToolAvailable: true,
+      imagesPerScene: 3,
+    });
+    expect(tools.map((t) => t.function.name)).toContain("generate_image");
+    const combined = messages.map((m) => m.content).join("\n");
+    expect(combined).toContain("### Pictures (generate_image)");
+    expect(combined).toContain("at most 3 per scene");
+  });
+
+  it("is in the Google essential tool list, so Gemini can call it", () => {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "../app/misc/providerCall.ts"),
+      "utf8",
+    );
+    const start = source.indexOf("const GOOGLE_ESSENTIAL_TOOLS");
+    const end = source.indexOf("]);", start);
+    expect(source.slice(start, end)).toContain('"generate_image"');
   });
 });

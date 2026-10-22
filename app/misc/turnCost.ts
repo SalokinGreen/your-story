@@ -173,7 +173,9 @@ export type TurnCostStage =
   | "progress_observer"
   | "reflection"
   | "compaction"
-  | "subagent";
+  | "subagent"
+  // A picture made in play (imageJobs.ts), recorded at the catalog price.
+  | "image";
 
 export const TURN_COST_STAGE_LABELS: Record<TurnCostStage, string> = {
   gm: "Game Master",
@@ -188,6 +190,7 @@ export const TURN_COST_STAGE_LABELS: Record<TurnCostStage, string> = {
   reflection: "Reflection",
   compaction: "Compaction",
   subagent: "Sub-agent",
+  image: "Pictures",
 };
 
 /** Display order for breakdowns - roughly the order a turn runs them in. */
@@ -204,6 +207,7 @@ export const TURN_COST_STAGE_ORDER: TurnCostStage[] = [
   "reflection",
   "compaction",
   "subagent",
+  "image",
 ];
 
 // ============================================================

@@ -88,6 +88,107 @@ for the last turn, and the Debug Logs' "AI generation complete" line logs
   model through OpenRouter. *Expected:* a normal turn, with no 400 about a
   thought signature.
 
+## 2026-10-22 — Pictures in play, PR I1 (`claude/image-gen-i1`)
+
+The suite drives the queue, the executor, the fal call and a real
+`generateStoryTurn` against injected providers and a fake IndexedDB; no fal,
+DeepInfra or OpenRouter image call was made, because each needs the author's
+key and spends their money. Nothing was seen rendered either (no browser in the
+session that built it). Everything below waits for the author's go and a fal
+key (`https://fal.ai/dashboard/keys`). About $0.10 covers the four fal checks.
+
+**Gate for slice S7 (reference pictures, not built).** Do these four first;
+they decide whether S7 is a small change or needs fal's storage upload
+(design §10):
+
+1. One schnell picture with `sync_mode: true` (Settings → API Keys → fal key,
+   then **Illustrate this** on any turn). *Expected:* a picture under the turn
+   within a few seconds, and in Debug Logs an "Image: scene picture … done"
+   line. Note how long it took. *Failure looks like:* a "Picture failed: fal
+   returned …" card. A `data:` URI is expected back; if fal returns an https
+   URL the code fetches it once (the `https://*.fal.media/*` allowlist entry
+   is for that), so a failure there names `fal.media`.
+2. One FLUX.2 [pro] portrait (NPCs page → **Make portrait**). *Expected:* the
+   portrait on the NPC's row and in the detail header.
+3. One FLUX.2 [pro] edit with that portrait as a `data:` URI in `image_urls`
+   (needs S7: `imageJobs.resolveReferencePictures` returns none until then).
+   Run it by hand with `curl`, or in a scratch build: is a `data:` URI
+   accepted, and is the face kept?
+4. One prompt fal should refuse (an explicit one). *Expected:* a "The image
+   service declined this one" card, not a black picture. Write the real 422
+   body down: `falImageCall.readPolicyViolation` guesses at `ctx.categories`
+   and `ctx.tags` for the category names, so an empty category list on the card
+   is not a failure but a hint to read the body.
+
+**Added after the engine review (PR #219):**
+
+- **Does `AbortSignal` cancel a request in both native fetches?** Tauri's
+  scoped HTTP plugin and `CapacitorHttp` (Android and iOS). Start a picture on
+  DeepInfra or fal, press Stop (or Undo) while "Painting…" shows. *Expected:*
+  the card ends "Cancelled" at once, and the provider call stops (Debug Logs
+  shows no later "done"). *Failure looks like:* the request keeps running
+  until it answers; the result is still dropped (not saved, billed or
+  attached, `imageJobs.runJob`), so the cost is only time and the provider's
+  own bill.
+- **Does a 1–3 MB base64 `sync_mode` response arrive intact through both
+  native fetches?** One FLUX.2 [pro] portrait on the desktop and on the APK.
+  *Expected:* a normal picture. *Failure looks like:* a "Picture failed" card
+  mentioning JSON, or a truncated or garbled picture.
+- **Do DeepInfra and OpenRouter answer with a link instead of bytes, and which
+  host?** The code fetches a link once (`imageFetch.ts`), but the desktop
+  allowlist has no entry for those image hosts. If a card reads "Could not
+  fetch the picture: …" naming a host, add it to
+  `src-tauri/capabilities/default.json` and rebuild.
+- **Clear this story's pictures.** Make a portrait, Clear (Story Editor →
+  Story → Pictures), then ask the GM for that NPC's portrait. *Expected:* the
+  GM is not told "already has a portrait", and the NPC row shows its emoji
+  again.
+- **Leave the story while a picture paints**, open another story, wait. *Expected:*
+  the other story is untouched; on reopening the first, the picture is on its
+  NPC or turn.
+
+**The built apps (`tauri build` launched, then the APK):**
+
+- **The allowlist.** In the desktop app with a fal key, press **Illustrate
+  this**. *Expected:* a picture. *Failure looks like:* a card reading "fal
+  returned …" or a network error in the first second, which means
+  `https://fal.run/*` is not in `src-tauri/capabilities/default.json`'s `http`
+  scope in the shipped build. `CapacitorHttp` carries it on Android with no
+  entry; check there too.
+- **A GM picture.** Play with a fal key and a story whose GM is told to
+  introduce a new place. *Expected:* at most two pictures per scene
+  (Settings → Images), each a card under that turn's prose; the pill reads
+  "Painting a picture"; the prose never mentions the picture; the turn cost
+  panel shows a "Pictures" row. *Failure looks like:* a picture every turn
+  (the cap is not holding), or a GM that says "here is a picture of…".
+- **Stop while one paints.** Start a turn, press Stop while "Painting…" shows.
+  *Expected:* the card ends as "Cancelled" with a Retry, nothing is saved, and
+  the Pictures row stays at zero.
+- **Reload.** Reload mid-paint, then after. *Expected:* a finished picture is
+  still there; one cut off by the reload shows "This picture isn't on this
+  device" with **Regenerate**; Debug Logs shows no error.
+- **A portrait for the NPC the GM introduces.** *Expected:* the GM asks for it
+  once ("already has a portrait" after that), and it shows in the NPC list, the
+  detail view and the reaction toast.
+- **Online play.** As a guest, join a room where the host has pictures.
+  *Expected:* each card reads "Picture on the host's screen"; no Illustrate
+  button; no Make portrait button (decision 60).
+- **Android WebView.** A picture's size in **Settings → Images → space used**
+  should be about 100–200 KB. *Failure looks like:* megabytes per picture,
+  which means the WebView lacks `OffscreenCanvas` and `imageShrink.ts` stored
+  the original bytes.
+- **DeepInfra and OpenRouter sizes.** With only a DeepInfra key, paint a scene
+  (1024×768) and a portrait (768×1024). *Expected:* both come back. *Failure
+  looks like:* a 400 naming `size` for one of the models; pin the model in
+  Settings → Images and note which size it refuses.
+- **Screens to look at (none was seen rendered):** Settings → Images; the
+  fal.ai block under API Keys; the Pictures block at the bottom of the Story
+  Editor's Story section; the pending, done, declined, failed and missing
+  cards under a turn; the **Illustrate this** button beside the voice controls
+  at phone width; the NPC detail header with its **Make portrait** button; the
+  character sheet's portrait block.
+
+
 ## 2026-10-22 — Token savings PR T1: history stubs, fixed start, summaries (`claude/token-savings-t1`)
 
 The suite measures the history sizes and the summary prompt against a

@@ -15,6 +15,7 @@ import {
 import { buildObserverWarningNote } from "../misc/observer";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { getModelConfig } from "../misc/ai_prices";
+import { getImageSettings, isImageToolAvailable } from "../misc/imageSettings";
 import {
   hardRuleFloor,
   classifyTier,
@@ -421,6 +422,18 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       lastAssistantPartForNotes?.observerFlags,
     );
 
+    const imageSettings = getImageSettings();
+    const imageTool = {
+      available: isImageToolAvailable(
+        {
+          falKey: localStorage.getItem("falKey") || undefined,
+          deepInfraKey: localStorage.getItem("deepinfraKey") || undefined,
+          openRouterKey: localStorage.getItem("openRouterKey") || undefined,
+        },
+        imageSettings,
+      ),
+      perScene: imageSettings.gmImagesPerScene,
+    };
     // Build GM stage messages using the SAME function as generation.ts
     const gmPrompt = buildGMStagePrompt({
       storyData,
@@ -432,6 +445,10 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       storyProgressNote: lastAssistantPartForNotes?.storyProgressNote,
       repetitionNote: lastAssistantPartForNotes?.repetitionNote,
       knowledgeNote: lastAssistantPartForNotes?.knowledgeNote,
+      // So the viewer shows the prompt the GM really gets: the Pictures section
+      // and generate_image appear only when pictures are on and a key is saved.
+      imageToolAvailable: imageTool.available,
+      imagesPerScene: imageTool.perScene,
     });
     const contextMessages = gmPrompt.messages;
     setMessages(contextMessages);

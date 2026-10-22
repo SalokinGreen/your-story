@@ -1172,9 +1172,18 @@ export function buildGMStagePrompt({
   repetitionNote,
   knowledgeNote,
   usesNativeReasoning = false,
+  imageToolAvailable = false,
+  imagesPerScene = 2,
 }: {
   storyData: StoryData;
   userChoice: string;
+  // generate_image (docs/image-generation-design.md §3.1): offered, and its
+  // prompt section written, only when pictures are on and the player has a key
+  // for a provider that could paint them (imageSettings.isImageToolAvailable).
+  // Otherwise the model would be told about a tool it cannot call. Fixed for a
+  // turn, so the base messages stay byte-identical across its rounds.
+  imageToolAvailable?: boolean;
+  imagesPerScene?: number; // The per-scene cap the prompt states
   customMaxContext?: number; // Memory Size slider - this is the main context control now
   customMaxOutput?: number; // Response Length - the output reserved out of the model's window
   modelName?: string; // Used to get model's actual context limit
@@ -1691,6 +1700,18 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
 - If the player skips the roll prompt, roll it for them with \`formula_roll\` and move on`
     : "";
 
+  // Pictures (generate_image): the prompt section exists only when the tool is
+  // offered, so a player without pictures sees exactly the prompt they had.
+  const imageSection = imageToolAvailable
+    ? `### Pictures (generate_image)
+- You can paint a picture for the player with \`generate_image\`: a scene, an NPC's portrait, the player character's portrait, or a place. Use it at moments that matter - the first arrival somewhere that matters, an NPC's first time on screen, a reveal or a set piece - and never on routine turns. The engine allows at most ${imagesPerScene} per scene and refuses the rest.
+- The picture is made in the background and appears under this turn. **Don't describe it in your prose** and don't mention that you made it - narrate as you normally would.
+- Describe what a camera would see (who, where, the light, the mood). No text, captions or lettering in the picture. Keep it non-explicit: nothing sexual, and no gore beyond what a fantasy book cover would show.
+- A named NPC who already has a portrait is refused ("already has one"); pass \`featuring\` with NPC ids (and "player") for anyone who appears in a scene picture.
+
+`
+    : "";
+
   // Per-turn facilitation nudge (see gmAdvice.ts): 1-2 rotating tips woven
   // into the live prompt so the curated advice bank actually reaches the GM
   // every turn, not only at scene boundaries via increment_scene.
@@ -1826,7 +1847,7 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - The roll deliberately steers away from letters already used in this story, so the cast stays distinguishable. Pass \`flavor\` to keep the result in the right cultural register, and \`starts_with\` only when a letter genuinely must be fixed (a sibling of an existing NPC, a clan naming convention).
 - A name the player already knows is a name that exists - don't re-roll established NPCs or places, only new ones.
 
-### State Changes
+${imageSection}### State Changes
 - **Player Stats:** Update their character sheet with \`edit_note\` as needed
 - **NPC Status:** Use \`update_npc\` to change attitudes, relationships, or conditions, or \`edit_note\` for detailed changes on their note
 - **Combatants:** Use \`update_combatant_stat\` or \`toggle_combatant_condition\` to adjust HP, conditions, or status effects during combat
@@ -1920,6 +1941,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "roll_table",
     "roll_portent",
     "generate_name",
+    // Pictures: only when pictures are on and a provider key exists
+    ...(imageToolAvailable ? ["generate_image"] : []),
     // Calculator - also the only thing that turns a roll into a pass/fail
     // verdict, since no dice tool takes a DC any more
     "calculate",

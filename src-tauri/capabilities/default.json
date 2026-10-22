@@ -23,6 +23,8 @@
         { "url": "https://api.search.brave.com/*" },
         { "url": "https://api.cartesia.ai/*" },
         { "url": "https://api.elevenlabs.io/*" },
+        { "url": "https://fal.run/*" },
+        { "url": "https://*.fal.media/*" },
         { "url": "https://your-story-sync.*.workers.dev/*" }
       ]
     },

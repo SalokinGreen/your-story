@@ -230,6 +230,8 @@ export interface StoryLore {
   var_on_triggers?: string[]; // Boolean variable names that turn this on when true
   var_off_triggers?: string[]; // Boolean variable names that turn this off when true
   thumbnailUrl?: string;
+  // A picture made in play (imageStore.ts id); wins over thumbnailUrl.
+  imageId?: string;
   on?: boolean;
   lastTriggeredIndex?: number; // Track when lore was last triggered for auto-expiry
   embedded?: boolean; // True if content has been embedded for semantic search
@@ -342,9 +344,27 @@ export interface GMConversationMessage {
   tool_call_id?: string; // For tool role messages
 }
 
+// In-play pictures (docs/image-generation-design.md). The bytes live in their
+// own IndexedDB database (imageStore.ts), never in StoryData; StoryData holds
+// only the ids below. All of these fields are optional, so old saves and
+// Designer adventures need no backfill.
+export type ImageSubject = "scene" | "npc" | "player" | "location";
+export interface SceneImageRef {
+  imageId: string; // Also the id of the job that makes it (imageJobs.ts)
+  requestedBy: "gm" | "player";
+  // What the picture was asked to show, so Regenerate still works on a device
+  // that holds no stored picture (the saved prompt lives with the bytes).
+  description?: string;
+}
+
 export interface ScenePart {
   content: string;
   imageUrl: string;
+  // Stable id of this part, set when the turn is generated (never during
+  // render) so a picture job can find the turn it belongs to. Old parts have none.
+  id?: string;
+  // Pictures made for this turn, shown under its prose (StoryImage.tsx).
+  images?: SceneImageRef[];
   user: boolean;
   role: "system" | "user" | "assistant";
   // Optional player-visible comment that is NOT sent to AI (kept separate from content)
@@ -563,6 +583,8 @@ export interface NPC {
   faction?: string; // What group they belong to
   symbol?: string; // Emoji icon
   custom_symbol_url?: string; // Custom image URL (for reactions)
+  // A portrait made in play (imageStore.ts id); wins over custom_symbol_url and the emoji.
+  portraitImageId?: string;
   notes?: string; // GM/player notes
   aliases?: string[]; // Alternate names/spellings that should also match this NPC when highlighted in prose
   createdAt: number; // Timestamp
@@ -573,6 +595,7 @@ export interface NPCReaction {
   npcId: string; // Which NPC is reacting
   npcName: string; // NPC name (for display)
   npcImage?: string; // NPC image URL
+  npcPortraitImageId?: string; // The NPC's portrait made in play (imageStore.ts); wins over npcImage
   reaction: string; // The reaction text (e.g., "liked this", "is disappointed", "gained respect")
   emoji?: string; // Optional emoji (e.g., "❤️", "😠", "🤔")
   context?: string; // What triggered the reaction
@@ -1096,6 +1119,13 @@ export interface StoryData {
   // counter rather than piggybacking on agmtState.sceneCount - this fires on
   // a turn cadence, not a scene cadence, since scenes vary wildly in length.
   turnsSinceStoryProgressCheck?: number;
+
+  // In-play pictures (imageStore.ts holds the bytes; see ImageSubject above).
+  playerPortraitImageId?: string; // The player character's portrait
+  imageStyle?: string; // This story's art-style line; unset uses DEFAULT_IMAGE_STYLE
+  // GM-picture cap bookkeeping: counts generate_image calls in the current
+  // scene and resets when the scene key changes (the tier3CallsInScene pattern).
+  imageState?: { gmImagesInScene: number; lastSceneKey?: string };
 }
 
 // Advanced RPG Tools state tracking

@@ -10,16 +10,20 @@
 import { isStandalone } from "./standalone";
 import { generateImage, GenerateImageRequestBody } from "./generateImageCall";
 
-export async function creatorImageFetch(body: GenerateImageRequestBody): Promise<Response> {
+export async function creatorImageFetch(
+  body: GenerateImageRequestBody,
+  signal?: AbortSignal,
+): Promise<Response> {
   if (!isStandalone()) {
     return fetch("/api/creator/generate-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
   }
 
-  const result = await generateImage(body);
+  const result = await generateImage(body, signal);
   const status = "error" in result ? result.status : 200;
   return new Response(JSON.stringify(result), {
     status,

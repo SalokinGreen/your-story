@@ -37,6 +37,7 @@ import LoreEditor from "./menu/LoreEditor";
 import RelationshipsEditor from "./menu/RelationshipsEditor";
 import NPCEditor from "./menu/NPCEditor";
 import ThreadsEditor from "./menu/ThreadsEditor";
+import PictureSettings from "./menu/PictureSettings";
 import VariablesEditor from "./menu/VariablesEditor";
 import StoryMetaEditor from "./menu/StoryMetaEditor";
 import CouchPlayersEditor from "./menu/CouchPlayersEditor";
@@ -1692,6 +1693,24 @@ export default function MenuPage({
                     authorNotes={storyData.author_notes}
                     onUpdate={(updates) => onUpdateStoryData(updates)}
                   />
+                  {/* Pictures made in play: this story's art style, the space
+                      they take, and Clear (docs/image-generation-design.md §6) */}
+                  <h4 className="text-sm font-semibold text-blue-200 mt-8 mb-3 flex items-center gap-2">
+                    <DynamicIcon name="Image" className="w-4 h-4" />
+                    Pictures
+                  </h4>
+                  {storyDbId ? (
+                    <PictureSettings
+                      storyDbId={storyDbId}
+                      storyData={storyData}
+                      imageStyle={storyData.imageStyle}
+                      onUpdateStoryData={onUpdateStoryData}
+                    />
+                  ) : (
+                    <p className="text-sm text-blue-200/60">
+                      Save the story first to set its pictures.
+                    </p>
+                  )}
                 </div>
               </div>
         </FullScreenView>

@@ -211,6 +211,8 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "add_combatant",
   "update_combatant_stat",
   "npc_roll",
+  // Pictures (only present in the request when imageToolAvailable)
+  "generate_image",
   // Terminal - required
   "end_gm_thinking",
 ]);

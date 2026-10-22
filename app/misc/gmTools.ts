@@ -240,6 +240,20 @@ export interface GenerateNameParams {
 }
 
 /**
+ * Generate Image - paint a picture of a moment, a character or a place
+ * (docs/image-generation-design.md §3.1). The engine checks the per-scene cap,
+ * the key and the ids before anything is spent, and the picture is made in the
+ * background: the call answers at once.
+ */
+export interface GenerateImageParams {
+  subject: "scene" | "npc" | "player" | "location";
+  description: string; // What a camera would see: who, where, light, mood. <= 400 chars
+  npc_id?: string; // subject "npc": whose portrait
+  lore_title?: string; // subject "location": the title of the note it belongs to
+  featuring?: string[]; // NPC ids, and "player", who appear in a scene picture
+}
+
+/**
  * Request Continuation - Ask for another GM round after seeing results
  * Use when you need to chain actions (e.g., attack roll → damage roll)
  */
@@ -662,6 +676,7 @@ export type GMToolParams =
   | { name: "roll_table"; params: RollTableParams }
   | { name: "roll_portent"; params: RollPortentParams }
   | { name: "generate_name"; params: GenerateNameParams }
+  | { name: "generate_image"; params: GenerateImageParams }
   | { name: "read_notes"; params: ReadNotesParams }
   | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "get_game_state"; params: GetGameStateParams }
@@ -1270,6 +1285,58 @@ const generateNameTool: ToolSchema = {
         },
       },
       required: [],
+    },
+  },
+};
+
+const generateImageTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "generate_image",
+    description: `Paint a picture for the player: a scene, an NPC's portrait, the player character's portrait, or a place. It is made in the background and appears under this turn, so the call answers at once and you never describe the picture in your prose.
+
+Use it sparingly, at moments that matter:
+- the first arrival somewhere that matters (subject "location" for a note that has no picture yet, otherwise "scene")
+- an NPC's first time on screen (subject "npc")
+- a reveal or a set piece (subject "scene")
+Never on routine turns. The engine caps how many pictures you may make per scene and refuses the rest; the refusal tells you the limit.
+
+Write \`description\` as what a camera would see: who is there, where, the light, the mood. No text, captions or lettering in the picture. Keep it non-explicit: nothing sexual, and no gore beyond what a fantasy book cover would show. Under 400 characters.
+
+- subject "scene": a moment. Put NPC ids and/or "player" in \`featuring\` for anyone who appears in it.
+- subject "npc": a portrait. \`npc_id\` is required; an NPC that already has a portrait is refused.
+- subject "player": a portrait of the player character, from the character sheet.
+- subject "location": a place. \`lore_title\` is the exact title of the note it belongs to; a note that already has a picture is refused.`,
+    parameters: {
+      type: "object",
+      properties: {
+        subject: {
+          type: "string",
+          enum: ["scene", "npc", "player", "location"],
+          description: "What the picture is of",
+        },
+        description: {
+          type: "string",
+          description:
+            "What a camera would see: who, where, light, mood. Visual only, no text in the picture, non-explicit. Max 400 characters.",
+        },
+        npc_id: {
+          type: "string",
+          description: "subject 'npc': the id of the NPC whose portrait this is",
+        },
+        lore_title: {
+          type: "string",
+          description:
+            "subject 'location': the exact title of the note this picture belongs to",
+        },
+        featuring: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "NPC ids, and 'player', who appear in a scene picture. Unknown ids are ignored.",
+        },
+      },
+      required: ["subject", "description"],
     },
   },
 };
@@ -2210,6 +2277,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   rollTableTool,
   rollPortentTool,
   generateNameTool,
+  // Pictures (offered only when imageToolAvailable, see buildGMStagePrompt)
+  generateImageTool,
   // Note & memory lookup tools
   readNotesTool,
   searchMemoryTool,
