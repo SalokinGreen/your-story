@@ -202,3 +202,33 @@ describe("ensureStoryDataArrays", () => {
     expect(story.scene).toEqual({ parts: [] });
   });
 });
+
+describe("starting with attached notes", () => {
+  it("reports the template notes the attached ones replaced", async () => {
+    const adventure = buildDesignerAdventure();
+    const base = {
+      content: "x",
+      relatedCharacters: [],
+      relatedLocations: [],
+      keys: [],
+      secrtet: false,
+      type: "lore" as const,
+    };
+    adventure.storyTemplate = {
+      ...adventure.storyTemplate,
+      lore: [{ ...base, title: "The Docks", enabled: false }],
+    } as typeof adventure.storyTemplate;
+    let replaced: string[] = [];
+    const id = await startAdventureLocally(
+      adventure,
+      "Player",
+      [{ ...base, title: "The Docks", content: "mine" }],
+      (titles) => (replaced = titles),
+    );
+    expect(replaced).toEqual(["The Docks"]);
+    const saved = await getLocalStory(id);
+    const docks = saved!.storyData.lore.find((l) => l.title === "The Docks");
+    expect(docks?.content).toBe("mine");
+    expect(docks?.enabled).toBe(true);
+  });
+});

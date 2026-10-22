@@ -167,22 +167,50 @@ export default function LibraryPage() {
     const context = pendingPlay;
     setPendingPlay(null);
     try {
+      const replaced: string[] = [];
       const localId =
         context.kind === "adventure"
           ? await startAdventureLocally(
               context.adventure.adventureData,
               "Player",
               initialLore.length ? initialLore : undefined,
+              (titles) => replaced.push(...titles),
             )
           : await startFreeformStoryLocally(
               "Player",
               initialLore.length ? initialLore : undefined,
             );
+      if (replaced.length) {
+        const n = replaced.length;
+        addNotification(
+          `${n} note${n === 1 ? "" : "s"} from the adventure ${n === 1 ? "was" : "were"} replaced by ${n === 1 ? "the one" : "the ones"} you attached${n <= 3 ? `: ${replaced.join(", ")}` : ""}`,
+          "info",
+        );
+      }
       router.push(`/story?storyId=${localId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("Error starting story:", error);
       addNotification(`Failed to start: ${message}`, "failure");
+    }
+  };
+
+  // A built-in starter is read-only and never stored, so "Open a copy" saves
+  // it as a normal adventure under a fresh local id (its notes keep their
+  // built-in ids, so the system is still found) and opens that in the
+  // Designer. It runs in a click handler, never during render.
+  const handleOpenBuiltinCopy = async (adventure: LocalAdventure) => {
+    try {
+      const id = `local:${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      await saveLocalAdventure(id, {
+        ...adventure.adventureData,
+        title: `${adventure.title} (copy)`,
+      });
+      router.push(`/creator?edit=${encodeURIComponent(id)}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Error copying built-in adventure:", error);
+      addNotification(`Failed to open a copy: ${message}`, "failure");
     }
   };
 
@@ -424,6 +452,10 @@ export default function LibraryPage() {
             }
             onNewFolder={() => setShowNewFolderDialog(true)}
             onImportFolder={() => importFolderInputRef.current?.click()}
+            onPlayBuiltin={(adventure) =>
+              setPendingPlay({ kind: "adventure", adventure })
+            }
+            onOpenBuiltinCopy={handleOpenBuiltinCopy}
           />
         ) : view.kind === "folder" ? (
           <FolderDetailView

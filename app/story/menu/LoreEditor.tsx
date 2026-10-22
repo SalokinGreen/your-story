@@ -32,11 +32,13 @@ import {
   LibraryNote,
   createLibraryNote,
   updateLibraryNote,
-  getLibraryNote,
+  getLibraryNoteOrBuiltin,
   libraryNoteToStoryLore,
+  mergeImportedLore,
   storyLoreToLibraryNoteFields,
 } from "../../misc/localNotesLibraryManager";
 import { pinnedNoteWarning } from "../../misc/contextLimits";
+import { isBuiltinId } from "../../misc/systems";
 import PDFImporter from "../../components/PDFImporter";
 import LibraryPickerModal from "../../components/LibraryPickerModal";
 
@@ -185,11 +187,14 @@ export default function LoreEditor({
   // separate list with its own import path.
   const importSelectedLibraryNotes = (notes: LibraryNote[]) => {
     if (notes.length === 0) return;
-    const updated = [...localLore, ...notes.map(libraryNoteToStoryLore)];
+    const { lore: updated, replaced } = mergeImportedLore(
+      localLore,
+      notes.map(libraryNoteToStoryLore),
+    );
     setLocalLore(updated);
     onUpdate(updated);
     addNotification(
-      `Imported ${notes.length} note${notes.length === 1 ? "" : "s"} from library`,
+      `Imported ${notes.length} note${notes.length === 1 ? "" : "s"} from library${replaced.length ? ` (${replaced.length} replaced a note already here)` : ""}`,
       "success",
     );
     setShowLibraryPicker(false);
@@ -199,6 +204,13 @@ export default function LoreEditor({
   const pushLoreToLibrary = async (index: number) => {
     const item = localLore[index];
     if (!item.libraryNoteId) return;
+    if (isBuiltinId(item.libraryNoteId)) {
+      addNotification(
+        "Built-in notes can't be changed in the library - edits to it stay in this story",
+        "warning",
+      );
+      return;
+    }
     setLibrarySyncBusy((prev) => ({ ...prev, [index]: "pushing" }));
     try {
       await updateLibraryNote(item.libraryNoteId, storyLoreToLibraryNoteFields(item));
@@ -221,7 +233,7 @@ export default function LoreEditor({
     if (!item.libraryNoteId) return;
     setLibrarySyncBusy((prev) => ({ ...prev, [index]: "pulling" }));
     try {
-      const note = await getLibraryNote(item.libraryNoteId);
+      const note = await getLibraryNoteOrBuiltin(item.libraryNoteId);
       if (!note) {
         addNotification("That library note no longer exists", "failure");
         return;

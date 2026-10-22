@@ -13,14 +13,26 @@ import {
   CharacterSheetTemplate,
   Goal,
   LoreType,
+  Meter,
   NPC,
   Preset,
+  ProgressTrack,
   StartingChoice,
   StoryData,
   StoryLore,
   SystemState,
 } from "@/app/misc/structs";
 import { resolveSystem } from "@/app/misc/systems/resolve";
+import {
+  LibraryNote,
+  libraryNoteToStoryLore,
+  mergeImportedLore,
+} from "@/app/misc/localNotesLibraryManager";
+import {
+  BUILTIN_SYSTEMS,
+  getBuiltinNote,
+  type BuiltinSystem,
+} from "@/app/misc/systems";
 import { createCharacterSheetTemplate } from "@/app/misc/characterSheetTemplate";
 import { migrateCustomTablesToNotes } from "@/app/misc/tableNotes";
 
@@ -53,6 +65,12 @@ export interface AdventureDraft {
   // The hand switch for the meter, track, session and action-roll tools
   // (decision 79). Unset means "derive it from the notes imported".
   systemState?: Pick<SystemState, "usesSystemTools">;
+  // Carried through untouched, never edited by a Designer tool: a built-in
+  // starter opened in the Designer ("Open a copy") has meters and tracks
+  // (the world's Heat, the cohort's objectives) that a draft otherwise has
+  // no field for, and saving would silently drop them.
+  meters?: Meter[];
+  progressTracks?: ProgressTrack[];
 }
 
 /** A trailing warning for the Designer when a note sent to the GM in full every turn is long (decision 96). */
@@ -565,6 +583,10 @@ export function draftToAdventure(draft: AdventureDraft): Partial<Adventure> {
     npcs: draft.npcs.length > 0 ? draft.npcs : undefined,
     goals: draft.goals,
     presets: draft.presets,
+    ...(draft.meters?.length ? { meters: draft.meters } : {}),
+    ...(draft.progressTracks?.length
+      ? { progressTracks: draft.progressTracks }
+      : {}),
     ...(draft.systemState?.usesSystemTools !== undefined
       ? {
           systemState: {
@@ -622,6 +644,10 @@ export function adventureToDraft(adventure: Partial<Adventure>): AdventureDraft 
     startingChoices: adventure.startingChoices ?? [],
     presets: adventure.presets ?? story.presets ?? [],
     characterSheetTemplate: adventure.characterSheetTemplate,
+    ...(story.meters?.length ? { meters: story.meters } : {}),
+    ...(story.progressTracks?.length
+      ? { progressTracks: story.progressTracks }
+      : {}),
     ...(story.systemState?.usesSystemTools !== undefined
       ? { systemState: { usesSystemTools: story.systemState.usesSystemTools } }
       : {}),
@@ -740,4 +766,47 @@ export function draftReadiness(draft: AdventureDraft): {
   if (!draft.lore.some((l) => l.type === "character_sheet"))
     missing.push("a character sheet");
   return { ready: missing.length === 0, missing };
+}
+
+// ============================================
+// LIBRARY IMPORT
+// ============================================
+
+/**
+ * Brings library notes into a draft by the one import rule
+ * (`mergeImportedLore`). When an imported note belongs to a built-in system
+ * and the draft has no character sheet template yet, the system's sheet
+ * template becomes the draft's (`sheetFrom` names the system). The meter sets
+ * need nothing: `resolveSystem` finds them from the notes.
+ */
+export function importLibraryNotesIntoDraft(
+  draft: AdventureDraft,
+  notes: LibraryNote[],
+  systems: BuiltinSystem[] = BUILTIN_SYSTEMS,
+): {
+  draft: AdventureDraft;
+  replaced: string[];
+  added: string[];
+  sheetFrom?: string;
+} {
+  const merged = mergeImportedLore(draft.lore, notes.map(libraryNoteToStoryLore));
+  let next: AdventureDraft = { ...draft, lore: merged.lore };
+  let sheetFrom: string | undefined;
+  if (!draft.characterSheetTemplate?.template) {
+    for (const note of notes) {
+      const builtin = getBuiltinNote(note.id, systems);
+      const system = builtin && systems.find((s) => s.id === builtin.systemId);
+      if (system?.sheetTemplate) {
+        next = {
+          ...next,
+          characterSheetTemplate: createCharacterSheetTemplate(
+            system.sheetTemplate,
+          ),
+        };
+        sheetFrom = system.title;
+        break;
+      }
+    }
+  }
+  return { draft: next, replaced: merged.replaced, added: merged.added, sheetFrom };
 }
