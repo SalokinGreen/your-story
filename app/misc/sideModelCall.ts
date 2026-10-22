@@ -84,6 +84,8 @@ export interface SideModelRequest extends SideCallCostContext {
    */
   reasoningEffort?: string;
   tools?: unknown[];
+  /** A stable conversation id for provider-side caching (providerCall.ts). */
+  cacheKey?: string;
   abortSignal?: AbortSignal;
 }
 
@@ -131,6 +133,7 @@ export async function callSideModel(
         ...keys,
         customModel: getCustomModelIfUUID(request.model),
         reasoningEffort: request.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+        ...(request.cacheKey ? { cacheKey: request.cacheKey } : {}),
       },
       request.abortSignal,
     );

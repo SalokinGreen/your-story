@@ -51,6 +51,7 @@ import {
 } from "@/app/misc/pacingFeedback";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
+import { storyCacheKey, markRoundBreakpoint } from "@/app/misc/cacheMarks";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { pickProviderKeys } from "@/app/misc/sideModelCall";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
@@ -466,6 +467,9 @@ export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /** Of promptTokens, how many the provider served from its prompt cache. */
+  cachedTokens?: number;
+  cacheWriteTokens?: number;
 }
 
 export interface GenerationMeta {
@@ -2454,6 +2458,12 @@ async function generateStoryTurnOnce(
             }
           }
 
+          // Claude's third cache breakpoint: the latest message of this
+          // round's request, which the next round extends. On a copy - the
+          // stored gmBaseMessages never carry it, and a round with no history
+          // yet already has the turn mark on its last message.
+          markRoundBreakpoint(messagesWithHistory, conversationHistory.length > 0);
+
           // Check if user cancelled
           if (options.abortSignal?.aborted) {
             throw new Error("Generation cancelled by user");
@@ -2487,6 +2497,7 @@ async function generateStoryTurnOnce(
               deepinfraKey: options.deepinfraKey,
               zaiKey: options.zaiKey,
               customModel: getCustomModelIfUUID(model),
+              ...storyCacheKey(options.storyId, "gm"),
               // Set only on the round immediately after the M2 gate fires -
               // forces the model to call some tool rather than relying on
               // the prose re-prompt alone. Omitted otherwise, letting the
@@ -2695,6 +2706,8 @@ async function generateStoryTurnOnce(
               modelKey: String(gmModel),
               promptTokens: gmResult.meta.usage?.promptTokens || 0,
               completionTokens: gmResult.meta.usage?.completionTokens || 0,
+              cachedTokens: gmResult.meta.usage?.cachedTokens,
+              cacheWriteTokens: gmResult.meta.usage?.cacheWriteTokens,
               providerReportedUsd: gmResult.meta.estimatedCost,
             });
 
@@ -2707,6 +2720,12 @@ async function generateStoryTurnOnce(
               gmMeta.usage.completionTokens +=
                 gmResult.meta.usage?.completionTokens || 0;
               gmMeta.usage.totalTokens += gmResult.meta.usage?.totalTokens || 0;
+              gmMeta.usage.cachedTokens =
+                (gmMeta.usage.cachedTokens || 0) +
+                (gmResult.meta.usage?.cachedTokens || 0);
+              gmMeta.usage.cacheWriteTokens =
+                (gmMeta.usage.cacheWriteTokens || 0) +
+                (gmResult.meta.usage?.cacheWriteTokens || 0);
               gmMeta.tokenCost += gmResult.meta.tokenCost || 0;
             }
             totalTokenCost += gmResult.meta.tokenCost || 0;
@@ -3305,6 +3324,7 @@ async function generateStoryTurnOnce(
         deepinfraKey: options.deepinfraKey,
         zaiKey: options.zaiKey,
         customModel: getCustomModelIfUUID(narrationModel),
+        ...storyCacheKey(options.storyId, "narration"),
         // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
         // Also stop on [STOP] marker for player agency stopping points
         stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
@@ -3448,6 +3468,8 @@ async function generateStoryTurnOnce(
             modelKey: String(narrationModel),
             promptTokens: event.meta.usage?.promptTokens || 0,
             completionTokens: event.meta.usage?.completionTokens || 0,
+            cachedTokens: event.meta.usage?.cachedTokens,
+            cacheWriteTokens: event.meta.usage?.cacheWriteTokens,
             providerReportedUsd: event.meta.estimatedCost,
           });
           totalTokenCost += event.meta.tokenCost;
@@ -3602,6 +3624,8 @@ async function generateStoryTurnOnce(
           modelKey: String(narrationModel),
           promptTokens: choicesResultMeta.usage?.promptTokens || 0,
           completionTokens: choicesResultMeta.usage?.completionTokens || 0,
+          cachedTokens: choicesResultMeta.usage?.cachedTokens,
+          cacheWriteTokens: choicesResultMeta.usage?.cacheWriteTokens,
           providerReportedUsd: choicesResultMeta.estimatedCost,
         });
         totalTokenCost += choicesResultMeta.tokenCost;

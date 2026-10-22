@@ -146,7 +146,13 @@ describe("a turn on the Claude subscription", () => {
     expect(runs[1].prompt).toMatch(/\[Tool result · calculate · cli\w+_0\]\n\S/);
     expect(runs[1].prompt.startsWith(runs[0].prompt)).toBe(true);
     expect(runs[1].systemPrompt).toBe(runs[0].systemPrompt);
-    expect(runs[0].prompt.startsWith("[User]\n> I attack the goblin")).toBe(true);
+    // The prompt is the live block and the action in one user message; the
+    // stable block and history (here none) went to the system file.
+    expect(runs[0].prompt.startsWith("[User]\n")).toBe(true);
+    expect(runs[0].prompt).toContain("> I attack the goblin");
+    expect(runs[0].prompt).toContain("LIVE GAME STATE");
+    expect(runs[0].systemPrompt).toContain("THE STORY'S FOUNDATION");
+    expect(runs[0].systemPrompt).not.toContain("> I attack the goblin");
     // No GM round went to an HTTP provider.
     expect(httpCalls.filter((c) => c.body.tools)).toHaveLength(0);
   });

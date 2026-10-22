@@ -349,6 +349,7 @@ describe("calibration", () => {
       calls: stages.reduce((n, s) => n + s.calls, 0),
       promptTokens: 0,
       completionTokens: 0,
+      cachedTokens: 0,
       totalUsd: 0,
       hasUnpricedCalls: false,
       byStage: stages.map((s) => ({

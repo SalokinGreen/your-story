@@ -443,12 +443,31 @@ counts against it, and a Claude call is billed at OpenRouter's own
 (`modelRejectsForcedToolChoice`): it thinks by default and is reported to
 reject a forced tool call, though OpenRouter lists the parameter as
 supported. A request built outside `providerCall` (the OCR importer's
-`callProviderAI`) needs the same care. The GM stage marks the player's
-action `cacheBreakpoint`, and a
-Claude request with tools gets prompt-cache breakpoints there and on the
-system message. A change to the GM prompt's message layout must keep the
-base messages byte-identical across a turn's rounds, or that cache stops
-hitting.
+`callProviderAI`) needs the same care. **The GM request is ordered by how
+often each piece changes** (decision 91, `buildGMStagePrompt`): the system
+prompt with nothing per-turn in it; one user message, the stable block
+(`buildStableBlock`: the player, the archetype, the DM instructions, the
+"story so far" summary), and a short assistant acknowledgement; history (every
+part after `summarizedThroughIndex`), its last message marked
+`cacheBreakpoint: "prefix"`; then ONE user message, the live block and the
+player's action (`buildLiveBlock`: the character sheet, the campaign plan,
+the note-title lists, memory, NPCs, goals, threads, the oracle line, combat,
+timers, pending events and moves, then the setup blocks, the Observer,
+progress, repetition and knowledge notes, the pacing note and the GM tip),
+marked `"turn"`. `generation.ts` marks the last message of each later round's
+request copy `"round"` (`cacheMarks.ts`). A Claude request with tools gets
+`cache_control` on the system message and the last message of each mark kind,
+four at most; the `claude` CLI puts everything up to the `"prefix"` message in
+its system file. **Anything per-turn goes in the live block, never the system
+prompt or the stable block**, and a change to the layout must keep the base
+messages byte-identical across a turn's rounds and everything up to the end
+of history identical across turns, or the caches stop hitting
+(`tests/tokenBudget.test.ts` measures the shared prefix). Mistral gets a
+`prompt_cache_key` and OpenRouter a `session_id` (`ys:<storyId>:gm` and
+`:narration`; a Mistral 400/422 naming the key retries once without it and
+turns it off for the session). OpenRouter and Google models get an earlier
+turn's `reasoning` and `reasoning_details` no longer, only the current
+turn's; DeepSeek still gets `reasoning_content` on every tool call.
 
 **The player's own Claude subscription runs through the `claude` CLI, on the
 desktop app only** (decisions 10–13, `docs/claude-gm-design.md` §4). The

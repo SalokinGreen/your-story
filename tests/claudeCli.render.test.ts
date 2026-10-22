@@ -46,7 +46,7 @@ const BASE: ChatMessage[] = [
   },
   { role: "tool", content: "2", tool_call_id: "old_1" },
   { role: "assistant", content: "The bridge sways in the wind." },
-  { role: "user", content: "> I attack the goblin", cacheBreakpoint: true },
+  { role: "user", content: "> I attack the goblin", cacheBreakpoint: "turn" },
   { role: "assistant", content: "<thinking>" },
 ];
 
@@ -135,7 +135,7 @@ describe("renderCliPrompt", () => {
     // A story with no GM history yet: [action, prefill, story prompt].
     const { prompt } = renderCliPrompt([
       { role: "system", content: "sys" },
-      { role: "user", content: "> I look around", cacheBreakpoint: true },
+      { role: "user", content: "> I look around", cacheBreakpoint: "turn" },
       { role: "assistant", content: GM_STAGE_AFFIRMATION },
       { role: "user", content: "Now write the story." },
     ]);
@@ -148,7 +148,7 @@ describe("renderCliPrompt", () => {
     const { prompt } = renderCliPrompt(
       [
         { role: "system", content: "sys" },
-        { role: "user", content: "> act", cacheBreakpoint: true },
+        { role: "user", content: "> act", cacheBreakpoint: "turn" },
         { role: "assistant", content: "The goblin lunges." },
         { role: "user", content: "This scene requires a roll." },
       ],

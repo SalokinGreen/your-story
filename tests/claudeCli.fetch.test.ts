@@ -31,7 +31,7 @@ function gmRound(overrides: Partial<GenerateRequestBody> = {}): GenerateRequestB
   return {
     messages: [
       { role: "system", content: "You ARE the Game Master." },
-      { role: "user", content: "> I attack the goblin", cacheBreakpoint: true },
+      { role: "user", content: "> I attack the goblin", cacheBreakpoint: "turn" },
     ],
     tools: TOOLS,
     model: "Claude Sonnet (subscription)",
@@ -87,7 +87,7 @@ describe("a GM round (structured mode)", () => {
       model: "claude-sonnet-5-5",
       modelName: "Claude Sonnet (subscription)",
       provider: "claude-cli",
-      usage: { promptTokens: 1003, completionTokens: 50, totalTokens: 1053 },
+      usage: { promptTokens: 1003, completionTokens: 50, totalTokens: 1053, cacheWriteTokens: 1000 },
       estimatedCost: 0,
     });
   });
@@ -369,7 +369,7 @@ describe("the first round of a fresh conversation", () => {
     gmRound({
       messages: [
         { role: "system", content: "You ARE the Game Master." },
-        { role: "user", content: "> I attack the goblin", cacheBreakpoint: true },
+        { role: "user", content: "> I attack the goblin", cacheBreakpoint: "turn" },
         {
           role: "assistant",
           content: "",

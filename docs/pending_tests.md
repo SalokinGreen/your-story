@@ -10,6 +10,54 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-22 — Token savings PR T2: the stable prefix and provider caching (`claude/token-savings-t2`)
+
+The suite measures the layout against a recording `fetch` (consecutive turns
+share 11,165 of 14,598 message tokens, from 0) and the provider bodies against
+a mocked one; no model was called. Decision 105: one real session on the
+default models, after this merges, with the author's go. Cached tokens are in
+the cost ledger (slice 7): the Turn Cost panel shows "N% of input from cache"
+for the last turn, and the Debug Logs' "AI generation complete" line logs
+`cachedTokens` and `cacheWriteTokens`.
+
+- **The cache share on screen.** After a second turn on any cached model,
+  open Settings' Turn Cost panel. *Expected:* "N% of input from cache" beside
+  the token counts, above 0. The panel line was never seen rendered (no
+  browser in the building session).
+
+- **Mistral's cache.** Play two turns on a Mistral Small model.
+  *Expected:* after the first round, `cachedTokens` is above 0 in the Debug
+  Logs. *Failure looks like:* never above 0 (Mistral ignores the key), or a
+  "Mistral rejected prompt_cache_key - retrying without it" line (rejected;
+  it is skipped for the rest of the session and play carries on).
+- **Cross-turn hits.** On DeepSeek, play three turns. *Expected:* turn 2
+  onwards shows most of round 1's input cached (the stable prefix is
+  everything but the live block and the action). *Failure looks like:* 0
+  cached on every first round, which means the prefix is still changing;
+  compare two turns' requests in the Debug Logs.
+- **Claude's round mark and tool results (Claude via OpenRouter, if played).**
+  The round mark never lands on a `tool` message (OpenRouter types a tool
+  message's content as a string); it walks back to the last assistant or
+  user message with text, or is left off. A turn with tool calls and some
+  assistant text. *Expected:* round 2 onwards shows cache reads for the part
+  up to that text. *Open question, a possible later gain and not a crash
+  risk:* would OpenRouter accept `cache_control` on a tool message's content
+  parts? If it does, the mark could sit on the latest tool result and cache
+  the whole round.
+- **Claude, five minutes apart.** Turns more than five minutes apart should
+  not read cache (decision 104 decides whether to move to the 1-hour cache).
+- **The subscription route.** On the desktop, one turn on a Claude
+  (subscription) model. *Expected:* the system prompt file holds the stable
+  block and history (check the "Claude CLI run" log line's sizes), and the
+  second round's request starts the same.
+- **The GM's behaviour with its nudges next to the action.** Five turns in a
+  story with a pacing note and the GM tip. *Expected:* nothing odd; the Observer
+  flags no more than before. *Failure looks like:* the GM quoting a note back
+  to the player.
+- **OpenRouter reasoning replay on Gemini.** A tool-calling turn on a Gemini
+  model through OpenRouter. *Expected:* a normal turn, with no 400 about a
+  thought signature.
+
 ## 2026-10-22 — Pictures in play, PR I1 (`claude/image-gen-i1`)
 
 The suite drives the queue, the executor, the fal call and a real
@@ -82,6 +130,7 @@ they decide whether S7 is a small change or needs fal's storage upload
   cards under a turn; the **Illustrate this** button beside the voice controls
   at phone width; the NPC detail header with its **Make portrait** button; the
   character sheet's portrait block.
+
 
 ## 2026-10-22 — Token savings PR T1: history stubs, fixed start, summaries (`claude/token-savings-t1`)
 

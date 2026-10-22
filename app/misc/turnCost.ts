@@ -58,6 +58,8 @@ export interface ModelPrice {
   inputPrice: number;
   /** $ per 1M output tokens. */
   outputPrice: number;
+  /** $ per 1M cached input tokens, when a dated provider price is known. */
+  cachedInputPrice?: number;
   displayName: string;
   provider: string;
   /** True when we have no price data at all (unpriced custom model). */
@@ -96,6 +98,7 @@ export function getModelPrice(modelKey: string): ModelPrice {
     return {
       inputPrice: config.inputPrice,
       outputPrice: config.outputPrice,
+      cachedInputPrice: (config as { cachedInputPrice?: number }).cachedInputPrice,
       displayName: config.name,
       provider: config.provider,
       unpriced: false,
@@ -118,10 +121,17 @@ export function priceCall(
   modelKey: string,
   promptTokens: number,
   completionTokens: number,
+  cachedTokens = 0,
 ): number {
   const price = getModelPrice(modelKey);
+  // Cached tokens are part of promptTokens. They cost cachedInputPrice where
+  // the model has one; without it they are priced as plain input, which
+  // overstates a cached call (the entry records that, see TurnCostEntry).
+  const cached = Math.min(Math.max(0, cachedTokens), Math.max(0, promptTokens));
+  const cachedRate = price.cachedInputPrice ?? price.inputPrice;
   return (
-    (Math.max(0, promptTokens) / 1_000_000) * price.inputPrice +
+    ((Math.max(0, promptTokens) - cached) / 1_000_000) * price.inputPrice +
+    (cached / 1_000_000) * cachedRate +
     (Math.max(0, completionTokens) / 1_000_000) * price.outputPrice
   );
 }
@@ -214,6 +224,15 @@ export interface TurnCostEntry {
   provider: string;
   promptTokens: number;
   completionTokens: number;
+  /** Of promptTokens, how many the provider served from its prompt cache. */
+  cachedTokens?: number;
+  /** Tokens written to the cache (Claude bills these above plain input). */
+  cacheWriteTokens?: number;
+  /**
+   * True when cachedTokens is above 0 but the model has no cached price, so
+   * costUsd priced them as plain input and overstates the call.
+   */
+  cachedAtFullPrice?: boolean;
   /** List-price cost in dollars, computed from tokens. */
   costUsd: number;
   /**
@@ -241,6 +260,8 @@ export interface TurnCostReport {
   calls: number;
   promptTokens: number;
   completionTokens: number;
+  /** Of promptTokens, the share served from the providers' caches. */
+  cachedTokens: number;
   totalUsd: number;
   /** True if any call in the turn used a model we have no prices for. */
   hasUnpricedCalls: boolean;
@@ -313,6 +334,9 @@ export interface RecordAICallParams {
   modelKey: string;
   promptTokens: number;
   completionTokens: number;
+  /** Of promptTokens, how many were served from the provider's cache. */
+  cachedTokens?: number;
+  cacheWriteTokens?: number;
   /** Provider's own dollar figure, when it reports one. */
   providerReportedUsd?: number;
   /**
@@ -344,10 +368,20 @@ export function recordAICall(params: RecordAICallParams): void {
       provider: price.provider,
       promptTokens: params.promptTokens || 0,
       completionTokens: params.completionTokens || 0,
+      ...(params.cachedTokens ? { cachedTokens: params.cachedTokens } : {}),
+      ...(params.cacheWriteTokens ? { cacheWriteTokens: params.cacheWriteTokens } : {}),
+      // Only when the dollar figure that counts is our own: a provider-reported
+      // cost (OpenRouter's usage.cost) already reflects the cache discount.
+      ...(params.cachedTokens &&
+      price.cachedInputPrice === undefined &&
+      params.providerReportedUsd === undefined
+        ? { cachedAtFullPrice: true }
+        : {}),
       costUsd: priceCall(
         params.modelKey,
         params.promptTokens || 0,
         params.completionTokens || 0,
+        params.cachedTokens || 0,
       ),
       providerReportedUsd: params.providerReportedUsd,
       unpriced: price.unpriced && params.providerReportedUsd === undefined,
@@ -376,6 +410,8 @@ interface GenerateResponseMeta {
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
+    cachedTokens?: number;
+    cacheWriteTokens?: number;
   };
   estimatedCost?: number;
 }
@@ -400,6 +436,8 @@ export function recordSideCall(
     modelKey,
     promptTokens: usage.promptTokens || 0,
     completionTokens: usage.completionTokens || 0,
+    cachedTokens: usage.cachedTokens,
+    cacheWriteTokens: usage.cacheWriteTokens,
     providerReportedUsd: data?.meta?.estimatedCost,
     costTurnId: context?.costTurnId,
   });
@@ -417,6 +455,7 @@ export function getTurnCostReport(turnId: string): TurnCostReport | null {
   const byStage = new Map<TurnCostStage, TurnCostStageSummary>();
   let promptTokens = 0;
   let completionTokens = 0;
+  let cachedTokens = 0;
   let totalUsd = 0;
   let hasUnpricedCalls = false;
   let lastAt = turn.startedAt;
@@ -424,6 +463,7 @@ export function getTurnCostReport(turnId: string): TurnCostReport | null {
   for (const entry of turn.entries) {
     const usd = effectiveUsd(entry);
     promptTokens += entry.promptTokens;
+    cachedTokens += entry.cachedTokens ?? 0;
     completionTokens += entry.completionTokens;
     totalUsd += usd;
     if (entry.unpriced) hasUnpricedCalls = true;
@@ -448,6 +488,7 @@ export function getTurnCostReport(turnId: string): TurnCostReport | null {
     calls: turn.entries.length,
     promptTokens,
     completionTokens,
+    cachedTokens,
     totalUsd,
     hasUnpricedCalls,
     byStage: TURN_COST_STAGE_ORDER.filter((s) => byStage.has(s)).map(

@@ -545,3 +545,113 @@ Tests 2,246 to 2,256 (+10). New tests use the run-time shape: the last part of
 - **Minor:** `increment_scene` joins `KEEP_WHOLE_TOOLS`; a stubbed `**ERROR**`
   result keeps its first line.
 - Skipped as told: the tokenizer-load cache miss and object-shaped arguments.
+
+### 2026-10-22 - PR T2 (slices 5 and 6), `claude/token-savings-t2`
+
+Built on master `e80c7f6` (T1 merged). Baseline before the first edit: 139
+files, **2,256 tests**, `tsc` clean. After: 142 files, **2,283 tests** (+27:
+`providerCall.cache` 10, `aiStaged.stablePrefix` 10, `claudeCli.prefix` 4,
+`tokenBudget` +2, `providerCall.reasoning` +1; five existing tests updated,
+net 0). Slice 7 (cached tokens in the ledger) is **not built** in this PR:
+the brief for T2 named slices 5 and 6. Everything else in the plan's T2 row
+is here. The harness now measures **11,165 of 14,598 message tokens shared
+between consecutive turns** (was 0): the system prompt, the stable block and
+all the previous turn's history; only the live block, the action and the
+new history tail differ. No `engine-review` agent ran from this session (no
+agent tool was available to the builder); the coordinating session should run
+it on the diff.
+
+- **`cacheBreakpoint` is `"prefix" | "turn" | "round"`** in both `ChatMessage`
+  types (`providerCall.ts`, `chatMessage.ts`). Five tests that set `true`
+  now set `"turn"`.
+- **The helpers for the marks and the key live in a new `cacheMarks.ts`**
+  (`storyCacheKey`, `markRoundBreakpoint`), not in `generation.ts`, so
+  `generation.ts` takes three small edits (an import, two spreads, one call)
+  and the merge with the image-generation branch stays small. The round mark
+  goes on a copy of the request's last message and only when the round has
+  history appended (a first round's last message already carries `"turn"`).
+- **The stable block always exists.** The old code skipped the state message
+  if it was under 100 characters, which its header alone never allowed; the
+  block is now unconditional, so the acknowledgement always follows it and
+  `"prefix"` always has a message to land on.
+- **Per-turn blocks keep their text, with one added heading.** The pacing line
+  was the tail of the Length & Pacing paragraph; in the live block it sits
+  under "PACING NOTE (this turn)". The setup blocks, the four notes and the GM
+  tip are verbatim, after the state sections and right before the action.
+- **The live block opens with a "LIVE GAME STATE (this turn)" rule, the stable
+  block with "THE STORY'S FOUNDATION (changes rarely)"**, replacing the one
+  "CURRENT GAME STATE" header.
+- **The CLI split.** `renderCliPrompt` splits after the last `"prefix"` message
+  when something follows it; a request with only a `"turn"` mark keeps the
+  old split (before the marked action), so a caller without a prefix mark
+  behaves as before.
+- **Claude's third mark can land on a `tool` message** (a round after a tool
+  call ends in one). Its content goes out as a list of text parts with
+  `cache_control`, like the other marks. Whether OpenRouter forwards that on a
+  `tool` message is unverified; it is the first entry in `pending_tests.md`
+  for Claude, with the fallback (mark the assistant message before it).
+- **Mistral's rejection check** reads the error text with `response.clone()`
+  and looks for `prompt_cache_key` in a 400 or 422; the retry runs once, the
+  flag is module-level and survives for the session, and
+  `resetMistralCacheKeyRejected()` exists for tests.
+- **OpenRouter's `session_id` is cut to 128 characters** (its documented
+  limit); a story id plus `ys:` and `:narration` is far under it.
+- `callSideModel` gained an optional `cacheKey` but no caller passes one (the
+  side agents are not a conversation to keep warm).
+
+### 2026-10-22 - after the engine review (PR T2)
+
+- **The round mark never lands on a `tool` message** (the earlier decision
+  that it could is withdrawn). `markRoundBreakpoint` walks back to the last
+  non-tool message with text and puts no mark if that one is already marked
+  or there is none; a tool-only round therefore gets no round mark.
+- **`cachedAtFullPrice` is set only without a provider-reported cost**, since
+  `effectiveUsd` prefers OpenRouter's `usage.cost`, which already has the
+  discount.
+- Anthropic's cache lookback is about 20 content blocks. After a turn with
+  about 10 or more tool calls, the next turn's `prefix` mark will miss, so the
+  history is re-written at 1.25x; the harness's shared-token count overstates
+  Claude's saving on tool-heavy turns. A possible fix later is an intermediate
+  history mark.
+- The Mistral retry can fire once on an unrelated 400 whose body echoes
+  `prompt_cache_key`. That is accepted.
+- `ai_staged.ts`: the `get_game_state` line said "the state shown above"; it
+  now says "the state in the live block".
+
+### 2026-10-22 - PR T2, slice 7 (cached tokens in the ledger), added after the first report
+
+Tests 2,283 to 2,291 (+8: `cacheUsage` 8; `claudeCli.fetch` and `turnCost`
+fixtures updated). Supersedes the "slice 7 not built" lines above.
+
+- **`readCacheUsage(provider, usage)`** (`providerCall.ts`) reads
+  `prompt_tokens_details.cached_tokens` / `cache_write_tokens`, and for
+  DeepSeek `prompt_cache_hit_tokens`. Zero reads as absent. Both the streaming
+  and non-streaming paths put `cachedTokens` / `cacheWriteTokens` on
+  `meta.usage`; `claudeCli.ts`'s `usageOf` fills them from the CLI's
+  `cache_read_input_tokens` / `cache_creation_input_tokens` (summed over a
+  retry). The CLI's `promptTokens` already included both, as before.
+- **Cached tokens are part of `promptTokens`**, not extra. `priceCall` takes an
+  optional `cachedTokens` (clamped to the prompt), prices them at
+  `cachedInputPrice` or, without one, at the plain input price, and the entry
+  gets `cachedAtFullPrice: true` so the panel can say its dollar figure
+  overstates that call. A provider-reported dollar figure (Claude's
+  `usage.cost`, DeepInfra) still wins in the totals, as before.
+- **Cache-write premium is not priced.** Claude's 1.25x writes are recorded
+  (`cacheWriteTokens`) but not added to the estimate: Claude is billed at
+  OpenRouter's own `usage.cost` anyway.
+- **`cachedInputPrice` is filled only where a dated price was already in the
+  file's comments**: Grok 4.5 ($0.30), Grok 4.7 ($0.50), GLM 5.3 and 5.3 Flash
+  on Z.ai ($0.26, $0.03), Mistral Large 4 ($0.14). DeepSeek's and Gemini's
+  comments give prices that are off-peak or date-limited, so those stay
+  empty for now.
+- **Wired into** the GM rounds, narration and choices ledger entries
+  (`generation.ts`) and `recordSideCall` (every side agent). The one-off tier
+  classifier is not wired (its prompt is tiny). `GenerationMeta.usage` sums the
+  GM rounds' cached figures.
+- **The Turn Cost panel** shows "N% of input from cache" next to the last
+  turn's token counts when any call reported a hit; its tooltip says when some
+  models were priced without a cached rate. Not seen rendered (no browser in
+  this session): it is a text span in an existing line.
+- **The estimate side (`turnCostEstimate.ts`) is untouched**: it still
+  predicts at full input price, now an overstatement once caching works.
+  Calibration against real turns is the follow-up, after the live check.
