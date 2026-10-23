@@ -780,6 +780,11 @@ export interface SetupState {
   // the player-scope ones by player id ("solo" in solo play). Absent means
   // nothing is covered.
   covered?: { table: string[]; players: Record<string, string[]> };
+  // Players (ids as setupParticipants gives them, "solo" in solo play) who
+  // already had a populated character sheet when the setup style was chosen.
+  // They are not asked the per-character steps; table and world steps still
+  // apply. Set once, with `mode` (premadePlayerIds in campaignPlan.ts).
+  premadeFor?: string[];
 }
 
 export interface StoryData {

@@ -3100,7 +3100,10 @@ async function generateStoryTurnOnce(
                       ? JSON.parse(rawArgs || "{}")
                       : rawArgs || {};
                   const paramsUsed = JSON.stringify(parsedArgs, null, 2);
-                  toolContent = `**ERROR** in ${result.toolName}: ${errorMsg}\n\nYou called with: ${paramsUsed}\n\nPlease check the tool's required parameters and try again with correct arguments.`;
+                  // "The game has already started" is not a parameter problem.
+                  toolContent = /already started/i.test(errorMsg)
+                    ? `**ERROR** in ${result.toolName}: ${errorMsg}`
+                    : `**ERROR** in ${result.toolName}: ${errorMsg}\n\nYou called with: ${paramsUsed}\n\nPlease check the tool's required parameters and try again with correct arguments.`;
                 }
               } else {
                 toolContent = `[${tc.function.name}] Executed`;
@@ -3351,18 +3354,14 @@ async function generateStoryTurnOnce(
           }
         }
 
-        // Round limit reached in session zero with nothing moved forward: the
-        // same guard as the setup gate's exhaustion, so a turn that burned
-        // all its rounds on tools that did nothing narrates nothing either.
-        if (
-          sessionZeroTurn &&
-          !isComplete &&
-          !startGameSucceededThisTurn &&
-          !setupProgressThisTurn
-        ) {
+        // Round limit reached in session zero, the last round still a tool
+        // round: its text is a line written before the tools' results were
+        // read (an answered question's follow-up, say), so the turn ends on
+        // the engine's own line whether or not the turn made progress.
+        if (sessionZeroTurn && !isComplete && !startGameSucceededThisTurn) {
           setupGateExhausted = true;
           logger.action(
-            "Setup gate: round limit reached with no setup progress - ending the turn on the engine line, no narration",
+            "Setup gate: round limit reached before the game started - ending the turn on the engine line, no narration",
             { maxRounds: MAX_GM_ROUNDS },
           );
           discardHeldSetupProse();

@@ -210,7 +210,7 @@ describe("buildSessionZeroBlock: the rule and the mode", () => {
   it("full mode: one ask_question per creation step", () => {
     const block = buildSessionZeroBlock(story({ setup: { mode: "full" } }));
     expect(block).toContain("MODE: step by step");
-    expect(block).toContain("one step per `ask_question` call");
+    expect(block).toContain("character steps one per `ask_question` call");
     expect(block).not.toContain("MODE: quick setup");
     expect(block).toContain("SETUP STEPS");
     expect(block).toContain("NEXT STEP TO ASK: setting");

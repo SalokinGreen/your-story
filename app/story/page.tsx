@@ -97,6 +97,7 @@ import {
   settleSetupResolver,
 } from "../misc/setupConfirmAnswer";
 import { SETUP_STYLE_LINES } from "../misc/setupStrip";
+import { premadePlayerIds } from "../misc/campaignPlan";
 import type {
   ManualRollRequest,
   ManualRollAnswer,
@@ -2304,7 +2305,13 @@ function StoryPageContent() {
     // Host in a networked room: don't generate on the host's own submit -
     // buffer it and wait for the rest of the table (see recordSeatInput).
     if (netSession?.role === "host" && !bypassBatch) {
-      if (modeToSet) storyData.setup = { ...storyData.setup, mode: modeToSet };
+      if (modeToSet) {
+        storyData.setup = {
+          ...storyData.setup,
+          mode: modeToSet,
+          premadeFor: premadePlayerIds(storyData, setupRoster()),
+        };
+      }
       recordSeatInput({
         playerId: netSession.myLocalPlayerId,
         name: resolveSeatName(netSession.myLocalPlayerId),
@@ -2347,7 +2354,13 @@ function StoryPageContent() {
     logger.action("User custom input", { customText });
 
     if (modeToSet) {
-      storyData.setup = { ...storyData.setup, mode: modeToSet };
+      // A sheet that exists now is a pre-made character: its owner skips the
+      // per-character steps.
+      storyData.setup = {
+        ...storyData.setup,
+        mode: modeToSet,
+        premadeFor: premadePlayerIds(storyData, setupRoster()),
+      };
     }
 
     // Physical dice mode: record who this turn belongs to, so a

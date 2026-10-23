@@ -2475,12 +2475,15 @@ function stepRef(m: MissingCreationStep): string {
 }
 
 /**
- * Records the creation step an answered ask_question covered, on the working
+ * Records the creation steps an answered ask_question covered, on the working
  * copy (docs/session-zero-detail-design.md 3.2), and returns the line the GM
- * reads: what was recorded and what is next. One step per call; a step counts
- * only when every item carrying its tag was answered and, for a player step,
- * the engine can name the player (the question's target, or solo). Returns ""
- * when no question carried a tag.
+ * reads: what was recorded and what is next. Each tag counts only when every
+ * item carrying it was answered and, for a player step, the engine can name
+ * the player (the question's target, or solo). Table steps may be batched, and
+ * in quick mode so may anything; in full mode a player step (the per-character
+ * build) is asked one at a time, so a call mixing it with other tags records
+ * the table tags and refuses the player ones. Returns "" when no question
+ * carried a tag.
  */
 function recordCreationSteps(
   story: StoryData,
@@ -2493,28 +2496,46 @@ function recordCreationSteps(
     .filter((x) => x.tag);
   if (tagged.length === 0) return "";
 
-  const tags = new Set(tagged.map((x) => x.tag));
-  if (tags.size > 1) {
-    return `[Setup: nothing recorded - this call carried ${tags.size} different setup_step tags (${[...tags].join(", ")}). Ask one setup step at a time.]`;
-  }
-  const tag = tagged[0].tag;
+  const tags = [...new Set(tagged.map((x) => x.tag))];
   const steps = getCreationSteps(story, setupPlayers);
-  const step = steps.find((s) => s.id === tag);
-  if (!step) {
-    return `[Setup: unknown setup_step "${tag}" ignored, nothing recorded. This story's steps: ${steps.map((s) => s.id).join(", ")}.]`;
-  }
-  if (tagged.some((x) => answers[x.i]?.skipped !== false)) {
-    return `[Setup: ${tag} not recorded - the player skipped it. Ask it again.]`;
-  }
-
   const people = setupParticipants(story, setupPlayers);
-  let who: { id: string; name: string } | undefined;
-  if (step.scope === "player") {
+  const fullMode = story.setup?.mode === "full";
+
+  const prev = story.setup?.covered ?? { table: [], players: {} };
+  const covered = { table: [...prev.table], players: { ...prev.players } };
+  const recordedList: string[] = [];
+  const notes: string[] = [];
+
+  for (const tag of tags) {
+    const mine = tagged.filter((x) => x.tag === tag);
+    const step = steps.find((s) => s.id === tag);
+    if (!step) {
+      notes.push(
+        `unknown setup_step "${tag}" ignored, nothing recorded. This story's steps: ${steps.map((s) => s.id).join(", ")}.`
+      );
+      continue;
+    }
+    if (fullMode && tags.length > 1 && step.scope === "player") {
+      notes.push(
+        `${tag} not recorded - this call carried ${tags.length} different setup_step tags (${tags.join(", ")}). Ask one setup step at a time.`
+      );
+      continue;
+    }
+    if (mine.some((x) => answers[x.i]?.skipped !== false)) {
+      notes.push(`${tag} not recorded - the player skipped it. Ask it again.`);
+      continue;
+    }
+    if (step.scope === "table") {
+      if (!covered.table.includes(step.id)) covered.table.push(step.id);
+      recordedList.push(step.id);
+      continue;
+    }
+    let who: { id: string; name: string } | undefined;
     if (people.length === 1) {
       who = people[0];
     } else {
       const named = new Set(
-        tagged.map((x) =>
+        mine.map((x) =>
           people.find(
             (p) =>
               p.name.trim().toLowerCase() ===
@@ -2524,23 +2545,21 @@ function recordCreationSteps(
       );
       const id = named.size === 1 ? [...named][0] : undefined;
       who = people.find((p) => p.id === id);
-      if (!who) {
-        return `[Setup: ${tag} not recorded - say which player it is for with target_player_name on every ${tag} question (${people.map((p) => p.name).join(", ")}).]`;
-      }
     }
+    if (!who) {
+      notes.push(
+        `${tag} not recorded - say which player it is for with target_player_name on every ${tag} question (${people.map((p) => p.name).join(", ")}).`
+      );
+      continue;
+    }
+    const have = covered.players[who.id] ?? [];
+    covered.players[who.id] = have.includes(step.id) ? have : [...have, step.id];
+    recordedList.push(`${step.id} (${who.name})`);
   }
 
-  const prev = story.setup?.covered ?? { table: [], players: {} };
-  const covered = { table: [...prev.table], players: { ...prev.players } };
-  if (step.scope === "table") {
-    if (!covered.table.includes(step.id)) covered.table.push(step.id);
-  } else if (who) {
-    const mine = covered.players[who.id] ?? [];
-    covered.players[who.id] = mine.includes(step.id) ? mine : [...mine, step.id];
-  }
+  if (recordedList.length === 0) return `[Setup: nothing recorded - ${notes.join(" ")}]`;
+
   story.setup = { ...story.setup, covered };
-
-  const recorded = `${step.id}${who ? ` (${who.name})` : ""}`;
   const progress = getCreationProgress(story, setupPlayers);
   const next = progress.missing[0];
   const tail = next
@@ -2548,7 +2567,8 @@ function recordCreationSteps(
     : story.setup?.mode === "full"
       ? "Every step is covered: write the sheet and the plan."
       : "Every required step is covered.";
-  return `[Setup: Recorded: ${recorded}. ${tail}]`;
+  const extra = notes.length ? ` Not recorded: ${notes.join(" ")}` : "";
+  return `[Setup: Recorded: ${recordedList.join(", ")}.${extra} ${tail}]`;
 }
 
 /** The labels of a multi_select answer that are really among the options, once each, in option order. */
@@ -4052,6 +4072,10 @@ async function executeConfirmSetup(
       true
     );
   }
+  // Believed unreachable: the approval just above made the hashes current, and
+  // the checks start_game runs (sheet, plan, approval, session zero still on)
+  // were all satisfied before the card opened. Kept so a future start_game
+  // refusal reads as a plain 'did not start' instead of a false start.
   return make(
     true,
     "approved",

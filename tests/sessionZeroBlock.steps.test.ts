@@ -57,12 +57,12 @@ describe("the tagging rule and the step list", () => {
     expect(quick).toContain("- tone: ·");
     expect(quick).toContain("NEXT STEP TO ASK: setting");
     // Quick setup is not walked step by step.
-    expect(quick).not.toContain("One step per call");
+    expect(quick).not.toContain("asked one at a time");
     expect(quick).toContain("MODE: quick setup");
 
     const full = buildSessionZeroBlock(story({ mode: "full" }));
     expect(full).toContain("TAGGING");
-    expect(full).toContain("One step per call");
+    expect(full).toContain("asked one at a time");
   });
 
   it("full mode lists every step with ✓, → and · and the next step's hint", () => {

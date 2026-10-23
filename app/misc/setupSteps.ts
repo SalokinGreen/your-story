@@ -144,9 +144,15 @@ export function getRequiredSteps(story: StoryData, players?: Roster): CreationSt
   return getCreationSteps(story, players).filter((s) => isStepRequired(story, s));
 }
 
-/** Required table steps once + required player steps per player. */
+/** Whether a pre-made character sheet covers this player's own steps. */
+export function isPremade(story: StoryData, playerId: string): boolean {
+  return story.setup?.premadeFor?.includes(playerId) ?? false;
+}
+
+/** Required table steps once + required player steps per player without a pre-made sheet. */
 export function creationTotal(story: StoryData, players?: Roster): number {
-  const n = setupParticipants(story, players).length;
+  const people = setupParticipants(story, players);
+  const n = people.filter((p) => !isPremade(story, p.id)).length;
   return getRequiredSteps(story, players).reduce(
     (sum, s) => sum + (s.scope === "table" ? 1 : n),
     0,
@@ -193,6 +199,7 @@ export function getCreationProgress(story: StoryData, players?: Roster): Creatio
       else missing.push({ step });
     } else {
       for (const p of people) {
+        if (isPremade(story, p.id)) continue;
         total++;
         if (isStepCovered(story, step, p.id)) covered++;
         else missing.push({ step, player: p.name, playerId: p.id });

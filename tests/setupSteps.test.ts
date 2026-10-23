@@ -13,6 +13,7 @@ import {
   getRequiredSteps,
 } from "@/app/misc/setupSteps";
 import {
+  premadePlayerIds,
   getSetupProgress,
   setupEngineLine,
   setupGateMessage,
@@ -235,5 +236,41 @@ describe("the gate's words name the next step and player", () => {
       "(Let's finish setting up first: next is a few questions about the game.)",
     );
     expect(setupGateMessage("character")).toContain("character_sheet");
+  });
+});
+
+describe("pre-made characters", () => {
+  const sheet = (overrides: Partial<StoryLore> = {}) =>
+    lore({ title: "Character: Nik", type: "character_sheet", content: "Nik, a courier.", ...overrides });
+  const couchOverrides = {
+    multiplayer: { enabled: true, couchPlayers: COUCH },
+  } as Partial<StoryData>;
+
+  it("solo: any populated enabled sheet at mode time marks the player pre-made", () => {
+    expect(premadePlayerIds(story({}, [sheet()]))).toEqual([SOLO_PLAYER_ID]);
+    expect(premadePlayerIds(story({}, [sheet({ content: "  " })]))).toEqual([]);
+    expect(premadePlayerIds(story({}, [sheet({ enabled: false })]))).toEqual([]);
+    expect(premadePlayerIds(story({}))).toEqual([]);
+  });
+
+  it("couch: matches by owner id or a Character: <name> title", () => {
+    const s = story({}, [sheet({ title: "Character: Ann" }), sheet({ title: "x", ownerCouchPlayerId: "b" })], couchOverrides);
+    expect(premadePlayerIds(s)).toEqual(["a", "b"]);
+    const onlyAnn = story({}, [sheet({ title: "Character: Ann" })], couchOverrides);
+    expect(premadePlayerIds(onlyAnn)).toEqual(["a"]);
+  });
+
+  it("a pre-made player is not asked the player steps; table and world steps still apply", () => {
+    const solo = story({ mode: "full", premadeFor: [SOLO_PLAYER_ID] }, [bbLore()]);
+    expect(creationTotal(solo)).toBe(3);
+    expect(getCreationProgress(solo).missing.map((m) => m.step.id)).toEqual([
+      "setting",
+      "tone",
+      "campaign",
+    ]);
+    const couch = story({ mode: "full", premadeFor: ["a"] }, [bbLore()], couchOverrides);
+    expect(creationTotal(couch)).toBe(16); // 1 cohort + 3 world + 12 x Bo
+    expect(getCreationProgress(couch).missing.every((m) => m.playerId !== "a")).toBe(true);
+    expect(creationTotal(story({ mode: "quick", premadeFor: ["solo"] }))).toBe(2);
   });
 });

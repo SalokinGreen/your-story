@@ -28,6 +28,7 @@ import type { StoryData, StoryLore, PlanState, SpineLength } from "./structs";
 import {
   describeMissing,
   getCreationProgress,
+  setupParticipants,
   type CreationProgress,
 } from "./setupSteps";
 
@@ -321,6 +322,36 @@ function normaliseTitle(t: string): string {
   return t.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/** A sheet belongs to a player by `ownerCouchPlayerId` or a "Character: <name>" title. */
+function playerHasSheet(
+  sheets: StoryLore[],
+  p: { id: string; name: string },
+): boolean {
+  const title = normaliseTitle(`Character: ${p.name}`);
+  return sheets.some(
+    (s) =>
+      s.ownerCouchPlayerId === p.id ||
+      (!s.ownerCouchPlayerId && normaliseTitle(s.title) === title),
+  );
+}
+
+/**
+ * The players who already have a populated, enabled sheet right now (ids as
+ * setupParticipants gives them; solo is "solo"). Recorded as
+ * `setup.premadeFor` when the setup style is first chosen, so a pre-made
+ * character is not asked the per-character steps.
+ */
+export function premadePlayerIds(
+  story: StoryData,
+  players?: ReadonlyArray<{ id: string; name: string }>,
+): string[] {
+  const sheets = populatedSheets(story);
+  if (sheets.length === 0) return [];
+  const people = setupParticipants(story, players);
+  if (people.length === 1) return [people[0].id];
+  return people.filter((p) => playerHasSheet(sheets, p)).map((p) => p.id);
+}
+
 /**
  * Where session zero stands, derived from live state. `players` names who
  * needs a character sheet; when omitted, couch co-op's `couchPlayers` (two or
@@ -343,13 +374,7 @@ export function getSetupProgress(
   const missingSheetFor: string[] = [];
   if (required.length > 1) {
     for (const p of required) {
-      const title = normaliseTitle(`Character: ${p.name}`);
-      const has = sheets.some(
-        (s) =>
-          s.ownerCouchPlayerId === p.id ||
-          (!s.ownerCouchPlayerId && normaliseTitle(s.title) === title),
-      );
-      if (!has) missingSheetFor.push(p.name);
+      if (!playerHasSheet(sheets, p)) missingSheetFor.push(p.name);
     }
     character = missingSheetFor.length === 0;
   } else {

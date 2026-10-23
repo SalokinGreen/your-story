@@ -1356,7 +1356,7 @@ const confirmSetupTool: ToolSchema = {
   type: "function",
   function: {
     name: "confirm_setup",
-    description: `Session zero only. Once the character sheet(s) and the Campaign Plan exist, show the player a card with both and wait for their OK or their changes. Required before start_game. Editing a sheet or the plan afterwards cancels the OK.`,
+    description: `Session zero only. Once the character sheet(s) and the Campaign Plan exist, show the player a card with both and wait for their OK or their changes. The player's OK starts the game: pass story_name and premise. Editing a sheet or the plan afterwards cancels the OK.`,
     parameters: {
       type: "object",
       properties: {
@@ -1387,7 +1387,7 @@ const startGameTool: ToolSchema = {
   type: "function",
   function: {
     name: "start_game",
-    description: `Call ONCE, when session zero is done and you are about to narrate the opening scene. It names the story and hands off from session zero to real play. Requires the character sheet(s), the "Campaign Plan" gm_plan note (only its Opening Image beat detailed) and the player's OK through confirm_setup (an error otherwise). Order: character(s), Campaign Plan, confirm_setup, start_game, then the campaign intro.`,
+    description: `Direct path only: confirm_setup already starts the game on the player's OK. Call ONCE, when session zero is done. It names the story and hands off from session zero to real play. Requires the character sheet(s), the "Campaign Plan" gm_plan note (only its Opening Image beat detailed) and the player's OK through confirm_setup (an error otherwise).`,
     parameters: {
       type: "object",
       properties: {

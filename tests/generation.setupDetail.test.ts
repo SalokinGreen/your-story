@@ -270,6 +270,23 @@ describe("approval starts the game", () => {
     expect(result.content).not.toContain(setupEngineLine("confirm"));
   });
 
+  it("hitting the round limit on chained answered questions ends on the engine line, not the last round's text", async () => {
+    const s = story({ setup: { mode: "quick" } });
+    const { fetchMock } = createMockGMFetch([
+      { content: "Where is it set? (stale)", toolCalls: [askStep("setting")] },
+      { content: "And the tone? (stale)", toolCalls: [askStep("tone")] },
+    ]);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { cb, rec } = callbacksWith();
+
+    const result = await generateStoryTurn(s, "hi", { ...baseOptions, maxToolLoops: 2 }, cb);
+
+    expect(s.sessionZeroActive).toBe(true);
+    expect(result.content).not.toContain("stale");
+    expect(result.content).toBe(setupEngineLine("character", { covered: 2, total: 2, missing: [] }));
+    expect(rec.storyComplete.join("")).not.toContain("stale");
+  });
+
   it("Stop on the card cancels the turn: nothing is committed and the game has not started", async () => {
     const s = ready();
     const { fetchMock } = createMockGMFetch([
@@ -415,14 +432,14 @@ describe("a Retry in session zero", () => {
 
   it("a conversation that started the game through the card is narrated, not held", async () => {
     const s = story({
-      sessionZeroActive: false,
+      sessionZeroActive: true,
       lore: [SHEET, PLAN],
     });
     const h = withNarration([], "NARRATED intro.");
     global.fetch = h.fetchMock as unknown as typeof fetch;
     const { cb } = callbacksWith();
 
-    // Not session zero any more; sanity that nothing here trips the guard.
+    // Session zero is still on in the stored story; only the confirm_setup result's `started` flag says the game began.
     const result = await generateStoryTurn(
       s,
       "go",

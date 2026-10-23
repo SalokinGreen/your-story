@@ -149,11 +149,34 @@ describe("recording a step", () => {
     expect(partial.results[0].contextForStory).toContain("setting not recorded");
   });
 
-  it("records none when a call carries two different tags", async () => {
+  it("quick mode records setting and tone batched in one call", async () => {
     const s = story({ mode: "quick" });
     const out = await run(
       s,
       [ask(q({ setup_step: "setting" }), q({ setup_step: "tone" }))],
+      answering(answered(2)),
+    );
+    expect(out.modifiedStoryData.setup?.covered?.table).toEqual(["setting", "tone"]);
+    expect(out.results[0].contextForStory).toContain("Recorded: setting, tone");
+  });
+
+  it("full mode records batched table steps but refuses a player step mixed in", async () => {
+    const s = story({ mode: "full" });
+    const out = await run(
+      s,
+      [ask(q({ setup_step: "setting" }), q({ setup_step: "tone" }), q({ setup_step: "drives" }))],
+      answering(answered(3)),
+    );
+    expect(out.modifiedStoryData.setup?.covered?.table).toEqual(["setting", "tone"]);
+    expect(out.modifiedStoryData.setup?.covered?.players).toEqual({});
+    expect(out.results[0].contextForStory).toContain("Ask one setup step at a time");
+  });
+
+  it("full mode records none when two player steps share a call", async () => {
+    const s = story({ mode: "full" });
+    const out = await run(
+      s,
+      [ask(q({ setup_step: "drives" }), q({ setup_step: "history" }))],
       answering(answered(2)),
     );
     expect(out.modifiedStoryData.setup?.covered).toBeUndefined();

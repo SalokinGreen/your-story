@@ -345,9 +345,10 @@ worsen it; it is noted in §3.7 for its own PR.
 
 - **No mode chosen means no required steps.** `isStepRequired` returns
   false for every step when `setup.mode` is unset (an old save, a bare test
-  story). Full requires all; quick requires `setting` and `tone`. The strip
-  and `handleChooseSetupStyle` always set a mode in play, so this only keeps
-  old saves and fixtures from being asked new questions.
+  story). Full requires all; quick requires `setting` and `tone`. This
+  spares bare fixtures only, not old saves in play: the first typed line sets
+  quick mode (`handleCustomInput`), so an old save mid-setup is asked setting
+  and tone (intended, section 5).
 - **`next` is `interview` ahead of `concept`.** When required steps are
   missing, the interview is the next step even if the concept flag is false;
   the concept also ticks once any step is covered. The block's checklist gains
@@ -378,7 +379,34 @@ worsen it; it is noted in §3.7 for its own PR.
   setup-progress and block tests give quick-mode fixtures their covered
   `setting` and `tone`, and the gate tests' story has no mode so the gate is
   tested on its own. Counts: 189 files / 2,933 tests became 193 / 2,990.
-- **Open question for the author:** a pre-made character (a starter's preset)
-  in *full* mode is still asked every step, since a populated sheet does not
-  waive any (the plan says full is all). Waiving player steps for a player who
-  already has a sheet is a small change if wanted.
+- **Open question for the author:** a pre-made character in full mode was
+  asked every step. Answered; see the engine-review fixes below.
+
+### 2026-10-23: engine-review fixes
+
+- **Batched answers are recorded.** `recordCreationSteps` records each tag
+  whose items were all answered for table-scope steps (setting, tone,
+  campaign, cohort), and for every step in quick mode. Only a player-scope
+  step in full mode (the per-character build) keeps the one-tag-per-call
+  refusal: a call mixing it with other tags records the table tags and
+  refuses the player ones with the "ask one setup step at a time" note. The
+  block's full-mode rules say so.
+- **The round limit never shows a tool round's text.** In a session-zero turn
+  with no successful start, a GM loop that ends on `maxToolLoops` with the
+  last round still a tool round ends on `setupEngineLine`, whether or not the
+  turn made progress (it used to require no progress, so an answered question's
+  stale follow-up could show).
+- **The prompt no longer says to call `start_game` after approval.** The system
+  prompt's order line and the `confirm_setup` and `start_game` descriptions say
+  the player's OK starts the game (pass `story_name` and `premise`) and
+  `start_game` is the direct path. A "game has already started" tool error no
+  longer ends with "check the tool's required parameters".
+- **Pre-made characters in full mode skip the per-character steps.**
+  `SetupState.premadeFor` holds the player ids (`"solo"` in solo play) with a
+  populated, enabled sheet when the style was first chosen
+  (`premadePlayerIds`, in `campaignPlan.ts` beside the sheet-ownership match:
+  `setupSteps.ts` cannot import it without a cycle). Both places that set the
+  mode in `page.tsx` write it. `creationTotal` and `getCreationProgress` skip
+  player-scope steps for those ids; table and world steps still apply; the
+  block's step list marks them "covered by the pre-made sheet".
+- Counts: 193 files / 2,994 tests became 193 / 3,000.

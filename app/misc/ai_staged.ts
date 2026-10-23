@@ -32,6 +32,7 @@ import { resolveSystem, SYSTEM_TOOL_NAMES } from "@/app/misc/systems/resolve";
 import {
   getCreationProgress,
   getRequiredSteps,
+  isPremade,
   isStepCovered,
   setupParticipants,
   type CreationStep,
@@ -1268,7 +1269,7 @@ function creationStepList(story: StoryData): string {
   const rows = getRequiredSteps(story).map((step) =>
     step.scope === "table"
       ? `- ${step.id}: ${mark(step)}`
-      : `- ${step.id}: ${people.map((p) => `${p.name} ${mark(step, p.id)}`).join(", ")}`,
+      : `- ${step.id}: ${people.map((p) => `${p.name} ${isPremade(story, p.id) ? "(covered by the pre-made sheet)" : mark(step, p.id)}`).join(", ")}`,
   );
   return `SETUP STEPS (✓ asked and answered, → ask next, · still to come):\n${rows.join("\n")}`;
 }
@@ -1285,7 +1286,7 @@ function creationRules(
   );
   if (mode === "full") {
     lines.push(
-      "- One step per call: never two different tags in one `ask_question`. Several questions under the same tag are fine (all must be answered).",
+      "- Table and world steps (setting, tone, campaign, cohort) may be batched in one `ask_question`, each under its own tag. A character step (name and look, history, drives, abilities) is asked one at a time: never two different character tags in one call, and never mixed with another. Several questions under the same tag are fine (all must be answered).",
       "- Always give `intro`: one or two sentences on what is being chosen and why it matters. Give 2-4 options whose descriptions say what each does in play, mechanics and flavour.",
       "- Creative steps (the table, world, name and look, history, drives): offer 2-4 suggestions and set allow_custom true. Tone is a multi_select.",
       "- With several players, a player step carries target_player_name (the player it is for) on every item; table steps are untargeted. Table steps first, then each player in turn.",
@@ -1339,7 +1340,7 @@ function setupNextStep(
 function setupModeLines(mode: "quick" | "full"): string {
   if (mode === "full") {
     return `MODE: step by step.
-- Ask the setup steps (listed below) in order, one step per \`ask_question\` call, before writing anything.
+- Ask the setup steps (listed below) in order before writing anything: character steps one per \`ask_question\` call, table and world steps may share a call.
 - Each question offers 2-4 options and a custom answer; never fill in a choice the player did not make.
 - Write the sheet only after every step is covered, then the plan from what you learned.
 - Keep each reply short: the question, no story.`;
@@ -2239,7 +2240,7 @@ You keep a living plan the way a modern tabletop GM does: it describes a **situa
   - **medium** (~7 beats, default when scope is unclear) - an ordinary multi-session campaign: **Opening Image (Session 0)**, **Inciting Incident (Session 1)**, **Rising Complications**, **Midpoint Turn**, **Crisis**, **Climax**, **Resolution**.
   - **long** (~15 beats) - an extended, multi-arc campaign that needs more medium-horizon texture than a single "Rising Complications" beat can hold: **Opening Image (Session 0)**, **Setup / Ordinary World**, **Theme Stated**, **Inciting Incident (Session 1)**, **Debate**, **Break Into Rising Action**, **B-Story (Allies & Relationships)**, **Fun and Games (Early Wins)**, **Midpoint Turn**, **Bad Guys Close In (Escalating Complications)**, **All Is Lost**, **Dark Night of the Soul**, **Break Into Finale**, **Climax**, **Resolution (Final Image)**.
   Use the FIXED beat names for whichever preset you pick, in order - don't rename or reorder them. At creation, detail ONLY the first beat ("Opening Image", goal: establish/create the character(s) and their ordinary world); leave the rest as one-line placeholders. Do not plan further yet.
-- **The spine is a hard prerequisite for \`start_game\` (ENFORCED).** Session zero is not over until the "Campaign Plan" note exists: \`start_game\` returns an error while it's missing. Order is always character(s) -> plan -> \`confirm_setup\` (the player's OK) -> \`start_game\` -> the campaign intro (a short briefing, then the opening scene).
+- **The spine is a hard prerequisite for \`start_game\` (ENFORCED).** Session zero is not over until the "Campaign Plan" note exists: \`start_game\` returns an error while it's missing. Order is always character(s) -> plan -> \`confirm_setup\` (the player's OK starts the game; pass \`story_name\` and \`premise\`) -> the campaign intro (a short briefing, then the opening scene). \`start_game\` is only the direct path.
 - **The spine is your best GUESS at where the drama goes - not gates the players must trip.** It exists to give tone and pacing a target for the narration. When play diverges from what a beat predicted, **rewrite the remaining spine** to fit what actually happened - never steer the players back toward it. The one-beat-ahead gate enforces *bookkeeping* (keep the plan current), not *plot adherence*.
 - **One beat ahead, never more.** The current beat gets a short goal, a \`[ ]\` checklist, and an **advance-on** block (below). Future beats stay one-liners. Never script beats the player hasn't reached.
 - **Advance-on triggers, never a scripted "advance-when" moment.** A beat advances on player ACTION or on TIME/consequence - never on the players producing one specific pre-decided event:
