@@ -689,12 +689,15 @@ report's §11.3. The ones that shape play:
 - `ask_question` / `ask_for_roll` — the GM asks the player a question, or
   asks them to roll (dice modes `ai` / `manual` / `physical`, with the 3D
   tray). `multi_select: true` questions take several picks (`selectedLabels`,
-  decision 146; see "Session zero" below).
+  decision 146; see "Session zero" below). In session zero an item can carry
+  `setup_step` (the creation step it covers, recorded by the engine) and
+  `intro` (a sentence or two shown above the options; decision 148).
 - `start_game`, `advance_plan`, `open_side_beat` / `close_side_beat` —
-  session zero ends with `start_game`, and play runs against a campaign plan
-  (`gm_plan` notes, `campaignPlan.ts`). `start_game` refuses until the
-  character sheet(s), the plan and the player's approval all exist (see
-  "Session zero"). Every new adventure starts in session zero
+  session zero ends with the player's OK on the setup card, which starts the
+  game (`confirm_setup`, below); `start_game` is the direct path. Play runs
+  against a campaign plan (`gm_plan` notes, `campaignPlan.ts`). `start_game`
+  refuses until the character sheet(s), the plan and the player's approval all
+  exist (see "Session zero"). Every new adventure starts in session zero
   (`sessionZeroActive`), with or without pre-made characters. The preset
   picker shows only when the adventure has pre-made characters
   (`hasPremadeCharacters()`, `presets.ts`); otherwise the story starts as
@@ -703,10 +706,11 @@ report's §11.3. The ones that shape play:
   `intro_override` waits for `start_game` (`shouldUseIntroOverride()`,
   `presets.ts`); during session zero the choice goes to the GM with the
   authored opening attached (decision 130).
-- `confirm_setup` — session zero only. Shows the player a card with the
-  sheet(s) and the plan and waits for their OK or their changes (decision 143;
-  "Session zero" below). Always offered, like `start_game`, so the tool list
-  does not change at `start_game`.
+- `confirm_setup` — session zero only. Refuses while a required creation step
+  is uncovered, then shows the player a card with the sheet(s) and the plan and
+  waits for their OK or their changes (decisions 143, 148; "Session zero"
+  below). Its OK also starts the game. Always offered, like `start_game`, so
+  the tool list does not change at `start_game`.
 - `increment_scene`, `resolve_random_event`, `acknowledge_director_move` —
   the director's side of a turn.
 - `start_combat` / `add_combatant` / `remove_combatant` /
@@ -767,21 +771,60 @@ holds the six places a tool lives together.
 
 A new adventure starts in **session zero** (`StoryData.sessionZeroActive`),
 and the GM may not narrate the story until setup is done (decisions 142–147,
-`docs/session-zero-design.md`, `docs/session-zero-plan.md`).
+`docs/session-zero-design.md`, `docs/session-zero-plan.md`; the step-by-step
+walk-through is decision 148, `docs/session-zero-detail-design.md`).
 
 **The state** is `StoryData.setup?` (`SetupState` in `structs.ts`, optional,
 absent on old saves): `mode` (`quick` or `full`, set by the style buttons;
 typing instead means quick), `conceptDone` (a setup question was answered),
 `approval` (the hashes of the sheet(s) and plan the player approved),
-`referenceTitles` (notes read during setup, newest first, at most 20) and
-`questionsAsked` (answered `ask_question` calls, counted as they happen).
+`referenceTitles` (notes read during setup, newest first, at most 20),
+`questionsAsked` (answered `ask_question` calls, counted as they happen),
+`covered` (the creation steps asked and answered: `{ table: string[];
+players: Record<string, string[]> }`, keyed by player id, `"solo"` in solo
+play; absent means none) and `premadeFor` (the player ids whose sheet was
+already populated when the style was chosen).
+
+**The creation steps** (decision 148, `app/misc/setupSteps.ts`, `CreationStep`:
+`id`, `label`, `group`, `scope` `table` or `player`, `hint`). `getCreationSteps(story,
+players?)` returns, in order: `cohort` (only with two or more players), the
+world steps `setting`, `tone` and `campaign`; the system's `creationSteps`
+(`BuiltinSystem.creationSteps`); or, for a story with no system but an enabled
+`mechanics` note, one `abilities` step; then `name_look`, `history` and
+`drives`. Blood & Bone's nine system steps (`blood-and-bone/creationSteps.ts`)
+are `kind`, `archetype`, `stats`, `vow`, `connections` (both connections, one
+tag), `burden` ("none" counts; its hint says to state the starting Stress),
+`power`, `path` and `gear`. Stress is a rule the GM states, not a step.
+**Required:** full mode, every step; quick mode, `setting` and `tone` only; no
+mode chosen (an old save, a bare story), none. `creationTotal()` counts the
+table steps once and each player step once per player who needs it. A player
+with a pre-made sheet (`premadeFor`) is skipped for the player steps.
+- **Recording** (`recordCreationSteps`, `gmExecutor.ts`, run by
+  `executeAskQuestion` in session zero). A tag counts only if it is a step of
+  this story (an unknown tag is ignored and the result lists the valid ones),
+  every item carrying it was answered (a skip is not counted), and a player step
+  names its player: the solo player, or the item's `target_player_name`. A table
+  step counts whoever answers. Several items under one tag count together, once
+  all are answered. In full mode a call that mixes a player-scope tag with
+  another tag refuses the player tag ("ask one setup step at a time"); the table
+  tags in it are still recorded. Quick mode takes any mix. The result reads
+  "[Setup: Recorded: connections (Nik). Next: burden (Nik).]", so the GM sees
+  progress between rounds (the live block is built once per turn).
+- **What the engine can know:** that a step was asked and answered under its
+  tag, not that the question was good. The hint for each step is in the prompt.
+- **Sheet and plan steps** are not tagged: the sheet or plan being written
+  satisfies `character` and `campaign`, not `interview`.
 
 **The steps** are derived by `getSetupProgress(story, players?)`
-(`campaignPlan.ts`), which returns the five flags and `next`, the first step
-not done (`concept`, `character`, `campaign`, `confirm`, `start_game`, or
-`null` once started):
-- **Concept:** `conceptDone`, or a populated sheet already exists (pre-made
-  characters and old saves). `mode` plays no part.
+(`campaignPlan.ts`), which returns the five flags, `next`, the first step
+not done (`interview`, `concept`, `character`, `campaign`, `confirm`,
+`start_game`, or `null` once started) and `creation` (`covered`, `total`,
+`missing`, in step then player order):
+- **Interview:** `next` is `interview` while any required creation step is
+  missing, ahead of `concept` (the implementation log's choice; the design had
+  it before `character`). The gate and the engine line then name that step.
+- **Concept:** `conceptDone`, a populated sheet, or any creation step covered.
+  `mode` plays no part.
 - **Character:** each player who needs one has a populated, enabled
   `character_sheet`. Solo play needs one. Couch co-op and party need one per
   player, matched by `ownerCouchPlayerId` or a "Character: <name>" title
@@ -800,7 +843,16 @@ rule). It replaces `freshStorySetupBlock`, `sessionZeroStartGameReminder`,
 session zero. It holds, in order: the checklist, the next step with its tools,
 the rule that the GM does not narrate until `start_game` succeeds, the mode's
 lines, the sheet template, the creation rules, the setup reference, and after
-6 setup questions (`SETUP_QUESTION_NUDGE_AT`) a nudge to propose.
+6 setup questions (`SETUP_QUESTION_NUDGE_AT`) a nudge to propose. The checklist
+gains a "Setup steps (n/m asked and answered)" row when the mode requires steps,
+and the block lists each required step per player with ✓ (covered), → (next) or
+· (still to come). The creation rules say to tag every covering item with
+`setup_step`. In full mode they add: table and world steps may share a call,
+character steps go one per call, always an `intro`, options that say what they
+do in play, 2–4 suggestions and `allow_custom` on creative steps, and
+`target_player_name` on every player-step item. In full mode the nudge is
+replaced by "every step is covered: write the sheet and the plan" (quick mode
+keeps the nudge at 6).
 - **Template precedence:** the story's own `characterSheetTemplate` if it has
   one, else the resolved system's `sheetTemplate`. An explicit template always
   wins.
@@ -816,14 +868,21 @@ lines, the sheet template, the creation rules, the setup reference, and after
 - History is not touched. The history stubs are the same as before, and the
   block and reference leave the request at `start_game`.
 
-**`confirm_setup({ character_summary, campaign_hook })`** refuses without the
-sheet(s) or the plan and names which. Otherwise it pauses the turn like
-`ask_question`. The card (`app/components/SetupConfirmModal.tsx`, opened from
+**`confirm_setup({ character_summary, campaign_hook, story_name?, premise? })`**
+refuses while a required creation step is uncovered (`Not yet: you haven't
+asked Nik about connections, …`), and refuses without the sheet(s) or the plan,
+naming which. Otherwise it pauses the turn like `ask_question`. The card (`app/components/SetupConfirmModal.tsx`, opened from
 `requestSetupConfirmation` in `page.tsx`) shows the sheet(s) and the plan
 **from the executor's working copy**, passed with the request, not from page
 state. Its four outcomes:
 - **Start the story** (`approved`): the executor stores `setup.approval` with
-  the hashes of exactly what the card showed.
+  the hashes of exactly what the card showed, then runs `executeStartGame` on
+  the same working copy (`story_name` falls back to the current name unless it
+  is empty or "New Story", then "Untitled Story"). It is one result, with
+  `started: true` when the game started (`resultStartedGame()` reads that flag,
+  never the text); the GM writes the campaign intro in the same turn. If the
+  start is refused, the result is `approved` with `started: false` and the
+  gate's approved-but-not-started path takes over.
 - **Change something…** (`changes`): the player's note goes back to the GM,
   which edits and calls `confirm_setup` again. Any edit cancels the approval
   through the hashes.
@@ -842,16 +901,17 @@ the live state, and names what is missing. A stale approval is named as one.
 Outside session zero it refuses with "The game has already started." On success
 it clears `sessionZeroActive` and its result carries the campaign intro
 (decision 144): a short briefing in the story's voice, then the opening scene,
-ending on a clear first choice.
+ending on a clear first choice. It is the direct path; a card OK starts the game
+the same way.
 
 **The setup gate** (`generation.ts`, `MAX_SETUP_PROMPTS` = 2). A session-zero
 turn may end only if, that turn, the tool **results** show progress: an
 answered `ask_question`; a `confirm_setup` that ended as `approved`,
 `changes` or `dismissed` (a refused or stopped one is not progress); a sheet
 or plan `create_note` / `edit_note` that changed the setup hashes; or a
-successful `start_game`. An approval with `start_game` still not called is a
-violation even though approval is progress, because the approval already said
-to call it. On a violation the turn's round is taken back out of every store
+successful start (`start_game`, or a card OK that started the game). An
+approval whose start was refused (`approved` with `started: false`) is a
+violation even though approval is progress, because the setup is not finished. On a violation the turn's round is taken back out of every store
 it reached, and the GM gets `setupGateMessage(next)` with the next step and its
 tool, with `tool_choice: "required"` unless the model rejects a forced choice
 (Qwen 3.8, `gmModelRejectsForcedToolChoice`). Claude and Z.ai are downgraded to
@@ -872,9 +932,28 @@ tool, with `tool_choice: "required"` unless the model rejects a forced choice
   rejected. A rejected round's prose is removed from the turn's accumulated
   text, `gmThinking`, the context and the replayed history, so it is never
   shown, sent, spoken or kept. Outside session zero none of this applies.
+- **Latest words only** (decision 148). Before the game starts, a setup turn
+  shows only the latest round's text: the feed, `gmThinking`, live narration,
+  read-aloud and the guests' callback. Earlier rounds' prose stays in the GM's
+  own conversation, so an old "Step one: …" is never re-shown. At the start,
+  the pre-start text is dropped (for a card OK and a direct `start_game` alike),
+  and from then on prose streams as on any turn, so the intro can have prose
+  before and after its tool calls.
+- **An empty latest round** while setup is incomplete is not an end: the gate
+  re-prompts with the next step, on the same counter. After the cap the engine
+  line shows.
+- **The card was closed or sent back.** If this turn's `confirm_setup` ended
+  `dismissed` or `changes` and the GM then says nothing, the turn ends on
+  `SETUP_CARD_HANDED_BACK_LINE`, "(What would you like to change?)", and the
+  card is not forced open again.
+- **Round limit.** A session-zero loop that hits `maxToolLoops` with its last
+  round still a tool round ends on `setupEngineLine`, whether or not the turn
+  made progress.
 - **Retry.** A session-zero Retry or Reword runs the full GM loop, so the gate
   applies. The precomputed-results path is guarded: in session zero with no
-  successful `start_game`, the narration call is skipped.
+  successful start, the narration call is skipped, and the saved text is the
+  last assistant message whatever it called (an empty one gives the engine
+  line, naming the step).
 
 **Cancellation.** A Stop during any pause (`ask_question`, `confirm_setup`, a
 dice request) commits nothing from that batch and runs no later tool.
@@ -888,8 +967,10 @@ while session zero runs, from the pure `setupStripState(story)`
 "Quick setup" and "Step by step". `handleChooseSetupStyle` in `page.tsx` sets
 the mode and sends the player line from the same updated story object, and
 typing first picks quick through the same path. Then the checklist shows
-Concept, Character, Campaign and Start (Start ticks on approval). Character and
-Campaign open their notes. It hides while a turn is loading. Online guests get
+Concept, Character, Campaign and Start (Start ticks on approval). In full mode
+a "Setup n/total" item sits after Concept, ticked when every required step is
+covered (`setupStripState`; 15 for a solo Blood & Bone build, 28 for a couch of
+two); quick mode keeps the four items. Character and Campaign open their notes. It hides while a turn is loading. Online guests get
 it read-only, with no buttons and no note links. Party phones do not render it.
 
 **`ask_question` with `multi_select`** (decision 146). The question shows
@@ -900,6 +981,12 @@ GM's line reads `→ "A", "C"`. Any custom text the player typed is kept
 alongside the picks (the modal offers the box only when `allow_custom` is set). `selectedLabels` is honoured only on a multi-select
 question. The phone protocol caps picks at 4 (`PARTY_MAX_PICKS`). Couch
 `target_player_name` routing is unchanged.
+
+**The question's `intro`** (decision 148) is shown above the options in
+`AskQuestionModal.tsx`, whose body scrolls inside a bounded height, so the
+controls stay reachable with the keyboard open. On party phones it travels as
+`intro` in `PartyRequestView` (`party/protocol.ts`, added by `partyHost.ts`) and
+`PartyController.tsx` shows it; `party.redaction.test.ts` covers it.
 
 ## The creator is conversational — a Game Designer, not a Game Master
 
@@ -1214,7 +1301,9 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 189 files and 2,933 tests (2026-10-23, after session
+- `tests/` — Vitest, 193 files and 3,000 tests (2026-10-24, after session zero
+  detail; the file count was checked, the test count is from the implementation
+  log in `docs/session-zero-detail-design.md`, not a run). Earlier: 189 files and 2,933 tests (2026-10-23, after session
   zero), largely against `app/misc/`.
   Deterministic tests seed `Math.random`; follow that for new dice and oracle
   tests.

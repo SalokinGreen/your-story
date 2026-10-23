@@ -1,7 +1,8 @@
 # A step-by-step setup that is actually step by step — design and plan
 
-Status: **draft, revised after Codex's review (§6), waiting for the author's
-approval.** It extends [`session-zero-design.md`](session-zero-design.md)
+Status: **approved (decision 149) and built** on `claude/session-zero-detail`;
+where the build differs, the "Decisions made during implementation" sections
+at the bottom win. It extends [`session-zero-design.md`](session-zero-design.md)
 (decisions 142–147) with decision 148. Design and plan are in one document
 because this is a follow-up on an approved flow, and the plan section names
 the files.
@@ -72,7 +73,7 @@ The export also shows **two bugs** in the new flow:
 - the creative steps (background, name, drives) offer suggestions, and your
   own words are always welcome.
 
-**The checklist** counts the build: "Setup 7/17" (§3.6 gives the count), so
+**The checklist** counts the build: "Setup 7/15" (§3.6 gives the count), so
 you can see how far along you are.
 
 **The card cannot open until every step is covered.** If the GM tries,
