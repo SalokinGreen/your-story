@@ -13,6 +13,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import { DynamicIcon } from "./DynamicIcon";
 import { getImage, type StoredImage } from "../misc/imageStore";
 import { getImageJobState, subscribeImageJobs } from "../misc/imageJobs";
@@ -210,50 +211,58 @@ export default function StoryImage({
             className="w-full h-auto"
           />
         </button>
-        {open && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/90 p-2"
-            onClick={() => setOpen(false)}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt="Picture of this moment"
-              className="max-w-full min-h-0 flex-1 object-contain"
-            />
-            <button
-              type="button"
-              aria-label="Close picture"
-              className="absolute top-3 right-3 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+        {/* Portalled to <body>: a parent with a backdrop filter or transform
+            would otherwise trap this `fixed` view inside its own box and
+            stacking order, under the voice bubbles. */}
+        {open &&
+          createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/90 p-2"
+              style={{
+                paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+              }}
               onClick={() => setOpen(false)}
             >
-              <DynamicIcon name="X" className="w-5 h-5" />
-            </button>
-            {/* The cost, the model and Regenerate live here, not under the
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={url}
+                alt="Picture of this moment"
+                className="max-w-full min-h-0 flex-1 object-contain"
+              />
+              <button
+                type="button"
+                aria-label="Close picture"
+                className="absolute top-3 right-3 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+                onClick={() => setOpen(false)}
+              >
+                <DynamicIcon name="X" className="w-5 h-5" />
+              </button>
+              {/* The cost, the model and Regenerate live here, not under the
                 picture in the feed. */}
-            <div
-              className="shrink-0 w-full max-w-[68ch] px-2 pt-2 flex items-center justify-between gap-2 text-xs text-white/60"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <span>{cost ? `${cost} · ${image.model}` : image.model}</span>
-              {onRegenerate && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    onRegenerate();
-                  }}
-                  className="px-2 py-1 rounded border border-white/20 hover:bg-white/10 text-white/80 hover:text-white"
-                  title="Paint this one again (costs again)"
-                >
-                  Regenerate
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+              <div
+                className="shrink-0 w-full max-w-[68ch] px-2 pt-2 flex items-center justify-between gap-2 text-xs text-white/60"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>{cost ? `${cost} · ${image.model}` : image.model}</span>
+                {onRegenerate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      onRegenerate();
+                    }}
+                    className="px-2 py-1 rounded border border-white/20 hover:bg-white/10 text-white/80 hover:text-white"
+                    title="Paint this one again (costs again)"
+                  >
+                    Regenerate
+                  </button>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )}
       </figure>
     );
   }

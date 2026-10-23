@@ -252,6 +252,12 @@ export function TurnWorkLine({
           } ${live ? "animate-pulse" : ""} transition-colors`}
           aria-expanded={canOpen ? open : undefined}
         >
+          {/* The die marks a turn whose line leads with a roll (design §2). */}
+          {!live && summary.rolls.length > 0 && (
+            <span aria-hidden="true" className="mr-1">
+              ⚄
+            </span>
+          )}
           {shown}
           {canOpen && (
             <DynamicIcon

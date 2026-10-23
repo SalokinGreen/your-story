@@ -918,7 +918,7 @@ export default function Story({
     <div className="w-full flex-1 min-h-0 flex flex-col px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 backdrop-blur-xl bg-ys-bg"
+        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 bg-ys-bg"
       >
         {/* Combat Display - shows active combat state */}
         {storyData.combatState?.active && (
