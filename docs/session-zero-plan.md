@@ -1,200 +1,322 @@
 # Campaign setup that actually sets up — implementation plan
 
-Status: **draft, waiting for the author's approval.** Design:
-[`session-zero-design.md`](session-zero-design.md). Decisions 142–146.
-Branch `claude/session-zero`, one PR, six slices. Line numbers are from
-`master` at the merge of #233 (2026-10-23).
+Status: **draft, revised after Codex's review, waiting for the author's
+approval.** Design: [`session-zero-design.md`](session-zero-design.md).
+Decisions 142–146. Branch `claude/session-zero`, one PR, six slices. Line
+numbers are from `master` at the merge of #233 (2026-10-23).
 
 **Every slice ends with `tsc` clean and the suite green.** `engine-review`
-runs on slices 1–4, which are engine work. The browser preview checks
-slices 5–6. The baseline is Vitest 182 files / 2,802 tests and `tsc` clean.
-Lint is counted per touched file.
+runs on slices 1–4, the engine slices. The browser preview checks slice 5.
+Baseline: Vitest 182 files / 2,802 tests, `tsc` clean, lint counted per
+touched file.
 
-## Slice 1 — The setup state and `start_game`'s rule
+## Slice 1 — The setup state, `confirm_setup` and `start_game`'s rule
 
-- **`app/misc/structs.ts`:** `interface SetupState { mode?: "quick" | "full";
-  conceptDone?: boolean; approved?: boolean }` and
-  `StoryData.setup?: SetupState`. It is optional, so no backfill is needed.
-  Add it to the party redaction's field list only if the phone needs it;
-  it does not.
+These land together, so `start_game`'s approval rule never exists without
+the tool that grants it (Codex's ordering point).
+
+- **`app/misc/structs.ts`:**
+  - `SetupState` (design §3.1): `mode`, `conceptDone`,
+    `approval: { sheetHash; planHash }` and `referenceTitles`;
+  - `StoryData.setup?`, optional, so no backfill is needed;
+  - not in party redaction.
 - **`app/misc/campaignPlan.ts`:**
-  `getSetupProgress(story): { concept, character, campaign, start: boolean; next: "concept" | "character" | "campaign" | "start" | null }`,
-  as in design §3.1. Character means at least one `character_sheet` note,
-  using the existing `hasCharacterSheetNote` (`observer.ts:474`); move it to
-  `campaignPlan.ts` if that avoids a cycle.
-- **`app/misc/gmExecutor.ts` `executeStartGame` (`3567`):**
-  - it refuses unless character, campaign and start are all done, naming
-    the missing steps;
-  - its success text carries the intro instructions (decision 144): "Now
-    write the campaign intro: first a short briefing in the story's voice
-    (who the player is, where, what's at stake, why they are here), then
-    the opening scene ending on a clear first choice."
-- **Old saves in session zero** with a sheet and a plan but no `setup`:
-  `start` is false, so they get the `confirm_setup` step. That is intended.
+  - `getSetupProgress(story, players?)`, which returns `{ concept,
+    character, campaign, approved, started, next }`. `next` is one of
+    `"concept" | "character" | "campaign" | "confirm" | "start_game"`, or
+    `null`.
+  - The rules are design §3.1's table:
+    - a sheet counts if it is populated and enabled, one per required
+      player (solo play needs one; couch co-op and party need one per
+      player, matched by `ownerCouchPlayerId` or a "Character: <name>"
+      title);
+    - the plan must be an existing, enabled `gm_plan` note, so a stale
+      `planState` alone does not count during setup;
+    - approval holds only while its hashes match.
+  - `hashNotes(notes)` is a stable string hash of the titles and contents,
+    with no crypto API needed.
+  - `hasCharacterSheetNote` moves here from `observer.ts:474` if that avoids
+    an import cycle.
+- **`confirm_setup`, in all six places:**
+  - schema in `gmTools.ts`;
+  - the live whitelist;
+  - the executor `executeConfirmSetup` in `gmExecutor.ts`;
+  - `GOOGLE_ESSENTIAL_TOOLS`, together with `ask_question`, which is missing
+    there today;
+  - a label;
+  - the observer registration, if the drift test needs it.
+
+  `tests/gmTools.sixPlaces.test.ts` gains explicit required-tool assertions:
+  `ask_question`, `confirm_setup` and `start_game` must each be in the
+  whitelist, the Google list and the labels. Today the test only checks
+  that Google entries point into the whitelist.
+- **What `executeConfirmSetup` does:**
+  1. It refuses without the sheet(s) or the plan, naming them.
+  2. It builds the card's content from the **executor's working copy** (the
+     clone at `gmExecutor.ts:867`): the sheet and plan text go with the
+     request.
+  3. It awaits a new `requestSetupConfirmation(req)`, modelled on
+     `requestPlayerAnswer`. The result is `{ approved: true }`,
+     `{ approved: false, note }`, `{ dismissed: true }` or
+     `{ stopped: true }`.
+  4. On approval, it writes `setup.approval` with the hashes of what was
+     shown.
+  5. On Stop, it returns a stopped result, and the executor's batch loop
+     stops (below).
+- **Cancellation (Codex P1).**
+  - `executeGMTools` gets the turn's abort signal through `GMToolContext`.
+  - After any awaited pause (`ask_question`, `confirm_setup`, the dice
+    requests) and before each later tool, it checks `signal.aborted`. If
+    aborted, it returns without committing its clone and runs no further
+    tools.
+  - `generation.ts` (around `2839`) does not merge the batch into
+    `StoryData` when the turn was aborted.
+- **`executeStartGame` (`3567`):**
+  - it refuses unless `character && campaign && approved` on the live state,
+    naming what is missing;
+  - its success text carries decision 144's intro instructions.
 - **Tests:**
-  - `tests/setupProgress.test.ts`: every combination of the four steps, and
-    `next`;
-  - `tests/gmTools.startGame.test.ts`: the refusal names the missing steps,
-    and success carries the intro.
+  - `tests/setupProgress.test.ts`: every combination, couch with two
+    players, a disabled or empty sheet, a stale `planState`, hash
+    invalidation after an edit, and pre-made or old-save Concept;
+  - `tests/gmTools.confirmSetup.test.ts`: refusals; the card built from the
+    working copy; the four outcomes; approval hashes;
+  - `tests/gmTools.startGame.test.ts`: the new refusal, and the intro on
+    success;
+  - a cancellation test: Stop during `confirm_setup` with `start_game` later
+    in the same batch commits nothing and runs nothing;
+  - the drift test, with its required-tool assertions;
+  - `tests/toolBudget.test.ts`.
 
-## Slice 2 — `confirm_setup` and the setup card
+## Slice 2 — The setup card, and the page's pause plumbing
 
-- **The tool, in all six places:**
-  - the schema in `gmTools.ts`: `confirm_setup({ character_summary: string; campaign_hook: string })`, a short description;
-  - the live whitelist in `buildGMStagePrompt`;
-  - `executeConfirmSetup` in `gmExecutor.ts`. It refuses without a sheet or
-    a plan, naming which. Otherwise it pauses through a new
-    `requestSetupConfirmation` callback, modelled exactly on
-    `requestPlayerAnswer` / `executeAskQuestion` (`gmExecutor.ts:2219`),
-    which returns `{ approved: true } | { approved: false; note: string } | null`.
-    On approved it sets `setup.approved = true` and returns "Approved: call
-    start_game now, then write the intro…". On a note it returns it. On null
-    (Stop, skip) it returns "The player closed the card; ask what they want
-    to change.";
-  - the Google list;
-  - a label ("Checking with you");
-  - the observer's registration, if the drift test requires it.
-- **`app/components/SetupConfirmModal.tsx`** (`ys-*` tokens; registers
-  `useBackHandler`):
-  - it shows the summary and the hook;
-  - it links "Open the character sheet" and "Open the campaign plan" through
-    `onOpenNote` and the existing note opener;
-  - its buttons are **Start the story** and **Change something…** (a text
-    area and Send).
-- **`app/story/page.tsx`:** the pause plumbing, as for `askQuestionRequest`.
-  Stop resolves it with null. Party mode and online play show it on the
-  table or host screen; the request is not relayed to phones or guests.
-- **Tests:**
-  - `tests/gmTools.confirmSetup.test.ts`: refusals; approved sets the flag
-    and the text; a note round-trips; null;
-  - the drift test passes with the new tool;
-  - `tests/toolBudget.test.ts` still passes (the description stays short).
+- **`app/components/SetupConfirmModal.tsx`**, on the `ys-*` tokens, with
+  `useBackHandler` (back = dismiss):
+  - the summary and the hook;
+  - the sheet and plan text it was given, in collapsible sections, so it
+    shows the reviewed snapshot, not page state;
+  - **Start the story**, and **Change something…**, which opens a text area
+    with a Send button.
+- **`app/story/page.tsx`:**
+  - `setupConfirmRequest` state and a resolver, as for
+    `askQuestionRequest`;
+  - `handleStop` resolves it with `{ stopped: true }`;
+  - in party mode and online play it shows on the table or host screen and
+    is never relayed;
+  - a guest sees "The host is reviewing the setup".
+- **Tests:** the modal's pure pieces (if extracted), and the stopped
+  resolution.
 
-## Slice 3 — The session-zero block and what stays in view
+## Slice 3 — The session-zero block
 
-- **`app/misc/systems/types.ts`:** `BuiltinSystem.creationNoteId?: string`.
-  Blood & Bone sets `builtin:blood-and-bone:character-creation`.
+- **`app/misc/systems/types.ts`:** `creationNoteId?`, set by Blood & Bone.
 - **`app/misc/ai_staged.ts`:**
-  - **`buildSessionZeroBlock(story, lore)`** (design §3.3): the checklist
-    from `getSetupProgress`, the next step with its tools, the no-narration
-    rule, and the mode's four lines. In full mode, the system's creation
-    note goes in full: the story's note whose `libraryNoteId` is the
-    system's `creationNoteId`, and only if the story has it. Then the sheet
-    template, the soft nudge after 6 setup questions, and the
-    questions-asked count, read from this session zero's history parts
-    (count the `ask_question` calls).
-  - **Placement.** The live block shows it while `sessionZeroActive`, in
+  - **`buildSessionZeroBlock(story)`** (design §3.3–3.4), in this order:
+    1. the checklist from `getSetupProgress`;
+    2. the next step and its tools;
+    3. the no-narration rule;
+    4. the mode's four lines;
+    5. the template: the story's own, else the system's (an explicit
+       template always wins);
+    6. the creation note in full, if present and enabled;
+    7. the setup reference from `setup.referenceTitles`: newest first, one
+       per title, never the creation note twice, capped at
+       `SETUP_REFERENCE_CAP_TOKENS`, with anything over the cap listed by
+       title;
+    8. the 6-question nudge. The count of `ask_question` calls answered this
+       session zero is kept in `setup` as `questionsAsked` (add the field),
+       not recounted from history.
+  - **Placement.** It goes in the live block while `sessionZeroActive`, in
     place of `freshStorySetupBlock`, `sessionZeroStartGameReminder`,
-    `setupOverdueBlock` and `buildSheetTemplateBlock`. Those keep firing for
-    a story outside session zero that lacks a sheet or a plan.
-  - **The template.** `buildSheetTemplateBlock` / the new block fall back to
-    `resolveSystem(story).system?.sheetTemplate` when the story has no
-    `characterSheetTemplate`.
-- **`app/misc/historyStubs.ts` `renderHistoryPart`:** a `read_notes`
-  result in a part written during session zero stays whole. The part needs
-  to know: add `ScenePart.sessionZero?: true`, set by `generation.ts` when a
-  turn runs with `sessionZeroActive`. Old parts without the flag are
-  unchanged.
+    `setupOverdueBlock` and `buildSheetTemplateBlock`. Those keep firing
+    outside session zero.
+- **`read_notes` during session zero** (`gmExecutor.ts`, around `1071`)
+  moves the titles to the front of `setup.referenceTitles`.
+- **History stubs are untouched.**
 - **Tests:**
   - the block in each step and mode;
-  - the template falls back to the system's;
-  - full mode carries the creation note and quick mode does not;
-  - the block is in the live block, never the stable prefix
-    (`tokenBudget.test.ts`'s shared-prefix check);
-  - a session-zero part keeps its `read_notes` whole, and a normal part
-    still stubs;
-  - **measure** the session-zero block's tokens for Blood & Bone full mode
-    and record the number in the plan's "Decisions made" entry.
+  - template precedence (the story's own over the system's);
+  - full mode carries the creation note, and quick mode carries it too when
+    present, for grounding (decide and record);
+  - the reference: order, dedupe, the cap, the overflow listed by title, a
+    disabled note left out;
+  - the block sits in the live block, and the shared-prefix check in
+    `tokenBudget.test.ts` still passes, with earlier history byte-identical
+    across a `start_game`;
+  - a **budget test**: a full Blood & Bone setup request (system prompt,
+    tools, history of three setup turns, the block) under the GM-stage
+    budget. Record the figure.
 
-## Slice 4 — The setup gate
+## Slice 4 — The setup gate, buffering, and the other gates
 
-- **`app/misc/generation.ts`:** beside the M2 and plan gates (`2971–3036`):
-  - **When it fires:** `sessionZeroActive`, setup not complete (`next` is
-    not null), and the round made no tool call.
-  - **What it does:**
-    - it increments `noSetupPrompts` (cap `MAX_SETUP_PROMPTS = 2`);
-    - it pushes the user message naming the next step and its tool;
-    - it sets `forceToolChoiceNextRound = "required"`, except for providers
-      that reject it (`modelRejectsForcedToolChoice`, Claude via OpenRouter,
-      Z.ai), which get the message only;
-    - it logs a Debug Logs line, then `continue gmRoundLoop`.
-  - **Order** against the other gates: the setup gate runs first during
-    session zero, since the roll and plan gates do not apply there.
-- **The violating round's prose.** Find out what happens today with the
-  prose pushed to `allGMContextParts` (`2960`) and streamed by `onGMContent`
-  (`2557`) when a gate retries. Make the setup gate drop that round's prose
-  from the turn's story and clear it from the live narration, so the player
-  reads only the retry. Record what was found.
-- **`conceptDone`:** set when the first `ask_question` of session zero is
-  answered (`executeAskQuestion`, when `sessionZeroActive`).
-- **Tests** (`tests/generation.setupGate.test.ts`), with the same harness as
-  the roll and plan gate tests:
-  - a prose-only session-zero round is re-prompted with the message and the
-    forced choice;
-  - an `ask_question` round passes;
-  - the cap of two fails open;
-  - a forced-choice-rejecting model gets the message only;
-  - no gate outside session zero;
-  - the violating prose is not in the returned story.
+- **`app/misc/generation.ts`:**
+  - **Progress this turn.** Track `setupProgressThisTurn`, set from tool
+    results: an answered `ask_question` (which also sets `conceptDone` and
+    increments `questionsAsked`), a sheet or plan `create_note` / `edit_note`
+    that succeeded, `confirm_setup` approved, or `start_game` succeeded.
+  - **The gate.** At the final, tool-less round while `sessionZeroActive`,
+    when `start_game` has not succeeded this turn and there was no progress
+    this turn:
+    - re-prompt with the next step;
+    - force the tool choice where the model allows it;
+    - cap at 2 (`MAX_SETUP_PROMPTS`).
+  - **After the cap,** end the turn with the engine line, and do not run
+    the narration or continuation stage. The round-limit path (around
+    `3097–3197`) gets the same guard.
+  - **Approved but not started.** When `next === "start_game"`, the gate
+    message asks for exactly that.
+  - **The other gates.** The M2 and plan gates (around `2978` and `3017`)
+    are skipped while `sessionZeroActive`, including the round that calls
+    `start_game`.
+  - **No narration stage.** While `sessionZeroActive` and `start_game` has
+    not succeeded this turn, there is no story-continuation call. The final
+    round's text is the turn's text.
+  - **Buffering (Codex P1).** While `sessionZeroActive`, `onGMContent` and
+    the narration callbacks receive nothing during the turn. The final
+    validated text is delivered once, at the end, to the timeline, the guest
+    broadcast (`page.tsx:1145`) and read-aloud. A rejected round's text is
+    removed from `allGMContextParts` and from the turn's replay history, so
+    it never reaches the player, guests, read-aloud or later context.
+- **Tests:** `tests/generation.setupGate.test.ts`, with the M2 and plan
+  gate harness. It covers:
+  - prose only: a re-prompt with a forced choice;
+  - prose plus an unrelated or failed tool: still a violation;
+  - an answered question: passes;
+  - a full setup in one turn (sheet, plan, `confirm_setup` approved,
+    `start_game`, intro) passes, and the intro narrates;
+  - approved without start: asks for `start_game`;
+  - the cap, then the engine line, with no narration and no continuation
+    call;
+  - round-limit exhaustion: no narration;
+  - a forced-choice-rejecting model: the message only;
+  - combat or a plan beat pending during session zero: only the setup gate
+    acts;
+  - buffering: no callback received a rejected round's text, the guest
+    broadcast and read-aloud got only the final text, and the replay
+    history carries no rejected text;
+  - outside session zero: no change.
 
-## Slice 5 — The style choice, the strip, and multi-select questions
+## Slice 5 — The strip, the style choice and multi-select questions
 
-- **`app/components/SetupStrip.tsx`** (`ys-*` tokens), mounted in
-  `story.tsx` above the composer, beside the interrupted-turn banner:
-  - with no `setup.mode`, two buttons, "Quick setup" and "Step by step".
-    Choosing one sets `setup.mode` through `onUpdateStoryData`, then sends
-    the player line through `onCustomInput`;
-  - after that, the four steps with ticks. Character and Campaign open
-    their notes;
-  - hidden while loading and outside session zero.
-- **The freeform greeting** (`localStoryManager.ts` `buildFreeformGreeting`,
-  `294–314`) becomes a short line pointing at the two buttons: "Pick how
-  you'd like to set up, or just tell me what you're in the mood for." A
-  player who types first gets `quick` (set in `handleCustomInput` when
-  `sessionZeroActive && !setup?.mode`).
-- **Multi-select (decision 146):**
-  - `gmTools.ts`: `multi_select?: boolean` on question items, and a line in
+- **`app/components/SetupStrip.tsx`** (`ys-*` tokens), in `story.tsx` above
+  the composer:
+  - with no mode, two buttons that call a single new
+    `onChooseSetupStyle(mode)`. That host-owned handler in `page.tsx`
+    updates `setup.mode` and sends the player line from the **same**
+    updated story object (Codex's stale-state point);
+  - then the five-state checklist: Concept, Character, Campaign, Approved
+    and Start, shown as four ticks plus the card. Character and Campaign
+    open their notes;
+  - hidden while loading;
+  - read-only for guests and party phones.
+- **The freeform greeting** (`localStoryManager.ts` `buildFreeformGreeting`)
+  points at the two buttons. Typing first picks quick, in
+  `handleCustomInput`, through the same handler.
+- **Multi-select (decision 146), every transport step:**
+  - `gmTools.ts`: `multi_select?: boolean` on question items, plus a line in
     the description;
-  - `AskQuestionModal.tsx`: checkboxes and Done when it is set; the answer
-    item gains `selectedLabels`;
-  - `executeAskQuestion` formats every pick: `→ "A", "C"`;
-  - party mode: `app/misc/party/` (the question protocol and `partyHost`)
-    and `app/party/PartyController.tsx`'s question view;
-  - `tests/party.redaction.test.ts` is unaffected (questions are already
-    relayed);
-  - tests: modal logic (if a pure helper is extracted) and the executor
-    formatting.
-- **Check:** in the browser preview, a freeform story shows the style
-  buttons, and choosing one shows the strip. Ticks are checked by seeding
-  notes. The multi-select modal is checked with a seeded request through
-  the dev path the earlier slices used. Take screenshots.
+  - `AskQuestionModal.tsx`: checkboxes and a Done button when it is set;
+    the answer item gains `selectedLabels`;
+  - `executeAskQuestion` formats every pick (`→ "A", "C"`) and drops labels
+    that are not among the options;
+  - party: `app/misc/party/protocol.ts` (serialise `multi_select`; parse
+    `selectedLabels`, around `255`), `partyHost.ts` (offer, around `797`,
+    and the answer cleaning, around `540`), and
+    `app/party/PartyController.tsx`'s question view;
+  - **unchanged:** couch `target_player_name` routing, and a disconnect
+    falling back to the host.
+- **Tests:**
+  - the executor's formatting, including invalid labels and custom text;
+  - the protocol round-trip;
+  - the host's cleaning;
+  - skip;
+  - `tests/party.redaction.test.ts` still passes.
+- **Check.** In the preview:
+  - a freeform story shows the style buttons, and a tap shows the strip
+    with quick mode set;
+  - seeded notes tick the steps;
+  - the setup card opens with a seeded request;
+  - the multi-select modal works;
+  - Ink and Paper White screenshots are taken.
 
-## Slice 6 — Docs
+## Slice 6 — Docs, and the starts
 
+- **Starts** (Codex P2: test each, including its existing intro):
+  - freeform (the greeting);
+  - preset with a sheet (Concept and Character ticked once a style is
+    chosen);
+  - Custom;
+  - a Designer adventure with starting choices (the `intro_override` wait
+    still holds);
+  - The Hollow Hour;
+  - an old save mid-session-zero;
+  - couch with two players (two sheets needed);
+  - party;
+  - online, as the host.
+
+  Unit-test the pure parts. List the rest in `pending_tests.md`.
 - **`CLAUDE.md`:**
-  - the session-zero paragraph: the setup state, the block, the gate,
-    `confirm_setup`, the strip and multi-select;
-  - `start_game`'s new rule;
-  - the history-stub exception;
-  - the tool list gains `confirm_setup`.
-- **`docs/pending_tests.md`:**
-  - a real session zero on the default ladder, quick and full, with Blood &
-    Bone. This is a real-model run, which needs the author's go. Expected:
-    choices, a proposal, a sheet and a plan, the card, Start, and a
-    briefing then a scene. Failure looks like narration before the card, or
-    the gate firing twice and failing open;
+  - the session-zero paragraph: the state, the block, the gate (no
+    fail-open), `confirm_setup`, the card, the strip, buffering and
+    multi-select;
+  - `start_game`'s rule;
+  - the cancellation rule;
+  - `confirm_setup` added to the tool list.
+- **`docs/pending_tests.md`:** a real session zero, quick and full, on the
+  default ladder with Blood & Bone. That is a real model run, and needs the
+  author's go. It covers:
+  - expected: choices → proposal → sheet and plan → card → Start →
+    briefing → scene;
+  - what failure looks like;
   - the same on a phone;
-  - a Claude GM, where the gate's message works without a forced choice.
-- **`docs/status-report-2026-10-20.md`:** nothing listed there changes.
-- **The devlog,** with the strip, the card and the multi-select modal.
-- **Both docs** marked built.
+  - a Claude GM;
+  - couch with two players.
+- **The devlog** and both docs marked built.
 
 ## What breaks, and for whom
 
-- **A story in session zero today** gets the new block and gate on its next
-  turn, and must pass the card to start. Intended.
-- **An old story already playing** is unaffected: it is not in session zero.
-- **The tool list grows by one tool.** The budget test holds it.
+- **A story in session zero today** gets the new flow on its next turn and
+  must pass the card. This is intended.
+- **Online setup turns** no longer stream live. Replies arrive whole at the
+  end of each setup turn.
+- **The tool list grows by one.** The budget test holds it.
+
+## Codex's review (2026-10-23)
+
+Codex (gpt-6.1-sol, high) found eleven problems. All were checked against
+the code and taken in:
+
+1. **The gate failed open.** It now has no fail-open: after the cap the
+   turn ends with an engine line, with no narration or continuation, and
+   the round-limit path has the same guard.
+2. **The turn's exit rule was undefined.** The gate now judges progress
+   from this turn's tool results, and approved-but-not-started has its own
+   step. A setup done in one turn, with its intro, is tested.
+3. **The roll and plan gates were not excluded.** Both are now suspended
+   during session zero, including the `start_game` round.
+4. **The approval did not match what was approved.** It is now bound to
+   hashes, so edits cancel it, and the card shows the executor's working
+   copy.
+5. **Stop could be undone by the resumed batch.** The abort signal now
+   reaches the executor, which commits nothing after a Stop, and Stop and
+   dismiss are told apart.
+6. **Streamed prose could not be taken back.** Setup text is now buffered
+   until the turn validates, and rejected text is removed everywhere it
+   would reach.
+7. **The progress rules were wrong in several cases.** Concept is now
+   explicit for pre-made characters and old saves, couch needs a sheet per
+   player, and a stale `planState` no longer counts.
+8. **The history exception broke the cache and was unbounded.** It is
+   replaced by a capped setup reference in the live block, so history stays
+   untouched.
+9. **The cost was measured too narrowly.** A whole-request budget test is
+   added, the explicit template wins, and the tier pin is recorded as
+   costing more (the author's call).
+10. **Multi-select needed every transport step changed.** Each step is now
+    listed and tested.
+11. **Tool coverage and ordering had gaps.** There are required-tool
+    assertions and Google entries, `confirm_setup` lands with its rule, and
+    the style choice is a single host-owned handler.
 
 ## Decisions made during implementation
 

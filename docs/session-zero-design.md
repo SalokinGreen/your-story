@@ -86,9 +86,14 @@ Why it could do that:
    - then the **opening scene**, ending on a clear first choice.
 6. **The GM cannot skip any of this** (decision 143).
    - If it tries to narrate the story before setup is done, the engine sends
-     it back to the next unfinished step, up to twice a turn.
+     it back to the next unfinished step, up to twice a turn. After that the
+     turn ends with "(Let's finish setting up first: next is …)", never with
+     story narration.
+   - A rejected reply is never shown to you, sent to guests or read aloud.
    - If it tries to start the story before the sheet, the plan and your OK
      exist, `start_game` refuses and names what is missing.
+   - Editing the sheet or the plan after your OK cancels the OK, so you
+     approve what actually starts.
 
 ## 3. How
 
@@ -98,145 +103,182 @@ Why it could do that:
 
 ```ts
 interface SetupState {
-  mode?: "quick" | "full";   // chosen by the player (§3.2)
-  conceptDone?: boolean;     // the player answered the first setup question
-  approved?: boolean;        // the player pressed "Start the story" (§3.5)
+  mode?: "quick" | "full";      // chosen by the player (§3.2)
+  conceptDone?: boolean;        // see below
+  approval?: {                  // the player pressed "Start the story" (§3.5)
+    sheetHash: string;          // of the sheet note(s) the card showed
+    planHash: string;           // of the plan note the card showed
+  };
+  referenceTitles?: string[];   // notes read during setup, newest first (§3.4)
 }
 ```
 
-The steps are **derived**, never written twice. A new
-`getSetupProgress(story)` in `campaignPlan.ts` reads each one from existing
-state:
+The steps are **derived** from live state. `getSetupProgress(story)` in
+`campaignPlan.ts` computes them:
 
 | step | done when |
 |---|---|
-| Concept | `setup.mode` is set and `setup.conceptDone` is true |
-| Character | at least one `character_sheet` note exists |
-| Campaign | `hasCampaignPlan(story)` |
-| Start | `setup.approved` (and, once the game starts, `sessionZeroActive` is false) |
+| Concept | `mode` is set, and either `conceptDone` (a setup question was answered) or a sheet already exists (a pre-made character or an old save) |
+| Character | each player who needs one has a populated, enabled `character_sheet` note. That is one for solo play; in couch co-op or party mode, one per player, matched by `ownerCouchPlayerId` or a "Character: <name>" title. |
+| Campaign | an existing, enabled `gm_plan` note. A stale `planState` with no note does not count during setup. |
+| Approved | `approval` is set **and** its hashes match the current sheet(s) and plan. Any later edit cancels the approval (Codex's review). |
+| Started | `sessionZeroActive` is false |
 
-`getSetupProgress` also names the **next step**. Everything else reads it:
-the prompt block, the gate, the checklist and `start_game`.
+`getSetupProgress` also names the **next step**. The block, the gate, the
+checklist, `confirm_setup` and `start_game` all read it.
 
 ### 3.2 Choosing the style
 
-A new story in session zero with no `setup.mode` opens on a **style choice**
-instead of the old freeform greeting. It is two buttons in the checklist
-strip: "Quick setup" and "Step by step".
+A new story in session zero with no `setup.mode` opens on a **style
+choice**: two buttons in the checklist strip, "Quick setup" and "Step by
+step".
 
-- Tapping one sets `setup.mode`, and sends a short player line ("Let's do a
-  quick setup." / "Let's build my character step by step.") as the first
-  turn. So the GM starts knowing the mode.
-- A player who just types instead gets `quick` by default. The line still
-  goes to the GM.
+- A tap sets `setup.mode` and sends the player line ("Let's do a quick
+  setup." / "Let's build my character step by step."). Both happen in **one
+  host-owned callback**, so the state and the turn cannot disagree.
+- Typing instead means quick mode.
+- Online guests and party phones see the strip read-only, without the
+  buttons.
 
 ### 3.3 One setup block, not three
 
-FRESH STORY, START OF PLAY and the setup reminders are replaced, during
-session zero, by **one** live-block section, `buildSessionZeroBlock(story)`:
+During session zero, one live-block section, `buildSessionZeroBlock(story)`,
+replaces the FRESH STORY block, START OF PLAY and the setup reminders. It
+holds:
 
-- **The checklist,** with ✓ / → / · marks against the four steps.
-- **The next step,** with the exact tools to use:
-  - **Concept:** ask with `ask_question`. In quick mode, 2–4 questions, and
-    multi-select where several answers make sense.
-  - **Character:** build the sheet from the CHARACTER SHEET TEMPLATE, then
-    `create_note` of type `character_sheet`. In full mode, one
-    `ask_question` per creation step first.
-  - **Campaign:** `read_notes`, then `create_note` of type `gm_plan`, with
-    the existing plan rules.
-  - **Start:** `confirm_setup` (§3.5).
-- **The rule:** during session zero you never narrate the story. Every
-  reply either asks the player (`ask_question`), does a setup step, or calls
-  `confirm_setup`. A short out-of-character line beside a tool call is fine.
-- **The mode's instructions,** quick or full, in four lines each.
-- **The sheet template,** from the story's `characterSheetTemplate`, or
-  otherwise the resolved system's `sheetTemplate` (§3.4).
+- the checklist (✓ / → / ·);
+- the next step, with the exact tools to use;
+- the rule: until `start_game`, you never narrate the story; every turn
+  either asks the player (`ask_question`), does a setup step or calls
+  `confirm_setup`, and a short out-of-character line is fine;
+- the mode's four lines;
+- the sheet template;
+- the setup reference (§3.4);
+- after 6 setup questions, a nudge to propose.
 
-It sits in the live block, like everything per-turn (the cache rule). The
-old blocks stay for a story that is not in session zero but lacks a sheet or
-a plan: an old save that started play without them.
+It sits in the live block (the cache rule). The old blocks stay for a story
+outside session zero that lacks a sheet or a plan.
 
-### 3.4 What setup needs stays in view
+### 3.4 What setup needs stays in view, without touching history
 
-- **The system's template.** When a story has no `characterSheetTemplate`
-  but `resolveSystem` finds a built-in system, the template block uses that
-  system's `sheetTemplate`. A freeform Blood & Bone story gets the Blood &
-  Bone sheet.
-- **The system's creation rules,** while session zero lasts. A `BuiltinSystem`
-  gains `creationNoteId`, Blood & Bone's
-  `builtin:blood-and-bone:character-creation`, and the session-zero block
-  carries that note **in full**. It is about 2,300 tokens, measured in the
-  plan. The GM no longer has to `read_notes` it each turn.
-- **Notes read during session zero stay whole in history** until
-  `start_game`. `renderHistoryPart` keeps `read_notes` results unstubbed in
-  the parts written while `sessionZeroActive`. Session zero is a few turns,
-  so this costs less than re-reading 6,000–13,000 tokens every turn, as the
-  evidence shows, and the cached prefix makes it cheaper still. Once play
-  starts, the stub rules apply again from the next compaction.
+The first draft kept setup-time `read_notes` results whole in history.
+Codex showed that changes bytes of earlier history when setup ends, and
+grows without bound, so it is dropped. **History stubs are unchanged.**
+
+Instead, what setup needs rides in the session-zero block, which is per-turn
+by nature:
+
+- **The system's creation rules** (`BuiltinSystem.creationNoteId`; Blood &
+  Bone's `builtin:blood-and-bone:character-creation`), in full, only if the
+  story holds that note and it is enabled.
+- **The setup reference:** the notes the GM read during setup, newest
+  first, up to `SETUP_REFERENCE_CAP_TOKENS`.
+  - The cap is about 6,000 tokens; the plan measures it against the whole
+    request.
+  - `setup.referenceTitles` is updated by `read_notes` during session zero.
+  - Each title appears once, and the creation note is not counted twice.
+  - A note too large for what is left is listed by title with the usual
+    "read it again" line.
+- **The sheet template:** the story's own `characterSheetTemplate` if it
+  has one (an explicit template always wins), else the resolved system's
+  `sheetTemplate`.
+
+At `start_game` the block, the reference and the creation rules leave the
+request. Nothing in history moves.
 
 ### 3.5 The OK before the start: `confirm_setup`
 
-A new GM tool, `confirm_setup({ character_summary, campaign_hook })`. It
-pauses the turn the way `ask_question` does:
+`confirm_setup({ character_summary, campaign_hook })` pauses the turn like
+`ask_question`.
 
-- **The setup card.** The page shows a card with the summary and hook the GM
-  wrote, a link to the sheet and the plan, and two buttons: **Start the
-  story** and **Change something…** (a text box).
-- **Start** sets `setup.approved = true`, and the tool returns: "Approved.
-  Call start_game, then write the campaign intro: …" with the briefing and
-  scene instructions of decision 144.
-- **Change** returns the player's note. The GM edits and calls
-  `confirm_setup` again.
-- **Preconditions.** `confirm_setup` refuses if the sheet or the plan is
-  missing, and names which.
-- **Where the card is answered:**
-  - in couch co-op, on the shared screen;
-  - in party mode, on the table's screen (setup is a table decision);
-  - online, by the host.
-- **The six places.** The tool goes in all six places a tool lives, and the
-  drift test (`gmTools.sixPlaces.test.ts`) holds it.
+- **It refuses** without the sheet(s) or the plan, and names which.
+- **The card shows the current text.** The executor works on a clone, so
+  the card's sheet and plan come from that working copy, passed with the
+  request, not from page state (Codex's review).
+- **Start the story** stores `approval` with the hashes of exactly what the
+  card showed.
+- **Change something…** returns the player's note. Any edit the GM then
+  makes cancels the approval through the hashes.
+- **Dismiss is not Stop.**
+  - Dismissing the card returns "The player closed the card; ask what they
+    want to change."
+  - **Stop** cancels the turn. The executor checks the turn's abort signal
+    after the pause and **commits nothing**, so Stop's restore of the
+    pre-turn story is not overwritten by a batch finishing afterwards
+    (Codex's review). Later tools in the batch, `start_game` included, do
+    not run.
+- **Who answers the card:**
+  - couch co-op: the shared screen;
+  - party mode: the table;
+  - online: the host.
 
-`start_game` gains one rule: it refuses unless `getSetupProgress` says
-Character, Campaign and Start are done, and names the missing steps. Its
-success result carries the intro instructions, so the briefing comes in the
-same turn.
+  The card is not relayed to phones or guests.
 
-### 3.6 The setup gate
+**`start_game`** refuses unless Character, Campaign and **Approved** all
+hold on the live state, and names what is missing. Its success result
+carries the intro instructions (decision 144).
 
-This is a third gate beside the roll gate and the plan gate, in
-`generation.ts`'s round loop:
+### 3.6 The setup gate, and what the player sees
 
-- **When it fires:** a session-zero round ends with **no tool call** (prose
-  only), and setup is not complete.
-- **What it does:**
-  - it pushes a user message: "Setup isn't finished: next step is
-    <step> — <what to call>. Don't narrate the story yet.";
-  - it forces `tool_choice: "required"` for the next round (the providers
-    that reject a forced choice get the message alone, as the other gates
-    already do);
-  - it retries.
-- **Cap:** 2 per turn (`MAX_SETUP_PROMPTS`), then it fails open, as the
-  others do.
-- **Logging:** each firing writes a Debug Logs line.
+**When a setup turn may end.** A session-zero turn may end only when, this
+turn:
+- the player **answered a question**; or
+- a **setup step advanced** (a sheet or plan written or changed, or
+  approval given); or
+- **`start_game` succeeded**.
 
-A round that asks a question through `ask_question`, or calls any setup
-tool, satisfies it. The gate does not judge what the question was. That
-catches the failure in the evidence, prose instead of setup, without
-policing wording.
+These are judged from the tool *results* of this turn's rounds, not from
+whether a tool was called, so unrelated or failed tools do not count
+(Codex's review). A turn that reaches its final, tool-less round without any
+of these is a violation.
 
-The prose of a violating round is not shown as story. That round's text is
-dropped from the turn's narration, and the retry's output is what the player
-reads. The plan checks what the UI does with text already streamed.
+**On a violation,** the GM is re-prompted with the next step and its tool:
+- `tool_choice: "required"` is set where the provider allows it. Providers
+  that reject a forced choice (Claude via OpenRouter, Qwen, Z.ai) get the
+  message only.
+- This happens up to **2** times (`MAX_SETUP_PROMPTS`).
+- **It does not fail open.** After the cap, the turn ends with an engine
+  line in the GM's voice, "(Let's finish setting up first: next is
+  <step>.)", with no narration and no story continuation.
+- The round-limit fallback is blocked from narrating as well.
+- When approval is given but `start_game` has not been called, the next
+  step is `start_game`, and the gate asks for exactly that.
+
+**The other gates.** The roll gate (M2) and the plan gate are suspended
+while `sessionZeroActive`, up to and including the round that calls
+`start_game`. They apply again from the next turn. The setup gate keeps its
+own counter.
+
+**No narration stage during setup.** While `sessionZeroActive`, and unless
+`start_game` succeeded this turn, the story-continuation stage does not run.
+The turn's text is setup talk, saved as the GM's turn as usual.
+
+**What the player sees.** During setup the GM's text is **buffered**. It
+reaches the timeline, online guests and read-aloud only when the turn ends
+validly, so a rejected round's prose is never shown, sent or spoken (Codex's
+review). It is also removed from the turn's accumulated narration and replay
+history. The cost: no live streaming during setup, whose replies are short.
+
+**Cost.** Session zero already pins every turn to the top tier
+(`hardRuleFloor`: Sonnet at xhigh by default). The plan budgets a whole
+request across setup's rounds and turns (tools, the block, the reference)
+and records the figure. Changing the tier rule is not part of this work. If
+the figure is high, that is the author's call.
 
 ### 3.7 Multi-select questions (decision 146)
 
 - **The tool.** `ask_question`'s question items gain `multi_select?: boolean`.
+  `ask_question` and `confirm_setup` both join the Google tool list, which
+  lacks `ask_question` today.
 - **The modal** shows checkboxes and a Done button when it is set, plus the
   free-text box when `allow_custom`.
 - **The answer** item gains `selectedLabels?: string[]`, and the result
   text lists every pick.
-- **Party phones** relay it the same way (`partyHost.offerQuestion` and the
-  phone's question view). Single-choice stays the default.
+- **Party phones** need every transport step changed explicitly: the
+  protocol serialisation, the phone's parse and the host's cleaning of an
+  answer. Each of these drops the flag or the array today (Codex). Couch
+  `target_player_name` routing is unchanged. Single-choice stays the
+  default.
 
 ### 3.8 The checklist strip
 
@@ -256,8 +298,9 @@ It hides while a turn is loading.
 - **The plan rules** stay as they are: the spine, the beats, read before
   planning.
 - **Adventures with pre-made characters.** The preset picker stays. A
-  pre-made character arrives with its sheet, so Character is already ticked,
-  and setup goes straight to Campaign and Start.
+  pre-made character arrives with its sheet, so Concept and Character are
+  already ticked once a style is chosen, and setup goes on to Campaign and
+  the card.
 - **Out of scope:**
   - a non-Blood & Bone system's creation note (there is none yet; the field
     is ready for one);
@@ -270,9 +313,8 @@ It hides while a turn is loading.
   stall in questions. Quick mode's "2–4 questions, then propose" and the
   checklist keep it visible to the player. The plan adds a soft nudge in
   the session-zero block after 6 setup questions.
-- **Token cost of keeping rules whole.** This is bounded by the length of
-  session zero, and below the re-reads it replaces. The plan measures one
-  setup in the token-budget test.
+- **Token cost.** The setup reference is capped and leaves at
+  `start_game`. The plan measures a whole setup.
 - **Providers that reject a forced tool choice** (Claude via OpenRouter,
   Qwen, Z.ai). For them the gate relies on its message, as the M2 gate
   already does.
