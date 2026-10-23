@@ -15,6 +15,9 @@ const MISTRAL_MODEL = "Mistral Small 4";
 const mockPlatformFetch = vi.fn();
 vi.mock("@/app/misc/platformFetch", () => ({
   getProviderFetch: () => mockPlatformFetch,
+  getAbortableProviderFetch: () => mockPlatformFetch,
+  markHostDown: vi.fn(),
+  hostOf: (url: string) => new URL(url).hostname,
 }));
 
 import { callSideModel, pickProviderKeys } from "@/app/misc/sideModelCall";

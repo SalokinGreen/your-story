@@ -27,7 +27,11 @@ import {
   SamplingSettings,
   filterSettingsForProvider,
 } from "@/app/misc/samplingSettings";
-import { getProviderFetch } from "@/app/misc/platformFetch";
+import {
+  getAbortableProviderFetch,
+  hostOf,
+  markHostDown,
+} from "@/app/misc/platformFetch";
 
 export type Provider =
   | "deepseek"
@@ -654,14 +658,27 @@ async function postChatRequest(
   provider: Provider,
   signal: AbortSignal | undefined,
 ): Promise<Response> {
-  const providerFetch = getProviderFetch();
-  const send = () =>
-    providerFetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-      signal,
-    });
+  const providerFetch = getAbortableProviderFetch(endpoint);
+  const send = async () => {
+    try {
+      return await providerFetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+        signal,
+      });
+    } catch (error) {
+      // A network error before any response from the Android WebView's own
+      // fetch most likely means the host stopped answering CORS preflights.
+      // Take it off the list for the session, but never replay: the POST may
+      // have reached the provider and been billed. The player's Retry goes
+      // the native way. An abort is not a host fault.
+      if (error instanceof TypeError && signal?.aborted !== true) {
+        markHostDown(hostOf(endpoint));
+      }
+      throw error;
+    }
+  };
   const response = await send();
   if (
     !response.ok &&
@@ -1002,8 +1019,10 @@ export function abortErrorFor(signal: AbortSignal | undefined): Error {
 
 /**
  * With a signal, rejects with an AbortError the moment it fires - even when
- * the fetch underneath ignores it (Capacitor), whose request then runs to
- * completion unread.
+ * the fetch underneath ignores it (Capacitor's patched fetch, which Google and
+ * Z.ai still use on Android and every host uses on iOS), whose request then
+ * runs to completion unread. On Android the CORS-listed hosts (platformFetch.ts)
+ * go through the WebView's own fetch, which honours the signal.
  */
 export function generateNonStreaming(
   body: GenerateRequestBody,

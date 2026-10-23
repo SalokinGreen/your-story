@@ -382,3 +382,25 @@ checked against the code, and all are taken in:
   disk on the next load.
 - The banner hides while a turn is loading.
 - Not run: the browser preview check in the slice's "Check".
+
+### 2026-10-23, slice 3 (streaming and Stop on Android)
+
+- **`generateSimple` took no signal**, so the classifier fix needed a new
+  `abortSignal` option there, passed as `providerFetch`'s third argument.
+  The classifier's catch still swallows an abort and falls back to the
+  deterministic tier; the GM's first call then aborts at once.
+- **`hostOf(url)` and `resetDownHostsForTests()` are exported** from
+  `platformFetch.ts` (the first so `providerCall` can name the host to mark).
+- **Mark-down rule:** any `TypeError` thrown by the request's fetch, with the
+  caller's signal not aborted, marks the host. It does not check which
+  transport was used; marking a host that was already going native is
+  harmless. No replay, including the Mistral cache-key retry path (that retry
+  only follows a response).
+- **Tests that mock `platformFetch`** (`providerFetch.abort`, `sideModelCall`)
+  gained `getAbortableProviderFetch`, `markHostDown` and `hostOf` in their mocks.
+- **Header check:** every provider request is built by `postChatRequest`
+  through `buildHeaders`: `Content-Type` and `Authorization`, plus
+  `HTTP-Referer` and `X-Title` for OpenRouter only. `session_id`,
+  `prompt_cache_key` and `cache_control` are body fields. All four listed
+  hosts' preflights allow these. Nothing bypasses `postChatRequest`.
+- Not verified: any real device or CORS preflight (needs the Android app).
