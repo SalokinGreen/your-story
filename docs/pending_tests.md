@@ -13,14 +13,17 @@ session cannot do".
 
 ## 2026-10-23 — Downloads on the phone, and the AI Context height (claude/ai-context-phone)
 
-- **AI Context → the download (JSON) and TXT buttons, on the APK.** Expected:
-  Android's share sheet opens with a `context-gm-….json` / `.txt`, and
-  "Save to Files" or "Downloads" saves it. Failure looks like: nothing
-  happens (the old `<a download>` behaviour), or the sheet opens without a
-  file (the `url` fallback), or an error line in the Debug Logs.
-- **The same for Debug Logs → Export, the Story menu → Export, and the
-  Library's folder and notes exports.** Each opens the share sheet with its
-  file. Cancelling the sheet shows no error.
+- **AI Context -> the download (JSON) and TXT buttons, on the Android APK.**
+  Expected: the file is saved straight into `Downloads/Your Story/` (open the
+  Files app, Downloads) with a "Saved to Downloads/Your Story/context-gm-....json"
+  message, and no share sheet opens. Pressing it twice gives two files, not an
+  overwrite. On Android 7-9 a one-time storage permission prompt appears first;
+  denying it shows an error message. Failure looks like the share sheet (an
+  old build), an error toast, or a "Could not save the AI context" line in the
+  Debug Logs. On iOS the share sheet is kept (no Downloads folder there).
+- **The same for Debug Logs -> Export, the Story menu -> Export, and the
+  Library's folder and notes exports.** Each saves to `Downloads/Your Story/`
+  and shows "Saved to ...". The web and desktop apps behave as before.
 - **AI Context and Debug Logs fill the screen on the phone.** The panel
   reaches the bottom with only a small gap, scrolls inside itself, and its
   up/down buttons work; rotating the phone refits it. Failure looks like an

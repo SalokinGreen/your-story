@@ -75,13 +75,17 @@ export default function ExportFolderModal({
       return;
     }
 
+    let location: string | undefined;
     try {
-      await downloadFolderLibrary(folder, selection);
+      ({ location } = await downloadFolderLibrary(folder, selection));
     } catch {
       addNotification("Failed to export folder", "failure");
       return;
     }
-    addNotification(`Exported folder "${folder.name}"`, "success");
+    addNotification(
+      location ? `Saved to ${location}` : `Exported folder "${folder.name}"`,
+      "success",
+    );
     onClose();
   };
 

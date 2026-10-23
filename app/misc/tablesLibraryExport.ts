@@ -6,7 +6,7 @@
  * notesLibraryExport.ts.
  */
 
-import { saveFile } from "./saveFile";
+import { saveFile, type SavedFile } from "./saveFile";
 import { LibraryTable } from "./localTablesLibraryManager";
 import { CustomTableEntry } from "./structs";
 
@@ -66,7 +66,7 @@ export function prepareTablesForExport(
 export async function downloadLibraryTables(
   tables: LibraryTable[],
   filename?: string
-): Promise<void> {
+): Promise<SavedFile> {
   const exportData = prepareTablesForExport(tables);
   const json = JSON.stringify(exportData, null, 2);
   const blob = new Blob([json], { type: "application/json" });
@@ -81,7 +81,7 @@ export async function downloadLibraryTables(
           .slice(0, 50)
       : `tables-library-${new Date().toISOString().slice(0, 10)}`);
 
-  await saveFile(`${safeName}.tables`, blob, "application/json");
+  return saveFile(`${safeName}.tables`, blob, "application/json");
 }
 
 // ============================================

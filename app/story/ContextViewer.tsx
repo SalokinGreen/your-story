@@ -15,6 +15,7 @@ import {
 import { buildObserverWarningNote } from "../misc/observer";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { saveFile } from "../misc/saveFile";
+import { useNotification } from "../misc/NotificationContext";
 import { useFitToViewport } from "../misc/useFitToViewport";
 import { logger } from "../misc/logger";
 import { getModelConfig } from "../misc/ai_prices";
@@ -315,6 +316,7 @@ function TurnHistoryCard({ turn }: { turn: TurnSummary }) {
 }
 
 export default function ContextViewer({ storyData }: ContextViewerProps) {
+  const { addNotification } = useNotification();
   const { ref: panelRef, height: panelHeight } =
     useFitToViewport<HTMLDivElement>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -561,13 +563,15 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const downloadAsJSON = async () => {
     const jsonData = JSON.stringify(messages, null, 2);
     try {
-      await saveFile(
+      const { location } = await saveFile(
         `context-gm-${Date.now()}.json`,
         jsonData,
         "application/json",
       );
+      if (location) addNotification(`Saved to ${location}`, "success");
     } catch (error) {
       logger.error("Could not save the AI context", { error: String(error) });
+      addNotification("Could not save the AI context", "failure");
     }
   };
 
@@ -576,9 +580,15 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       .map((msg) => `=== ${formatRole(msg.role)} ===\n\n${msg.content}\n\n`)
       .join("\n");
     try {
-      await saveFile(`context-gm-${Date.now()}.txt`, textData, "text/plain");
+      const { location } = await saveFile(
+        `context-gm-${Date.now()}.txt`,
+        textData,
+        "text/plain",
+      );
+      if (location) addNotification(`Saved to ${location}`, "success");
     } catch (error) {
       logger.error("Could not save the AI context", { error: String(error) });
+      addNotification("Could not save the AI context", "failure");
     }
   };
 

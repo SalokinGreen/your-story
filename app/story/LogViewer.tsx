@@ -4,11 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import { logger, LogEntry } from "../misc/logger";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { saveFile } from "../misc/saveFile";
+import { useNotification } from "../misc/NotificationContext";
 import { useFitToViewport } from "../misc/useFitToViewport";
 
 export default function LogViewer() {
   const { ref: panelRef, height: panelHeight } =
     useFitToViewport<HTMLDivElement>();
+  const { addNotification } = useNotification();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -75,15 +77,17 @@ export default function LogViewer() {
                 )
                 .join("\n");
               try {
-                await saveFile(
+                const { location } = await saveFile(
                   `story-log-${Date.now()}.txt`,
                   text,
                   "text/plain",
                 );
+                if (location) addNotification(`Saved to ${location}`, "success");
               } catch (error) {
                 logger.error("Could not save the session log", {
                   error: String(error),
                 });
+                addNotification("Could not save the session log", "failure");
               }
             }}
             className="px-3 py-1 text-sm bg-ys-accent/15 text-ys-accent rounded hover:bg-ys-accent/25 flex items-center gap-1"

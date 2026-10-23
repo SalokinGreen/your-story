@@ -10,6 +10,8 @@ public class MainActivity extends BridgeActivity {
         // A plugin that lives in this project (not an npm package) is
         // registered before super.onCreate builds the bridge.
         registerPlugin(TurnKeepAlivePlugin.class);
+        // Downloads go straight to the public Downloads folder (FileSaverPlugin).
+        registerPlugin(FileSaverPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

@@ -436,13 +436,16 @@ export default function MenuPage({
         data: storyData,
       };
 
-      await saveFile(
+      const { location } = await saveFile(
         `${storyData.story_name.replace(/[^a-z0-9]/gi, "_")}_${Date.now()}.json`,
         JSON.stringify(exportData, null, 2),
         "application/json",
       );
 
-      addNotification("Story exported successfully!", "success");
+      addNotification(
+        location ? `Saved to ${location}` : "Story exported successfully!",
+        "success",
+      );
     } catch (error) {
       addNotification("Failed to export story", "failure");
     } finally {

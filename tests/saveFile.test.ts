@@ -4,9 +4,17 @@ const isNativePlatform = vi.fn();
 const writeFile = vi.fn();
 const share = vi.fn();
 const canShare = vi.fn();
+const getPlatform = vi.fn();
+const saveToDownloads = vi.fn();
 
 vi.mock("@capacitor/core", () => ({
-  Capacitor: { isNativePlatform: () => isNativePlatform() },
+  Capacitor: {
+    isNativePlatform: () => isNativePlatform(),
+    getPlatform: () => getPlatform(),
+  },
+  registerPlugin: () => ({
+    saveToDownloads: (o: unknown) => saveToDownloads(o),
+  }),
 }));
 vi.mock("@capacitor/filesystem", () => ({
   Directory: { Cache: "CACHE" },
@@ -24,10 +32,59 @@ beforeEach(() => {
   writeFile.mockResolvedValue({ uri: "file:///cache/a.txt" });
   share.mockResolvedValue({});
   canShare.mockResolvedValue({ value: true });
+  getPlatform.mockReturnValue("web");
+  saveToDownloads.mockResolvedValue({
+    path: "Download/Your Story/a.txt",
+  });
 });
 
-describe("saveFile on a native platform", () => {
-  beforeEach(() => isNativePlatform.mockReturnValue(true));
+describe("saveFile on Android", () => {
+  beforeEach(() => {
+    isNativePlatform.mockReturnValue(true);
+    getPlatform.mockReturnValue("android");
+  });
+
+  it("saves a string as UTF-8 base64 into Downloads and returns the location", async () => {
+    const result = await saveFile("a.txt", "héllo", "text/plain");
+    expect(saveToDownloads).toHaveBeenCalledWith({
+      name: "a.txt",
+      mimeType: "text/plain",
+      base64: Buffer.from("héllo", "utf8").toString("base64"),
+    });
+    expect(result).toEqual({ location: "Download/Your Story/a.txt" });
+  });
+
+  it("saves a Blob as base64", async () => {
+    await saveFile("a.bin", new Blob([new Uint8Array([104, 105])]), "x/y");
+    expect(saveToDownloads).toHaveBeenCalledWith({
+      name: "a.bin",
+      mimeType: "x/y",
+      base64: btoa("hi"),
+    });
+  });
+
+  it("does not use the file system or the share sheet", async () => {
+    await saveFile("a.txt", "x", "text/plain");
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the plugin fails", async () => {
+    saveToDownloads.mockRejectedValue(new Error("denied"));
+    await expect(saveFile("a.txt", "x", "text/plain")).rejects.toThrow("denied");
+  });
+});
+
+describe("saveFile on iOS", () => {
+  beforeEach(() => {
+    isNativePlatform.mockReturnValue(true);
+    getPlatform.mockReturnValue("ios");
+  });
+
+  it("never calls the Downloads plugin", async () => {
+    await saveFile("a.txt", "x", "text/plain");
+    expect(saveToDownloads).not.toHaveBeenCalled();
+  });
 
   it("writes a string as utf8 to the cache and shares the uri", async () => {
     await saveFile("a.txt", "héllo", "text/plain");
@@ -70,7 +127,7 @@ describe("saveFile on a native platform", () => {
 
   it("treats a cancelled share sheet as success", async () => {
     share.mockRejectedValue(new Error("Share canceled"));
-    await expect(saveFile("a.txt", "x", "text/plain")).resolves.toBeUndefined();
+    await expect(saveFile("a.txt", "x", "text/plain")).resolves.toEqual({});
   });
 
   it("throws other share errors", async () => {
@@ -92,8 +149,10 @@ describe("saveFile elsewhere", () => {
     const revoke = vi.fn();
     vi.stubGlobal("URL", { createObjectURL: create, revokeObjectURL: revoke });
 
-    await saveFile("a.json", "{}", "application/json");
+    const result = await saveFile("a.json", "{}", "application/json");
 
+    expect(result).toEqual({});
+    expect(saveToDownloads).not.toHaveBeenCalled();
     expect(anchor.href).toBe("blob:abc");
     expect(anchor.download).toBe("a.json");
     expect(anchor.click).toHaveBeenCalledOnce();

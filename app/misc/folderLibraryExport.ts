@@ -8,7 +8,7 @@
  * types together since folders are shared across all of them.
  */
 
-import { saveFile } from "./saveFile";
+import { saveFile, type SavedFile } from "./saveFile";
 import { Adventure, StoryData } from "./structs";
 import { LocalStory } from "./localStoryManager";
 import { LocalAdventure } from "./localAdventureManager";
@@ -99,7 +99,7 @@ export async function downloadFolderLibrary(
   folder: { name: string; icon: string; color: string },
   data: FolderExportSelection,
   filename?: string,
-): Promise<void> {
+): Promise<SavedFile> {
   const exportData = prepareFolderForExport(folder, data);
   const json = JSON.stringify(exportData, null, 2);
   const blob = new Blob([json], { type: "application/json" });
@@ -113,7 +113,7 @@ export async function downloadFolderLibrary(
       .slice(0, 50) ||
     `folder-${new Date().toISOString().slice(0, 10)}`;
 
-  await saveFile(`${safeName}.folder`, blob, "application/json");
+  return saveFile(`${safeName}.folder`, blob, "application/json");
 }
 
 // ============================================

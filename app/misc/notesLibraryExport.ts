@@ -5,7 +5,7 @@
  * and imports them back into the notes library.
  */
 
-import { saveFile } from "./saveFile";
+import { saveFile, type SavedFile } from "./saveFile";
 import { LibraryNote } from "./localNotesLibraryManager";
 import { LoreType } from "./structs";
 
@@ -71,7 +71,7 @@ export function prepareNotesForExport(
 export async function downloadLibraryNotes(
   notes: LibraryNote[],
   filename?: string
-): Promise<void> {
+): Promise<SavedFile> {
   const exportData = prepareNotesForExport(notes);
   const json = JSON.stringify(exportData, null, 2);
   const blob = new Blob([json], { type: "application/json" });
@@ -86,7 +86,7 @@ export async function downloadLibraryNotes(
           .slice(0, 50)
       : `notes-library-${new Date().toISOString().slice(0, 10)}`);
 
-  await saveFile(`${safeName}.notes`, blob, "application/json");
+  return saveFile(`${safeName}.notes`, blob, "application/json");
 }
 
 // ============================================
