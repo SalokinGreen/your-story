@@ -1,6 +1,6 @@
 # Android: turns that survive leaving the app, and the back gesture — design
 
-Status: **draft, waiting for the author's approval.** The implementation plan
+Status: **approved (decision 136), being built.** The implementation plan
 is [`android-background-plan.md`](android-background-plan.md). Decisions
 132–135 in [`decisions.md`](decisions.md).
 

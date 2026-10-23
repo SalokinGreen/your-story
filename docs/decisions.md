@@ -207,6 +207,7 @@ The author: "I want to be able to leave the app while it generates and it finish
 | 133 | "What should the back gesture do at the top of each screen?" | **"Story → Library → leave (Recommended)."** Back closes whatever is open (dialog, picture, menu, sub-page); on the story itself it goes to the Library; on the Library home it puts the app in the background, like Home, and never kills it. Rejected: story → leave; a second back to confirm leaving. |
 | 134 | "On the phone the GM's reply currently arrives all at once at the end instead of word by word, and Stop doesn't cancel the request on the phone. Fix those in this project?" | **"Yes, in this project (Recommended)."** |
 | 135 | "If Android kills the app mid-turn anyway (low memory, swiped away), what should happen when you come back?" | **"Say so, offer Retry (Recommended)."** The player's line is kept and the story shows that the last turn was interrupted, with Retry. Rejected: retry automatically; as today. |
+| 136 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"Approved"** — built as planned on `claude/android-background`. |
 
 ### Interview — removing the arcade leftovers (2026-10-23)
 

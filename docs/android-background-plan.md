@@ -1,7 +1,7 @@
 # Android: turns that survive leaving the app, and the back gesture — implementation plan
 
-Status: **draft, revised after Codex's review, waiting for the author's
-approval.** Design: [`android-background-design.md`](android-background-design.md).
+Status: **approved (decision 136), being built; revised after Codex's
+review.** Design: [`android-background-design.md`](android-background-design.md).
 Decisions 132–135. Branch `claude/android-background`, one PR, five slices.
 Line numbers are from `master` at e1000b1 (2026-10-23).
 
