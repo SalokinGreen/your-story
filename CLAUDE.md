@@ -195,7 +195,7 @@ Sessions run in two very different places, and the difference is not cosmetic:
 | `npm ci`, the Vitest suite, `tsc`, `eslint`, both Next builds | yes | yes (the SessionStart hook runs `npm ci`) |
 | the browser preview and screenshots | yes | **no** |
 | the Tauri desktop build and launching it (Windows, Rust ≥ 1.90) | yes | **no** |
-| an Android build | **no** (no SDK here) | **no** — `build-apps.yml`, with the author's go |
+| an Android build | yes (the SDK since 2026-10-24; the `verify` skill has the command and the shared signing key) | **no** — `build-apps.yml`, with the author's go |
 | an iOS build | **no** (no Mac) | **no** — `build-apps.yml`, with the author's go |
 | calls to a real model | **only with the author's go** — the keys are theirs and every call costs money | **no** — no keys, and none may be added |
 
