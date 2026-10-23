@@ -10,6 +10,30 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-23 — The model picker, simplified (`claude/model-picker`)
+
+Settings was walked through in the browser preview (the Models card, Mixed
+after a simulated sync, a save keeping a newer build's entry, Advanced
+settings, the Architecture tab, the Advanced tag). No model was called.
+
+- **The first turn on the new ladder** (author's go: it spends on the key).
+  On a fresh profile with an OpenRouter key, play two turns of any story, one
+  ordinary and one in combat. Debug Logs → "Reasoning tier resolved" should
+  show GLM 5.3 for both, effort `none` on the ordinary turn and `high` on the
+  combat one; a long free-form action should log a "Tier classification" call
+  on Claude Haiku 5.5. Failure looks like Haiku still on tier 0/1 (the old
+  ladder) or the classifier on GLM.
+- **A Mistral model in Default** (needs a Mistral key). Put Ministral 3 8B in
+  Default and start a fight. The combat turn sends Mistral
+  `reasoning_effort: "high"` (decision 123's floor); the GM round should
+  succeed. If Mistral rejects the parameter on that model, every combat turn
+  fails with a provider error (and there is no other model to step down to):
+  then the floor must skip models that do not reason.
+- **The Claude subscription on the desktop app.** Put a subscription model in
+  Advanced, then join an online session: Settings and the in-game notice
+  should name "Advanced" (not "Tier 3") as falling back, and the panel's
+  instructions should point at Default/Advanced and AI → Advanced settings.
+
 ## 2026-10-23 — The story screen, simplified (`claude/story-screen`)
 
 Everything that renders was walked through in the browser preview at 375 px

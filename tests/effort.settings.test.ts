@@ -22,6 +22,7 @@ import {
   getNarrationEffortOverride,
   isReasoningEffort,
   setNarrationEffortOverride,
+  setSlotOverride,
   REASONING_CONFIG_CHANGED_EVENT,
 } from "@/app/misc/reasoningTiers";
 import {
@@ -98,88 +99,101 @@ describe("the five efforts", () => {
   });
 });
 
-describe("the narration voice's stored effort", () => {
-  it("defaults to none when nothing is stored", () => {
-    expect(getNarrationEffortOverride()).toBeNull();
+describe("the narration's effort is Default's (decisions 53 and 118)", () => {
+  it("defaults to none when nothing is saved", () => {
     expect(getEffectiveNarrationEffort()).toBe("none");
   });
 
-  it("keeps a stored value, for every effort", () => {
+  it("is the effort the player gave Default, for every effort", () => {
     for (const effort of REASONING_EFFORTS) {
-      localStorage.setItem("narrationEffortOverride", effort);
-      expect(getNarrationEffortOverride()).toBe(effort);
+      setSlotOverride("default", { modelKey: "GLM 5.3", reasoningEffort: effort });
       expect(getEffectiveNarrationEffort()).toBe(effort);
     }
   });
 
-  it("rejects a junk stored value and reads it as the default", () => {
-    for (const junk of ["max", "medium", "", "null", "{}", "HIGH"]) {
-      localStorage.setItem("narrationEffortOverride", junk);
-      expect(getNarrationEffortOverride(), junk).toBeNull();
-      expect(getEffectiveNarrationEffort(), junk).toBe("none");
-    }
-  });
-
-  it("is written by the setter, cleared by null, and announced to the cost panel", () => {
-    setNarrationEffortOverride("high");
-    expect(localStorage.getItem("narrationEffortOverride")).toBe("high");
-    expect(getEffectiveNarrationEffort()).toBe("high");
-    expect(dispatchEvent).toHaveBeenCalledTimes(1);
-    expect((dispatchEvent.mock.calls[0][0] as Event).type).toBe(REASONING_CONFIG_CHANGED_EVENT);
-
-    setNarrationEffortOverride(null);
-    expect(localStorage.getItem("narrationEffortOverride")).toBeNull();
-    expect(getEffectiveNarrationEffort()).toBe("none");
-
-    // A value that is not an effort is never stored.
-    setNarrationEffortOverride("max" as never);
-    expect(localStorage.getItem("narrationEffortOverride")).toBeNull();
-  });
-
-  it("applies to the default voice and to a voice the player picked", () => {
-    localStorage.setItem("narrationEffortOverride", "normal");
+  it("applies to the default model and to one the player picked", () => {
+    setSlotOverride("default", { modelKey: "GLM 5.3", reasoningEffort: "normal" });
     expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
     expect(getEffectiveNarrationEffort()).toBe("normal");
 
-    localStorage.setItem("narrationModelOverride", "Claude Sonnet 5.5");
+    setSlotOverride("default", { modelKey: "Claude Sonnet 5.5", reasoningEffort: "normal" });
     expect(getEffectiveNarrationModelKey()).toBe("Claude Sonnet 5.5");
     expect(getEffectiveNarrationEffort()).toBe("normal");
   });
 
-  it("falls back to none when the voice falls back off the device (decision 16)", () => {
-    localStorage.setItem("narrationModelOverride", SONNET_SUBSCRIPTION);
-    localStorage.setItem("narrationEffortOverride", "high");
+  it("falls back to the shipped model and effort together when Default's model falls back off the device (decision 16)", () => {
+    setSlotOverride("default", { modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "high" });
 
     // The desktop runs the subscription: the effort holds.
     expect(getEffectiveNarrationModelKey()).toBe(SONNET_SUBSCRIPTION);
     expect(getEffectiveNarrationEffort()).toBe("high");
 
-    // A phone or the web build cannot: the voice is the default model, and
-    // the effort chosen for the subscription model goes with it.
+    // A phone or the web build cannot: the model is the shipped one, and the
+    // effort chosen for the subscription model goes with it.
     fakeCli.platform = false;
     expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
     expect(getEffectiveNarrationEffort()).toBe("none");
   });
 
-  it("falls back to none during an online session (decision 29)", () => {
-    localStorage.setItem("narrationModelOverride", SONNET_SUBSCRIPTION);
-    localStorage.setItem("narrationEffortOverride", "xhigh");
+  it("falls back to the shipped effort during an online session (decision 29)", () => {
+    setSlotOverride("default", { modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "xhigh" });
     setOnlineSessionActive(true);
     expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
     expect(getEffectiveNarrationEffort()).toBe("none");
   });
 
-  it("falls back to none when the catalog dropped the saved voice", () => {
-    localStorage.setItem("narrationModelOverride", "Grok Code Fast 1");
-    localStorage.setItem("narrationEffortOverride", "high");
+  it("falls back when the catalog dropped Default's saved model", () => {
+    localStorage.setItem(
+      "reasoningTierOverrides",
+      JSON.stringify(
+        [0, 1, 2, 3].map((i) =>
+          i < 3 ? { modelKey: "Grok Code Fast 1", reasoningEffort: "high" } : null,
+        ),
+      ),
+    );
     expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
     expect(getEffectiveNarrationEffort()).toBe("none");
   });
+});
 
-  it("syncs between devices next to the narration model", () => {
+describe("the saved narration voice and effort (replaced by Default, decision 118)", () => {
+  it("are still read, written and synced, so an older device keeps its choice", () => {
+    expect(getNarrationEffortOverride()).toBeNull();
+    for (const effort of REASONING_EFFORTS) {
+      localStorage.setItem("narrationEffortOverride", effort);
+      expect(getNarrationEffortOverride()).toBe(effort);
+    }
+    for (const junk of ["max", "medium", "", "null", "{}", "HIGH"]) {
+      localStorage.setItem("narrationEffortOverride", junk);
+      expect(getNarrationEffortOverride(), junk).toBeNull();
+    }
+
+    setNarrationEffortOverride("high");
+    expect(localStorage.getItem("narrationEffortOverride")).toBe("high");
+    expect(dispatchEvent).toHaveBeenCalledTimes(1);
+    expect((dispatchEvent.mock.calls[0][0] as Event).type).toBe(REASONING_CONFIG_CHANGED_EVENT);
+    setNarrationEffortOverride(null);
+    expect(localStorage.getItem("narrationEffortOverride")).toBeNull();
+    setNarrationEffortOverride("max" as never);
+    expect(localStorage.getItem("narrationEffortOverride")).toBeNull();
+
     const keys = SYNCABLE_SETTINGS_KEYS as readonly string[];
     expect(keys).toContain("narrationEffortOverride");
+    expect(keys).toContain("narrationModelOverride");
     expect(keys.indexOf("narrationEffortOverride")).toBe(keys.indexOf("narrationModelOverride") + 1);
+  });
+
+  it("are no longer used: the narration follows Default", () => {
+    localStorage.setItem("narrationModelOverride", "Mistral Small 4");
+    localStorage.setItem("narrationEffortOverride", "xhigh");
+    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
+    expect(getEffectiveNarrationEffort()).toBe("none");
+
+    setSlotOverride("default", { modelKey: "Claude Sonnet 5.5", reasoningEffort: "low" });
+    expect(getEffectiveNarrationModelKey()).toBe("Claude Sonnet 5.5");
+    expect(getEffectiveNarrationEffort()).toBe("low");
+    // ...and the saved voice is still there afterwards.
+    expect(localStorage.getItem("narrationModelOverride")).toBe("Mistral Small 4");
   });
 });
 
@@ -209,8 +223,7 @@ describe("a side agent's effort (decision 53)", () => {
   });
 
   it("stays none when the layer falls to the narration voice for want of a key, even at a high narration effort", () => {
-    localStorage.setItem("narrationModelOverride", "Mistral Small 4");
-    localStorage.setItem("narrationEffortOverride", "high");
+    setSlotOverride("default", { modelKey: "Mistral Small 4", reasoningEffort: "high" });
     expect(resolveSideCallModel(null, { mistralKey: "m" })).toEqual({
       model: "Mistral Small 4",
       reasoningEffort: "none",

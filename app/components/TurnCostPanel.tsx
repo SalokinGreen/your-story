@@ -21,6 +21,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import { StoryData } from "@/app/misc/structs";
+import { useAPIKeys } from "@/app/misc/APIKeysContext";
+import { pickProviderKeys } from "@/app/misc/sideModelCall";
 import {
   TurnCostReport,
   TURN_COST_STAGE_LABELS,
@@ -38,7 +40,13 @@ import {
 } from "@/app/misc/turnCostEstimate";
 import { LAYER_SETTINGS_CHANGED_EVENT } from "@/app/misc/layerSettings";
 import { REASONING_CONFIG_CHANGED_EVENT } from "@/app/misc/reasoningTiers";
-import { getTierModelDisplayName } from "@/app/misc/reasoningTiers";
+import { SYNC_COMPLETED_EVENT } from "@/app/misc/syncManager";
+import { getTierModelDisplayName, slotForTier } from "@/app/misc/reasoningTiers";
+
+// The slot a tier belongs to, in the words Settings uses (decision 124).
+function slotLabel(tier: number): string {
+  return slotForTier(tier) === "advanced" ? "Advanced" : "Default";
+}
 
 interface TurnCostPanelProps {
   /**
@@ -59,9 +67,11 @@ export default function TurnCostPanel({
   const [lastTurn, setLastTurn] = useState<TurnCostReport | null>(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
 
+  // The keys decide which model the tier classifier is priced on (decision 124).
+  const { keys } = useAPIKeys();
   const refreshEstimate = useCallback(() => {
-    setEstimate(estimateTurnCostFromSettings(storyData));
-  }, [storyData]);
+    setEstimate(estimateTurnCostFromSettings(storyData, pickProviderKeys(keys)));
+  }, [storyData, keys]);
 
   const refreshActuals = useCallback(() => {
     setLastTurn(getLatestTurnCostReport());
@@ -80,6 +90,7 @@ export default function TurnCostPanel({
       LAYER_SETTINGS_CHANGED_EVENT,
       TURN_COST_INPUTS_CHANGED_EVENT,
       "custom-models-changed",
+      SYNC_COMPLETED_EVENT,
     ];
     events.forEach((e) => window.addEventListener(e, refreshEstimate));
     return () =>
@@ -169,7 +180,7 @@ export default function TurnCostPanel({
         </div>
         {predictedTier && (
           <p className="text-[11px] text-blue-200/50 mt-2">
-            Assuming tier {predictedTier.tier} (
+            Assuming {slotLabel(predictedTier.tier)} (
             {getTierModelDisplayName(predictedTier.modelKey)}, effort{" "}
             {predictedTier.reasoningEffort}) for the GM
             {storyData ? " on your next turn" : ""}.

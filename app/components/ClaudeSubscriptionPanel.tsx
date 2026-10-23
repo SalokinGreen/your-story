@@ -149,7 +149,7 @@ export default function ClaudeSubscriptionPanel() {
           </div>
           <p className="text-xs text-blue-300/60">
             Play on your own Claude plan: pick a &ldquo;(subscription)&rdquo;
-            model for a tier or the narration voice. For those turns this app
+            model for Default or Advanced. For those turns this app
             runs Anthropic&rsquo;s <code>claude</code> CLI on this computer. It
             never sees or stores your sign-in.
           </p>
@@ -167,7 +167,7 @@ export default function ClaudeSubscriptionPanel() {
           )}
           <p className="text-[11px] text-blue-300/40">
             The side agents stay on their own models unless you point one at a
-            subscription model under Architecture. A turn that reaches your
+            subscription model under AI → Advanced settings. A turn that reaches your
             plan&rsquo;s usage limit stops with a message; it is never moved to
             a paid provider.
           </p>

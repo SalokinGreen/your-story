@@ -29,8 +29,14 @@ import type { MemoryEntry, StoryData } from "@/app/misc/structs";
 
 const MISTRAL_KEY = "mistral-test-key";
 const ZAI_KEY = "zai-test-key";
-/** The narration voice a Mistral-only player picks in Settings. */
+/** The Default model a Mistral-only player picks in Settings; narration follows it (decision 118). */
 const MISTRAL_NARRATION_MODEL = "Mistral Small 4";
+/** What Settings saves for Default: the same choice in tiers 0, 1 and 2. */
+const MISTRAL_DEFAULT_SLOT = {
+  reasoningTierOverrides: JSON.stringify(
+    [0, 1, 2, 3].map((i) => (i < 3 ? { modelKey: MISTRAL_NARRATION_MODEL, reasoningEffort: "none" } : null)),
+  ),
+};
 const NARRATION = "The lock clicks open. The corridor beyond is dark.";
 
 /** ~1,500 tokens apiece - several of these age well past a small history budget. */
@@ -149,8 +155,8 @@ function stubBrowserStorage(entries: Record<string, string>) {
 }
 
 describe("side calls forward every provider key", () => {
-  it("compacts and reflects with only a Mistral key saved and the narration voice on a Mistral model", async () => {
-    stubBrowserStorage({ narrationModelOverride: MISTRAL_NARRATION_MODEL });
+  it("compacts and reflects with only a Mistral key saved and Default on a Mistral model", async () => {
+    stubBrowserStorage(MISTRAL_DEFAULT_SLOT);
     const { fetchMock, calls } = createFetchMock();
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -201,7 +207,7 @@ describe("side calls forward every provider key", () => {
   });
 
   it("runs the Observer's judges and the Director Assistant on that voice too", async () => {
-    stubBrowserStorage({ narrationModelOverride: MISTRAL_NARRATION_MODEL });
+    stubBrowserStorage(MISTRAL_DEFAULT_SLOT);
     // An increment_scene call makes the Director Assistant due; an active
     // thread gives it something to judge; the character sheet keeps the
     // Observer from suspending itself.

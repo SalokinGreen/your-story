@@ -85,6 +85,27 @@ describe("story turn markup", () => {
     expect(html).not.toContain("secret plan");
   });
 
+  it("only an Advanced turn carries a tag on its work line (decision 124)", () => {
+    const work: TimelineBlock[] = [
+      { id: "f", kind: "tool", toolName: "fate_question", success: true, contextForStory: "[Roll: 37]" },
+    ];
+    const line = (tier: number) =>
+      renderToStaticMarkup(
+        createElement(TurnWorkLine, {
+          blocks: work,
+          reasoningTier: { tier, modelKey: "Claude Sonnet 5.5", effort: "xhigh" },
+        }),
+      );
+    for (const tier of [0, 1, 2]) {
+      const html = line(tier);
+      expect(html).not.toContain("Advanced");
+      expect(html).not.toMatch(/>Td</);
+    }
+    const advanced = line(3);
+    expect(advanced).toContain("Advanced");
+    expect(advanced).toContain("xhigh effort");
+  });
+
   it("the player's line shows each speaker and the OOC tag", () => {
     const html = renderToStaticMarkup(
       createElement(PlayerLine, {

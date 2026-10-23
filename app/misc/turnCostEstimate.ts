@@ -33,6 +33,7 @@
 import { StoryData } from "@/app/misc/structs";
 import {
   getEffectiveTiers,
+  getEffectiveSlot,
   getEffectiveNarrationModelKey,
   getEffectiveNarrationEffort,
   resolveTier,
@@ -54,6 +55,8 @@ import {
   resolveSideCallModel,
   resolveObserverRewriteModel,
 } from "@/app/misc/layerSettings";
+import type { ProviderKeys } from "@/app/misc/sideModelCall";
+import { hasKeyForModel } from "@/app/misc/ai_prices";
 import { ObserverSettings, settingsFor } from "@/app/misc/observer";
 import { ObserverFlagType } from "@/app/misc/structs";
 import { computeGMStageBudget } from "@/app/misc/ai_staged";
@@ -190,6 +193,12 @@ export interface EstimateTurnCostParams {
   observerSettings?: ObserverSettings;
   /** Defaults to the rolling averages recorded by turnCost.ts. */
   calibration?: TurnCostCalibration;
+  /**
+   * The player's provider keys. Only the classifier line uses them, to price
+   * what generation.ts will run: the side-agent model, or Default when the
+   * player has no key for it (design §3). Omitted, the side model is assumed.
+   */
+  providerKeys?: ProviderKeys;
 }
 
 // ============================================================
@@ -373,11 +382,22 @@ export function estimateTurnCost(
   const plans: StagePlan[] = [];
 
   // --- Tier classifier (rare, tiny) ----------------------------------
+  // Priced with generation.ts's rule: the side-agent model at its effort, else
+  // Default when the player has no key for it.
+  const classifierSide = resolveSideCallModel(null, params.providerKeys);
+  const classifierCall =
+    !params.providerKeys ||
+    hasKeyForModel(classifierSide.model, params.providerKeys)
+      ? classifierSide
+      : (() => {
+          const d = getEffectiveSlot("default");
+          return { model: String(d.modelKey), reasoningEffort: d.reasoningEffort };
+        })();
   plans.push({
     stage: "classifier",
     label: "Tier classification",
-    modelKey: String(resolveTier(0).modelKey),
-    reasoningEffort: resolveTier(0).reasoningEffort,
+    modelKey: classifierCall.model,
+    reasoningEffort: classifierCall.reasoningEffort,
     inputPerCall: CLASSIFIER_INPUT_TOKENS,
     outputPerCall: CLASSIFIER_OUTPUT_TOKENS,
     expectedCalls: calibratedCalls(
@@ -615,6 +635,7 @@ export function estimateTurnCost(
  */
 export function estimateTurnCostFromSettings(
   storyData?: StoryData,
+  providerKeys?: ProviderKeys,
 ): TurnCostEstimate {
   let customMaxContext: number | undefined;
   let customMaxOutput: number | undefined;
@@ -641,6 +662,7 @@ export function estimateTurnCostFromSettings(
     customMaxContext,
     customMaxOutput,
     maxToolLoops,
+    providerKeys,
   });
 }
 

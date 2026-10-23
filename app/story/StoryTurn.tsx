@@ -21,11 +21,11 @@ import {
   type MentionMatcher,
   splitTextWithMentions,
 } from "../misc/noteMentions";
-import { getTierModelDisplayName } from "../misc/reasoningTiers";
+import { getTierModelDisplayName, slotForTier } from "../misc/reasoningTiers";
 import { parsePlayerLine } from "./playerLine";
 import { formatTurnWork, summarizeTurnWork } from "./turnWork";
 
-// Display-only shape for the reasoning-tier badge at the end of the work
+// Display-only shape for the "Advanced" tag at the end of the work
 // line - covers both a saved ScenePart's stored fields and a live in-progress
 // ResolvedTier (see generation.ts:onReasoningTierResolved).
 export interface ReasoningTierDisplay {
@@ -306,7 +306,7 @@ export function TurnActions({
 }
 
 // The GM's working, folded into one quiet line: dice spelled out, everything
-// else counted, the tier badge at its end. Tapping it opens the pills in
+// else counted, the "Advanced" tag at its end (a Default turn shows nothing). Tapping it opens the pills in
 // their original order. While the turn streams it shows what the GM is doing
 // ("Thinking…", pulsing) and stays closed.
 export function TurnWorkLine({
@@ -324,8 +324,13 @@ export function TurnWorkLine({
 }) {
   const [open, setOpen] = React.useState(false);
   const summary = summarizeTurnWork(blocks);
+  // Only an Advanced turn is tagged (decision 124); Default turns say nothing.
+  const advancedTier =
+    reasoningTier && slotForTier(reasoningTier.tier) === "advanced"
+      ? reasoningTier
+      : undefined;
   const live = streaming ? (summary.live ?? "Thinking…") : undefined;
-  if (summary.isEmpty && !live && !reasoningTier) {
+  if (summary.isEmpty && !live && !advancedTier) {
     // No work line to sit at the end of: a lone "…" above the prose reads as
     // a glitch, and touch players open the row by tapping the turn anyway.
     // The toggle stays for keyboard users, shown once it has focus.
@@ -366,12 +371,12 @@ export function TurnWorkLine({
             />
           )}
         </button>
-        {reasoningTier && (
+        {advancedTier && (
           <span
-            className="text-[10px] font-mono text-ys-muted border border-ys-border rounded px-1 leading-tight cursor-default shrink-0"
-            title={`${getTierModelDisplayName(reasoningTier.modelKey)} · ${reasoningTier.effort} effort`}
+            className="text-[10px] text-ys-muted border border-ys-border rounded px-1 leading-tight cursor-default shrink-0"
+            title={`${getTierModelDisplayName(advancedTier.modelKey)} · ${advancedTier.effort} effort`}
           >
-            T{reasoningTier.tier}
+            Advanced
           </span>
         )}
         {trailing}

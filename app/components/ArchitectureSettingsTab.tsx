@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import ModelSelect from "./ModelSelect";
 import TurnCostPanel from "./TurnCostPanel";
-import { getCustomModels, CustomModel } from "@/app/misc/user_settings";
+import { CustomModel } from "@/app/misc/user_settings";
 import {
   AnyModelKey,
   REASONING_EFFORTS,
@@ -173,7 +173,7 @@ function Toggle({
  * Memory Keeper, Reflection). Off by default - the stage runs on
  * SIDE_AGENT_DEFAULT_MODEL_KEY (decision 51); `offNote` replaces that line
  * for a stage whose unpinned default is not just that (the Observer, whose
- * rewrite follows the narration voice, decision 52).
+ * rewrite follows the Default model, decisions 52 and 118).
  */
 function StageOverrideCard({
   icon,
@@ -246,19 +246,18 @@ function StageOverrideCard({
   );
 }
 
-export default function ArchitectureSettingsTab() {
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const toggleExpanded = (index: number) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  };
-
-  const [customModels] = useState<CustomModel[]>(() => getCustomModels());
-
+/**
+ * The five side-agent pickers (Memory Keeper, Reflection, Director Assistant,
+ * Story Progress Observer with its check-in interval, Observer). They live
+ * under AI > Advanced settings (decision 121); the Architecture tab only points
+ * there. `customModels` is the live list, so a model added in Settings shows
+ * here without a reopen.
+ */
+export function SideAgentPickers({
+  customModels,
+}: {
+  customModels: CustomModel[];
+}) {
   const [observerModelOverride, setObserverModelOverrideState] = useState<
     ModelEffortOverride | null
   >(() => getObserverModelOverride());
@@ -277,10 +276,6 @@ export default function ArchitectureSettingsTab() {
   );
   const [storyProgressCheckInterval, setStoryProgressCheckIntervalState] =
     useState<number>(() => getStoryProgressCheckInterval());
-
-  const [observerSettings, setObserverSettingsState] = useState(() =>
-    getObserverSettings(),
-  );
 
   const handleObserverModelChange = (override: ModelEffortOverride | null) => {
     setObserverModelOverride(override);
@@ -313,91 +308,8 @@ export default function ArchitectureSettingsTab() {
     setStoryProgressCheckIntervalState(getStoryProgressCheckInterval());
   };
 
-  const handleFlagPatch = (
-    type: ObserverFlagType,
-    patch: Partial<ObserverCheckSettings>,
-  ) => {
-    setObserverCheckSetting(type, patch);
-    setObserverSettingsState(getObserverSettings());
-  };
-
-  const handleResetObserverSettings = () => {
-    resetObserverSettings();
-    setObserverSettingsState(getObserverSettings());
-  };
-
-  const anyObserverOverride = OBSERVER_FLAG_ORDER.some((type) => {
-    const s = observerSettings[type];
-    return s.enabled !== true || s.triggersReset !== true || s.sensitivity !== 5;
-  });
-
   return (
     <div className="space-y-6">
-      {/* Every model override on this tab is another AI call per turn, so
-          the running cost belongs at the top of it, not buried in Settings
-          > AI Config. */}
-      <TurnCostPanel defaultExpanded />
-
-      {/* Architecture Overview */}
-      <div className="space-y-2">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
-          <DynamicIcon name="Layers" className="w-4 h-4" />
-          The Five-Layer Architecture
-        </h4>
-        <p className="text-xs text-blue-300/60">
-          The GM is an AI that narrates and proposes tool calls; a
-          deterministic engine executes them. Everything below is that
-          engine&rsquo;s five layers - tap one to read what it does.
-        </p>
-        <div className="space-y-1.5">
-          {LAYERS.map((layer, index) => {
-            const isOpen = expanded.has(index);
-            return (
-              <div
-                key={layer.title}
-                className="bg-white/5 rounded-lg border border-white/10 overflow-hidden"
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleExpanded(index)}
-                  className="w-full flex items-center justify-between gap-2 p-3 text-left"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-purple-300/70 bg-purple-500/15 px-1.5 py-0.5 rounded">
-                      {layer.badge}
-                    </span>
-                    <span className="text-sm text-white truncate">
-                      {layer.title}
-                    </span>
-                    {layer.aiDriven && (
-                      <span
-                        title="Uses its own AI call(s), configurable below"
-                        className="shrink-0 text-[10px] text-blue-300/60 flex items-center gap-1"
-                      >
-                        <DynamicIcon name="Sparkles" className="w-3 h-3" />
-                        AI
-                      </span>
-                    )}
-                  </div>
-                  <DynamicIcon
-                    name={isOpen ? "ChevronUp" : "ChevronDown"}
-                    className="w-4 h-4 text-blue-300/50 shrink-0"
-                  />
-                </button>
-                {isOpen && (
-                  <div className="px-3 pb-3 space-y-1.5">
-                    <p className="text-xs text-blue-200/80">{layer.summary}</p>
-                    <p className="text-[10px] text-blue-300/40 font-mono">
-                      {layer.files}
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Memory Keeper */}
       <StageOverrideCard
         icon="Database"
@@ -463,17 +375,126 @@ export default function ArchitectureSettingsTab() {
       </div>
 
       {/* Observer */}
-      <div className="space-y-3">
-        <StageOverrideCard
-          icon="ShieldCheck"
-          title="Observer"
-          description="Reviews each completed turn for rule violations. Applies to all of the LLM-backed checks below; the response-length check is free and doesn't use a model."
-          override={observerModelOverride}
-          onChange={handleObserverModelChange}
-          customModels={customModels}
-          offNote={`Off - checks run on ${SIDE_AGENT_DEFAULT_MODEL_KEY}, effort ${SIDE_AGENT_DEFAULT_EFFORT}; rewrites use the narration voice and its effort.`}
-        />
+      <StageOverrideCard
+        icon="ShieldCheck"
+        title="Observer"
+        description="Reviews each completed turn for rule violations. Applies to all of the LLM-backed checks below; the response-length check is free and doesn't use a model."
+        override={observerModelOverride}
+        onChange={handleObserverModelChange}
+        customModels={customModels}
+        offNote={`Off - checks run on ${SIDE_AGENT_DEFAULT_MODEL_KEY}, effort ${SIDE_AGENT_DEFAULT_EFFORT}; rewrites use the Default model and its effort.`}
+      />
+    </div>
+  );
+}
 
+export default function ArchitectureSettingsTab() {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const toggleExpanded = (index: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const [observerSettings, setObserverSettingsState] = useState(() =>
+    getObserverSettings(),
+  );
+
+  const handleFlagPatch = (
+    type: ObserverFlagType,
+    patch: Partial<ObserverCheckSettings>,
+  ) => {
+    setObserverCheckSetting(type, patch);
+    setObserverSettingsState(getObserverSettings());
+  };
+
+  const handleResetObserverSettings = () => {
+    resetObserverSettings();
+    setObserverSettingsState(getObserverSettings());
+  };
+
+  const anyObserverOverride = OBSERVER_FLAG_ORDER.some((type) => {
+    const s = observerSettings[type];
+    return s.enabled !== true || s.triggersReset !== true || s.sensitivity !== 5;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Every model override on this tab is another AI call per turn, so
+          the running cost belongs at the top of it, not buried in Settings
+          > AI Config. */}
+      <TurnCostPanel defaultExpanded />
+
+      {/* Architecture Overview */}
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+          <DynamicIcon name="Layers" className="w-4 h-4" />
+          The Five-Layer Architecture
+        </h4>
+        <p className="text-xs text-blue-300/60">
+          The GM is an AI that narrates and proposes tool calls; a
+          deterministic engine executes them. Everything below is that
+          engine&rsquo;s five layers - tap one to read what it does.
+        </p>
+        <div className="space-y-1.5">
+          {LAYERS.map((layer, index) => {
+            const isOpen = expanded.has(index);
+            return (
+              <div
+                key={layer.title}
+                className="bg-white/5 rounded-lg border border-white/10 overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(index)}
+                  className="w-full flex items-center justify-between gap-2 p-3 text-left"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-purple-300/70 bg-purple-500/15 px-1.5 py-0.5 rounded">
+                      {layer.badge}
+                    </span>
+                    <span className="text-sm text-white truncate">
+                      {layer.title}
+                    </span>
+                    {layer.aiDriven && (
+                      <span
+                        title="Uses its own AI call(s), configurable under AI > Advanced settings"
+                        className="shrink-0 text-[10px] text-blue-300/60 flex items-center gap-1"
+                      >
+                        <DynamicIcon name="Sparkles" className="w-3 h-3" />
+                        AI
+                      </span>
+                    )}
+                  </div>
+                  <DynamicIcon
+                    name={isOpen ? "ChevronUp" : "ChevronDown"}
+                    className="w-4 h-4 text-blue-300/50 shrink-0"
+                  />
+                </button>
+                {isOpen && (
+                  <div className="px-3 pb-3 space-y-1.5">
+                    <p className="text-xs text-blue-200/80">{layer.summary}</p>
+                    <p className="text-[10px] text-blue-300/40 font-mono">
+                      {layer.files}
+                    </p>
+                    {layer.aiDriven && (
+                      <p className="text-xs text-blue-300/60">
+                        Its model is set in AI &rarr; Advanced settings.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Observer Checks (the Observer's model is picked under AI > Advanced settings) */}
+      <div className="space-y-3">
         <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium text-white flex items-center gap-2">
