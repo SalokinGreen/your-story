@@ -1,6 +1,6 @@
 # The reading themes reach the whole app — design
 
-Status: **draft, waiting for the author's approval.** The implementation plan
+Status: **approved (decision 141), being built.** The implementation plan
 is [`whole-app-themes-plan.md`](whole-app-themes-plan.md). Decisions 137–140
 in [`decisions.md`](decisions.md).
 
@@ -102,6 +102,9 @@ surface.
 - `<html>` gets `color-scheme` from the theme. A `theme-color` meta follows
   `--ys-bg`, so the phone's status bar matches.
 - `.prose a` is violet today. It becomes the accent, underlined.
+- **Scrollbars** are hard-coded purple on grey today, switched by the OS dark
+  mode (the author noticed). They take the tokens: a border-coloured thumb,
+  muted on hover, on a transparent track.
 - `dark:` variants are removed where they exist (the toasts): the theme
   decides, not the OS.
 - **No flash.** A small inline script in the root layout's `<head>` reads

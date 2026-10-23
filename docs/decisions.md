@@ -207,6 +207,7 @@ The author: "After the deprecation pruning, I want to work on making the themes 
 | 138 | "Paper White is the only light theme. When it's picked, should every screen go light too?" | **"Yes, all screens (Recommended)."** Every screen has to work on a light background. Rejected: story text only; drop Paper White. |
 | 139 | "The home page, Library and site header use blue-to-purple gradients today. What should they become?" | **"A subtle theme gradient."** A gentle gradient made from the theme's own colours, so it changes with the theme. Rejected: flat theme colours. |
 | 140 | "Should party-mode phones follow the table's theme?" | **"Each phone its own."** Phones use their own saved theme (Ink by default). Rejected: follow the table. |
+| 141 | The design and the implementation plan (2026-10-23) | **"Approved. Plus I noticed the theme doesn't change scroll bars. We need to fix that"** — the scrollbars join slice 1; then the author asked for Codex's review before building ("Codex time"). |
 
 ### Interview — Android: turns that survive leaving the app, and the back gesture (2026-10-23)
 

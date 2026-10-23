@@ -1,6 +1,6 @@
 # The reading themes reach the whole app — implementation plan
 
-Status: **draft, waiting for the author's approval.** Design:
+Status: **approved (decision 141), being built.** Design:
 [`whole-app-themes-design.md`](whole-app-themes-design.md). Decisions
 137–140. Branch `claude/whole-app-themes`, one PR, six slices. Counts are
 from the 2026-10-23 survey on `master` at 69dad7e: grep occurrences of
@@ -50,6 +50,15 @@ mapping reads wrong in Paper White):
     and `--background` / `--foreground` are deleted (grep that nothing else
     reads them).
   - `.prose a` becomes the accent, underlined.
+  - **Scrollbars** (the author, 2026-10-23: "the theme doesn't change scroll
+    bars"). `globals.css` hard-codes them: purple `#667eea`/`#764ba2` thumbs
+    on `#f1f1f1`/`#1a1a1a`, switched by the OS dark mode (`::-webkit-scrollbar*`
+    at about lines 217-251, `scrollbar-color` at about 255-261). They become
+    tokens: the thumb `var(--ys-border)` (hover `var(--ys-muted)`), the track
+    `transparent`, for both the `::-webkit-scrollbar*` rules and
+    `scrollbar-color`, with no OS media query. The two Tailwind
+    `scrollbar-thumb-*` uses (`lore.tsx:654`, `npcs.tsx:480`) go with their
+    files in slice 3. `color-scheme` covers any native scrollbar left.
   - `@layer components` gets `ys-card`, `ys-input`, `ys-button` (and its
     `--primary`, `--ghost` and `--danger` variants), `ys-chip`,
     `ys-modal-backdrop` and `ys-modal`, each on the tokens.
@@ -72,7 +81,8 @@ mapping reads wrong in Paper White):
     The test evaluates the script string against a fake `document`.
   - New `tests/themeTokensOnly.test.ts` holds the ratchet. Its file list
     starts with `globals.css` and `NotificationContainer.tsx`.
-- **Check:** the story screen in Ink is unchanged, pixel for pixel by eye
+- **Check:** scrollbars in Ink and Paper White (the Notes list, the Story
+  Editor, a long story) take the theme. The story screen in Ink is unchanged, pixel for pixel by eye
   against a before screenshot. Paper White sets the body background with no
   dark first frame (reload with the network throttled). The toasts work in
   both themes.
