@@ -197,6 +197,19 @@ tier slots (0–3) and the narration voice. The design is
 | 123 | After Codex's review (2026-10-23): "Default runs everyday turns and combat/rules on GLM 5.3. Today combat and rules think at 'high' and everyday turns at 'low'. How should the Default slot's single effort work?" | **"Combat never below 'high' (Recommended)."** The Default effort applies to every Default turn, but a combat or rules turn (tier 2) never thinks below `high`; the picker's help says so. A narrowing of decision 120. |
 | 124 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"approved"** — built as planned on `claude/model-picker`. |
 
+### Interview — campaign setup that actually sets up (2026-10-23)
+
+The author, after a Blood & Bone freeform start went wrong (a GM context export of it is the evidence: the GM asked three good questions, then never wrote a character sheet, a plan or `start_game`, re-read 4-9 rules notes every turn because history stubs cleared them, and narrated a scene with no foundation; the author: "Okay, this is a horrible campaign start, like I need a proper campaign intro"): "campaign setup doesn't work properly. We have to improve the workflow and stream line it better." The design is [`session-zero-design.md`](session-zero-design.md), the plan [`session-zero-plan.md`](session-zero-plan.md).
+
+| # | question | decision |
+|---|---|---|
+| 142 | "How should campaign setup (session zero) feel to play?" | **"Choice between few choices and proposal, or full step by step build."** The player picks at the start: *quick* (2-4 key choices as tap-able options, then the GM proposes a complete character and campaign hook to accept or tweak) or *full* (the GM walks every step of the system's creation rules, one question at a time). Rejected: GM builds it all with one or two questions. |
+| 143 | "Should the engine enforce the setup steps, so the GM can't start the story until the character sheet and campaign plan exist (and you've OK'd them)?" | **"Yes, enforce them (Recommended)."** Like the dice gate: narrating the opening before the sheet, the plan and the player's OK exist sends the GM back to finish setup. |
+| 144 | "What should the campaign intro (the first real scene after setup) give you?" | **"A briefing, then the scene (Recommended)."** A short who-you-are / where / what's-at-stake prologue in the story's voice, then the opening scene with a clear first choice. Rejected: cinematic prologue only; straight into the scene. |
+| 145 | "Should you see setup progress while it happens?" | **"Yes, a small checklist (Recommended)."** A slim strip above the composer (Concept · Character · Campaign · Start) that ticks as each is done, with the sheet and plan one tap away. Rejected: conversational only. |
+| 146 | The author's direct request, not a multiple-choice question: "Right now we only have the GM asking questions you can choose in between, but Claude Code also has multiple choice questions." | **`ask_question` gains multi-select.** A question can be marked to allow several answers; the player ticks any number of options (plus free text where allowed), and the GM receives every pick. Single-choice stays the default. Part of the session-zero design. |
+| 147 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"Approved"** — built as planned on `claude/session-zero`. |
+
 ### Interview — the reading themes reach the whole app (2026-10-23)
 
 The author: "After the deprecation pruning, I want to work on making the themes reach all of the platform with ink being the default." Only the story screen uses the `ys-*` tokens today. The design is [`whole-app-themes-design.md`](whole-app-themes-design.md), the plan [`whole-app-themes-plan.md`](whole-app-themes-plan.md).

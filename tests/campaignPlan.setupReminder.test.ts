@@ -216,22 +216,24 @@ describe("the GM prompt carries the reminder", () => {
     expect(prompt).not.toContain("SETUP OVERDUE");
   });
 
+  // Outside session zero (a started story that lacks its plan) the reminder
+  // blocks still fire; during session zero the session-zero block replaces
+  // them (session-zero plan slice 3).
   it("injects the soft block with the plan instruction", () => {
     const prompt = promptFor(
       createTestStory({
-        sessionZeroActive: true,
+        sessionZeroActive: false,
         scene: { parts: parts(SETUP_REMINDER_SOFT_TURNS) },
       }),
     );
     expect(prompt).toContain("SETUP UNFINISHED");
     expect(prompt).toContain("No campaign plan exists");
-    expect(prompt).toContain("`start_game` has not been called");
   });
 
   it("injects the urgent block past the urgent threshold", () => {
     const prompt = promptFor(
       createTestStory({
-        sessionZeroActive: true,
+        sessionZeroActive: false,
         scene: { parts: parts(SETUP_REMINDER_URGENT_TURNS + 3) },
       }),
     );
@@ -239,15 +241,16 @@ describe("the GM prompt carries the reminder", () => {
     expect(prompt).not.toContain("SETUP UNFINISHED");
   });
 
-  it("only mentions the missing piece", () => {
+  it("is replaced by the session-zero block while session zero lasts", () => {
     const prompt = promptFor(
       createTestStory({
         lore: [note()],
         sessionZeroActive: true,
-        scene: { parts: parts(SETUP_REMINDER_SOFT_TURNS) },
+        scene: { parts: parts(SETUP_REMINDER_URGENT_TURNS + 3) },
       }),
     );
-    expect(prompt).toContain("`start_game` has not been called");
-    expect(prompt).not.toContain("No campaign plan exists");
+    expect(prompt).toContain("SESSION ZERO - SETTING UP THE STORY");
+    expect(prompt).not.toContain("SETUP OVERDUE");
+    expect(prompt).not.toContain("SETUP UNFINISHED");
   });
 });

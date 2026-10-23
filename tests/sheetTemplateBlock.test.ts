@@ -75,6 +75,15 @@ describe("buildSheetTemplateBlock", () => {
 });
 
 describe("in the GM request", () => {
+  it("is carried by the session-zero block, the one setup section", () => {
+    const text = messagesFor(story())
+      .map((m) => String(m.content))
+      .join("\n");
+    expect(text).toContain("SESSION ZERO - SETTING UP THE STORY");
+    expect(text).not.toContain("FRESH STORY");
+    expect(text.match(/## CHARACTER SHEET TEMPLATE/g)).toHaveLength(1);
+  });
+
   it("sits in the live block, not the system prompt or the stable block", () => {
     const messages = messagesFor(story());
     const holders = messages.filter((m) =>
@@ -107,8 +116,8 @@ describe("in the GM request", () => {
     }
   });
 
-  it("changes the FRESH STORY line to point at the template", () => {
-    const text = messagesFor(story())
+  it("changes the FRESH STORY line to point at the template (outside session zero)", () => {
+    const text = messagesFor(story({ sessionZeroActive: false }))
       .map((m) => String(m.content))
       .join("\n");
     expect(text).toContain("FRESH STORY");

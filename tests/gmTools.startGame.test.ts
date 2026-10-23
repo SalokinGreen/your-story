@@ -5,14 +5,16 @@
  * reasoning-tier router's hard floor (hardRuleFloor, reasoningTiers.ts)
  * stops forcing TOP_TIER.
  *
- * It also refuses to run at all until the campaign spine exists
- * (hasCampaignPlan, campaignPlan.ts) - writing the plan is part of session
+ * It also refuses to run at all until the character sheet and the campaign
+ * spine exist and the player approved them through confirm_setup
+ * (getSetupProgress, campaignPlan.ts) - writing the plan is part of session
  * zero's job, and a campaign started without one never gets one.
  */
 import { describe, it, expect } from "vitest";
 import { executeGMTools } from "@/app/misc/gmExecutor";
 import { buildGMStagePrompt } from "@/app/misc/ai_staged";
 import { StoryData, StoryLore } from "@/app/misc/structs";
+import { currentSetupHashes } from "@/app/misc/campaignPlan";
 import {
   hardRuleFloor,
   SCENE_BASELINE_TIER,
@@ -32,8 +34,33 @@ function spineNote(overrides: Partial<StoryLore> = {}): StoryLore {
   } as StoryLore;
 }
 
-function createMockStoryData(overrides: Partial<StoryData> = {}): StoryData {
+function sheetNote(overrides: Partial<StoryLore> = {}): StoryLore {
   return {
+    title: "Character: Hero",
+    content: "Name: Hero. Kind: Human. Stress 2.",
+    relatedCharacters: [],
+    relatedLocations: [],
+    secrtet: false,
+    keys: [],
+    type: "character_sheet",
+    ...overrides,
+  } as StoryLore;
+}
+
+// The player's OK, bound to the hashes of the lore as it stands.
+function withApproval(story: StoryData): StoryData {
+  return {
+    ...story,
+    setup: {
+      mode: "quick",
+      conceptDone: true,
+      approval: currentSetupHashes(story),
+    },
+  };
+}
+
+function createMockStoryData(overrides: Partial<StoryData> = {}): StoryData {
+  const story = {
     story_name: "New Story",
     player_name: "Hero",
     premise: "",
@@ -44,12 +71,15 @@ function createMockStoryData(overrides: Partial<StoryData> = {}): StoryData {
     inventory: [],
     abilities: [],
     achievements: [],
-    // start_game is gated on the spine existing, so the happy-path cases
-    // below need one; the gate's own describe block drops it.
-    lore: [spineNote()],
+    // start_game is gated on a sheet, the spine and the player's OK, so the
+    // happy-path cases below have all three; the gate's own describe blocks
+    // drop them.
+    lore: [sheetNote(), spineNote()],
     memory: [],
     ...overrides,
   } as StoryData;
+  // An explicit setup override is kept as given.
+  return overrides.setup !== undefined ? story : withApproval(story);
 }
 
 function createToolCall(name: string, args: Record<string, unknown>) {
@@ -141,7 +171,7 @@ describe("start_game", () => {
 
 describe("start_game requires a campaign plan", () => {
   it("refuses to start the game when no gm_plan spine note exists", async () => {
-    const storyData = createMockStoryData({ lore: [] });
+    const storyData = createMockStoryData({ lore: [sheetNote()] });
     const result = await executeGMTools(
       [createToolCall("start_game", { story_name: "Premature Saga" })],
       storyData,
@@ -157,7 +187,7 @@ describe("start_game requires a campaign plan", () => {
 
   it("still refuses when the only gm_plan note is a side beat", async () => {
     const storyData = createMockStoryData({
-      lore: [spineNote({ title: "Side beat — The Missing Cat" })],
+      lore: [sheetNote(), spineNote({ title: "Side beat — The Missing Cat" })],
       activeSideBeatTitle: "Side beat — The Missing Cat",
     });
     const result = await executeGMTools(
@@ -170,7 +200,7 @@ describe("start_game requires a campaign plan", () => {
   });
 
   it("allows the start once the spine note exists", async () => {
-    const storyData = createMockStoryData({ lore: [spineNote()] });
+    const storyData = createMockStoryData({ lore: [sheetNote(), spineNote()] });
     const result = await executeGMTools(
       [createToolCall("start_game", { story_name: "Ready Saga" })],
       storyData,
@@ -180,11 +210,10 @@ describe("start_game requires a campaign plan", () => {
     expect(result.modifiedStoryData.sessionZeroActive).toBe(false);
   });
 
-  it("allows the start on a story whose planState exists but whose note was deleted", async () => {
-    // Mid-campaign edge case: the player renamed/removed the note. The
-    // campaign was planned, so don't re-block it into session zero.
+  it("does not count a stale planState whose note is gone (changed by session zero's rule)", async () => {
+    // During setup a plan means a note the player can see and approve.
     const storyData = createMockStoryData({
-      lore: [],
+      lore: [sheetNote()],
       planState: {
         beats: ["Opening Image (Session 0)", "Inciting Incident"],
         currentBeatIndex: 0,
@@ -195,12 +224,13 @@ describe("start_game requires a campaign plan", () => {
       storyData,
     );
 
-    expect(result.results[0].success).toBe(true);
+    expect(result.results[0].success).toBe(false);
+    expect(result.results[0].contextForStory).toContain("no campaign plan");
   });
 
   it("ignores a disabled spine note", async () => {
     const storyData = createMockStoryData({
-      lore: [spineNote({ enabled: false })],
+      lore: [sheetNote(), spineNote({ enabled: false })],
     });
     const result = await executeGMTools(
       [createToolCall("start_game", { story_name: "Disabled Plan Saga" })],
@@ -208,6 +238,76 @@ describe("start_game requires a campaign plan", () => {
     );
 
     expect(result.results[0].success).toBe(false);
+  });
+});
+
+describe("start_game requires the sheet and the player's OK", () => {
+  it("refuses without a character sheet, and names it", async () => {
+    const storyData = createMockStoryData({ lore: [spineNote()] });
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "No Hero" })],
+      storyData,
+    );
+    expect(result.results[0].success).toBe(false);
+    expect(result.results[0].contextForStory).toContain("no character sheet");
+    expect(result.modifiedStoryData.sessionZeroActive).toBe(true);
+  });
+
+  it("refuses an empty or disabled sheet", async () => {
+    for (const sheet of [sheetNote({ content: "  " }), sheetNote({ enabled: false })]) {
+      const result = await executeGMTools(
+        [createToolCall("start_game", { story_name: "Blank" })],
+        createMockStoryData({ lore: [sheet, spineNote()] }),
+      );
+      expect(result.results[0].success).toBe(false);
+      expect(result.results[0].contextForStory).toContain("no character sheet");
+    }
+  });
+
+  it("refuses without the player's approval, and names confirm_setup", async () => {
+    const storyData = createMockStoryData({ setup: { mode: "quick", conceptDone: true } });
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Unapproved" })],
+      storyData,
+    );
+    expect(result.results[0].success).toBe(false);
+    expect(result.results[0].contextForStory).toContain("confirm_setup");
+    expect(result.modifiedStoryData.sessionZeroActive).toBe(true);
+  });
+
+  it("refuses when the sheet changed after the OK", async () => {
+    const base = createMockStoryData();
+    const edited = {
+      ...base,
+      lore: [sheetNote({ content: "Name: Hero. Kind: Witch." }), spineNote()],
+    } as StoryData;
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Edited" })],
+      edited,
+    );
+    expect(result.results[0].success).toBe(false);
+    expect(result.results[0].contextForStory).toContain("changed after");
+  });
+
+  it("names everything that is missing at once", async () => {
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Nothing" })],
+      createMockStoryData({ lore: [], setup: {} }),
+    );
+    const text = result.results[0].contextForStory;
+    expect(text).toContain("no character sheet");
+    expect(text).toContain("no campaign plan");
+  });
+
+  it("carries the campaign intro instructions on success", async () => {
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Intro Saga" })],
+      createMockStoryData(),
+    );
+    expect(result.results[0].success).toBe(true);
+    expect(result.results[0].contextForStory).toContain("Now write the campaign intro");
+    expect(result.results[0].contextForStory).toContain("short briefing");
+    expect(result.results[0].contextForStory).toContain("first choice");
   });
 });
 

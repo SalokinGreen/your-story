@@ -11,7 +11,10 @@
  */
 
 import { providerFetch } from "@/app/misc/providerFetch";
-import { GenerateRequestBody } from "@/app/misc/providerCall";
+import {
+  GenerateRequestBody,
+  modelRejectsForcedToolChoice,
+} from "@/app/misc/providerCall";
 import {
   StoryData,
   CommandResponse,
@@ -56,7 +59,7 @@ import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { storyCacheKey, markRoundBreakpoint } from "@/app/misc/cacheMarks";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { pickProviderKeys } from "@/app/misc/sideModelCall";
-import { hasKeyForModel } from "@/app/misc/ai_prices";
+import { hasKeyForModel, getModelConfig } from "@/app/misc/ai_prices";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   runObserver,
@@ -108,6 +111,8 @@ import {
   DiceThrowRequest,
   AskQuestionRequest,
   AskQuestionAnswer,
+  SetupConfirmationRequest,
+  SetupConfirmationAnswer,
   GMExecutionResult,
   resolveCheckPerTurnVisibility,
   rollAwareToolName,
@@ -155,7 +160,14 @@ import {
   applyTierEscalation,
   TOP_TIER,
 } from "@/app/misc/reasoningTiers";
-import { isPlanAwaitingNextBeat } from "@/app/misc/campaignPlan";
+import {
+  isPlanAwaitingNextBeat,
+  getSetupProgress,
+  currentSetupHashes,
+  setupGateMessage,
+  setupEngineLine,
+  MAX_SETUP_PROMPTS,
+} from "@/app/misc/campaignPlan";
 import { getCustomModelIfUUID, CustomModel } from "@/app/misc/user_settings";
 
 // ============================================================
@@ -277,6 +289,9 @@ export interface GenerationOptions {
   replyLength?: ReplyLength;
   // Abort signal for cancelling generation
   abortSignal?: AbortSignal;
+  // Who needs a character sheet during session zero (couch players or party
+  // seats), passed on to the GM tool context for confirm_setup / start_game.
+  setupPlayers?: { id: string; name: string }[];
   // Layer 5 hardening (see observer.ts): set internally by generateStoryTurn's
   // observer retry loop, not meant to be passed in by callers. Injected into
   // the GM prompt to explain why the previous attempt at this turn was reset.
@@ -383,6 +398,12 @@ export interface GenerationCallbacks {
   onAskQuestion?: (
     request: AskQuestionRequest
   ) => Promise<AskQuestionAnswer | null>;
+  // The GM called confirm_setup (session zero): the UI shows the setup card
+  // and resolves with the player's decision (approved, changes, dismissed or
+  // stopped).
+  onRequestSetupConfirmation?: (
+    request: SetupConfirmationRequest
+  ) => Promise<SetupConfirmationAnswer>;
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,
@@ -1903,6 +1924,26 @@ export async function generateStoryTurn(
   }
 }
 
+/**
+ * Whether a model answers a forced tool call (`tool_choice: "required"`) with
+ * a 400, by the key the round ran on (an AI_MODELS key or a custom model's
+ * UUID). The setup gate then relies on its message alone.
+ */
+function gmModelRejectsForcedToolChoice(modelKey: string): boolean {
+  try {
+    const custom = getCustomModelIfUUID(modelKey);
+    if (custom) {
+      return modelRejectsForcedToolChoice({
+        provider: "openrouter",
+        model: custom.modelId,
+      });
+    }
+    return modelRejectsForcedToolChoice(getModelConfig(modelKey));
+  } catch {
+    return false;
+  }
+}
+
 async function generateStoryTurnOnce(
   storyData: StoryData,
   userChoice: string,
@@ -2037,6 +2078,28 @@ async function generateStoryTurnOnce(
       logger.action("Using precomputed GM conversation (retry flow)", {
         historyEntries: gmConversationHistory.length,
       });
+
+      // Defensive guard for session zero: the narration call below would
+      // skip the setup gate. A precomputed conversation that never started
+      // the game is not narrated; the turn keeps its own text (the last
+      // assistant message that made no tool call), else the engine line.
+      // (The page runs a session-zero retry through the full GM loop, so
+      // this is only reached by a caller that forgot to.)
+      if (
+        storyData.sessionZeroActive === true &&
+        !gmResults.some((r) => r.toolName === "start_game" && r.success)
+      ) {
+        const lastText = [...gmConversationHistory]
+          .reverse()
+          .find((m) => m.role === "assistant" && !m.tool_calls?.length);
+        const saved = lastText ? extractVisibleText(lastText.content).trim() : "";
+        gmFinalStoryContent =
+          saved ||
+          setupEngineLine(getSetupProgress(storyData, options.setupPlayers).next);
+        logger.action("Session-zero retry: skipping the narration call", {
+          usedSavedText: !!saved,
+        });
+      }
     } else {
       // GM Stage is always enabled - legacy tool calling has been removed
       // The enableGMStage option is now ignored and GM stage always runs
@@ -2302,6 +2365,36 @@ async function generateStoryTurnOnce(
         // a tool call outright rather than relying on prose alone to ask for
         // one. Consumed (read then cleared) at the top of the next round.
         let forceToolChoiceNextRound: "required" | undefined;
+
+        // ---- Session zero's setup gate (docs/session-zero-plan.md, slice 4) ----
+        // Read ONCE, from the story as the turn found it. start_game flips
+        // storyData.sessionZeroActive mid-turn, and the roll and plan gates
+        // must stay off for the whole turn including the round that starts
+        // the game, so every check below uses this, not the live flag.
+        const sessionZeroTurn = storyData.sessionZeroActive === true;
+        // Set from this turn's tool RESULTS, never from what the model says.
+        let setupProgressThisTurn = false;
+        let setupApprovedThisTurn = false;
+        let startGameSucceededThisTurn = false;
+        let setupPrompts = 0; // its own counter, like the M2 and plan gates
+        // True once the gate's prompts ran out (or the round limit hit with no
+        // progress): the turn ends on the engine line, with no narration.
+        let setupGateExhausted = false;
+        // Until start_game succeeds, a session-zero turn's prose is held back
+        // from every live callback (the feed, the guest broadcast, read-aloud):
+        // the gate may still reject it, and streamed text cannot be taken
+        // back. After start_game the intro is the story and streams as usual.
+        const setupTextHeld = () =>
+          sessionZeroTurn && !startGameSucceededThisTurn;
+        // The turn ends on the engine line: nothing the GM wrote this turn is
+        // narrated, shown as thinking, or left on a replayed assistant message.
+        const discardHeldSetupProse = () => {
+          gmAccumulatedStory.length = 0;
+          gmThinking.length = 0;
+          for (const entry of conversationHistory) {
+            if (entry.role === "assistant") entry.content = "";
+          }
+        };
         // Client-side token budgeting is only an estimate, so a request can
         // still overflow the model's real context window. currentGMBudget
         // starts at the configured (or default) budget and is permanently
@@ -2553,16 +2646,18 @@ async function generateStoryTurnOnce(
             }
             if (event.type === "content" && event.content) {
               gmContent += event.content;
-              // Stream GM content to callback for real-time display
-              callbacks.onGMContent?.(event.content, gmContent);
-              // Same accumulation gmFinalStoryContent uses below, computed
-              // live so TTS can start speaking narration as it's written
-              // instead of waiting for the whole GM stage to finish.
-              callbacks.onLiveNarrationUpdate?.(
-                extractVisibleText(
-                  [...gmAccumulatedStory, gmContent].join("\n\n"),
-                ),
-              );
+              if (!setupTextHeld()) {
+                // Stream GM content to callback for real-time display
+                callbacks.onGMContent?.(event.content, gmContent);
+                // Same accumulation gmFinalStoryContent uses below, computed
+                // live so TTS can start speaking narration as it's written
+                // instead of waiting for the whole GM stage to finish.
+                callbacks.onLiveNarrationUpdate?.(
+                  extractVisibleText(
+                    [...gmAccumulatedStory, gmContent].join("\n\n"),
+                  ),
+                );
+              }
             }
             if (event.type === "reasoning" && event.content) {
               gmReasoning += event.content;
@@ -2695,6 +2790,16 @@ async function generateStoryTurnOnce(
             finalBalance = gmResult.meta.balance;
           }
 
+          // Where each of the turn's text stores stood before this round
+          // wrote to them, so the setup gate can take a rejected round's
+          // text back out of every one (rejectRoundText below).
+          const roundMarks = {
+            thinking: gmThinking.length,
+            accumulated: gmAccumulatedStory.length,
+            context: allGMContextParts.length,
+            history: conversationHistory.length,
+          };
+
           // Capture GM's thinking text (content before/with tool calls)
           // Only add if it's meaningfully different from previous thinking
           if (gmResult.content) {
@@ -2808,6 +2913,12 @@ async function generateStoryTurnOnce(
               })),
             });
 
+            // The sheet and plan as they stand before this batch, to tell
+            // whether a create_note / edit_note really changed either.
+            const setupHashesBefore = sessionZeroTurn
+              ? currentSetupHashes(storyData)
+              : null;
+
             const gmExecution = await executeGMTools(
               gmResult.toolCalls,
               storyData,
@@ -2820,9 +2931,22 @@ async function generateStoryTurnOnce(
                 requestManualRoll: callbacks.onAskForRoll,
                 requestDiceThrow: callbacks.onRequestDiceThrow,
                 requestPlayerAnswer: callbacks.onAskQuestion,
+                requestSetupConfirmation: callbacks.onRequestSetupConfirmation,
               },
-              { imageJobs: options.imageToolContext },
+              {
+                imageJobs: options.imageToolContext,
+                abortSignal: options.abortSignal,
+                setupPlayers: options.setupPlayers,
+              },
             );
+
+            // Stopped during the batch (the signal fired, or Stop on the
+            // setup card): the executor committed nothing, and neither do we.
+            // Throw the same error the round-start check does, so the turn
+            // unwinds through the existing cancellation path.
+            if (gmExecution.aborted) {
+              throw new Error("Generation cancelled by user");
+            }
 
             // Accumulate results across rounds
             gmResults.push(...gmExecution.results);
@@ -2837,6 +2961,49 @@ async function generateStoryTurnOnce(
 
             // Update storyData with any modifications from GM tools
             Object.assign(storyData, gmExecution.modifiedStoryData);
+
+            // Session zero's progress, judged from the results the engine
+            // produced: an answered question, a sheet or plan note that was
+            // written or edited and now reads differently, an approved card,
+            // a game that started.
+            if (sessionZeroTurn && setupHashesBefore) {
+              for (const r of gmExecution.results) {
+                // A card the player answered (changes, closed) is progress
+                // too, or closing it would re-open it; only a refusal and a
+                // stop are not. Only an approval counts as approved.
+                if (r.toolName === "confirm_setup") {
+                  const outcome = (r.result as { outcome?: string } | undefined)
+                    ?.outcome;
+                  if (outcome && outcome !== "refused" && outcome !== "stopped") {
+                    setupProgressThisTurn = true;
+                  }
+                  if (r.success && outcome === "approved") {
+                    setupApprovedThisTurn = true;
+                  }
+                  continue;
+                }
+                if (!r.success) continue;
+                if (r.toolName === "ask_question") setupProgressThisTurn = true;
+                if (r.toolName === "start_game") {
+                  setupProgressThisTurn = true;
+                  startGameSucceededThisTurn = true;
+                }
+              }
+              const noteWritten = gmExecution.results.some(
+                (r) =>
+                  r.success &&
+                  (r.toolName === "create_note" || r.toolName === "edit_note"),
+              );
+              if (noteWritten) {
+                const after = currentSetupHashes(storyData);
+                if (
+                  after.sheetHash !== setupHashesBefore.sheetHash ||
+                  after.planHash !== setupHashesBefore.planHash
+                ) {
+                  setupProgressThisTurn = true;
+                }
+              }
+            }
 
             // Track consecutive failures - only count ACTUAL tool errors, not dice roll failures
             // Dice rolls that fail their DC are still successful tool executions
@@ -2968,6 +3135,64 @@ async function generateStoryTurnOnce(
               );
             }
 
+            // Session zero's setup gate (docs/session-zero-design.md 3.6).
+            // A session-zero turn may not end on prose unless it moved setup
+            // forward (an answered question, a sheet or plan written, the
+            // card approved) or started the game. There is no fail-open: when
+            // the prompts run out the turn ends on the engine line, with no
+            // narration. The M2 and plan gates below are off in session zero,
+            // so this is the only gate that acts on such a turn.
+            if (sessionZeroTurn && !startGameSucceededThisTurn) {
+              const setupNow = getSetupProgress(storyData, options.setupPlayers);
+              // Approved this turn and only start_game is left: the approval
+              // result told the model to call it, and prose now would strand
+              // the player on a finished setup.
+              const approvedButNotStarted =
+                setupApprovedThisTurn && setupNow.next === "start_game";
+              if (!setupProgressThisTurn || approvedButNotStarted) {
+                // Take this round's text back out of every store it reached,
+                // so the player, the guests, read-aloud and later context
+                // never see a round the engine rejected.
+                gmThinking.length = roundMarks.thinking;
+                gmAccumulatedStory.length = roundMarks.accumulated;
+                allGMContextParts.length = roundMarks.context;
+                conversationHistory.length = roundMarks.history;
+
+                if (setupPrompts < MAX_SETUP_PROMPTS) {
+                  setupPrompts++;
+                  logger.action(
+                    "Setup gate: session-zero turn ended on prose with no setup progress - forcing another round",
+                    {
+                      setupPrompts,
+                      next: setupNow.next,
+                      approvedButNotStarted,
+                      round: gmRound,
+                    },
+                  );
+                  conversationHistory.push({
+                    role: "user",
+                    content: setupGateMessage(setupNow.next),
+                  });
+                  // The gates' usual forcing, unless the next round's model
+                  // answers a forced tool call with a 400 (then the message
+                  // above does the forcing).
+                  if (!gmModelRejectsForcedToolChoice(gmModel)) {
+                    forceToolChoiceNextRound = "required";
+                  }
+                  continue gmRoundLoop;
+                }
+
+                setupGateExhausted = true;
+                logger.action(
+                  "Setup gate: prompts exhausted - ending the turn on the engine line, no narration",
+                  { setupPrompts, next: setupNow.next },
+                );
+                discardHeldSetupProse();
+                isComplete = true;
+                break;
+              }
+            }
+
             // M2 roll-invariant gate (see isSceneGatedForRoll/
             // hasSatisfiedRollGate, reasoningTiers.ts): when this scene is
             // gated (combat active, a challenge active, or the GM itself
@@ -2981,6 +3206,7 @@ async function generateStoryTurnOnce(
             );
 
             if (
+              !sessionZeroTurn &&
               sceneIsGated &&
               !rollToolCalledThisTurn &&
               !isRepetitive &&
@@ -3014,6 +3240,7 @@ async function generateStoryTurnOnce(
             // writes the next beat, keeping the plan exactly one beat ahead.
             // Same fail-open cap posture as M2.
             if (
+              !sessionZeroTurn &&
               isPlanAwaitingNextBeat(storyData) &&
               !isRepetitive &&
               noPlanAdvancePrompts < MAX_PLAN_ADVANCE_PROMPTS
@@ -3065,6 +3292,23 @@ async function generateStoryTurnOnce(
           }
         }
 
+        // Round limit reached in session zero with nothing moved forward: the
+        // same guard as the setup gate's exhaustion, so a turn that burned
+        // all its rounds on tools that did nothing narrates nothing either.
+        if (
+          sessionZeroTurn &&
+          !isComplete &&
+          !startGameSucceededThisTurn &&
+          !setupProgressThisTurn
+        ) {
+          setupGateExhausted = true;
+          logger.action(
+            "Setup gate: round limit reached with no setup progress - ending the turn on the engine line, no narration",
+            { maxRounds: MAX_GM_ROUNDS },
+          );
+          discardHeldSetupProse();
+        }
+
         // Combine all context parts from all rounds (for backward compat/logging)
         gmStoryContext = allGMContextParts.join("\n\n");
         // Copy conversation history to outer scope for story continuation
@@ -3091,6 +3335,23 @@ async function generateStoryTurnOnce(
           logger.action("Combined accumulated GM story", {
             parts: gmAccumulatedStory.length,
             totalLength: gmFinalStoryContent.length,
+          });
+        }
+
+        // Session zero without a started game never runs the separate
+        // narration call (the GM's own final text is the turn's text), and a
+        // turn with nothing valid to say - the gate gave up, or the round
+        // limit hit, or the final text was empty - says the engine line.
+        if (
+          sessionZeroTurn &&
+          !startGameSucceededThisTurn &&
+          (setupGateExhausted || !gmFinalStoryContent.trim())
+        ) {
+          gmFinalStoryContent = setupEngineLine(
+            getSetupProgress(storyData, options.setupPlayers).next,
+          );
+          logger.action("Setup turn ends on the engine line", {
+            line: gmFinalStoryContent,
           });
         }
 

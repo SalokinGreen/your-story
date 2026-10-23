@@ -1164,6 +1164,16 @@ override nor the interval is in `SYNCABLE_SETTINGS_KEYS`.
   suspended; `start_game` names the story and clears it.
   `startAdventureLocally()` (creator adventures) does **not** enter session zero.
 
+> **Update 2026-10-23 (session zero, decision 147, `claude/session-zero`): the
+> `start_game` line above is no longer true.** `start_game` now refuses until
+> the character sheet(s), an enabled `gm_plan` note and the player's approval
+> through `confirm_setup` all exist, and it refuses outside session zero. The
+> rule is `getSetupProgress()` in `campaignPlan.ts`. The setup gate in
+> `generation.ts` re-prompts a session-zero turn that ends on prose without
+> progress, up to twice, then ends it on an engine line. The M2 and plan gates
+> are off during session zero. Not verified against a real model: see
+> `docs/pending_tests.md` (2026-10-23, Session zero).
+
 ### 11.9 Multiplayer
 
 - **Couch co-op (one device):** `StoryData.multiplayer.couchPlayers` from the

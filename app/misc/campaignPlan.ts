@@ -191,3 +191,230 @@ export function getSetupReminder(state: StoryData): SetupReminder | null {
     missingStart,
   };
 }
+
+// ============================================
+// SESSION-ZERO SETUP PROGRESS (docs/session-zero-design.md 3.1)
+// ============================================
+
+/**
+ * Whether this story has a character_sheet note with anything in it - the
+ * same "has setup happened yet?" test buildGMStagePrompt uses to decide
+ * between its FRESH STORY setup block and normal play. (Lives here, and is
+ * re-exported by observer.ts, so setup progress and the observer share one
+ * definition without an import cycle.)
+ */
+export function hasCharacterSheetNote(storyData: StoryData): boolean {
+  return populatedSheets(storyData).length > 0;
+}
+
+function populatedSheets(story: StoryData): StoryLore[] {
+  return (story.lore || []).filter(
+    (l) =>
+      l.enabled !== false &&
+      l.type === "character_sheet" &&
+      Boolean(l.content?.trim()),
+  );
+}
+
+/**
+ * A stable string hash of notes' titles and contents (FNV-1a over UTF-16
+ * code units, hex). No crypto API, so it runs everywhere the engine does.
+ * Order-independent: notes are sorted by title first.
+ */
+export function hashNotes(
+  notes: ReadonlyArray<{ title: string; content?: string }>,
+): string {
+  const parts = [...notes]
+    .map((n) => `${n.title}\u0000${n.content ?? ""}`)
+    .sort();
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193 ^ 0x5bd1e995;
+  const text = parts.join("\u0001");
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x85ebca6b) >>> 0;
+    h2 = (h2 ^ (h2 >>> 13)) >>> 0;
+  }
+  return `${h1.toString(16).padStart(8, "0")}${h2.toString(16).padStart(8, "0")}-${text.length}`;
+}
+
+/** The player-sheet notes and the plan note a setup approval is bound to. */
+export function getSetupNotes(story: StoryData): {
+  sheets: StoryLore[];
+  plan: StoryLore | undefined;
+} {
+  return { sheets: populatedSheets(story), plan: findSpinePlanNote(story) };
+}
+
+/** The hashes of the current sheet(s) and plan, as `setup.approval` stores them. */
+export function currentSetupHashes(story: StoryData): {
+  sheetHash: string;
+  planHash: string;
+} {
+  const { sheets, plan } = getSetupNotes(story);
+  return { sheetHash: hashNotes(sheets), planHash: hashNotes(plan ? [plan] : []) };
+}
+
+/** Most titles `setup.referenceTitles` keeps. */
+export const SETUP_REFERENCE_MAX_TITLES = 20;
+
+/**
+ * Moves notes the GM just read to the front of `setup.referenceTitles`
+ * (newest first, one entry per title, bounded). Mutates `story`; does
+ * nothing outside session zero.
+ */
+export function recordSetupReference(
+  story: StoryData,
+  titles: ReadonlyArray<string>,
+): void {
+  if (story.sessionZeroActive !== true || titles.length === 0) return;
+  const key = (t: string) => t.toLowerCase().replace(/\.md$/i, "").trim();
+  const incoming = new Set(titles.map(key));
+  const kept = (story.setup?.referenceTitles ?? []).filter(
+    (t) => !incoming.has(key(t)),
+  );
+  const fresh: string[] = [];
+  const seen = new Set<string>();
+  for (const t of titles) {
+    if (seen.has(key(t))) continue;
+    seen.add(key(t));
+    fresh.push(t);
+  }
+  story.setup = {
+    ...story.setup,
+    referenceTitles: [...fresh, ...kept].slice(0, SETUP_REFERENCE_MAX_TITLES),
+  };
+}
+
+export type SetupStep =
+  | "concept"
+  | "character"
+  | "campaign"
+  | "confirm"
+  | "start_game";
+
+export interface SetupProgress {
+  concept: boolean;
+  character: boolean;
+  campaign: boolean;
+  approved: boolean;
+  started: boolean;
+  /** The first step not yet done, or null once the story has started. */
+  next: SetupStep | null;
+  /** Players still without a sheet (names), when more than one is required. */
+  missingSheetFor: string[];
+}
+
+function normaliseTitle(t: string): string {
+  return t.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Where session zero stands, derived from live state. `players` names who
+ * needs a character sheet; when omitted, couch co-op's `couchPlayers` (two or
+ * more) are used, else solo play needs one sheet. A sheet belongs to a player
+ * by `ownerCouchPlayerId` or a "Character: <name>" title.
+ */
+export function getSetupProgress(
+  story: StoryData,
+  players?: ReadonlyArray<{ id: string; name: string }>,
+): SetupProgress {
+  const sheets = populatedSheets(story);
+  const required =
+    players && players.length > 0
+      ? players
+      : (story.multiplayer?.couchPlayers?.length ?? 0) > 1
+        ? (story.multiplayer?.couchPlayers ?? [])
+        : [];
+
+  let character: boolean;
+  const missingSheetFor: string[] = [];
+  if (required.length > 1) {
+    for (const p of required) {
+      const title = normaliseTitle(`Character: ${p.name}`);
+      const has = sheets.some(
+        (s) =>
+          s.ownerCouchPlayerId === p.id ||
+          (!s.ownerCouchPlayerId && normaliseTitle(s.title) === title),
+      );
+      if (!has) missingSheetFor.push(p.name);
+    }
+    character = missingSheetFor.length === 0;
+  } else {
+    character = sheets.length > 0;
+  }
+
+  const plan = findSpinePlanNote(story);
+  const campaign = !!plan;
+  const setup = story.setup;
+  // No mode dependency: nothing writes setup.mode (it only shapes the strip
+  // and the prompt), so a sheet or an answered concept is what ticks Concept.
+  const concept = !!setup?.conceptDone || sheets.length > 0;
+
+  const approval = setup?.approval;
+  let approved = false;
+  if (approval && character && campaign) {
+    const now = currentSetupHashes(story);
+    approved =
+      approval.sheetHash === now.sheetHash && approval.planHash === now.planHash;
+  }
+
+  const started = story.sessionZeroActive !== true;
+  let next: SetupStep | null = null;
+  if (!started) {
+    if (!concept) next = "concept";
+    else if (!character) next = "character";
+    else if (!campaign) next = "campaign";
+    else if (!approved) next = "confirm";
+    else next = "start_game";
+  }
+
+  return { concept, character, campaign, approved, started, next, missingSheetFor };
+}
+
+// ============================================
+// THE SETUP GATE'S WORDS (docs/session-zero-plan.md, slice 4)
+// ============================================
+
+/** How many times the setup gate re-prompts one turn before ending it. */
+export const MAX_SETUP_PROMPTS = 2;
+
+/** What the player reads for a step, in the engine line. */
+const SETUP_STEP_LABEL: Record<SetupStep, string> = {
+  concept: "a few questions about the game",
+  character: "the character sheet",
+  campaign: "the campaign plan",
+  confirm: "your OK on the setup card",
+  start_game: "starting the game",
+};
+
+/**
+ * The user message the setup gate adds when a session-zero turn is about to
+ * end on prose without moving setup forward. Names the next step and the tool
+ * that does it.
+ */
+export function setupGateMessage(next: SetupStep | null): string {
+  const head =
+    "Setup is not finished and this turn has not moved it forward, so the turn cannot end on prose alone.";
+  switch (next) {
+    case "concept":
+      return `${head} Next step: ask the player your setup questions with ask_question (their answers set the concept), then continue.`;
+    case "character":
+      return `${head} Next step: write the character sheet with create_note (type "character_sheet"), then continue.`;
+    case "campaign":
+      return `${head} Next step: write the campaign plan with create_note (type "gm_plan"), then continue.`;
+    case "confirm":
+      return `${head} Next step: call confirm_setup so the player can review the sheet and the plan and press Start.`;
+    case "start_game":
+      return `${head} The player has approved. Call start_game now, then write the campaign intro.`;
+    default:
+      return `${head} Call the tool for the next setup step.`;
+  }
+}
+
+/** The line a session-zero turn ends with when the gate's prompts ran out. */
+export function setupEngineLine(next: SetupStep | null): string {
+  const what = next ? SETUP_STEP_LABEL[next] : "the setup";
+  return `(Let's finish setting up first: next is ${what}.)`;
+}

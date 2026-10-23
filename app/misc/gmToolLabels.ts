@@ -73,6 +73,7 @@ export const TOOL_LABELS: Record<string, string> = {
 
   // Flow control
   start_game: "Starting the game",
+  confirm_setup: "Checking the setup with you",
 };
 
 /** Present-tense label for a tool call, for a live-progress indicator. */

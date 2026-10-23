@@ -42,9 +42,14 @@ export type LineKind = "typed" | "choice";
 
 export interface AnswerItem {
   selectedLabel?: string;
+  // Every option ticked on a multi-select question.
+  selectedLabels?: string[];
   customText?: string;
   skipped: boolean;
 }
+
+// A question has at most four options, so no honest answer ticks more.
+export const PARTY_MAX_PICKS = 4;
 
 export type PhoneMessage =
   // First message on every connection. playerId + seatKey reclaim a seat
@@ -117,6 +122,8 @@ export type PartyRequestView =
         question: string;
         options: { label: string; description?: string }[];
         allowCustom: boolean;
+        // Present (true) only on a multi-select question.
+        multiSelect?: boolean;
       }[];
     };
 
@@ -258,7 +265,24 @@ export function parsePhoneMessage(raw: string): PhoneMessage | null {
           a.customText === undefined ? undefined : str(a.customText, PARTY_MAX_LINE_CHARS);
         if (a.selectedLabel !== undefined && selectedLabel === undefined) return null;
         if (a.customText !== undefined && customText === undefined) return null;
-        answers.push({ selectedLabel, customText, skipped: a.skipped });
+        let selectedLabels: string[] | undefined;
+        if (a.selectedLabels !== undefined) {
+          if (!Array.isArray(a.selectedLabels) || a.selectedLabels.length > PARTY_MAX_PICKS) {
+            return null;
+          }
+          selectedLabels = [];
+          for (const l of a.selectedLabels) {
+            const label = str(l, PARTY_MAX_LINE_CHARS);
+            if (label === undefined) return null;
+            selectedLabels.push(label);
+          }
+        }
+        answers.push({
+          selectedLabel,
+          ...(selectedLabels ? { selectedLabels } : {}),
+          customText,
+          skipped: a.skipped,
+        });
       }
       return { type: "answer", requestId, answers };
     }

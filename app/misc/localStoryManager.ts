@@ -282,6 +282,10 @@ function buildPlayerPreferencesNote(
   };
 }
 
+// The strip above the composer offers the two ways to set up (SetupStrip.tsx).
+const SETUP_STYLE_POINTER =
+  "Pick how you'd like to set up below - quick, or step by step - or just tell me what you're in the mood for.";
+
 function buildFreeformGreeting(
   hasCharacterSheet: boolean,
   players?: FreeformPlayerSetup[],
@@ -292,28 +296,24 @@ function buildFreeformGreeting(
       names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
     return (
       `Welcome, ${nameList}! I've read through what everyone's looking for - this is going to be fun.\n\n` +
-      "Tell me what kind of world you all want to play in (genre, tone, setting), " +
-      "or just say \"surprise me\" and I'll cook something up that fits the whole table."
+      `${SETUP_STYLE_POINTER} Say "surprise me" and I'll cook something up that fits the whole table.`
     );
   }
   if (players && players.length === 1) {
     return (
       `Welcome, ${players[0].name}! I've got your preferences in front of me.\n\n` +
-      "Tell me what kind of story you're in the mood for (genre, tone, setting), " +
-      "or just say \"surprise me\" and I'll take it from there."
+      `${SETUP_STYLE_POINTER} Say "surprise me" and I'll take it from there.`
     );
   }
   if (hasCharacterSheet) {
     return (
       "Welcome back! I can see the character and notes you brought with you.\n\n" +
-      "Tell me what kind of story you're in the mood for (genre, tone, setting), " +
-      "or just say \"surprise me\" and I'll take it from there."
+      `${SETUP_STYLE_POINTER} Say "surprise me" and I'll take it from there.`
     );
   }
   return (
     "Welcome! There's no adventure set up yet - so let's build one together.\n\n" +
-    "Tell me what kind of story you're in the mood for (genre, tone, a character concept, anything at all), " +
-    "or just say \"surprise me\" and I'll take it from there."
+    `${SETUP_STYLE_POINTER} Say "surprise me" and I'll take it from there.`
   );
 }
 

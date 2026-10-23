@@ -36,6 +36,8 @@ export default function AskQuestionModal({
   const [answers, setAnswers] = useState<AskQuestionAnswerItem[]>([]);
   const [customText, setCustomText] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
+  // The options ticked so far on a multi_select question.
+  const [picked, setPicked] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset all local state whenever a new question batch comes in
@@ -49,6 +51,7 @@ export default function AskQuestionModal({
     setAnswers([]);
     setCustomText("");
     setShowCustomInput(false);
+    setPicked([]);
   }
 
   useEffect(() => {
@@ -85,17 +88,35 @@ export default function AskQuestionModal({
       setQuestionIndex(questionIndex + 1);
       setCustomText("");
       setShowCustomInput(false);
+      setPicked([]);
     }
   };
+
+  const multi = question.multi_select === true;
 
   const selectOption = (label: string) => {
     advance({ selectedLabel: label, skipped: false });
   };
 
+  const togglePick = (label: string) => {
+    setPicked((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label],
+    );
+  };
+
+  const submitPicks = () => {
+    if (picked.length === 0) return;
+    advance({ selectedLabels: picked, skipped: false });
+  };
+
   const submitCustom = () => {
     const text = customText.trim();
     if (!text) return;
-    advance({ customText: text, skipped: false });
+    advance(
+      multi && picked.length > 0
+        ? { selectedLabels: picked, customText: text, skipped: false }
+        : { customText: text, skipped: false },
+    );
   };
 
   const skipQuestion = () => {
@@ -134,22 +155,65 @@ export default function AskQuestionModal({
         <div className="p-5 space-y-4">
           {/* Predefined options */}
           <div className="space-y-2">
-            {question.options.map((opt, idx) => (
-              <button
-                key={idx}
-                onClick={() => selectOption(opt.label)}
-                className="w-full text-left px-4 py-3 rounded-xl bg-ys-text/5 border border-ys-border hover:border-ys-muted hover:bg-ys-text/10 active:scale-[0.99] transition-all"
-              >
-                <div className="font-semibold text-ys-text text-sm">
-                  {opt.label}
-                </div>
-                {opt.description && (
-                  <div className="text-xs text-ys-muted mt-0.5">
-                    {opt.description}
+            {multi && (
+              <p className="text-xs text-ys-muted text-center">
+                Pick as many as you like.
+              </p>
+            )}
+            {question.options.map((opt, idx) => {
+              const checked = multi && picked.includes(opt.label);
+              return (
+                <button
+                  key={idx}
+                  onClick={() =>
+                    multi ? togglePick(opt.label) : selectOption(opt.label)
+                  }
+                  role={multi ? "checkbox" : undefined}
+                  aria-checked={multi ? checked : undefined}
+                  className={`w-full text-left px-4 py-3 rounded-xl border active:scale-[0.99] transition-all ${
+                    checked
+                      ? "bg-ys-text/10 border-ys-accent"
+                      : "bg-ys-text/5 border-ys-border hover:border-ys-muted hover:bg-ys-text/10"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {multi && (
+                      <span
+                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                          checked
+                            ? "border-ys-accent bg-ys-accent text-ys-bg"
+                            : "border-ys-muted"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {checked && (
+                          <DynamicIcon name="Check" className="w-3 h-3" />
+                        )}
+                      </span>
+                    )}
+                    <div>
+                      <div className="font-semibold text-ys-text text-sm">
+                        {opt.label}
+                      </div>
+                      {opt.description && (
+                        <div className="text-xs text-ys-muted mt-0.5">
+                          {opt.description}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                </button>
+              );
+            })}
+            {multi && (
+              <button
+                onClick={submitPicks}
+                disabled={picked.length === 0}
+                className="w-full py-2.5 rounded-xl bg-ys-text text-ys-bg hover:opacity-90 active:scale-[0.99] disabled:opacity-40 font-semibold text-sm transition-all"
+              >
+                Done
               </button>
-            ))}
+            )}
           </div>
 
           {/* Free-text fallback */}

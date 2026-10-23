@@ -101,6 +101,7 @@ import {
   GM_TOOL_MAP,
   SetReasoningTierParams,
   StartGameParams,
+  ConfirmSetupParams,
 } from "./gmTools";
 import type { ImageToolContext, ImageJobTarget } from "./imageJobs";
 import { validateToolArgs, formatValidationErrors } from "./toolValidation";
@@ -148,7 +149,12 @@ import {
   MAX_DICE_SIDES,
 } from "./diceFormula";
 import { executeTools as executeStateTools } from "./toolExecutor";
-import { hasCampaignPlan } from "./campaignPlan";
+import {
+  currentSetupHashes,
+  getSetupNotes,
+  getSetupProgress,
+  recordSetupReference,
+} from "./campaignPlan";
 
 // ============================================
 // RESULT INTERFACES
@@ -160,6 +166,16 @@ import { hasCampaignPlan } from "./campaignPlan";
  */
 export interface GMToolContext {
   imageJobs?: ImageToolContext;
+  // The turn's abort signal. After any awaited pause (a question, the setup
+  // card, a dice request) the batch checks it: once aborted, no further tool
+  // runs and the working copy is NOT committed (aborted: true on the result),
+  // so Stop's restore of the pre-turn story is not overwritten by a batch
+  // that finishes afterwards.
+  abortSignal?: AbortSignal;
+  // Who needs a character sheet during session zero, when the page knows
+  // better than StoryData does (party seats). Default: couch players, else
+  // one sheet (getSetupProgress).
+  setupPlayers?: { id: string; name: string }[];
 }
 
 export interface GMToolResult {
@@ -190,6 +206,7 @@ export interface GMToolResult {
     | GMGetGameStateResult
     | GMSetReasoningTierResult
     | GMStartGameResult
+    | GMConfirmSetupResult
     | GMStateChangeResult
     // Timer results
     | GMCreateTimerResult
@@ -462,6 +479,12 @@ export interface GMStartGameResult {
   premise?: string;
 }
 
+export interface GMConfirmSetupResult {
+  type: "confirm_setup";
+  outcome: "approved" | "changes" | "dismissed" | "stopped" | "refused";
+  note?: string; // The player's requested changes, for "changes"
+}
+
 // ============================================
 // COMBAT RESULT INTERFACES
 // ============================================
@@ -710,6 +733,7 @@ export interface AskQuestionRequest {
 
 export interface AskQuestionAnswerItem {
   selectedLabel?: string; // Which predefined option was picked, if any
+  selectedLabels?: string[]; // Every option picked, for a multi_select question
   customText?: string; // Free-text answer, if that's what was given instead
   skipped: boolean;
 }
@@ -749,13 +773,39 @@ export interface GMInteractionHandlers {
   requestPlayerAnswer?: (
     request: AskQuestionRequest
   ) => Promise<AskQuestionAnswer | null>;
+  // Shows the setup card (confirm_setup) and resolves with the player's
+  // decision. Absent where the page does not provide the card.
+  requestSetupConfirmation?: (
+    request: SetupConfirmationRequest
+  ) => Promise<SetupConfirmationAnswer>;
 }
 
 export interface GMExecutionResult {
   results: GMToolResult[];
   modifiedStoryData: StoryData;
   storyContext: string; // Combined context for story stage
+  // True when the turn was stopped during the batch (the abort signal fired,
+  // or the player pressed Stop on the setup card). The batch's changes were
+  // not committed: modifiedStoryData is the story as it came in, and the
+  // caller must not treat it as this turn's result.
+  aborted?: boolean;
 }
+
+// What the setup card needs (confirm_setup, session zero). The sheet and plan
+// text are taken from the executor's working copy, so the card shows what the
+// approval will bind to, not whatever the page last rendered.
+export interface SetupConfirmationRequest {
+  characterSummary: string;
+  campaignHook: string;
+  sheets: { title: string; content: string }[];
+  plan: { title: string; content: string };
+}
+
+export type SetupConfirmationAnswer =
+  | { approved: true }
+  | { approved: false; note: string } // "Change something..."
+  | { dismissed: true } // the card was closed without a decision
+  | { stopped: true }; // Stop: the turn is cancelled
 
 // Tools whose successful execution counts as "the GM consulted the oracle"
 // for the recency counter in the prompt's Oracle State section. Same pair
@@ -867,8 +917,22 @@ export async function executeGMTools(
   const modified = structuredClone(storyData);
   const results: GMToolResult[] = [];
   const contextParts: string[] = [];
+  const signal = toolContext.abortSignal;
+
+  // A Stop leaves the story as it came in: the clone is dropped, never
+  // returned as the committed result.
+  const abortedBatch = (): GMExecutionResult => ({
+    results,
+    modifiedStoryData: storyData,
+    storyContext: contextParts.join("\n"),
+    aborted: true,
+  });
 
   for (const call of toolCalls) {
+    // Checked before every tool, so a pause that was stopped (or any abort
+    // that landed during an earlier tool) runs nothing further.
+    if (signal?.aborted) return abortedBatch();
+
     // route.ts marks a tool call this way when the response hit the token
     // limit before this call's arguments finished streaming - the raw
     // arguments string was unterminated JSON and got replaced with `{}`.
@@ -922,6 +986,23 @@ export async function executeGMTools(
               : String(parseError),
         }
       );
+      // A result for every call keeps results[i] aligned with toolCalls[i].
+      const errorMsg = `Tool call "${call.function.name}" had arguments that are not valid JSON, so this call did not go through. Send it again with well-formed arguments.`;
+      const parseErrorResult: GMToolResult = {
+        toolName: call.function.name,
+        toolCallId: call.id,
+        success: false,
+        result: {
+          type: "state_change" as const,
+          message: errorMsg,
+          command: call.function.name,
+        },
+        contextForStory: `[ERROR: ${errorMsg}]`,
+      };
+      parseErrorResult.hiddenFromPlayer =
+        isHiddenFromPlayerTool(call.function.name) || undefined;
+      results.push(parseErrorResult);
+      contextParts.push(parseErrorResult.contextForStory);
       continue;
     }
 
@@ -1007,6 +1088,16 @@ export async function executeGMTools(
             params as AskQuestionParams,
             interaction
           );
+          // An answered question is session zero's progress: the concept has
+          // begun, and the count feeds the "enough questions" nudge. On the
+          // working copy, so it reaches StoryData like any other state change.
+          if (result.success && modified.sessionZeroActive === true) {
+            modified.setup = {
+              ...modified.setup,
+              conceptDone: true,
+              questionsAsked: (modified.setup?.questionsAsked ?? 0) + 1,
+            };
+          }
           break;
         case "opposed_formula":
           result = await executeOpposedFormula(
@@ -1069,6 +1160,11 @@ export async function executeGMTools(
           // docs/gm-plan-notes-design.md): mark that notes were read this
           // turn so the Campaign Plan spine note can be created.
           modified.notesReadThisTurn = true;
+          // Session zero keeps what the GM read in view (the setup reference
+          // in the live block), since history stubs the result.
+          if (result.success && result.result.type === "read_notes") {
+            recordSetupReference(modified, result.result.titles);
+          }
           break;
         case "search_memory":
           result = await executeSearchMemory(
@@ -1213,7 +1309,17 @@ export async function executeGMTools(
           result = executeStartGame(
             call.id,
             params as StartGameParams,
-            modified
+            modified,
+            toolContext.setupPlayers
+          );
+          break;
+        case "confirm_setup":
+          result = await executeConfirmSetup(
+            call.id,
+            params as ConfirmSetupParams,
+            modified,
+            interaction,
+            toolContext.setupPlayers
           );
           break;
         default:
@@ -1351,6 +1457,16 @@ export async function executeGMTools(
     if (result.contextForStory) {
       contextParts.push(result.contextForStory);
     }
+
+    // Stop pressed on the setup card, or the turn aborted during this tool:
+    // nothing after it runs and nothing is committed.
+    if (
+      result.toolName === "confirm_setup" &&
+      (result.result as GMConfirmSetupResult).outcome === "stopped"
+    ) {
+      return abortedBatch();
+    }
+    if (signal?.aborted) return abortedBatch();
 
     // Log genuine execution failures for debugging - not a check that simply
     // didn't pass (see isRealToolFailure).
@@ -2264,14 +2380,27 @@ async function executeAskQuestion(
 
   const answers = params.questions.map((q, i) => {
     const item = answer.answers[i];
-    const text = item?.skipped
-      ? ""
-      : item?.selectedLabel || item?.customText || "";
+    let text = "";
+    // How the answer reads in the GM's context: every pick quoted.
+    let shown = "";
+    if (item && !item.skipped) {
+      const picks = q.multi_select ? validPicks(q, item) : [];
+      if (picks.length > 0) {
+        const custom = item.customText?.trim();
+        const parts = custom ? [...picks, custom] : picks;
+        text = parts.join(", ");
+        shown = parts.map((p) => `"${p}"`).join(", ");
+      } else {
+        text = item.selectedLabel || item.customText || "";
+        shown = text ? `"${text}"` : "";
+      }
+    }
     return {
       question: q.question,
       targetPlayerName: q.target_player_name,
       answer: text,
       skipped: !text,
+      shown,
     };
   });
 
@@ -2279,7 +2408,7 @@ async function executeAskQuestion(
     "[Asked the player:",
     ...answers.map(
       (a) =>
-        `Q: "${a.question}"${a.targetPlayerName ? ` (for ${a.targetPlayerName})` : ""} → ${a.skipped ? "Skipped" : `"${a.answer}"`}`
+        `Q: "${a.question}"${a.targetPlayerName ? ` (for ${a.targetPlayerName})` : ""} → ${a.skipped ? "Skipped" : a.shown}`
     ),
     "]",
   ].join("\n");
@@ -2288,9 +2417,23 @@ async function executeAskQuestion(
     toolName: "ask_question",
     toolCallId,
     success: answers.some((a) => !a.skipped),
-    result: { type: "ask_question", answers },
+    result: {
+      type: "ask_question",
+      answers: answers.map((a) => ({
+        question: a.question,
+        targetPlayerName: a.targetPlayerName,
+        answer: a.answer,
+        skipped: a.skipped,
+      })),
+    },
     contextForStory,
   };
+}
+
+/** The labels of a multi_select answer that are really among the options, once each, in option order. */
+function validPicks(q: AskQuestionItem, item: AskQuestionAnswerItem): string[] {
+  const picked = new Set(item.selectedLabels ?? []);
+  return q.options.map((o) => o.label).filter((l, i, all) => picked.has(l) && all.indexOf(l) === i);
 }
 
 /**
@@ -3567,9 +3710,12 @@ function executeSetReasoningTier(
 function executeStartGame(
   toolCallId: string,
   params: StartGameParams,
-  storyData: StoryData
+  storyData: StoryData,
+  setupPlayers?: { id: string; name: string }[]
 ): GMToolResult {
-  if (!hasCampaignPlan(storyData)) {
+  // Outside session zero there is nothing to start (a second call, an old
+  // save): refuse, so it can't rename the story or reset the tier state.
+  if (storyData.sessionZeroActive !== true) {
     return {
       toolName: "start_game",
       toolCallId,
@@ -3579,7 +3725,45 @@ function executeStartGame(
         story_name: params.story_name,
         premise: params.premise,
       } as GMStartGameResult,
-      contextForStory: `[ERROR: Cannot start the game yet - this story has no campaign plan. Session zero isn't over until the spine exists. Create it first: \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (later beats stay one-line placeholders) - see the CAMPAIGN PLAN section. If this story has existing lore/mechanics/dm_instructions notes, \`read_notes\`/\`search_notes\` them first; create_note enforces that. Then call start_game again.]`,
+      contextForStory: "[ERROR: The game has already started.]",
+    };
+  }
+
+  // Session zero is over only when the character sheet(s) and the plan exist
+  // and the player approved exactly those (getSetupProgress, campaignPlan.ts).
+  // Judged on the working copy, which holds this batch's earlier edits.
+  const progress = getSetupProgress(storyData, setupPlayers);
+  if (!progress.character || !progress.campaign || !progress.approved) {
+    const missing: string[] = [];
+    if (!progress.character) {
+      missing.push(
+        progress.missingSheetFor.length > 0
+          ? `no character sheet yet for ${progress.missingSheetFor.join(", ")} (create_note, type character_sheet, titled "Character: <name>")`
+          : `no character sheet yet (create_note, type character_sheet)`
+      );
+    }
+    if (!progress.campaign) {
+      missing.push(
+        `no campaign plan. Session zero isn't over until the spine exists. Create it first: \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (later beats stay one-line placeholders) - see the CAMPAIGN PLAN section. If this story has existing lore/mechanics/dm_instructions notes, \`read_notes\`/\`search_notes\` them first; create_note enforces that`
+      );
+    }
+    if (progress.character && progress.campaign && !progress.approved) {
+      missing.push(
+        storyData.setup?.approval
+          ? "the sheet or the plan changed after the player's OK, so the OK no longer counts. Call confirm_setup again"
+          : "the player has not approved the setup yet. Call confirm_setup and wait for their OK"
+      );
+    }
+    return {
+      toolName: "start_game",
+      toolCallId,
+      success: false,
+      result: {
+        type: "start_game",
+        story_name: params.story_name,
+        premise: params.premise,
+      } as GMStartGameResult,
+      contextForStory: `[ERROR: Cannot start the game yet - ${missing.join("; ")}. Then call start_game again.]`,
     };
   }
 
@@ -3605,8 +3789,113 @@ function executeStartGame(
     } as GMStartGameResult,
     contextForStory: `[Session zero complete - story named "${params.story_name}"${
       params.premise ? `. Premise: ${params.premise}` : ""
-    }]`,
+    }. Now write the campaign intro: first a short briefing in the story's voice (who the player is, where, what's at stake, why they are here), then the opening scene, ending on a clear first choice.]`,
   };
+}
+
+/**
+ * Execute confirm_setup: show the player the finished sheet(s) and plan and
+ * wait for their decision (docs/session-zero-design.md 3.5). Refuses without
+ * the sheet(s) or the plan. The card is built from the executor's working
+ * copy, and an OK stores the hashes of exactly that text, so any later edit
+ * to the sheet or the plan cancels it.
+ */
+async function executeConfirmSetup(
+  toolCallId: string,
+  params: ConfirmSetupParams,
+  storyData: StoryData,
+  interaction: GMInteractionHandlers,
+  setupPlayers?: { id: string; name: string }[]
+): Promise<GMToolResult> {
+  const make = (
+    success: boolean,
+    outcome: GMConfirmSetupResult["outcome"],
+    contextForStory: string,
+    note?: string
+  ): GMToolResult => ({
+    toolName: "confirm_setup",
+    toolCallId,
+    success,
+    result: {
+      type: "confirm_setup",
+      outcome,
+      ...(note ? { note } : {}),
+    } as GMConfirmSetupResult,
+    contextForStory,
+  });
+
+  if (storyData.sessionZeroActive !== true) {
+    return make(false, "refused", "[ERROR: The game has already started.]");
+  }
+
+  const progress = getSetupProgress(storyData, setupPlayers);
+  const missing: string[] = [];
+  if (!progress.character) {
+    missing.push(
+      progress.missingSheetFor.length > 0
+        ? `the character sheet for ${progress.missingSheetFor.join(", ")}`
+        : "the character sheet"
+    );
+  }
+  if (!progress.campaign) missing.push("the Campaign Plan (a gm_plan note)");
+  if (missing.length > 0) {
+    return make(
+      false,
+      "refused",
+      `[ERROR: Can't show the setup card yet - missing ${missing.join(" and ")}. Write ${missing.length > 1 ? "them" : "it"} with create_note first, then call confirm_setup.]`
+    );
+  }
+
+  if (!interaction.requestSetupConfirmation) {
+    return make(
+      false,
+      "refused",
+      "[ERROR: confirm_setup is unavailable here - the setup card can't be shown. Tell the player what you built and ask in the chat whether to start.]"
+    );
+  }
+
+  const { sheets, plan } = getSetupNotes(storyData);
+  if (!plan) {
+    // Unreachable after the progress check; keeps the types honest.
+    return make(false, "refused", "[ERROR: the Campaign Plan is missing.]");
+  }
+
+  const answer = await interaction.requestSetupConfirmation({
+    characterSummary: params.character_summary,
+    campaignHook: params.campaign_hook,
+    sheets: sheets.map((n) => ({ title: n.title, content: n.content ?? "" })),
+    plan: { title: plan.title, content: plan.content ?? "" },
+  });
+
+  if ("stopped" in answer) {
+    return make(false, "stopped", "[The turn was stopped on the setup card.]");
+  }
+  if ("dismissed" in answer) {
+    return make(
+      false,
+      "dismissed",
+      "[The player closed the card; ask what they want to change.]"
+    );
+  }
+  if (!answer.approved) {
+    return make(
+      false,
+      "changes",
+      `[The player wants changes before starting: "${answer.note}". Make the changes, then call confirm_setup again.]`,
+      answer.note
+    );
+  }
+
+  // Approved: bind the OK to the text the card showed (the working copy).
+  storyData.setup = {
+    ...storyData.setup,
+    approval: currentSetupHashes(storyData),
+  };
+  return make(
+    true,
+    "approved",
+    "[Approved: the player pressed Start the story. Call start_game now, then write the campaign intro: first a short briefing in the story's voice (who the player is, where, what's at stake, why they are here), then the opening scene, ending on a clear first choice.]"
+  );
 }
 
 // ============================================

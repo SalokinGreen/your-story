@@ -262,6 +262,7 @@ export interface AskQuestionItem {
   question: string; // The question text
   options: AskQuestionOption[]; // 2-4 predefined answers
   allow_custom?: boolean; // Allow a free-text answer too (default true)
+  multi_select?: boolean; // The player may pick several options (default false)
   target_player_name?: string; // Couch co-op only: which player this question is directed at
 }
 
@@ -327,6 +328,16 @@ export interface SetReasoningTierParams {
 export interface StartGameParams {
   story_name: string;
   premise?: string;
+}
+
+/**
+ * Confirm Setup - show the player the finished sheet(s) and plan and wait for
+ * their OK before the story starts (session zero, docs/session-zero-design.md
+ * 3.5). The card's sheet and plan text come from the engine, not from here.
+ */
+export interface ConfirmSetupParams {
+  character_summary: string; // A short summary of the character(s)
+  campaign_hook: string; // The campaign's premise in a sentence or two
 }
 
 // ============================================
@@ -686,7 +697,8 @@ export type GMToolParams =
   | { name: "update_npc"; params: UpdateNPCParams }
   | { name: "remove_npc"; params: RemoveNPCParams }
   | { name: "npc_reaction"; params: NPCReactionParams }
-  | { name: "start_game"; params: StartGameParams };
+  | { name: "start_game"; params: StartGameParams }
+  | { name: "confirm_setup"; params: ConfirmSetupParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -986,6 +998,10 @@ const askQuestionTool: ToolSchema = {
               allow_custom: {
                 type: "boolean",
                 description: "Also offer a free-text answer (default true)",
+              },
+              multi_select: {
+                type: "boolean",
+                description: "Let them pick several options (default false)",
               },
               target_player_name: {
                 type: "string",
@@ -1324,11 +1340,34 @@ const setReasoningTierTool: ToolSchema = {
   },
 };
 
+const confirmSetupTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "confirm_setup",
+    description: `Session zero only. Once the character sheet(s) and the Campaign Plan exist, show the player a card with both and wait for their OK or their changes. Required before start_game. Editing a sheet or the plan afterwards cancels the OK.`,
+    parameters: {
+      type: "object",
+      properties: {
+        character_summary: {
+          type: "string",
+          description:
+            "One or two lines: name, kind, and the hook of the character (each character, if several)",
+        },
+        campaign_hook: {
+          type: "string",
+          description: "The campaign's premise in a sentence or two",
+        },
+      },
+      required: ["character_summary", "campaign_hook"],
+    },
+  },
+};
+
 const startGameTool: ToolSchema = {
   type: "function",
   function: {
     name: "start_game",
-    description: `Call ONCE, when session zero is done and you are about to narrate the opening scene. It names the story and hands off from session zero to real play. Requires the "Campaign Plan" gm_plan note, with only its Opening Image beat detailed, to exist already (an error otherwise). Order: character(s), Campaign Plan note, start_game, opening scene.`,
+    description: `Call ONCE, when session zero is done and you are about to narrate the opening scene. It names the story and hands off from session zero to real play. Requires the character sheet(s), the "Campaign Plan" gm_plan note (only its Opening Image beat detailed) and the player's OK through confirm_setup (an error otherwise). Order: character(s), Campaign Plan, confirm_setup, start_game, then the campaign intro.`,
     parameters: {
       type: "object",
       properties: {
@@ -2116,6 +2155,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Reasoning-tier self-escalation
   setReasoningTierTool,
   // Session zero -> real play handoff
+  confirmSetupTool,
   startGameTool,
 ];
 

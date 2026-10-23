@@ -540,6 +540,18 @@ function answer(
   const cleaned = questions.map((q, i) => {
     const a = answers[i];
     if (a.skipped) return { skipped: true };
+    if (q.multi_select) {
+      // Every ticked label the GM actually offered, once each, in option order.
+      const ticked = new Set(a.selectedLabels ?? []);
+      const labels = q.options.map((o) => o.label).filter((l, k, all) => ticked.has(l) && all.indexOf(l) === k);
+      const extra = q.allow_custom === false ? "" : cleanLine(a.customText ?? "");
+      if (labels.length === 0 && !extra) return { skipped: true };
+      return {
+        ...(labels.length > 0 ? { selectedLabels: labels } : {}),
+        ...(extra ? { customText: extra } : {}),
+        skipped: false,
+      };
+    }
     // Only a label the GM actually offered counts as a pick.
     const label = q.options.find((o) => o.label === a.selectedLabel)?.label;
     if (label) return { selectedLabel: label, skipped: false };
@@ -801,6 +813,7 @@ function requestView(req: PartyRequest): PartyRequestView {
         ...(o.description ? { description: o.description } : {}),
       })),
       allowCustom: q.allow_custom !== false,
+      ...(q.multi_select ? { multiSelect: true } : {}),
     })),
   };
 }
