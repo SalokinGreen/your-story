@@ -262,6 +262,7 @@ export interface AskQuestionItem {
   question: string; // The question text
   options: AskQuestionOption[]; // 2-4 predefined answers
   allow_custom?: boolean; // Allow a free-text answer too (default true)
+  multi_select?: boolean; // The player may pick several options (default false)
   target_player_name?: string; // Couch co-op only: which player this question is directed at
 }
 
@@ -997,6 +998,10 @@ const askQuestionTool: ToolSchema = {
               allow_custom: {
                 type: "boolean",
                 description: "Also offer a free-text answer (default true)",
+              },
+              multi_select: {
+                type: "boolean",
+                description: "Let them pick several options (default false)",
               },
               target_player_name: {
                 type: "string",

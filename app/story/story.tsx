@@ -28,6 +28,7 @@ import {
 import { appendTranscript, stillVoice } from "./composerDraft";
 import { wrapOutOfCharacter } from "./playerLine";
 import PartyTableStrip from "../components/PartyTableStrip";
+import SetupStrip from "../components/SetupStrip";
 import type { PartyTable } from "../misc/party/partyRuntime";
 import CombatDisplay from "../components/CombatDisplay";
 import { type TimelineBlock } from "../misc/turnTimeline";
@@ -117,6 +118,9 @@ interface StoryProps {
   // Opens the Notes or NPC page pre-selected on the given entry, e.g. when
   // the player clicks a highlighted name/note title in the story prose.
   onOpenNote?: (kind: "lore" | "npc", id: string) => void;
+  // Session zero: the player picked a setup style on the strip. The page sets
+  // setup.mode and sends the matching line in one step.
+  onChooseSetupStyle?: (mode: "quick" | "full") => void;
   // The last user choice that was submitted (shown while GM is thinking)
   pendingUserChoice?: string;
   // Chronological thinking/tool/text blocks for the turn currently
@@ -608,6 +612,7 @@ export default function Story({
   shortcutsSuspended,
   onResetToCurrentPart,
   onOpenNote,
+  onChooseSetupStyle,
   pendingUserChoice,
   liveGMEntries,
   liveNarrationText,
@@ -1374,6 +1379,18 @@ export default function Story({
             onJoin={onPartyJoin}
             onRemove={onPartyRemove}
             onAnswerHere={onPartyAnswerHere}
+          />
+        )}
+
+        {/* Session zero: the style choice, then the setup checklist. Read-only
+            for an online guest (no handler, no note links). */}
+        {storyData.sessionZeroActive && !loading && (
+          <SetupStrip
+            storyData={storyData}
+            onChooseSetupStyle={
+              netSession?.role === "guest" ? undefined : onChooseSetupStyle
+            }
+            onOpenNote={netSession?.role === "guest" ? undefined : onOpenNote}
           />
         )}
 

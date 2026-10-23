@@ -733,6 +733,7 @@ export interface AskQuestionRequest {
 
 export interface AskQuestionAnswerItem {
   selectedLabel?: string; // Which predefined option was picked, if any
+  selectedLabels?: string[]; // Every option picked, for a multi_select question
   customText?: string; // Free-text answer, if that's what was given instead
   skipped: boolean;
 }
@@ -2379,14 +2380,27 @@ async function executeAskQuestion(
 
   const answers = params.questions.map((q, i) => {
     const item = answer.answers[i];
-    const text = item?.skipped
-      ? ""
-      : item?.selectedLabel || item?.customText || "";
+    let text = "";
+    // How the answer reads in the GM's context: every pick quoted.
+    let shown = "";
+    if (item && !item.skipped) {
+      const picks = q.multi_select ? validPicks(q, item) : [];
+      if (picks.length > 0) {
+        const custom = item.customText?.trim();
+        const parts = custom ? [...picks, custom] : picks;
+        text = parts.join(", ");
+        shown = parts.map((p) => `"${p}"`).join(", ");
+      } else {
+        text = item.selectedLabel || item.customText || "";
+        shown = text ? `"${text}"` : "";
+      }
+    }
     return {
       question: q.question,
       targetPlayerName: q.target_player_name,
       answer: text,
       skipped: !text,
+      shown,
     };
   });
 
@@ -2394,7 +2408,7 @@ async function executeAskQuestion(
     "[Asked the player:",
     ...answers.map(
       (a) =>
-        `Q: "${a.question}"${a.targetPlayerName ? ` (for ${a.targetPlayerName})` : ""} → ${a.skipped ? "Skipped" : `"${a.answer}"`}`
+        `Q: "${a.question}"${a.targetPlayerName ? ` (for ${a.targetPlayerName})` : ""} → ${a.skipped ? "Skipped" : a.shown}`
     ),
     "]",
   ].join("\n");
@@ -2403,9 +2417,23 @@ async function executeAskQuestion(
     toolName: "ask_question",
     toolCallId,
     success: answers.some((a) => !a.skipped),
-    result: { type: "ask_question", answers },
+    result: {
+      type: "ask_question",
+      answers: answers.map((a) => ({
+        question: a.question,
+        targetPlayerName: a.targetPlayerName,
+        answer: a.answer,
+        skipped: a.skipped,
+      })),
+    },
     contextForStory,
   };
+}
+
+/** The labels of a multi_select answer that are really among the options, once each, in option order. */
+function validPicks(q: AskQuestionItem, item: AskQuestionAnswerItem): string[] {
+  const picked = new Set(item.selectedLabels ?? []);
+  return q.options.map((o) => o.label).filter((l, i, all) => picked.has(l) && all.indexOf(l) === i);
 }
 
 /**

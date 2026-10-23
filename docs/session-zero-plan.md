@@ -525,3 +525,43 @@ Six fixes to slices 1-4, from the engine review's findings:
 6. **Pre-existing: an unparseable tool call** in `executeGMTools` now pushes an
    error `GMToolResult` before `continue`, like the truncated-arguments branch,
    so `results[i]` stays aligned with `toolCalls[i]`. Tested.
+
+### 2026-10-23, slice 5
+
+- **The strip's state is a pure helper**, `setupStripState(story)` in
+  `app/misc/setupStrip.ts` (hidden / choose / checklist with four ticks,
+  note titles and `awaitingApproval`), with `SETUP_STYLE_LINES`; tested in
+  `tests/setupStrip.test.ts`. `SetupStrip.tsx` only renders it. The "your OK"
+  hint reads "your OK is next" when the sheet and plan are done and approval
+  is missing (also after an edit cancels an approval).
+- **Mode handling is an optional last parameter of `handleCustomInput`**
+  (`setupMode`), not a separate path: `handleChooseSetupStyle` calls it with
+  the line and the mode; typing first passes nothing and the same function
+  picks `quick` when `sessionZeroActive && !setup.mode`. The mode is written
+  to the story object the turn generates from, *after* the undo snapshot (so
+  Undo of the first turn returns to the style choice) and, for a networked
+  host, before the input is buffered. Never for a guest.
+- **Read-only for guests** by passing no handlers (`netSession.role ===
+  "guest"` in `story.tsx`): the choose state then reads "The host is choosing
+  how to set up." and the checklist has no note links. Party phones do not
+  render `story.tsx` and have no strip.
+- **Character and Campaign open the first sheet and the plan note by title**
+  (`onOpenNote("lore", title)`; the Notes page selects by title). With several
+  sheets only the first opens.
+- **The greeting pointer is in all four variants** (the "Welcome back"
+  pre-made-character one too), one shared `SETUP_STYLE_POINTER`; "surprise
+  me" is kept.
+- **Multi-select:** an answer item with `selectedLabels` is honoured only when
+  the question has `multi_select`; on a single-choice question it is ignored.
+  Labels are filtered to the offered ones, deduped, in option order (executor
+  and host both). Custom text is kept alongside the picks (`allow_custom`
+  permitting), shown last in the GM's line: `→ "A", "C", "and a storm"`.
+  The result's `answer` field is the plain comma-joined text. The phone
+  protocol caps `selectedLabels` at 4 (`PARTY_MAX_PICKS`); the phone's view
+  carries `multiSelect: true` only on a multi-select question. The tool
+  description is unchanged (the budget test still passes); the flag has a
+  six-word schema description. The Google list already carries `ask_question`
+  (slice 1), so nothing to add there.
+- **Unverified (no preview run, as briefed):** the strip, the style buttons,
+  the multi-select modal and the phone's checkbox view render untested; no DOM
+  test setup exists. Screenshots on Ink and Paper White are owed.

@@ -664,23 +664,45 @@ function QuestionCard({
   const set = (index: number, answer: AnswerItem) =>
     setAnswers((prev) => prev.map((a, i) => (i === index ? answer : a)));
   // A question is answered once it has a pick, some text, or is skipped.
-  const complete = answers.every((a) => a.skipped || a.selectedLabel || a.customText?.trim());
+  const complete = answers.every(
+    (a) =>
+      a.skipped || a.selectedLabel || (a.selectedLabels?.length ?? 0) > 0 || a.customText?.trim(),
+  );
+  // A multi-select question ticks and unticks; typing keeps the ticks.
+  const toggle = (index: number, label: string) =>
+    setAnswers((prev) =>
+      prev.map((a, i) => {
+        if (i !== index) return a;
+        const current = a.skipped ? [] : (a.selectedLabels ?? []);
+        const next = current.includes(label)
+          ? current.filter((l) => l !== label)
+          : [...current, label];
+        return { selectedLabels: next, customText: a.customText, skipped: false };
+      }),
+    );
 
   return (
     <section className={`${card} space-y-5 border-ys-warning/40`} aria-label="The GM asks you a question">
       {request.questions.map((q, i) => (
         <div key={i} className="space-y-2">
           <h2 className="text-lg font-semibold">{q.question}</h2>
+          {q.multiSelect && <p className="text-sm text-ys-muted">Pick as many as you like.</p>}
           <div className="flex flex-col gap-2">
             {q.options.map((option) => {
-              const picked = answers[i].selectedLabel === option.label && !answers[i].skipped;
+              const picked = q.multiSelect
+                ? !answers[i].skipped && (answers[i].selectedLabels ?? []).includes(option.label)
+                : answers[i].selectedLabel === option.label && !answers[i].skipped;
               return (
                 <button
                   key={option.label}
                   type="button"
                   aria-pressed={picked}
                   className={`${secondaryButton} text-left ${picked ? "border-ys-accent bg-ys-accent/20" : ""}`}
-                  onClick={() => set(i, { selectedLabel: option.label, skipped: false })}
+                  onClick={() =>
+                    q.multiSelect
+                      ? toggle(i, option.label)
+                      : set(i, { selectedLabel: option.label, skipped: false })
+                  }
                 >
                   <span className="block font-semibold">{option.label}</span>
                   {option.description && (
@@ -695,7 +717,14 @@ function QuestionCard({
               value={answers[i].customText ?? ""}
               placeholder="Or answer in your own words"
               maxLength={PARTY_MAX_LINE_CHARS}
-              onChange={(e) => set(i, { customText: e.target.value, skipped: false })}
+              onChange={(e) =>
+                set(
+                  i,
+                  q.multiSelect
+                    ? { selectedLabels: answers[i].selectedLabels, customText: e.target.value, skipped: false }
+                    : { customText: e.target.value, skipped: false },
+                )
+              }
               className="w-full min-h-12 rounded-xl border border-ys-border bg-ys-surface px-4 text-base text-ys-text"
             />
           )}

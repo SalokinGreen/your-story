@@ -96,6 +96,7 @@ import {
   SETUP_STOPPED,
   settleSetupResolver,
 } from "../misc/setupConfirmAnswer";
+import { SETUP_STYLE_LINES } from "../misc/setupStrip";
 import type {
   ManualRollRequest,
   ManualRollAnswer,
@@ -2263,6 +2264,20 @@ function StoryPageContent() {
     else sendNetFloorRelease();
   }
 
+  // The strip's two buttons: one host-owned step that sets setup.mode and sends
+  // the player line, through the same path typed input takes.
+  function handleChooseSetupStyle(mode: "quick" | "full"): void {
+    if (loading || netSession?.role === "guest") return;
+    void handleCustomInput(
+      SETUP_STYLE_LINES[mode],
+      undefined,
+      undefined,
+      "freeform",
+      false,
+      mode,
+    );
+  }
+
   async function handleCustomInput(
     customText: string,
     playerComment?: string,
@@ -2271,12 +2286,25 @@ function StoryPageContent() {
     // Set by startBatchedTurn so the aggregated turn actually generates instead
     // of being re-buffered by the host collect-all guard below.
     bypassBatch: boolean = false,
+    // Session zero's style choice (the strip's buttons). Typing before a style
+    // is chosen means quick. It is written to the story object this turn
+    // generates from, so the mode and the turn cannot disagree.
+    setupMode?: "quick" | "full",
   ) {
     if (!storyData) return;
+
+    const modeToSet =
+      netSession?.role === "guest"
+        ? undefined
+        : (setupMode ??
+          (storyData.sessionZeroActive && !storyData.setup?.mode
+            ? "quick"
+            : undefined));
 
     // Host in a networked room: don't generate on the host's own submit -
     // buffer it and wait for the rest of the table (see recordSeatInput).
     if (netSession?.role === "host" && !bypassBatch) {
+      if (modeToSet) storyData.setup = { ...storyData.setup, mode: modeToSet };
       recordSeatInput({
         playerId: netSession.myLocalPlayerId,
         name: resolveSeatName(netSession.myLocalPlayerId),
@@ -2317,6 +2345,10 @@ function StoryPageContent() {
     }
 
     logger.action("User custom input", { customText });
+
+    if (modeToSet) {
+      storyData.setup = { ...storyData.setup, mode: modeToSet };
+    }
 
     // Physical dice mode: record who this turn belongs to, so a
     // formula_roll during it can be relayed to a specific connected guest
@@ -5058,6 +5090,7 @@ function StoryPageContent() {
             onNavigateRight={handleNavigateRight}
             onResetToCurrentPart={resetToCurrentPart}
             onOpenNote={handleOpenNote}
+            onChooseSetupStyle={handleChooseSetupStyle}
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
             liveNarrationText={liveNarrationText}
