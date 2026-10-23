@@ -133,27 +133,31 @@ export function TimelineView({
   onMentionClick?: (kind: "lore" | "npc", id: string) => void;
   only?: "text" | "work";
 }) {
+  // Keyed by position, not block.id: ids come from a module counter
+  // (turnTimeline.ts), so a saved timeline rebuilt on a re-render gets new
+  // ones, which would remount the prose and replay its fade-in. A turn's
+  // blocks only ever grow at the end, so position is a stable key.
   return (
     <>
-      {blocks.map((block) =>
+      {blocks.map((block, i) =>
         block.kind === "text" ? (
           only === "work" ? null : (
-            <React.Fragment key={block.id}>
-              {prettify(
-                block.content || "",
-                animate,
-                showHiddenMessages,
-                fontSettings,
-                mentionMatcher,
-                onMentionClick,
-              )}
+            <React.Fragment key={`text-${i}`}>
+              <ProseBlock
+                text={block.content || ""}
+                animate={animate}
+                showHiddenMessages={showHiddenMessages}
+                fontSettings={fontSettings}
+                mentionMatcher={mentionMatcher}
+                onMentionClick={onMentionClick}
+              />
               {block.streaming && (
                 <span className="animate-pulse text-ys-accent">▌</span>
               )}
             </React.Fragment>
           )
         ) : only === "text" ? null : (
-          <TimelineEntryPill key={block.id} block={block} />
+          <TimelineEntryPill key={`${block.kind}-${i}`} block={block} />
         ),
       )}
     </>
@@ -548,15 +552,16 @@ export function GMTurn({
           onMentionClick={onMentionClick}
         />
       )}
-      {showSeparateContent &&
-        prettify(
-          content,
-          animate,
-          showHiddenMessages,
-          fontSettings,
-          mentionMatcher,
-          onMentionClick,
-        )}
+      {showSeparateContent && (
+        <ProseBlock
+          text={content}
+          animate={animate}
+          showHiddenMessages={showHiddenMessages}
+          fontSettings={fontSettings}
+          mentionMatcher={mentionMatcher}
+          onMentionClick={onMentionClick}
+        />
+      )}
       {actionsOpen && actions}
     </div>
   );
@@ -580,6 +585,36 @@ export const parseHiddenText = (text: string, showHidden: boolean): string => {
     return text.replace(/\|\|[\s\S]*?\|\|/g, "");
   }
 };
+
+// prettify builds react-markdown's custom components inline, so every call
+// makes new component types and React remounts the whole passage, replaying
+// its fade-in. Memoized on its (stable) props, a passage re-renders only when
+// its text, the font settings or the mentions actually change, not whenever
+// anything else on the page does (tapping a turn, opening the menu).
+const ProseBlock = React.memo(function ProseBlock({
+  text,
+  animate,
+  showHiddenMessages,
+  fontSettings,
+  mentionMatcher,
+  onMentionClick,
+}: {
+  text: string;
+  animate: boolean;
+  showHiddenMessages: boolean;
+  fontSettings?: FontSettings;
+  mentionMatcher?: MentionMatcher | null;
+  onMentionClick?: (kind: "lore" | "npc", id: string) => void;
+}) {
+  return prettify(
+    text,
+    animate,
+    showHiddenMessages,
+    fontSettings,
+    mentionMatcher,
+    onMentionClick,
+  );
+});
 
 export const prettify = (
   text: string,

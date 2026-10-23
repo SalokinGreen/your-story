@@ -6,6 +6,7 @@ import {
   StoryData,
   CouchPlayer,
   SceneImageRef,
+  ScenePart,
 } from "../misc/structs";
 import React, { useState, useEffect, useRef } from "react";
 import TTSControls, {
@@ -407,6 +408,73 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
   },
 );
 
+type GMPartData = {
+  gmConversation: NonNullable<ScenePart["gmConversation"]>;
+  toolResults: Map<
+    string,
+    {
+      success: boolean;
+      contextForStory: string;
+      toolName: string;
+      hiddenFromPlayer?: boolean;
+    }
+  >;
+  storyReasoning: string | undefined;
+  reasoningTier: ReasoningTierDisplay | undefined;
+};
+
+const EMPTY_GM_DATA: GMPartData = {
+  gmConversation: [],
+  toolResults: new Map(),
+  storyReasoning: undefined,
+  reasoningTier: undefined,
+};
+
+// A GM part's saved conversation, tool results and tier, in the shapes GMTurn
+// rebuilds its timeline from.
+function buildGMDataForPart(part: ScenePart): GMPartData {
+  // Build toolResults map from gmToolCalls (keyed by toolCallId). Rolls
+  // made behind the GM's screen keep their `hiddenFromPlayer` flag here so
+  // buildSavedTimeline can drop them - they're carried in, not filtered
+  // out, precisely so the timeline knows to skip the tool call rather than
+  // falling back to rendering its raw name.
+  const toolResults = new Map<
+    string,
+    {
+      success: boolean;
+      contextForStory: string;
+      toolName: string;
+      hiddenFromPlayer?: boolean;
+    }
+  >();
+  if (part.gmToolCalls) {
+    for (const tc of part.gmToolCalls) {
+      if (tc.toolCallId) {
+        toolResults.set(tc.toolCallId, {
+          success: tc.success,
+          contextForStory: tc.contextForStory || "",
+          toolName: tc.toolName || "",
+          hiddenFromPlayer: tc.hiddenFromPlayer,
+        });
+      }
+    }
+  }
+
+  return {
+    gmConversation: part.gmConversation || EMPTY_GM_DATA.gmConversation,
+    toolResults,
+    storyReasoning: part.reasoning,
+    reasoningTier:
+      part.reasoningTier !== undefined
+        ? ({
+            tier: part.reasoningTier,
+            modelKey: part.reasoningTierModelKey || "",
+            effort: part.reasoningTierEffort || "none",
+          } as ReasoningTierDisplay)
+        : undefined,
+  };
+}
+
 export default function Story({
   storyData,
   storyId,
@@ -598,6 +666,12 @@ export default function Story({
   const couchPlayers =
     (storyData.multiplayer?.enabled && storyData.multiplayer.couchPlayers) ||
     [];
+  // Whether the floating voice bubbles are on screen. They hang over the
+  // bottom of the feed, so the feed gets room to scroll its last lines (and
+  // a just-opened turn-actions row) clear of them. They step aside while a
+  // turn is being edited, where they would sit on the text box.
+  const showVoiceBubbles =
+    !!onCustomInput && !partyTable && editingPart === null;
 
   // Kept at this level (rather than inside StoryComposer) so the "Enter/Space
   // jumps into the composer" keyboard shortcut below can reach it.
@@ -797,57 +871,17 @@ export default function Story({
   const latestExchangeIndex = exchanges.length - 1;
 
   // Helper to get GM conversation and tool results for a scene part
-  const getGMDataForPart = (partIndex: number) => {
-    const part = storyData.scene.parts[partIndex];
-    if (!part)
-      return {
-        gmConversation: [],
-        toolResults: new Map(),
-        storyReasoning: undefined,
-        reasoningTier: undefined as ReasoningTierDisplay | undefined,
-      };
+  // Built once per change to the parts, not per render: GMTurn memoizes its
+  // rebuilt timeline on these objects, and a timeline rebuilt with fresh
+  // block ids remounts the prose, which replays its fade-in on every state
+  // change on the page (tapping a turn, opening the menu).
+  const gmDataByPart = React.useMemo(
+    () => storyData.scene.parts.map((part) => buildGMDataForPart(part)),
+    [storyData.scene.parts],
+  );
+  const getGMDataForPart = (partIndex: number) =>
+    gmDataByPart[partIndex] ?? EMPTY_GM_DATA;
 
-    // Build toolResults map from gmToolCalls (keyed by toolCallId). Rolls
-    // made behind the GM's screen keep their `hiddenFromPlayer` flag here so
-    // buildSavedTimeline can drop them - they're carried in, not filtered
-    // out, precisely so the timeline knows to skip the tool call rather than
-    // falling back to rendering its raw name.
-    const toolResults = new Map<
-      string,
-      {
-        success: boolean;
-        contextForStory: string;
-        toolName: string;
-        hiddenFromPlayer?: boolean;
-      }
-    >();
-    if (part.gmToolCalls) {
-      for (const tc of part.gmToolCalls) {
-        if (tc.toolCallId) {
-          toolResults.set(tc.toolCallId, {
-            success: tc.success,
-            contextForStory: tc.contextForStory || "",
-            toolName: tc.toolName || "",
-            hiddenFromPlayer: tc.hiddenFromPlayer,
-          });
-        }
-      }
-    }
-
-    return {
-      gmConversation: part.gmConversation || [],
-      toolResults,
-      storyReasoning: part.reasoning,
-      reasoningTier:
-        part.reasoningTier !== undefined
-          ? ({
-              tier: part.reasoningTier,
-              modelKey: part.reasoningTierModelKey || "",
-              effort: part.reasoningTierEffort || "none",
-            } as ReasoningTierDisplay)
-          : undefined,
-    };
-  };
 
   // Pictures: a guest holds none (decision 60), and Regenerate is the host's.
   const isImageGuest = netSession?.role === "guest";
@@ -1038,7 +1072,11 @@ export default function Story({
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto min-h-0 text-ys-text"
         >
-          <div className="px-4 py-4 space-y-6 sm:max-w-[68ch] sm:mx-auto">
+          <div
+            className={`px-4 pt-4 space-y-6 sm:max-w-[68ch] sm:mx-auto ${
+              showVoiceBubbles ? "pb-28" : "pb-4"
+            }`}
+          >
             {exchanges.map((exchange, idx) => (
               <div key={`exchange-${idx}`} className="space-y-3">
                 {exchange.userMsg && (
@@ -1264,7 +1302,7 @@ export default function Story({
           input UI now, replacing the old composer mic button. Couch
           co-op/multiplayer get one bubble per player; solo play gets a
           single default bubble instead. */}
-      {onCustomInput && !partyTable && (
+      {showVoiceBubbles && onCustomInput && (
         <PlayerBubbles
           players={couchPlayers.length > 0 ? couchPlayers : SOLO_VOICE_PLAYER}
           onSubmit={(text, speakerIds) =>
