@@ -31,10 +31,11 @@ export function useBackHandler(active: boolean, onBack: () => void): void {
 }
 
 /**
- * A page's own back, run when no surface is open. Null for none (the app is
+ * A page's own back, run when no surface is open. Returning false declines
+ * it, like null. Null for none (the app is
  * then sent to the background). The latest function is always used.
  */
-export function useRouteBack(fn: (() => void) | null): void {
+export function useRouteBack(fn: (() => void | boolean) | null): void {
   const latest = useRef(fn);
   useEffect(() => {
     latest.current = fn;

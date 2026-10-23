@@ -104,6 +104,7 @@ import {
 import { logger } from "../misc/logger";
 import {
   clearTurn,
+  markTurnEnded,
   markTurnStarted,
   readInterruptedTurn,
   repairInterruptedStory,
@@ -596,6 +597,11 @@ function StoryPageContent() {
   } | null>(null);
   const interruptedTurnIdRef = useRef<string | null>(null);
   const liveTurnRef = useRef<{ storyId: string; turnId: string } | null>(null);
+  // A record kept after a finished turn failed its final save; a later
+  // successful save of the same story clears it (performSave).
+  const keptTurnRecordRef = useRef<{ storyId: string; turnId: string } | null>(
+    null,
+  );
   // The one boundary every generating turn crosses. `turn` says how a killed
   // turn is recovered: "new" resends `text`; "retry" (a reroll or reword)
   // runs Retry again. partsBefore is scene.parts.length before the turn
@@ -605,6 +611,9 @@ function StoryPageContent() {
     ...args: Parameters<typeof generateStoryTurn>
   ) {
     turnLiveRef.current = args[0];
+    // A banner never survives a new turn.
+    setInterruptedTurn(null);
+    interruptedTurnIdRef.current = null;
     // Android: keep the process alive while the player is away (decision 132).
     // Ended only after the final save has settled, so "ready" means saved.
     const turnId = newTurnId();
@@ -649,6 +658,10 @@ function StoryPageContent() {
       throw error;
     } finally {
       if (recordStoryId && settled) clearTurn(recordStoryId, turnId);
+      else if (recordStoryId) {
+        markTurnEnded(turnId);
+        keptTurnRecordRef.current = { storyId: recordStoryId, turnId };
+      }
       if (liveTurnRef.current?.turnId === turnId) liveTurnRef.current = null;
       turnLiveRef.current = null;
       turnSaveRef.current = null;
@@ -1215,7 +1228,11 @@ function StoryPageContent() {
   // (decision 133).
   useRouteBack(() => {
     if (currentState !== StoryState.STORY) setCurrentState(StoryState.STORY);
-    else router.push("/library");
+    else if (liveTurnRef.current || turnLiveRef.current) {
+      // A turn is running and the page does not abort it on leaving: decline,
+      // so the app goes to the background instead of away from the turn.
+      return false;
+    } else router.push("/library");
   });
   const oocUnread = useMemo(
     () =>
@@ -1393,6 +1410,9 @@ function StoryPageContent() {
       // was saved without the legacy stat-block arrays.
       ensureStoryDataArrays(loadedStoryData);
 
+      // A banner never survives a different story.
+      setInterruptedTurn(null);
+      interruptedTurnIdRef.current = null;
       // A record still here means the last turn never finished (the OS killed
       // the app mid-turn): cut the story back to before it and offer a retry.
       const interrupted = readInterruptedTurn(storyId!, Date.now());
@@ -1759,6 +1779,11 @@ function StoryPageContent() {
 
       await saveLocalStory(storyDbId, trimmedData);
       console.log("Local story saved successfully");
+      const kept = keptTurnRecordRef.current;
+      if (kept && kept.storyId === storyDbId) {
+        clearTurn(kept.storyId, kept.turnId);
+        keptTurnRecordRef.current = null;
+      }
       return true;
     } catch (error) {
       console.error("Error saving progress:", error);
@@ -3534,6 +3559,8 @@ function StoryPageContent() {
       };
       // This branch never reaches generateTrackedTurn, so it marks the same
       // record itself and clears it once its (immediate) save has resolved.
+      setInterruptedTurn(null);
+      interruptedTurnIdRef.current = null;
       const overrideTurnId = newTurnId();
       const overrideChoiceText = choice.text;
       if (storyDbId) {

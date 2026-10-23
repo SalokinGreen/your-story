@@ -674,7 +674,12 @@ async function postChatRequest(
       // have reached the provider and been billed. The player's Retry goes
       // the native way. An abort is not a host fault.
       if (error instanceof TypeError && signal?.aborted !== true) {
-        markHostDown(hostOf(endpoint));
+        const downHost = hostOf(endpoint);
+        markHostDown(downHost);
+        logger.warn(
+          `Android WebView fetch failed; ${downHost} now uses native HTTP for this session`,
+          { host: downHost, error: error.message },
+        );
       }
       throw error;
     }

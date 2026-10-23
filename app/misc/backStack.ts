@@ -18,7 +18,7 @@ interface BackEntry {
 }
 
 const stack: BackEntry[] = [];
-let routeBack: (() => void) | null = null;
+let routeBack: (() => void | boolean) | null = null;
 
 /** Adds an entry on top, or updates the function of one already there. */
 export function pushBackHandler(token: symbol, fn: () => void): void {
@@ -44,19 +44,19 @@ export function popBackHandler(): boolean {
 }
 
 /** The page's own back (story to Library, and so on); null for none. */
-export function setRouteBack(fn: (() => void) | null): void {
+export function setRouteBack(fn: (() => void | boolean) | null): void {
   routeBack = fn;
 }
 
 /** Clears the route back only if `fn` is still the one set (a page leaving). */
-export function clearRouteBack(fn: () => void): void {
+export function clearRouteBack(fn: () => void | boolean): void {
   if (routeBack === fn) routeBack = null;
 }
 
+/** False when there is none, or it returned false (declined: the app goes to the background). */
 export function runRouteBack(): boolean {
   if (!routeBack) return false;
-  routeBack();
-  return true;
+  return routeBack() !== false;
 }
 
 /** Test seam. */

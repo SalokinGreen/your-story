@@ -15,6 +15,7 @@ vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => false }));
 vi.mock("@tauri-apps/plugin-http", () => ({ fetch: vi.fn() }));
 
 import { generateNonStreaming, generateStream } from "@/app/misc/providerCall";
+import { logger } from "@/app/misc/logger";
 import { getAbortableProviderFetch, resetDownHostsForTests } from "@/app/misc/platformFetch";
 
 const webFetch = vi.fn();
@@ -127,6 +128,15 @@ describe("providerCall on Android, listed host", () => {
     patchedFetch.mockResolvedValue("patched");
     expect(await next("https://openrouter.ai/x")).toBe("patched");
     expect(webFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs a warning when a host is marked down", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    webFetch.mockRejectedValue(new TypeError("Failed to fetch"));
+    await generateNonStreaming(BODY).catch(() => {});
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("openrouter.ai now uses native HTTP");
+    warn.mockRestore();
   });
 
   it("an abort is not a host fault", async () => {

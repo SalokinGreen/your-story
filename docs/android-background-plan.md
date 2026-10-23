@@ -476,3 +476,27 @@ story, not to the list.
 - Not verified: any device (the preview cannot fire a native back). The
   console check from the slice (`popBackHandler()` against an open sheet, a
   dialog in it, and the full-screen picture) was not run here.
+
+### 2026-10-23, after the engine review
+
+- **A live turn is no longer read as interrupted.** `interruptedTurn.ts` keeps
+  a module-level set of turn ids live in this JS process: `markTurnStarted`
+  adds, `clearTurn` and the new `markTurnEnded` (a kept record whose turn is
+  over) remove, and `readInterruptedTurn` returns null without deleting the
+  record while the id is in the set. `resetLiveTurnIdsForTests()` simulates a
+  process restart. Because the story page does not abort a turn on unmount, a
+  reopen or sync reload no longer cuts parts or offers a second Retry.
+- **The story's back minimises during a live turn.** The route back may now
+  return `false` (`backStack.ts` `runRouteBack`, `useRouteBack`), which makes
+  `NativeBackButton` fall through to `App.minimizeApp()`. The story page
+  declines while `liveTurnRef` or `turnLiveRef` is set; sub-page to story
+  still works mid-turn.
+- **Stale banner.** `setInterruptedTurn(null)` and `interruptedTurnIdRef = null`
+  at the start of `generateTrackedTurn`, of the intro_override turn, and of the
+  story load before `readInterruptedTurn`.
+- **Killed full reroll.** For mode "retry", `repairInterruptedStory` also
+  drops a trailing assistant part whose content is empty after the cut.
+- **Kept record after a failed final save.** The wrapper remembers it in
+  `keptTurnRecordRef`; a later successful `performSave` of the same story
+  clears it.
+- **`markHostDown` logs** a `logger.warn` naming the host.

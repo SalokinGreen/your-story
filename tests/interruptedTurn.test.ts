@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INTERRUPTED_TURN_MAX_AGE_MS,
   clearTurn,
+  markTurnEnded,
   markTurnStarted,
   readInterruptedTurn,
   repairInterruptedStory,
+  resetLiveTurnIdsForTests,
   type InterruptedTurn,
 } from "@/app/misc/interruptedTurn";
 import type { StoryData } from "@/app/misc/structs";
@@ -40,22 +42,42 @@ describe("interruptedTurn", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("marks and reads a record under a per-story key", () => {
+  // Marks a record, then forgets the live ids as a process restart would.
+  const markAndRestart = (r: InterruptedTurn) => {
+    markTurnStarted(r);
+    resetLiveTurnIdsForTests();
+  };
+
+  it("returns null and keeps the record while its turn is live in this process", () => {
     markTurnStarted(rec());
+    expect(readInterruptedTurn("s1", 2_000)).toBeNull();
+    expect(store._data.has("ys:interruptedTurn:s1")).toBe(true);
+    resetLiveTurnIdsForTests();
+    expect(readInterruptedTurn("s1", 2_000)).toEqual(rec());
+  });
+
+  it("a kept record is offered once its turn has ended in this process", () => {
+    markTurnStarted(rec());
+    markTurnEnded("t1");
+    expect(readInterruptedTurn("s1", 2_000)).toEqual(rec());
+  });
+
+  it("marks and reads a record under a per-story key", () => {
+    markAndRestart(rec());
     expect(store._data.has("ys:interruptedTurn:s1")).toBe(true);
     expect(readInterruptedTurn("s1", 2_000)).toEqual(rec());
   });
 
   it("keeps stories apart", () => {
-    markTurnStarted(rec());
-    markTurnStarted(rec({ storyId: "s2", turnId: "t9", text: "other" }));
+    markAndRestart(rec());
+    markAndRestart(rec({ storyId: "s2", turnId: "t9", text: "other" }));
     expect(readInterruptedTurn("s1", 2_000)?.text).toBe("I open the door");
     expect(readInterruptedTurn("s2", 2_000)?.text).toBe("other");
     expect(readInterruptedTurn("s3", 2_000)).toBeNull();
   });
 
   it("clears only the record of the same turn id", () => {
-    markTurnStarted(rec());
+    markAndRestart(rec());
     clearTurn("s1", "other-turn");
     expect(readInterruptedTurn("s1", 2_000)).not.toBeNull();
     clearTurn("s1", "t1");
@@ -63,21 +85,21 @@ describe("interruptedTurn", () => {
   });
 
   it("a late clear of an older turn leaves a newer turn's record", () => {
-    markTurnStarted(rec({ turnId: "old" }));
-    markTurnStarted(rec({ turnId: "new" }));
+    markAndRestart(rec({ turnId: "old" }));
+    markAndRestart(rec({ turnId: "new" }));
     clearTurn("s1", "old");
     expect(readInterruptedTurn("s1", 2_000)?.turnId).toBe("new");
   });
 
   it("drops and returns null past 24 hours", () => {
-    markTurnStarted(rec());
+    markAndRestart(rec());
     const now = 1_000 + INTERRUPTED_TURN_MAX_AGE_MS + 1;
     expect(readInterruptedTurn("s1", now)).toBeNull();
     expect(store._data.has("ys:interruptedTurn:s1")).toBe(false);
   });
 
   it("still offers a record just inside 24 hours", () => {
-    markTurnStarted(rec());
+    markAndRestart(rec());
     expect(
       readInterruptedTurn("s1", 1_000 + INTERRUPTED_TURN_MAX_AGE_MS),
     ).not.toBeNull();
@@ -100,14 +122,14 @@ describe("interruptedTurn", () => {
       setItem: boom,
       removeItem: boom,
     });
-    expect(() => markTurnStarted(rec())).not.toThrow();
+    expect(() => markAndRestart(rec())).not.toThrow();
     expect(() => clearTurn("s1", "t1")).not.toThrow();
     expect(readInterruptedTurn("s1", 2_000)).toBeNull();
   });
 
   it("is a no-op without localStorage", () => {
     vi.stubGlobal("localStorage", undefined);
-    expect(() => markTurnStarted(rec())).not.toThrow();
+    expect(() => markAndRestart(rec())).not.toThrow();
     expect(readInterruptedTurn("s1", 2_000)).toBeNull();
   });
 });
@@ -144,5 +166,25 @@ describe("repairInterruptedStory", () => {
     const story = storyWith(1);
     repairInterruptedStory(story, rec({ partsBefore: 5 }));
     expect(story.scene.parts).toHaveLength(1);
+  });
+
+  it("retry: drops an empty trailing assistant part (a killed full reroll)", () => {
+    const story = storyWith(2);
+    story.scene.parts.push(part("  ", false));
+    repairInterruptedStory(story, rec({ mode: "retry", partsBefore: 3 }));
+    expect(story.scene.parts.map((p) => p.content)).toEqual(["p0", "p1"]);
+  });
+
+  it("retry: keeps a non-empty trailing assistant part", () => {
+    const story = storyWith(2);
+    repairInterruptedStory(story, rec({ mode: "retry", partsBefore: 2 }));
+    expect(story.scene.parts.map((p) => p.content)).toEqual(["p0", "p1"]);
+  });
+
+  it("new: leaves an empty trailing assistant part alone", () => {
+    const story = storyWith(2);
+    story.scene.parts.push(part("", false));
+    repairInterruptedStory(story, rec({ mode: "new", partsBefore: 3 }));
+    expect(story.scene.parts).toHaveLength(3);
   });
 });

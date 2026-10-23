@@ -24,6 +24,16 @@ export interface InterruptedTurn {
 /** A record older than this is stale: dropped on read instead of offered. */
 export const INTERRUPTED_TURN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+// Turn ids running in THIS JS process. The story page never aborts a turn on
+// unmount, so a turn can still be live while its record is on disk; a reload
+// of the same story in this process must not read that record as interrupted.
+const liveTurnIds = new Set<string>();
+
+/** Test-only: forgets the live ids, as a process restart would. */
+export function resetLiveTurnIdsForTests(): void {
+  liveTurnIds.clear();
+}
+
 const keyFor = (storyId: string) => `ys:interruptedTurn:${storyId}`;
 
 function storage(): Storage | null {
@@ -35,6 +45,7 @@ function storage(): Storage | null {
 }
 
 export function markTurnStarted(rec: InterruptedTurn): void {
+  liveTurnIds.add(rec.turnId);
   try {
     storage()?.setItem(keyFor(rec.storyId), JSON.stringify(rec));
   } catch {
@@ -42,8 +53,14 @@ export function markTurnStarted(rec: InterruptedTurn): void {
   }
 }
 
+/** The turn is over in this process but its record is kept (its final save failed). */
+export function markTurnEnded(turnId: string): void {
+  liveTurnIds.delete(turnId);
+}
+
 /** Clears the record only if it belongs to `turnId`. */
 export function clearTurn(storyId: string, turnId: string): void {
+  liveTurnIds.delete(turnId);
   try {
     const store = storage();
     if (!store) return;
@@ -80,6 +97,8 @@ export function readInterruptedTurn(
       store.removeItem(keyFor(storyId));
       return null;
     }
+    // Live in this process: the turn is still running, not interrupted. Keep the record.
+    if (liveTurnIds.has(rec.turnId)) return null;
     return rec as InterruptedTurn;
   } catch {
     return null;
@@ -93,6 +112,17 @@ export function repairInterruptedStory(
 ): StoryData {
   if (story.scene.parts.length > rec.partsBefore) {
     story.scene.parts.length = Math.max(0, rec.partsBefore);
+  }
+  // A killed full reroll leaves the part it was rewriting emptied.
+  if (rec.mode === "retry") {
+    const last = story.scene.parts[story.scene.parts.length - 1];
+    if (
+      last &&
+      last.role === "assistant" &&
+      (last.content ?? "").trim() === ""
+    ) {
+      story.scene.parts.pop();
+    }
   }
   return story;
 }
