@@ -179,6 +179,22 @@ design's open questions.
 | 107 | Build the token-savings plan | **Approved** (2026-10-22, to the coordinating session: "Approved. Also pull from origin and do the token saving + default system plans."). `token-savings-implementation-plan.md` is built in three PRs, T1 (slices 1-4) first; each merge still waits for the author (decision 5). |
 | 110 | How the cap shortens always-loaded notes ("When always-loaded notes go over the 10k budget, the cap keeps the start of each note (decision 96). But the campaign plan grows at the end, so its current beat is the part that gets cut. How should the cap shorten notes?") | **Keep the current beat.** Every note keeps its start; the campaign plan also keeps its last `## Current beat` section whole, after the kept front and the pointer. Revises how decision 96 shortens the plan. |
 
+### Interview — the model picker (2026-10-23)
+
+After the story screen merged (#227), the author asked: "simplify the model
+picker. 5 models are unnecessary. We should have 3 models: narration, default,
+and advanced. Or just 2. Default and advanced." Today Settings shows four GM
+tier slots (0–3) and the narration voice. The design is
+[`model-picker-design.md`](model-picker-design.md).
+
+| # | question | decision |
+|---|---|---|
+| 118 | "How many model slots should Settings show?" | **"Default + Advanced (Recommended)."** Two slots; narration uses the Default model. |
+| 119 | "When should the Advanced model be used?" | **"Automatically, as now (Recommended)."** The per-turn classifier and the GM's own escalation still decide: today's tiers 0–2 become Default, tier 3 becomes Advanced, and the per-scene cap on Advanced calls stays. |
+| 120 | "What happens to the reasoning-effort pickers?" | **"One effort per slot (Recommended)."** |
+| 121 | "The side agents … each have their own model picker today. What happens to them?" | **"Fold under an 'Advanced settings' section (Recommended)."** They keep working as now; their pickers move into a collapsed section. |
+| 122 | "Which models should the two slots start on for a player who never changes them?" | **"Default GLM 5.3, Advanced Sonnet (Recommended)."** Everyday turns move up from Haiku to GLM 5.3; combat, rules and the prose stay on GLM 5.3; boss fights stay on Sonnet. |
+
 ### Interview — the story screen (2026-10-22)
 
 The author showed two phone screenshots of OOC, another AI story app, and said
