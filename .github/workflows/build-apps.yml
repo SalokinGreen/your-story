@@ -106,13 +106,32 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # The action's default package list still names 'tools', which the
+      # SDK manager no longer has, so the step fails before any build.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: npm ci
       - run: NEXT_PUBLIC_STANDALONE=true npm run build
       - run: npx cap sync android
+      # Sign every debug APK with the same key, so a new build installs over
+      # the last one. Without it each runner makes a fresh debug key and the
+      # phone refuses the update ("App not installed"). The keystore is a
+      # repository secret, never a file in this public repo. It is handed to
+      # Gradle through the android.injected.signing.* properties (what Android
+      # Studio uses), because the default ~/.android/debug.keystore was not the
+      # one Gradle signed with on the runner. On a fork without the secret the
+      # runner's own debug key is used.
+      - name: Install the shared debug signing key
+        env:
+          ANDROID_DEBUG_KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+        if: env.ANDROID_DEBUG_KEYSTORE != ''
+        run: |
+          echo "$ANDROID_DEBUG_KEYSTORE" | base64 -d > "$RUNNER_TEMP/debug.keystore"
+          echo "SIGNING_ARGS=-Pandroid.injected.signing.store.file=$RUNNER_TEMP/debug.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=androiddebugkey -Pandroid.injected.signing.key.password=android" >> "$GITHUB_ENV"
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug $SIGNING_ARGS
       - uses: actions/upload-artifact@v4
         with:
           name: android-debug-apk
@@ -139,8 +158,10 @@ jobs:
       - run: npx cap sync ios
       - name: Build unsigned simulator build
         working-directory: ios/App
+        # Capacitor 8 uses Swift Package Manager: no CocoaPods workspace,
+        # only App.xcodeproj.
         run: |
-          xcodebuild -workspace App.xcworkspace -scheme App \
+          xcodebuild -project App.xcodeproj -scheme App \
             -configuration Release -sdk iphonesimulator \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
       - uses: actions/upload-artifact@v4
