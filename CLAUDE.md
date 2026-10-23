@@ -529,16 +529,33 @@ cost, and logs failures to the Debug Logs instead of swallowing them.
 `*Fetch.ts` wrappers.
 
 **Model selection is automatic but overridable.** `reasoningTiers.ts` picks
-`(model, reasoning_effort)` per turn. Every tier slot
-(`reasoningTierOverrides`), the narration model (`narrationModelOverride`)
-and each side agent (`layerSettings.ts`) can be overridden in Settings, and
-the GM can raise its own tier with `set_reasoning_tier`, capped by
-`MAX_TIER3_CALLS_PER_SCENE`. The default ladder (`REASONING_TIERS`, decision
-50) is Claude Haiku 5.5 for tiers 0 and 1 (effort `none`, which Claude gets as
-`low`), GLM 5.3 for tier 2 (combat and rules, `high`) and Claude Sonnet 5.5
-for tier 3 (boss fights and campaign-shaping calls, `xhigh`), with narration
-on GLM 5.3; all of them are OpenRouter models, so one OpenRouter key runs the
-lot (a Z.ai-only player picks "GLM 5.3 (Z.ai)" in Settings). An unpinned
+`(model, reasoning_effort)` per turn from a four-tier ladder; the GM can raise
+its own tier with `set_reasoning_tier`, capped by `MAX_TIER3_CALLS_PER_SCENE`
+(which counts requests for the top tier, not every top-tier call: session
+zero, a single-enemy fight and deadly stakes put a turn there directly).
+**Settings shows two slots over those four tiers** (decisions 118–124,
+`docs/model-picker-design.md`): **Default** fills tiers 0–2 and **Advanced**
+tier 3, each a model and an effort, written by `setSlotOverride` into the same
+synced four-entry `reasoningTierOverrides` array (it keeps every other entry
+byte for byte, so a newer build's model survives), and read from tier 1 and
+tier 3 (`getSlotOverride`, `getEffectiveSlot`); an array an older build wrote
+with differing tiers 0–2 shows as "Mixed" (`getDefaultSlotMix`). The default
+ladder (`REASONING_TIERS`, decision 122) is GLM 5.3 for tiers 0 and 1 (effort
+`none`, which GLM gets as `low`), GLM 5.3 for tier 2 (combat and rules,
+`high`) and Claude Sonnet 5.5 for tier 3 (session zero, boss fights,
+campaign-shaping calls, `xhigh`); tier 2 never runs below `high` whatever the
+Default effort (`atLeastEffort` in `getEffectiveTiers`, decision 123). All are
+OpenRouter models, so one OpenRouter key runs the lot (a Z.ai-only player
+picks "GLM 5.3 (Z.ai)" in both slots). **Narration follows Default**:
+`getEffectiveNarrationModelKey`/`Effort` return the Default slot, and the old
+`narrationModelOverride`/`narrationEffortOverride` keys are still stored and
+synced for older builds but no longer read on the play path. The ambiguity
+classifier runs on the side-agent model (Haiku, `none`), or on Default for a
+player with no key for it. The Observer's `tier_escalation_missed` retry asks
+for the nearest tier that is a different call (`nextDistinctTier`), and keeps
+the turn instead of rerolling it when none is (`observerRetryTier`); the step
+down after a GM error looks for a different model. The side agents' pickers
+live under Settings → AI → Advanced settings (`SideAgentPickers`). An unpinned
 side agent (the Observer and its judges, Memory Keeper, Director Assistant,
 Story Progress Observer, compaction and reflection) runs on
 `SIDE_AGENT_DEFAULT_MODEL_KEY` in `layerSettings.ts`, Claude Haiku 5.5,
@@ -549,20 +566,22 @@ they have its key (`resolveSideCallModel(override, keys)`, which every side
 call in `generation.ts` passes the six provider keys); it takes no fallback
 model, so a side agent can never inherit the GM model, or a subscription one. The
 Observer's rewrite is the exception, because it writes the prose the player
-reads: an unpinned Observer rewrites on the narration voice
-(`resolveObserverRewriteModel`, decision 52) while its judges stay on Haiku.
+reads: an unpinned Observer rewrites on the narration voice, which is now the
+Default slot (`resolveObserverRewriteModel`, decision 52), while its judges
+stay on Haiku.
 The choices call, including the one re-run after an Observer rewrite, stays
 on the narration model. **Every call carries an explicit effort** (decision
 53), chosen alongside its model and `none` by default, the cheapest effort
 each model allows (Claude, GLM 5.3 and the OpenRouter models flagged
 `reasoningMandatory`, which reject an explicit `none`, are sent `low`;
-`reasoningCannotBeTurnedOff` in `providerCall.ts`): a tier's and a side-agent pin's had a picker
-already, and the narration voice (`narrationEffortOverride`,
-`getEffectiveNarrationEffort()`, which falls back to `none` when the voice
-does) and the Game Designer (`designerReasoningEffort`) now have one. An
-unpinned side agent runs at `SIDE_AGENT_DEFAULT_EFFORT`, the tier classifier
-at tier 0's effort, and the Observer's unpinned rewrite and the choices at the
-narration effort; `callSideModel` sends `none` for a request that names
+`reasoningCannotBeTurnedOff` in `providerCall.ts`): each model slot
+(Default, Advanced) and each side-agent pin has an effort picker, and so does
+the Game Designer (`designerReasoningEffort`); the narration effort is the
+Default slot's (`getEffectiveNarrationEffort()`, which falls back to `none`
+when the slot's model can't run here). An unpinned side agent and the tier
+classifier run at `SIDE_AGENT_DEFAULT_EFFORT` (the classifier at Default's
+effort when it falls back to Default), and the Observer's unpinned rewrite and
+the choices at the narration effort; `callSideModel` sends `none` for a request that names
 none, so `applyReasoningEffort`'s Claude-without-effort rule is only a
 backstop, and `tests/everyCallCarriesEffort.test.ts` fails when a new inline
 call omits `reasoningEffort`. A model handed to a call must be an

@@ -1,6 +1,6 @@
 # The model picker, simplified — design
 
-2026-10-23. Status: **approved (decision 124), being built on `claude/model-picker`.** Decisions 118–123.
+2026-10-23. Status: **approved (decision 124) and built on `claude/model-picker`.** Decisions 118–124.
 The implementation plan is a separate document, written after this one is
 approved.
 

@@ -1,6 +1,6 @@
 # The model picker, simplified — implementation plan
 
-2026-10-23. Status: **approved (decision 124), being built on
+2026-10-23. Status: **approved (decision 124), built on
 `claude/model-picker`.** It builds [`model-picker-design.md`](model-picker-design.md)
 (decisions 118–123) and adds no product decisions of its own. The calls it
 had to make are in §8, and the review is in §9.
@@ -382,3 +382,19 @@ folded into the slice it belongs to:
   card whose layer is `aiDriven` (Director, Memory, Adjudication).
 - **Checked, no change:** `story/page.tsx` (~1015) prints `fallback.slot`
   only; `ContextViewer` keeps its tiers.
+
+### Planning session, after slice 1 (2026-10-23)
+
+- **The error step-down compares models, not calls.** `nextDistinctTier` takes
+  `by: "call" | "model"`. On the new ladder tiers 0–2 are all GLM 5.3, so a GLM
+  failure at tier 2 would otherwise have stepped down to GLM at a lower effort
+  and failed again. The Observer's retry still compares calls, since thinking
+  harder on the same model is a real change there.
+- **The Observer keeps the turn when no heavier call exists** (engine-review
+  finding 1). `observerRetryTier` returns null when nothing above the tier used
+  is a different call, or when the scene cap clamps the request back to the
+  same call; `generation.ts` then logs it and surfaces the flag instead of
+  rolling the turn back for a reroll. Its other findings: a Mistral model in
+  Default receiving `reasoning_effort: "high"` on combat turns went to
+  `pending_tests.md` (unverifiable here); the step-down's whole-turn wiring has
+  unit coverage of `nextDistinctTier(…, "model")` only.
