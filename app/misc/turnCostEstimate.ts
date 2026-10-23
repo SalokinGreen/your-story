@@ -196,7 +196,7 @@ export interface EstimateTurnCostParams {
   /**
    * The player's provider keys. Only the classifier line uses them, to price
    * what generation.ts will run: the side-agent model, or Default when the
-   * player has no key for it (decision 124). Omitted, the side model is assumed.
+   * player has no key for it (design §3). Omitted, the side model is assumed.
    */
   providerKeys?: ProviderKeys;
 }

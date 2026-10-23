@@ -2191,7 +2191,7 @@ async function generateStoryTurnOnce(
             // and paying for that on one word is waste. A player with no key
             // for that model (a desktop player running both slots on the
             // Claude subscription, say) keeps what this call always did and
-            // runs it on Default (decision 124).
+            // runs it on Default (design §3).
             const classifierKeys = pickProviderKeys(options);
             const sideChoice = resolveSideCallModel(null, classifierKeys);
             const classifierTier = hasKeyForModel(
@@ -2561,12 +2561,14 @@ async function generateStoryTurnOnce(
           // Model unavailable - fall back to the next-lower tier instead of crashing.
           if (!gmResponse.ok) {
             const failedTier = roundTier.tier;
-            // The nearest lower tier that is a different call; one that is
-            // the same model and effort would just repeat the failure.
+            // The nearest lower tier on a different model: the same model at
+            // a lower effort (tier 2 to tier 1 on the shipped ladder) would
+            // only fail the same way.
             const lower = nextDistinctTier(
               failedTier,
               "down",
               getEffectiveTiers(),
+              "model",
             );
             if (lower !== null) {
               const fallbackResolved = resolveTier(lower);

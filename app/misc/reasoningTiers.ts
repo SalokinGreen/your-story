@@ -407,10 +407,13 @@ export function setSlotOverride(
 }
 
 /**
- * The nearest tier above or below `from` whose (model, effort) differs from
- * `from`'s in the given effective ladder; null when none does. With Default
- * filling tiers 0 and 1 with one call, "one tier up" can be the same call, and
- * a retry or a step down onto it would be a reroll, not a change (design §3).
+ * The nearest tier above or below `from` that is a different call in the given
+ * effective ladder; null when none is. With Default filling tiers 0 and 1 with
+ * one call, "one tier up" can be the same call, and a retry onto it would be a
+ * reroll, not a change (design §3). `by` says what has to differ: "call"
+ * (model or effort; the Observer's retry, where thinking harder on the same
+ * model is a real change) or "model" (the step down after a provider error,
+ * where the same model at a lower effort would only fail again).
  */
 export function nextDistinctTier(
   from: number,
@@ -419,6 +422,7 @@ export function nextDistinctTier(
     modelKey: AnyModelKey;
     reasoningEffort: ReasoningEffort;
   }[],
+  by: "call" | "model" = "call",
 ): number | null {
   const here = tiers[from];
   if (!here) return null;
@@ -426,7 +430,7 @@ export function nextDistinctTier(
   for (let t = from + step; t >= 0 && t < tiers.length; t += step) {
     if (
       tiers[t].modelKey !== here.modelKey ||
-      tiers[t].reasoningEffort !== here.reasoningEffort
+      (by === "call" && tiers[t].reasoningEffort !== here.reasoningEffort)
     ) {
       return t;
     }

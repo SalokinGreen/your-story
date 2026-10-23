@@ -270,6 +270,19 @@ describe("nextDistinctTier", () => {
     expect(nextDistinctTier(1, "up", getEffectiveTiers())).toBeNull();
   });
 
+  it('by "model" (the error step-down) skips tiers on the same model, whatever their effort', () => {
+    const tiers = getEffectiveTiers();
+    // Shipped: tiers 0–2 are all GLM 5.3, so GLM failing at tier 2 has nowhere
+    // lower to go; it must not retry GLM at a lower effort.
+    expect(nextDistinctTier(2, "down", tiers, "model")).toBeNull();
+    expect(nextDistinctTier(3, "down", tiers, "model")).toBe(2);
+    localStorage.setItem(
+      KEY,
+      JSON.stringify([{ modelKey: "Claude Haiku 5.5", reasoningEffort: "none" }, null, null, null]),
+    );
+    expect(nextDistinctTier(2, "down", getEffectiveTiers(), "model")).toBe(0);
+  });
+
   it("returns null for a tier that does not exist", () => {
     expect(nextDistinctTier(9, "up", getEffectiveTiers())).toBeNull();
   });
