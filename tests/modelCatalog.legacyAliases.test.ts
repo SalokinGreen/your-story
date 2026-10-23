@@ -268,14 +268,20 @@ describe("a saved choice of a retired Mistral model keeps working", () => {
     expect(stored[1].modelKey).toBe("Claude Haiku 5.5");
   });
 
-  it.each(RETIRED)("as the narration voice: $key becomes $successor", ({ key, successor }) => {
+  it.each(RETIRED)("as the saved narration voice: $key becomes $successor (still read, no longer played)", ({ key, successor }) => {
     localStorage.setItem("narrationModelOverride", key);
     expect(getNarrationModelOverride()).toBe(successor);
+  });
+
+  it.each(RETIRED)("as Default, which the narration follows: $key becomes $successor", ({ key, successor }) => {
+    const o = { modelKey: key, reasoningEffort: "none" };
+    localStorage.setItem("reasoningTierOverrides", JSON.stringify([o, o, o, null]));
     expect(getEffectiveNarrationModelKey()).toBe(successor);
   });
 
-  it("as the narration voice, a Mistral-key-only player's unpinned side agent follows it to the successor", () => {
-    localStorage.setItem("narrationModelOverride", "Mistral Small 3.2");
+  it("as Default, a Mistral-key-only player's unpinned side agent follows the narration to the successor", () => {
+    const o = { modelKey: "Mistral Small 3.2", reasoningEffort: "none" };
+    localStorage.setItem("reasoningTierOverrides", JSON.stringify([o, o, o, null]));
     // No OpenRouter key: the side-agent default is out of reach, so the agent
     // takes the narration voice, which must be a model the Mistral key can call.
     const call = resolveSideCallModel(null, MISTRAL_ONLY);

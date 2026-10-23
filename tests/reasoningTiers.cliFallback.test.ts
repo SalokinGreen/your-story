@@ -1,9 +1,10 @@
 /**
  * Where a Claude subscription model may run (docs/claude-gm-design.md §4.5,
- * decisions 12 and 16). Tier and narration choices sync between devices, so
+ * decisions 12 and 16). Default and Advanced choices sync between devices, so
  * a desktop choice of "Claude Sonnet (subscription)" reaches a phone, which
  * cannot run the `claude` CLI: there each slot uses its default and Settings
- * lists why. The side agents never land on the subscription by inheritance,
+ * lists why (as "Default" or "Advanced", or "Default, tier 2" when an older
+ * build left Default's tiers apart). The side agents never land on the subscription by inheritance,
  * only when a layer is pointed there. The pickers offer the models only on a
  * desktop with the CLI signed in, and a request that still gets through off
  * the desktop is refused with a clear message.
@@ -19,6 +20,7 @@ import {
   getEffectiveTiers,
   getEffectiveNarrationModelKey,
   getSubscriptionFallbacks,
+  setSlotOverride,
 } from "@/app/misc/reasoningTiers";
 import {
   SIDE_AGENT_DEFAULT_MODEL_KEY,
@@ -54,12 +56,6 @@ beforeEach(() => {
   fakeCli.reset();
   resetClaudeCliStatusCache();
   const storage = new MemoryStorage();
-  // As synced from the desktop: tier 2 and the narration voice on the subscription.
-  storage.setItem(
-    "reasoningTierOverrides",
-    JSON.stringify([null, null, { modelKey: SONNET, reasoningEffort: "high" }, null]),
-  );
-  storage.setItem("narrationModelOverride", SONNET);
   vi.stubGlobal("localStorage", storage);
   vi.stubGlobal("window", {
     localStorage: storage,
@@ -67,6 +63,9 @@ beforeEach(() => {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   });
+  // As synced from the desktop: Default on the subscription (saved the way
+  // Settings saves it, into tiers 0, 1 and 2), which narration follows.
+  setSlotOverride("default", { modelKey: SONNET, reasoningEffort: "high" });
 });
 
 afterEach(() => {
@@ -80,16 +79,66 @@ describe("on a phone or the web build", () => {
 
   it("uses each slot's default for a synced subscription model", () => {
     const tiers = getEffectiveTiers();
-    expect(tiers[2].modelKey).toBe(REASONING_TIERS[2].modelKey);
-    expect(tiers[2].reasoningEffort).toBe(REASONING_TIERS[2].reasoningEffort);
+    for (const i of [0, 1, 2]) {
+      expect(tiers[i].modelKey).toBe(REASONING_TIERS[i].modelKey);
+      expect(tiers[i].reasoningEffort).toBe(REASONING_TIERS[i].reasoningEffort);
+    }
     expect(getEffectiveNarrationModelKey()).toBe(NARRATION_MODEL_KEY);
   });
 
-  it("tells Settings which slots fell back, and to what", () => {
+  it("tells Settings which slot fell back, and to what", () => {
     expect(getSubscriptionFallbacks()).toEqual([
-      { slot: "Tier 2", reason: "device", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[2].modelKey },
-      { slot: "Narration", reason: "device", modelKey: SONNET, fallbackModelKey: NARRATION_MODEL_KEY },
+      { slot: "Default", reason: "device", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[1].modelKey },
     ]);
+  });
+
+  it("names Advanced when its subscription model falls back", () => {
+    setSlotOverride("advanced", { modelKey: SONNET, reasoningEffort: "xhigh" });
+    expect(getSubscriptionFallbacks()).toEqual([
+      { slot: "Default", reason: "device", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[1].modelKey },
+      { slot: "Advanced", reason: "device", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[3].modelKey },
+    ]);
+    expect(getEffectiveTiers()[3].modelKey).toBe(REASONING_TIERS[3].modelKey);
+  });
+
+  it("names the tiers of a Mixed Default that an older build left apart", () => {
+    // Only tier 2 on the subscription: Default (tier 1) is fine, so the notice
+    // names the tier.
+    localStorage.setItem(
+      "reasoningTierOverrides",
+      JSON.stringify([null, null, { modelKey: SONNET, reasoningEffort: "high" }, null]),
+    );
+    expect(getSubscriptionFallbacks()).toEqual([
+      { slot: "Default, tier 2", reason: "device", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[2].modelKey },
+    ]);
+    localStorage.setItem(
+      "reasoningTierOverrides",
+      JSON.stringify([{ modelKey: SONNET, reasoningEffort: "low" }, null, { modelKey: SONNET, reasoningEffort: "high" }, null]),
+    );
+    expect(getSubscriptionFallbacks()).toEqual([
+      { slot: "Default, tiers 0 and 2", reason: "device", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[0].modelKey },
+    ]);
+  });
+
+  it("keeps Default's own name when a blocked tier 2 names a different model than tier 1", () => {
+    localStorage.setItem(
+      "reasoningTierOverrides",
+      JSON.stringify([
+        null,
+        { modelKey: SONNET, reasoningEffort: "low" },
+        { modelKey: "Claude Opus (subscription)", reasoningEffort: "high" },
+        null,
+      ]),
+    );
+    expect(getSubscriptionFallbacks()).toEqual([
+      { slot: "Default", reason: "device", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[1].modelKey },
+      { slot: "Default, tier 2", reason: "device", modelKey: "Claude Opus (subscription)", fallbackModelKey: REASONING_TIERS[2].modelKey },
+    ]);
+  });
+
+  it("no longer lists the saved narration voice: it is not used", () => {
+    localStorage.setItem("narrationModelOverride", SONNET);
+    expect(getSubscriptionFallbacks().map((f) => f.slot)).not.toContain("Narration");
   });
 
   it("lists a side agent's synced subscription override for the Settings notice", () => {
@@ -134,7 +183,9 @@ describe("in the desktop app", () => {
   });
 
   it("keeps the subscription choices, with no fallback notice", () => {
-    expect(getEffectiveTiers()[2]).toMatchObject({ modelKey: SONNET, reasoningEffort: "high" });
+    for (const i of [0, 1, 2]) {
+      expect(getEffectiveTiers()[i]).toMatchObject({ modelKey: SONNET, reasoningEffort: "high" });
+    }
     expect(getEffectiveNarrationModelKey()).toBe(SONNET);
     expect(getSubscriptionFallbacks()).toEqual([]);
   });
@@ -154,8 +205,8 @@ describe("in the desktop app", () => {
   });
 
   it("runs a side agent on the subscription only when its layer is pointed there", () => {
-    // Not pointed there (the narration voice and tier 2 are subscription
-    // models here, as synced from the desktop): the side-agent default,
+    // Not pointed there (Default, and so the narration, is a subscription
+    // model here, as synced from the desktop): the side-agent default,
     // never a subscription model and never the narration voice, decision 12.
     expect(getEffectiveNarrationModelKey()).toBe(SONNET);
     expect(resolveSideCallModel(null)).toEqual({
@@ -189,10 +240,9 @@ describe("during an online session (decision 29)", () => {
     expect(getEffectiveNarrationModelKey()).toBe(NARRATION_MODEL_KEY);
   });
 
-  it("tells Settings and the game which slots fell back, and why", () => {
+  it("tells Settings and the game which slot fell back, and why", () => {
     expect(getSubscriptionFallbacks()).toEqual([
-      { slot: "Tier 2", reason: "online", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[2].modelKey },
-      { slot: "Narration", reason: "online", modelKey: SONNET, fallbackModelKey: NARRATION_MODEL_KEY },
+      { slot: "Default", reason: "online", modelKey: SONNET, fallbackModelKey: REASONING_TIERS[1].modelKey },
     ]);
     expect(getLayerSubscriptionFallbacks()).toEqual([
       { slot: "Memory Keeper", modelKey: SONNET, reason: "online" },
@@ -217,7 +267,7 @@ describe("during an online session (decision 29)", () => {
   });
 
   it("does not touch a model that never needed the CLI", () => {
-    expect(getEffectiveTiers()[0].modelKey).toBe(REASONING_TIERS[0].modelKey);
+    // Advanced was left unset, so it was never on the subscription.
     expect(getEffectiveTiers()[3].modelKey).toBe(REASONING_TIERS[3].modelKey);
   });
 });

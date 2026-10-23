@@ -314,3 +314,36 @@ folded into the slice it belongs to:
 - the effort exception (the author chose combat's floor, decision 123);
 - the subscription panel's instructions;
 - the check-in interval.
+
+## Decisions made during implementation
+
+### 2026-10-23, slice 1
+
+- **The estimator got a `providerKeys` parameter.** `estimateTurnCost`
+  never held the provider keys (its side-agent lines resolve without them), so
+  the classifier line could not apply the "side model, else Default" rule.
+  `EstimateTurnCostParams.providerKeys` and
+  `estimateTurnCostFromSettings(storyData, providerKeys?)` are new and
+  optional; with no keys the side model is assumed, as for the other side
+  lines. `TurnCostPanel.tsx` passes `pickProviderKeys(useAPIKeys().keys)`
+  (a two-line change that slice 3 would otherwise have made).
+- **`getDefaultSlotMix` compares stored entries (unset equals unset)**, not
+  resolved ones. Resolved comparison would call a fresh profile Mixed, because
+  tier 2 ships at `high`. The effort it reports for tier 2 includes combat's
+  floor, since that is what runs.
+- **`getSubscriptionFallbacks` rule.** A blocked entry 1 is "Default" and
+  covers any blocked entry 0 or 2 naming the same model. Blocked entries it
+  doesn't cover are grouped by model and named by tier ("Default, tier 2",
+  "Default, tiers 0 and 2"). Entry 3 is "Advanced". The plan left the
+  grouping open.
+- **The classifier fallback test for a subscription-only profile** is
+  `tests/generation.classifierModel.test.ts` (a whole turn on the faked CLI),
+  and the Observer retry tests are `tests/generation.observerRetry.test.ts`.
+  The retry test uses Default saved at `GLM 5.3 / high` for the case that
+  matters: a turn starts at tier 1 (the baseline floors tier 0 away), so on the
+  shipped ladder `tier + 1` and the nearest distinct tier are both 2, and only
+  an identical tier 2 tells the two apart.
+- **Tests that pinned the old ladder or the narration voice** moved their
+  setup to `reasoningTierOverrides` (Default's three entries). The saved
+  narration getters and setters keep their own tests (stored, synced, aliased,
+  and no longer used).

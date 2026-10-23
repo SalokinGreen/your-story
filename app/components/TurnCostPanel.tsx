@@ -21,6 +21,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import { StoryData } from "@/app/misc/structs";
+import { useAPIKeys } from "@/app/misc/APIKeysContext";
+import { pickProviderKeys } from "@/app/misc/sideModelCall";
 import {
   TurnCostReport,
   TURN_COST_STAGE_LABELS,
@@ -59,9 +61,11 @@ export default function TurnCostPanel({
   const [lastTurn, setLastTurn] = useState<TurnCostReport | null>(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
 
+  // The keys decide which model the tier classifier is priced on (decision 124).
+  const { keys } = useAPIKeys();
   const refreshEstimate = useCallback(() => {
-    setEstimate(estimateTurnCostFromSettings(storyData));
-  }, [storyData]);
+    setEstimate(estimateTurnCostFromSettings(storyData, pickProviderKeys(keys)));
+  }, [storyData, keys]);
 
   const refreshActuals = useCallback(() => {
     setLastTurn(getLatestTurnCostReport());

@@ -56,6 +56,7 @@ import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { storyCacheKey, markRoundBreakpoint } from "@/app/misc/cacheMarks";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { pickProviderKeys } from "@/app/misc/sideModelCall";
+import { hasKeyForModel } from "@/app/misc/ai_prices";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   runObserver,
@@ -143,10 +144,11 @@ import {
   computeSceneKey,
   isSceneGatedForRoll,
   hasSatisfiedRollGate,
-  fallbackTier,
+  nextDistinctTier,
   describeTier,
   getTierState,
   getEffectiveTiers,
+  getEffectiveSlot,
   getEffectiveNarrationModelKey,
   getEffectiveNarrationEffort,
   applyTierEscalation,
@@ -1598,10 +1600,16 @@ export async function generateStoryTurn(
           Object.assign(storyData, preTurnSnapshot);
 
           if (majorFlag.type === "tier_escalation_missed") {
-            const requestedTier = Math.min(
-              TOP_TIER,
-              (tierUsedThisTurn ?? SCENE_BASELINE_TIER) + 1,
-            );
+            // The nearest tier that is a different call, not tier + 1: with
+            // Default filling tiers 0 and 1 alike, + 1 would rerun the same
+            // model at the same effort (design §3). Nothing different above
+            // means the top tier, as before.
+            const requestedTier =
+              nextDistinctTier(
+                tierUsedThisTurn ?? SCENE_BASELINE_TIER,
+                "up",
+                getEffectiveTiers(),
+              ) ?? TOP_TIER;
             const escalation = applyTierEscalation(
               storyData,
               requestedTier,
@@ -2177,9 +2185,24 @@ async function generateStoryTurnOnce(
 
         if (isClassificationAmbiguous(storyData, gmUserChoice)) {
           try {
-            // Tier 0's model at tier 0's effort (decision 53): the classifier
-            // is tier 0's call, so it thinks as hard as the player let tier 0.
-            const classifierTier = getEffectiveTiers()[0];
+            // A one-word answer runs on the side-agent model at its effort
+            // (decision 53), like every other small call, whatever the player
+            // picked for Default: Default is now a thinking model (GLM 5.3),
+            // and paying for that on one word is waste. A player with no key
+            // for that model (a desktop player running both slots on the
+            // Claude subscription, say) keeps what this call always did and
+            // runs it on Default (decision 124).
+            const classifierKeys = pickProviderKeys(options);
+            const sideChoice = resolveSideCallModel(null, classifierKeys);
+            const classifierTier = hasKeyForModel(
+              sideChoice.model,
+              classifierKeys,
+            )
+              ? {
+                  modelKey: sideChoice.model,
+                  reasoningEffort: sideChoice.reasoningEffort,
+                }
+              : getEffectiveSlot("default");
             const classifierModel = classifierTier.modelKey;
             const classifierResult = await generateSimple(
               [{ role: "user", content: buildClassifierPrompt(gmUserChoice) }],
@@ -2538,7 +2561,13 @@ async function generateStoryTurnOnce(
           // Model unavailable - fall back to the next-lower tier instead of crashing.
           if (!gmResponse.ok) {
             const failedTier = roundTier.tier;
-            const lower = fallbackTier(failedTier);
+            // The nearest lower tier that is a different call; one that is
+            // the same model and effort would just repeat the failure.
+            const lower = nextDistinctTier(
+              failedTier,
+              "down",
+              getEffectiveTiers(),
+            );
             if (lower !== null) {
               const fallbackResolved = resolveTier(lower);
               logger.action(

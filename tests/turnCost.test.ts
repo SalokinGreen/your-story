@@ -653,7 +653,9 @@ describe("estimateTurnCost", () => {
         },
       ]),
     );
-    localStorage.setItem("narrationModelOverride", id);
+    // Default, which the narration follows, on the unpriced model.
+    const slot = { modelKey: id, reasoningEffort: "none" };
+    localStorage.setItem("reasoningTierOverrides", JSON.stringify([slot, slot, slot, null]));
 
     const estimate = estimateTurnCost();
     expect(estimate.hasUnpricedModels).toBe(true);

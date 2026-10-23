@@ -155,17 +155,20 @@ describe("a non-streaming reply whose content is a list of chunks (Mistral's rea
   });
 });
 
-describe("the narration effort follows a voice saved under a retired key", () => {
-  it("keeps the saved effort when the saved voice resolves to its successor", () => {
-    localStorage.setItem("narrationModelOverride", "Mistral Small 3.2");
-    localStorage.setItem("narrationEffortOverride", "high");
+describe("the narration effort follows a Default saved under a retired key", () => {
+  const saveDefault = (modelKey: string, reasoningEffort: string) => {
+    const o = { modelKey, reasoningEffort };
+    localStorage.setItem("reasoningTierOverrides", JSON.stringify([o, o, o, null]));
+  };
+
+  it("keeps the saved effort when the saved model resolves to its successor", () => {
+    saveDefault("Mistral Small 3.2", "high");
     expect(getEffectiveNarrationModelKey()).toBe("Mistral Small 4");
     expect(getEffectiveNarrationEffort()).toBe("high");
   });
 
-  it("still falls back to none when the saved voice was dropped outright", () => {
-    localStorage.setItem("narrationModelOverride", "Grok Code Fast 1");
-    localStorage.setItem("narrationEffortOverride", "high");
+  it("still falls back to none when the saved model was dropped outright", () => {
+    saveDefault("Grok Code Fast 1", "high");
     expect(getEffectiveNarrationEffort()).toBe("none");
   });
 });

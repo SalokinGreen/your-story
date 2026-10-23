@@ -3,12 +3,14 @@
  * effort, chosen alongside its model. This drives real turns through
  * generateStoryTurn and reads the effort each request actually sends:
  *
- *  - the narration voice's calls (the story continuation, the choices, the
+ *  - the narration's calls (the story continuation, the choices, the
  *    choices re-run after an Observer rewrite, and the rewrite itself when the
- *    Observer is unpinned) carry the stored narration effort, "none" until the
- *    player picks one, and "none" again when the voice falls back;
+ *    Observer is unpinned) carry the Default slot's effort (decision 118),
+ *    "none" until the player picks one, and "none" again when Default's model
+ *    falls back;
  *  - the side agents carry "none", or their pin's own effort;
- *  - the tier classifier carries tier 0's effort.
+ *  - the tier classifier runs on the side-agent model at its effort
+ *    (decision 124), or on Default when the player has no key for that.
  *
  * The storage and resolution half is tests/effort.settings.test.ts.
  */
@@ -111,6 +113,12 @@ function memoryStorage(entries: Record<string, string> = {}) {
     removeItem: (key: string) => void map.delete(key),
     clear: () => map.clear(),
   };
+}
+
+/** What Settings saves for the Default slot: the same choice in tiers 0, 1 and 2. */
+function defaultSlotStorage(modelKey: string, reasoningEffort: string): Record<string, string> {
+  const entry = { modelKey, reasoningEffort };
+  return { reasoningTierOverrides: JSON.stringify([entry, entry, entry, null]) };
 }
 
 function stubBrowserStorage(entries: Record<string, string>) {
@@ -264,7 +272,7 @@ describe("the side agents carry none, or their pin's effort (decision 53)", () =
   });
 });
 
-describe("the narration voice's calls carry the narration effort (decision 53)", () => {
+describe("the narration's calls carry Default's effort (decisions 53 and 118)", () => {
   it("the story continuation and the choices: none by default", async () => {
     const calls = await runTurn({ gmRound: "", extra: { skipChoices: false } });
     const story = calls.filter(isNarrationStream);
@@ -276,17 +284,26 @@ describe("the narration voice's calls carry the narration effort (decision 53)",
     expect(choices[0].body.reasoningEffort).toBe("none");
   });
 
-  it("the story continuation and the choices: the stored effort, for the default voice", async () => {
-    stubBrowserStorage({ narrationEffortOverride: "high" });
+  it("the story continuation and the choices: Default's effort, for the shipped model", async () => {
+    stubBrowserStorage(defaultSlotStorage("GLM 5.3", "high"));
     const calls = await runTurn({ gmRound: "", extra: { skipChoices: false } });
     expect(calls.filter(isNarrationStream).map((c) => c.body.reasoningEffort)).toEqual(["high"]);
     expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["high"]);
-    // The GM's own round is the tier's, not the narrator's: tier 1 is "none" by default.
-    expect(calls.filter(isGmRound).map((c) => c.body.reasoningEffort)).toEqual(["none"]);
+    // The GM's own round is tier 1, which is Default too: the same effort.
+    expect(calls.filter(isGmRound).map((c) => c.body.reasoningEffort)).toEqual(["high"]);
   });
 
-  it("the story continuation and the choices: the stored effort, for a voice the player picked", async () => {
-    stubBrowserStorage({ narrationModelOverride: "Claude Sonnet 5.5", narrationEffortOverride: "normal" });
+  it("the saved narration voice and effort are stored but no longer used", async () => {
+    stubBrowserStorage({ narrationModelOverride: "Claude Sonnet 5.5", narrationEffortOverride: "high" });
+    const calls = await runTurn({ gmRound: "", extra: { skipChoices: false } });
+    const story = calls.filter(isNarrationStream);
+    expect(story.map((c) => c.body.model)).toEqual([NARRATION_MODEL_KEY]);
+    expect(story.map((c) => c.body.reasoningEffort)).toEqual(["none"]);
+    expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["none"]);
+  });
+
+  it("the story continuation and the choices: Default's model and effort, for a model the player picked", async () => {
+    stubBrowserStorage(defaultSlotStorage("Claude Sonnet 5.5", "normal"));
     const calls = await runTurn({ gmRound: "", extra: { skipChoices: false } });
     const story = calls.filter(isNarrationStream);
     expect(story.map((c) => c.body.model)).toEqual(["Claude Sonnet 5.5"]);
@@ -294,8 +311,8 @@ describe("the narration voice's calls carry the narration effort (decision 53)",
     expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["normal"]);
   });
 
-  it("falls back to none with the voice, when the saved voice is one the catalog dropped", async () => {
-    stubBrowserStorage({ narrationModelOverride: "Grok Code Fast 1", narrationEffortOverride: "high" });
+  it("falls back to none with the model, when Default's saved model is one the catalog dropped", async () => {
+    stubBrowserStorage(defaultSlotStorage("Grok Code Fast 1", "high"));
     const calls = await runTurn({ gmRound: "", extra: { skipChoices: false } });
     const story = calls.filter(isNarrationStream);
     expect(story.map((c) => c.body.model)).toEqual([NARRATION_MODEL_KEY]);
@@ -310,8 +327,8 @@ describe("the narration voice's calls carry the narration effort (decision 53)",
       return judgeVerdict(true);
     };
 
-    it("take the narration voice and its effort when the Observer is unpinned", async () => {
-      stubBrowserStorage({ narrationEffortOverride: "high" });
+    it("take Default's model and effort when the Observer is unpinned", async () => {
+      stubBrowserStorage(defaultSlotStorage("GLM 5.3", "high"));
       const calls = await runTurn({ gmRound: LONG_NARRATION, respond });
 
       const rewrites = calls.filter(isRewrite);
@@ -340,7 +357,7 @@ describe("the narration voice's calls carry the narration effort (decision 53)",
 
     it("keep a pinned Observer's own model and effort for the rewrite, but not for the choices", async () => {
       stubBrowserStorage({
-        narrationEffortOverride: "high",
+        ...defaultSlotStorage("GLM 5.3", "high"),
         observerModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.5", reasoningEffort: "low" }),
       });
       const calls = await runTurn({ gmRound: LONG_NARRATION, respond, extra: { mistralKey: "mistral-key" } });
@@ -355,31 +372,47 @@ describe("the narration voice's calls carry the narration effort (decision 53)",
   });
 });
 
-describe("the tier classifier carries tier 0's effort (decision 53)", () => {
+describe("the tier classifier runs on the side-agent model (decisions 53 and 124)", () => {
   /** No state signal and a long input: the one case that spends a classifier call. */
   const LONG_INPUT = "I study the door, the hinges and the lock for a long while, ".repeat(5);
 
-  it("tier 0's default effort", async () => {
+  it("the side-agent default and its effort", async () => {
     const calls = await runTurn({ userInput: LONG_INPUT, story: storyWith({ lore: [] } as Partial<StoryData>) });
     const classifier = calls.filter(isClassifier);
     expect(classifier).toHaveLength(1);
-    expect(classifier[0].body.model).toBe("Claude Haiku 5.5");
+    expect(classifier[0].body.model).toBe(SIDE_AGENT_DEFAULT_MODEL_KEY);
     expect(classifier[0].body.reasoningEffort).toBe("none");
   });
 
-  it("the effort the player gave tier 0, and its model", async () => {
+  it("whatever the player gave tier 0 and Default", async () => {
     stubBrowserStorage({
       reasoningTierOverrides: JSON.stringify([
         { modelKey: "Claude Sonnet 5.5", reasoningEffort: "high" },
-        null,
-        null,
+        { modelKey: "Claude Sonnet 5.5", reasoningEffort: "high" },
+        { modelKey: "Claude Sonnet 5.5", reasoningEffort: "high" },
         null,
       ]),
     });
     const calls = await runTurn({ userInput: LONG_INPUT, story: storyWith({ lore: [] } as Partial<StoryData>) });
     const classifier = calls.filter(isClassifier);
     expect(classifier).toHaveLength(1);
-    expect(classifier[0].body.model).toBe("Claude Sonnet 5.5");
-    expect(classifier[0].body.reasoningEffort).toBe("high");
+    expect(classifier[0].body.model).toBe(SIDE_AGENT_DEFAULT_MODEL_KEY);
+    expect(classifier[0].body.reasoningEffort).toBe("none");
+  });
+
+  it("falls to Default, at Default's effort, when the player has no key for the side-agent model", async () => {
+    // No OpenRouter key, only Mistral's: the side-agent default (OpenRouter
+    // Haiku) cannot run, and neither can Default (an OpenRouter model), so the
+    // classifier takes Default as it always took tier 0's model.
+    stubBrowserStorage(defaultSlotStorage("Grok 4.5", "low"));
+    const calls = await runTurn({
+      userInput: LONG_INPUT,
+      story: storyWith({ lore: [] } as Partial<StoryData>),
+      extra: { openRouterKey: undefined, mistralKey: "mistral-key" },
+    });
+    const classifier = calls.filter(isClassifier);
+    expect(classifier).toHaveLength(1);
+    expect(classifier[0].body.model).toBe("Grok 4.5");
+    expect(classifier[0].body.reasoningEffort).toBe("low");
   });
 });

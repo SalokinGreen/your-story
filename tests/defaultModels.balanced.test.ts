@@ -2,9 +2,10 @@
  * The "Balanced" defaults the author chose on 2026-10-21 (docs/decisions.md,
  * decisions 50 and 51):
  *
- *  - the reasoning ladder starts on Claude Haiku 5.5 (tiers 0 and 1), GLM 5.3
- *    (tier 2) and Claude Sonnet 5.5 (tier 3), with the narration voice on
- *    GLM 5.3, all through OpenRouter;
+ *  - the reasoning ladder starts on GLM 5.3 (tiers 0, 1 and 2; decision 122
+ *    moved the light tiers off Haiku) and Claude Sonnet 5.5 (tier 3), with the
+ *    narration following the Default slot (decision 118), all through
+ *    OpenRouter;
  *  - an unpinned side agent runs on its own default, Claude Haiku 5.5, no
  *    matter what the narration voice or the GM's tier model is - unless the
  *    player has no key for that default's provider, when it runs on the
@@ -22,6 +23,7 @@ vi.mock("@tauri-apps/api/core", async () => (await import("./helpers/fakeClaudeC
 
 import { fakeCli } from "./helpers/fakeClaudeCli";
 import { AI_MODELS, getModelConfig, hasKeyForModel, isKnownModelKey } from "@/app/misc/ai_prices";
+import type { ReasoningEffort } from "@/app/misc/reasoningTiers";
 import {
   REASONING_TIERS,
   NARRATION_MODEL_KEY,
@@ -29,6 +31,7 @@ import {
   getEffectiveNarrationModelKey,
   getEffectiveNarrationEffort,
   resolveTier,
+  setSlotOverride,
 } from "@/app/misc/reasoningTiers";
 import {
   SIDE_AGENT_DEFAULT_MODEL_KEY,
@@ -61,6 +64,11 @@ class MemoryStorage {
   removeItem(key: string): void {
     this.map.delete(key);
   }
+}
+
+/** Puts the narration on a model the way the player now does: through Default (decision 118). */
+function setNarrator(modelKey: string, reasoningEffort: ReasoningEffort = "none") {
+  setSlotOverride("default", { modelKey, reasoningEffort });
 }
 
 /** Every layer's saved-override key and the getter that reads it. */
@@ -96,10 +104,10 @@ afterEach(() => {
 });
 
 describe("the default ladder (decision 50)", () => {
-  it("is Haiku, Haiku, GLM 5.3, Sonnet at the efforts the ladder always had", () => {
+  it("is GLM 5.3, GLM 5.3, GLM 5.3 (high), Sonnet (decision 122)", () => {
     expect(REASONING_TIERS.map((t) => [t.modelKey, t.reasoningEffort])).toEqual([
-      ["Claude Haiku 5.5", "none"],
-      ["Claude Haiku 5.5", "none"],
+      ["GLM 5.3", "none"],
+      ["GLM 5.3", "none"],
       ["GLM 5.3", "high"],
       ["Claude Sonnet 5.5", "xhigh"],
     ]);
@@ -114,7 +122,7 @@ describe("the default ladder (decision 50)", () => {
       REASONING_TIERS.map((t) => t.modelKey),
     );
     expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
-    expect(resolveTier(0).modelKey).toBe("Claude Haiku 5.5");
+    expect(resolveTier(0)).toMatchObject({ modelKey: "GLM 5.3", reasoningEffort: "none" });
     expect(resolveTier(2)).toMatchObject({ modelKey: "GLM 5.3", reasoningEffort: "high" });
     expect(resolveTier(3)).toMatchObject({ modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" });
   });
@@ -142,15 +150,23 @@ describe("the default ladder (decision 50)", () => {
     expect(String(NARRATION_MODEL_KEY)).not.toContain("Z.ai");
   });
 
-  it("leaves a player's saved tier and narration overrides alone", () => {
+  it("leaves a player's saved tier overrides alone", () => {
     localStorage.setItem(
       "reasoningTierOverrides",
       JSON.stringify([null, null, { modelKey: "Grok 4.5", reasoningEffort: "high" }, null]),
     );
-    localStorage.setItem("narrationModelOverride", "Mistral Small 4");
     expect(getEffectiveTiers()[2].modelKey).toBe("Grok 4.5");
     expect(getEffectiveTiers()[3].modelKey).toBe("Claude Sonnet 5.5");
-    expect(getEffectiveNarrationModelKey()).toBe("Mistral Small 4");
+    // Narration is Default's tier 1, which the player left unset.
+    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
+  });
+
+  it("keeps a saved narration voice in storage, and no longer plays it (decision 118)", () => {
+    localStorage.setItem("narrationModelOverride", "Mistral Small 4");
+    localStorage.setItem("narrationEffortOverride", "high");
+    expect(localStorage.getItem("narrationModelOverride")).toBe("Mistral Small 4");
+    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
+    expect(getEffectiveNarrationEffort()).toBe("none");
   });
 });
 
@@ -188,10 +204,10 @@ describe("the default efforts reach OpenRouter in a form each model accepts", ()
     return JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
   }
 
-  it("tiers 0 and 1: Haiku's effort none goes out as low, never the 400-ing none", async () => {
+  it("tiers 0 and 1: GLM 5.3's effort none goes out as low, never the 400-ing none", async () => {
     for (const tier of [REASONING_TIERS[0], REASONING_TIERS[1]]) {
       const body = await sentBody(String(tier.modelKey), tier.reasoningEffort);
-      expect(body.model).toBe("anthropic/claude-haiku-5.5");
+      expect(body.model).toBe("z-ai/glm-5.3");
       expect(body.reasoning).toEqual({ effort: "low" });
     }
   });
@@ -246,7 +262,7 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
   });
 
   it("does not follow the narration voice", () => {
-    localStorage.setItem("narrationModelOverride", "Ministral 3 8B");
+    setNarrator("Ministral 3 8B");
     expect(getEffectiveNarrationModelKey()).toBe("Ministral 3 8B");
     expect(resolveSideCallModel(null).model).toBe("Claude Haiku 5.5");
     expect(NARRATION_MODEL_KEY).not.toBe(resolveSideCallModel(null).model);
@@ -336,7 +352,7 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
     // Keys the catalog dropped (a shut-down model, one synced from a newer
     // build) read as unset. With the narration voice moved off its default,
     // landing on it would show.
-    localStorage.setItem("narrationModelOverride", "Ministral 3 8B");
+    setNarrator("Ministral 3 8B");
     for (const [name, storageKey, read] of SIDE_AGENT_LAYERS) {
       localStorage.setItem(
         storageKey,
@@ -355,7 +371,7 @@ describe("an unpinned side agent never reaches the Claude subscription (decision
       "reasoningTierOverrides",
       JSON.stringify(REASONING_TIERS.map(() => ({ modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "high" }))),
     );
-    localStorage.setItem("narrationModelOverride", SONNET_SUBSCRIPTION);
+    // The narration follows Default (tier 1), which is on the subscription too.
   }
 
   it("in the desktop app, where the narration voice and the GM really are the subscription", () => {
@@ -384,7 +400,7 @@ describe("an unpinned side agent never reaches the Claude subscription (decision
 
   it("falls a subscription pin this device cannot run to Haiku, not to the narration model", () => {
     fakeCli.platform = false;
-    localStorage.setItem("narrationModelOverride", "Ministral 3 8B");
+    setNarrator("Ministral 3 8B");
     localStorage.setItem(
       "observerModelOverride",
       JSON.stringify({ modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "low" }),
@@ -418,7 +434,7 @@ describe("the Observer's rewrite follows the narration voice, not the judges (de
       ),
     ).toEqual({ model: "GLM 5.3", reasoningEffort: "none" });
     // ...and takes the effort the player set for the voice with it (decision 53).
-    localStorage.setItem("narrationEffortOverride", "high");
+    setNarrator("GLM 5.3", "high");
     expect(
       resolveObserverRewriteModel(
         getObserverModelOverride(),
@@ -431,7 +447,7 @@ describe("the Observer's rewrite follows the narration voice, not the judges (de
   });
 
   it("follows a narration voice the player picked", () => {
-    localStorage.setItem("narrationModelOverride", "Ministral 3 8B");
+    setNarrator("Ministral 3 8B");
     expect(
       resolveObserverRewriteModel(null, String(getEffectiveNarrationModelKey()), getEffectiveNarrationEffort()),
     ).toEqual({ model: "Ministral 3 8B", reasoningEffort: "none" });
@@ -495,7 +511,7 @@ describe("a side agent without a key for the default falls to the narration voic
   });
 
   it("keeps Haiku when the player has an OpenRouter key, whatever the narration voice is", () => {
-    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    setNarrator(MISTRAL_NARRATOR);
     expect(resolveSideCallModel(null, OPENROUTER)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     expect(resolveSideCallModel(null, { ...OPENROUTER, ...MISTRAL_ONLY })).toEqual({
       model: "Claude Haiku 5.5",
@@ -504,19 +520,19 @@ describe("a side agent without a key for the default falls to the narration voic
   });
 
   it("runs on the narration voice when the Mistral key is the only one and the voice is a Mistral model", () => {
-    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    setNarrator(MISTRAL_NARRATOR);
     expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: MISTRAL_NARRATOR, reasoningEffort: "none" });
   });
 
   it("follows a Z.ai key to the Z.ai entry of GLM, but not to the OpenRouter entry the voice defaults to", () => {
     // Fresh profile: the voice is "GLM 5.3" (OpenRouter), which a Z.ai key cannot call.
     expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
-    localStorage.setItem("narrationModelOverride", "GLM 5.3 (Z.ai)");
+    setNarrator("GLM 5.3 (Z.ai)");
     expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "GLM 5.3 (Z.ai)", reasoningEffort: "none" });
   });
 
   it("never falls to a Claude subscription narration voice", () => {
-    localStorage.setItem("narrationModelOverride", SONNET_SUBSCRIPTION);
+    setNarrator(SONNET_SUBSCRIPTION);
     expect(isClaudeCliModel(String(getEffectiveNarrationModelKey()))).toBe(true);
     for (const keys of [MISTRAL_ONLY, {}, { mistralKey: "m", zaiKey: "z" }]) {
       const resolved = resolveSideCallModel(null, keys);
@@ -530,13 +546,13 @@ describe("a side agent without a key for the default falls to the narration voic
     expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
     expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     // A custom model's UUID is an OpenRouter model, which this player cannot call.
-    localStorage.setItem("narrationModelOverride", CUSTOM_MODEL_UUID);
+    setNarrator(CUSTOM_MODEL_UUID);
     expect(getEffectiveNarrationModelKey()).toBe(CUSTOM_MODEL_UUID);
     expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("stays on Haiku with no keys at all", () => {
-    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    setNarrator(MISTRAL_NARRATOR);
     expect(resolveSideCallModel(null, {})).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     expect(resolveSideCallModel(null, { openRouterKey: "", mistralKey: undefined })).toEqual({
       model: "Claude Haiku 5.5",
@@ -545,13 +561,13 @@ describe("a side agent without a key for the default falls to the narration voic
   });
 
   it("is the same answer as before when the keys argument is left out", () => {
-    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    setNarrator(MISTRAL_NARRATOR);
     expect(resolveSideCallModel(null)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     expect(resolveSideCallModel(null, undefined)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
   });
 
   it("keeps a pinned layer on its pin, key or no key", () => {
-    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    setNarrator(MISTRAL_NARRATOR);
     // A pin on a provider the player has no key for is still the player's choice.
     pin("memoryKeeperModelOverride", "Claude Sonnet 5.5");
     expect(resolveSideCallModel(getMemoryKeeperModelOverride(), MISTRAL_ONLY)).toEqual({
@@ -571,7 +587,7 @@ describe("a side agent without a key for the default falls to the narration voic
 
   it("keeps a subscription pin the desktop can run, and falls one it cannot the same way as an unpinned layer", () => {
     pin("observerModelOverride", SONNET_SUBSCRIPTION);
-    localStorage.setItem("narrationModelOverride", MISTRAL_NARRATOR);
+    setNarrator(MISTRAL_NARRATOR);
     expect(resolveSideCallModel(getObserverModelOverride(), MISTRAL_ONLY)).toEqual({
       model: SONNET_SUBSCRIPTION,
       reasoningEffort: "low",

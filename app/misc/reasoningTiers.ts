@@ -86,14 +86,14 @@ export interface ReasoningTier {
  * same holds for a provider's HTTP error on a streamed round; only a non-200
  * from the proxy itself, or the subscription bridge's 502, takes fallbackTier.)
  *
- * The defaults (decision 50, "Balanced") are Claude Haiku 5.5 for the two
- * light tiers, GLM 5.3 for combat and rules, and Claude Sonnet 5.5 for boss
- * fights and campaign-shaping calls: all three are OpenRouter models, so one
- * OpenRouter key runs the whole ladder. The efforts are unchanged from the
- * Mistral/Grok/Kimi ladder these replaced, and providerCall.ts already
- * translates each for its model: Claude's "none" is sent as "low" (its
- * thinking cannot be turned off), GLM 5.3 always thinks and takes "high" as
- * "high", and Sonnet's "xhigh" goes out as OpenRouter's "xhigh".
+ * The defaults (decisions 50 and 122) are GLM 5.3 for the three lower tiers
+ * (tiers 0 and 1 at "none", which GLM gets as "low" because it always thinks;
+ * tier 2, combat and rules, at "high") and Claude Sonnet 5.5 for boss fights
+ * and campaign-shaping calls. Settings shows them as two slots, Default
+ * (tiers 0-2) and Advanced (tier 3); the engine still picks a tier per turn.
+ * Both are OpenRouter models, so one OpenRouter key runs the whole ladder.
+ * providerCall.ts translates each effort for its model: GLM 5.3 takes
+ * "high" as "high", and Sonnet's "xhigh" goes out as OpenRouter's "xhigh".
  *
  * All entries have supportsToolCalling: true in AI_MODELS — required since
  * GM adjudication calls dice/state tools mid-turn (DeepSeek R1 variants
@@ -102,12 +102,12 @@ export interface ReasoningTier {
  */
 export const REASONING_TIERS: ReasoningTier[] = [
   {
-    modelKey: "Claude Haiku 5.5",
+    modelKey: "GLM 5.3",
     reasoningEffort: "none",
     note: "banter, descriptions, NPC chatter",
   },
   {
-    modelKey: "Claude Haiku 5.5",
+    modelKey: "GLM 5.3",
     reasoningEffort: "none",
     note: "ordinary skill checks and everyday GM calls",
   },
@@ -124,10 +124,12 @@ export const REASONING_TIERS: ReasoningTier[] = [
 ];
 
 /**
- * The narration voice (decision 50): the model the story-continuation call
- * and the choices call run on, regardless of adjudication tier. When the GM's
- * own final round already wrote the prose, that round's tier model wrote it
- * instead (generation.ts, gmFinalStoryContent).
+ * Default's shipped model (decisions 50 and 122). Narration follows the
+ * Default slot (getEffectiveNarrationModelKey), so this is the model the
+ * story-continuation call and the choices call run on until the player picks
+ * one for Default. When the GM's own final round already wrote the prose,
+ * that round's tier model wrote it instead (generation.ts,
+ * gmFinalStoryContent).
  */
 export const NARRATION_MODEL_KEY: AIModelKey = "GLM 5.3";
 
@@ -232,23 +234,204 @@ function runsOnThisDevice(modelKey: string): boolean {
 }
 
 /**
+ * The higher of two efforts, by REASONING_EFFORTS order (cheapest first).
+ * Combat's floor (decision 123) uses it.
+ */
+export function atLeastEffort(
+  effort: ReasoningEffort,
+  floor: ReasoningEffort,
+): ReasoningEffort {
+  return REASONING_EFFORTS.indexOf(effort) >= REASONING_EFFORTS.indexOf(floor)
+    ? effort
+    : floor;
+}
+
+/** Tier 2 is combat and rules: it never thinks below this (decision 123). */
+const RULES_TIER = 2;
+const RULES_TIER_EFFORT_FLOOR: ReasoningEffort = "high";
+
+/**
  * REASONING_TIERS with any user overrides applied - this is what resolveTier()
  * reads. An override this device cannot run (a synced subscription model off
  * the desktop) is skipped, so that slot uses its default; Settings shows why
- * (getSubscriptionFallbacks).
+ * (getSubscriptionFallbacks). Tier 2 runs at the higher of its resolved effort
+ * and "high" (decision 123): the player's Default effort is one number, but a
+ * combat or rules turn should not drop below it, whether the effort came from
+ * an override or from the shipped ladder.
  */
 export function getEffectiveTiers(): ReasoningTier[] {
   const overrides = getTierOverrides();
   return REASONING_TIERS.map((tier, i) => {
     const o = overrides[i];
-    return o && runsOnThisDevice(o.modelKey)
+    const resolved: ReasoningTier =
+      o && runsOnThisDevice(o.modelKey)
+        ? {
+            modelKey: o.modelKey,
+            reasoningEffort: o.reasoningEffort,
+            note: tier.note,
+          }
+        : tier;
+    return i === RULES_TIER
       ? {
-          modelKey: o.modelKey,
-          reasoningEffort: o.reasoningEffort,
-          note: tier.note,
+          ...resolved,
+          reasoningEffort: atLeastEffort(
+            resolved.reasoningEffort,
+            RULES_TIER_EFFORT_FLOOR,
+          ),
         }
-      : tier;
+      : resolved;
   });
+}
+
+// ============================================================
+// MODEL SLOTS (decisions 118-124)
+// ============================================================
+// Settings shows two slots over the four-tier engine: Default fills tiers
+// 0-2 and Advanced fills tier 3. Storage is still the four-entry
+// reasoningTierOverrides array, so sync and older builds need no migration.
+
+export type ModelSlot = "default" | "advanced";
+
+/** The tier entries each slot fills: Default 0-2, Advanced 3 (decision 119). */
+export const SLOT_TIERS: Record<ModelSlot, readonly number[]> = {
+  default: [0, 1, 2],
+  advanced: [3],
+};
+
+/** The slot a tier belongs to: 0-2 Default, 3 Advanced. */
+export function slotForTier(tier: number): ModelSlot {
+  return tier >= TOP_TIER ? "advanced" : "default";
+}
+
+/**
+ * The tier that stands for each slot when one model is needed. Default is tier
+ * 1 and only tier 1 - the baseline, what most turns run on - so the row,
+ * narration and the classifier's fallback all agree. Tiers 0 and 2 never stand
+ * in for it; they show only in the "Mixed" line (getDefaultSlotMix).
+ */
+const SLOT_REPRESENTATIVE_TIER: Record<ModelSlot, number> = {
+  default: SCENE_BASELINE_TIER,
+  advanced: TOP_TIER,
+};
+
+/** The slot's saved choice: tier 1's override for Default, tier 3's for Advanced; null when unset. */
+export function getSlotOverride(slot: ModelSlot): TierOverride | null {
+  return getTierOverrides()[SLOT_REPRESENTATIVE_TIER[slot]] ?? null;
+}
+
+/**
+ * What the slot runs on here and now: tier 1 of the effective ladder for
+ * Default, tier 3 for Advanced. A subscription model this device cannot run
+ * reads as the shipped default.
+ */
+export function getEffectiveSlot(slot: ModelSlot): {
+  modelKey: AnyModelKey;
+  reasoningEffort: ReasoningEffort;
+} {
+  const entry = getEffectiveTiers()[SLOT_REPRESENTATIVE_TIER[slot]];
+  return { modelKey: entry.modelKey, reasoningEffort: entry.reasoningEffort };
+}
+
+function sameOverride(
+  a: TierOverride | null,
+  b: TierOverride | null,
+): boolean {
+  if (!a || !b) return !a && !b;
+  return a.modelKey === b.modelKey && a.reasoningEffort === b.reasoningEffort;
+}
+
+/**
+ * Default's entries 0 and 2 when they differ from entry 1 (a player set the
+ * tiers apart in an older build, or on another device), for the Settings
+ * "Mixed" line. Empty after any Default save, which writes all three. Entries
+ * compare as stored (unset equals unset), so a fresh profile is not Mixed
+ * even though tier 2 ships at "high"; the effort reported for tier 2 includes
+ * combat's floor, because that is what runs.
+ */
+export function getDefaultSlotMix(): {
+  tier: 0 | 2;
+  modelKey: AnyModelKey;
+  reasoningEffort: ReasoningEffort;
+}[] {
+  const overrides = getTierOverrides();
+  const base = overrides[SLOT_REPRESENTATIVE_TIER.default];
+  const mix: {
+    tier: 0 | 2;
+    modelKey: AnyModelKey;
+    reasoningEffort: ReasoningEffort;
+  }[] = [];
+  for (const tier of [0, 2] as const) {
+    const entry = overrides[tier];
+    if (sameOverride(entry, base)) continue;
+    const shown = entry ?? REASONING_TIERS[tier];
+    mix.push({
+      tier,
+      modelKey: shown.modelKey,
+      reasoningEffort:
+        tier === RULES_TIER
+          ? atLeastEffort(shown.reasoningEffort, RULES_TIER_EFFORT_FLOOR)
+          : shown.reasoningEffort,
+    });
+  }
+  return mix;
+}
+
+/**
+ * Saves a slot's choice (null clears it): Default writes entries 0, 1 and 2,
+ * Advanced writes entry 3, in one write and one change event. It works on the
+ * RAW stored array, not getTierOverrides(): that read turns a model this build
+ * does not know (a newer build's choice, synced here) into null, and writing it
+ * back would erase it. Every entry the slot does not own is kept as stored.
+ * Malformed JSON counts as four unset entries, as everywhere else.
+ */
+export function setSlotOverride(
+  slot: ModelSlot,
+  override: TierOverride | null,
+): void {
+  if (typeof window === "undefined") return;
+  let stored: unknown[] = [];
+  try {
+    const raw = localStorage.getItem(TIER_OVERRIDES_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) stored = parsed;
+  } catch {
+    stored = [];
+  }
+  const next: unknown[] = [...stored];
+  while (next.length < REASONING_TIERS.length) next.push(null);
+  for (const tier of SLOT_TIERS[slot]) {
+    next[tier] = override ? { ...override } : null;
+  }
+  localStorage.setItem(TIER_OVERRIDES_KEY, JSON.stringify(next));
+  notifyConfigChanged();
+}
+
+/**
+ * The nearest tier above or below `from` whose (model, effort) differs from
+ * `from`'s in the given effective ladder; null when none does. With Default
+ * filling tiers 0 and 1 with one call, "one tier up" can be the same call, and
+ * a retry or a step down onto it would be a reroll, not a change (design §3).
+ */
+export function nextDistinctTier(
+  from: number,
+  direction: "up" | "down",
+  tiers: readonly {
+    modelKey: AnyModelKey;
+    reasoningEffort: ReasoningEffort;
+  }[],
+): number | null {
+  const here = tiers[from];
+  if (!here) return null;
+  const step = direction === "up" ? 1 : -1;
+  for (let t = from + step; t >= 0 && t < tiers.length; t += step) {
+    if (
+      tiers[t].modelKey !== here.modelKey ||
+      tiers[t].reasoningEffort !== here.reasoningEffort
+    ) {
+      return t;
+    }
+  }
+  return null;
 }
 
 /**
@@ -273,13 +456,13 @@ export function setNarrationModelOverride(modelKey: AnyModelKey | null): void {
 }
 
 /**
- * NARRATION_MODEL_KEY with any user override applied - always used in place
- * of the constant. Like getEffectiveTiers, an override this device cannot run
- * falls back to the default.
+ * The model the story-continuation call, the choices call and the Observer's
+ * rewrite run on. Narration follows the Default slot (decision 118): the saved
+ * narration override (getNarrationModelOverride) stays stored and synced so an
+ * older device keeps its voice, but it is no longer read here.
  */
 export function getEffectiveNarrationModelKey(): AnyModelKey {
-  const override = getNarrationModelOverride();
-  return override && runsOnThisDevice(override) ? override : NARRATION_MODEL_KEY;
+  return getEffectiveSlot("default").modelKey;
 }
 
 /**
@@ -311,37 +494,19 @@ export function setNarrationEffortOverride(
 }
 
 /**
- * How hard the narration voice thinks (decision 53): the story continuation,
- * the choices calls and the Observer's rewrite when the Observer is unpinned.
- * DEFAULT_REASONING_EFFORT ("none") until the player picks one in Settings.
- *
- * It follows the voice, not the player's last pick: when the saved narration
- * model cannot be used here - a Claude subscription voice this device cannot
- * run (decisions 16 and 29), or one the catalog no longer has - the call falls
- * back to NARRATION_MODEL_KEY (getEffectiveNarrationModelKey), and the effort
- * chosen for that other model would be a guess for this one, so it falls back
- * to "none" too.
+ * How hard the narration thinks (decision 53): the story continuation, the
+ * choices calls and the Observer's rewrite when the Observer is unpinned. It is
+ * the Default slot's effort (decision 118); the saved narration effort is no
+ * longer read. Because it comes from the same effective entry as the model, a
+ * Default whose subscription model this device cannot run falls back to the
+ * shipped model and the shipped effort together.
  */
 export function getEffectiveNarrationEffort(): ReasoningEffort {
-  if (typeof window === "undefined") return DEFAULT_REASONING_EFFORT;
-  let savedModel: string | null = null;
-  try {
-    savedModel = localStorage.getItem(NARRATION_OVERRIDE_KEY);
-  } catch {
-    return DEFAULT_REASONING_EFFORT;
-  }
-  // Compare against the saved voice as the app reads it (getNarrationModelOverride
-  // resolves a retired key to its successor, LEGACY_MODEL_KEY_ALIASES), not
-  // the raw stored string: a saved "Mistral Small 3.2" runs as "Mistral Small
-  // 4", and its effort must follow it rather than fall back to "none".
-  if (savedModel && getEffectiveNarrationModelKey() !== getNarrationModelOverride()) {
-    return DEFAULT_REASONING_EFFORT;
-  }
-  return getNarrationEffortOverride() ?? DEFAULT_REASONING_EFFORT;
+  return getEffectiveSlot("default").reasoningEffort;
 }
 
 export interface SubscriptionFallback {
-  /** "Tier 2" or "Narration". */
+  /** "Default", "Advanced", or a Mixed Default's tiers: "Default, tier 2". */
   slot: string;
   /** Why it falls back: this device cannot run the CLI, or an online session is active. */
   reason: "device" | "online";
@@ -351,32 +516,69 @@ export interface SubscriptionFallback {
   fallbackModelKey: string;
 }
 
+function tierListLabel(tiers: number[]): string {
+  return tiers.length === 1
+    ? `tier ${tiers[0]}`
+    : `tiers ${tiers.slice(0, -1).join(", ")} and ${tiers[tiers.length - 1]}`;
+}
+
 /**
  * Decisions 16 and 29: the slots whose Claude subscription model cannot run
  * here and now (a synced choice on a device without the CLI, or any
  * subscription choice during an online session), and the default each uses
  * instead - for Settings' notice and the in-game one. Empty on the desktop
  * app outside an online session.
+ *
+ * Every stored entry is checked, not one per slot, because an older build can
+ * leave Default's entries apart. Tier 3 is "Advanced". A blocked entry 1 is
+ * "Default", and covers any blocked entry 0 or 2 that names the same model;
+ * blocked entries of a Mixed Default that it does not cover are named by tier
+ * ("Default, tier 2"). The narration voice has no entry any more (it follows
+ * Default).
  */
 export function getSubscriptionFallbacks(): SubscriptionFallback[] {
   const fallbacks: SubscriptionFallback[] = [];
-  getTierOverrides().forEach((o, i) => {
-    if (o && !runsOnThisDevice(o.modelKey)) {
-      fallbacks.push({
-        slot: `Tier ${i}`,
-        reason: claudeCliBlockReason() ?? "device",
-        modelKey: o.modelKey,
-        fallbackModelKey: REASONING_TIERS[i].modelKey,
-      });
+  const overrides = getTierOverrides();
+  const blocked = (i: number): TierOverride | null => {
+    const o = overrides[i];
+    return o && !runsOnThisDevice(o.modelKey) ? o : null;
+  };
+  const reason = (): "device" | "online" => claudeCliBlockReason() ?? "device";
+
+  const covered = new Set<number>();
+  const base = blocked(SCENE_BASELINE_TIER);
+  if (base) {
+    for (const t of SLOT_TIERS.default) {
+      if (blocked(t)?.modelKey === base.modelKey) covered.add(t);
     }
-  });
-  const narration = getNarrationModelOverride();
-  if (narration && !runsOnThisDevice(narration)) {
     fallbacks.push({
-      slot: "Narration",
-      reason: claudeCliBlockReason() ?? "device",
-      modelKey: narration,
-      fallbackModelKey: NARRATION_MODEL_KEY,
+      slot: "Default",
+      reason: reason(),
+      modelKey: base.modelKey,
+      fallbackModelKey: REASONING_TIERS[SCENE_BASELINE_TIER].modelKey,
+    });
+  }
+  const byModel = new Map<string, number[]>();
+  for (const t of SLOT_TIERS.default) {
+    const o = blocked(t);
+    if (!o || covered.has(t)) continue;
+    byModel.set(o.modelKey, [...(byModel.get(o.modelKey) ?? []), t]);
+  }
+  for (const [modelKey, tiers] of byModel) {
+    fallbacks.push({
+      slot: `Default, ${tierListLabel(tiers)}`,
+      reason: reason(),
+      modelKey,
+      fallbackModelKey: REASONING_TIERS[tiers[0]].modelKey,
+    });
+  }
+  const advanced = blocked(TOP_TIER);
+  if (advanced) {
+    fallbacks.push({
+      slot: "Advanced",
+      reason: reason(),
+      modelKey: advanced.modelKey,
+      fallbackModelKey: REASONING_TIERS[TOP_TIER].modelKey,
     });
   }
   return fallbacks;

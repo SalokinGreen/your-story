@@ -243,16 +243,26 @@ describe("a saved choice of a removed model uses the slot's default", () => {
     expect(stored[2]).toBeNull();
   });
 
-  it("as the narration voice", () => {
+  it("as the saved narration voice, which still reads as unset", () => {
     localStorage.setItem("narrationModelOverride", "Grok Code Fast 1");
     expect(getNarrationModelOverride()).toBeNull();
     expect(getEffectiveNarrationModelKey()).toBe(NARRATION_MODEL_KEY);
   });
 
-  it("keeps a narration voice that is still in the catalog, or a custom model", () => {
-    localStorage.setItem("narrationModelOverride", "Claude Sonnet 5.5");
+  it("as the narration, which follows Default", () => {
+    const dropped = { modelKey: "Grok Code Fast 1", reasoningEffort: "none" };
+    localStorage.setItem("reasoningTierOverrides", JSON.stringify([dropped, dropped, dropped, null]));
+    expect(getEffectiveNarrationModelKey()).toBe(NARRATION_MODEL_KEY);
+  });
+
+  it("keeps a Default model that is still in the catalog, or a custom model, for the narration", () => {
+    const slot = (modelKey: string) => {
+      const o = { modelKey, reasoningEffort: "none" };
+      localStorage.setItem("reasoningTierOverrides", JSON.stringify([o, o, o, null]));
+    };
+    slot("Claude Sonnet 5.5");
     expect(getEffectiveNarrationModelKey()).toBe("Claude Sonnet 5.5");
-    localStorage.setItem("narrationModelOverride", CUSTOM_MODEL_UUID);
+    slot(CUSTOM_MODEL_UUID);
     expect(getEffectiveNarrationModelKey()).toBe(CUSTOM_MODEL_UUID);
   });
 
