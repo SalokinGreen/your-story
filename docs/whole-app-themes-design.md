@@ -33,10 +33,12 @@ Ink the default. Nothing else did. A survey on 2026-10-23 found:
 - **No shared primitives.** There is no shared button, card, input or modal.
   Every file styles itself. `ConfirmDialog` is already fully on the tokens
   and is the template.
-- **Fixed on purpose:**
+- **Fixed on purpose** (including inline `style` and SVG colours, which a
+  class swap misses):
   - couch co-op player colours (`multiplayer/palette.ts`);
   - the 3D dice (`diceColors.ts`, drawn on a canvas);
-  - the theme picker's own swatches;
+  - the theme picker's own swatches, the party QR code's black and white,
+    and the Library's per-folder colours;
   - red, green and amber where they mean danger, success and warning.
 
 ## 2. What the player sees afterwards
@@ -78,7 +80,7 @@ The six stay. Five more are derived the way the existing ones already are
 | token | what for | derived as |
 |---|---|---|
 | `--ys-surface-2` | a raised or hovered surface: menus, selected rows, inputs on a card | bg mixed 11% toward text |
-| `--ys-on-accent` | text and icons on an accent fill (primary buttons) | bg or text, whichever contrasts more with accent |
+| `--ys-on-accent` | text and icons on an accent fill (primary buttons) | bg or text, whichever contrasts more with accent; if neither reaches 4.5:1, near-black or near-white (Codex: bg/text give only about 4.0:1 on Ocean Blue, Forest and Solarized) |
 | `--ys-danger` / `--ys-success` / `--ys-warning` | meaning colours for text, borders and icons; fills use them at low opacity | fixed hues (red, green, amber) at a lightness chosen by whether the theme is light or dark |
 
 Two more tokens are not colours:
@@ -87,6 +89,10 @@ Two more tokens are not colours:
 
 A theme is light when its background's relative luminance is over 0.5. Only
 Paper White is light today.
+
+Sepia's and Nord's muted already fall a little under 4.5:1 on surface (4.18
+and 4.43). Those presets name their own muted, so every token meets 4.5:1
+against bg, surface and surface-2.
 
 `THEME_PRESETS` and `applyThemeVars` move from `FontSettingsTab.tsx` into
 `themeTokens.ts`, so the list, the arithmetic and the applying live
@@ -107,11 +113,31 @@ surface.
   muted on hover, on a transparent track.
 - `dark:` variants are removed where they exist (the toasts): the theme
   decides, not the OS.
-- **No flash.** A small inline script in the root layout's `<head>` reads
-  `storyTheme` and sets the tokens before first paint. It is a copy of the
+- **No flash.** A plain synchronous `<script dangerouslySetInnerHTML>` in the
+  root layout's `<head>` reads `storyTheme` and sets the tokens before first
+  paint. It is not `next/script`: that queues `beforeInteractive` inline
+  content, so it does not run before paint. `<html>` keeps its existing
+  `suppressHydrationWarning`. It is a copy of the
   same arithmetic as `themeTokens()`, kept in step by a test that runs both
   on every preset. `FontInitializer` still runs afterwards, as today. The
   static export and the desktop app (`csp: null`) allow an inline script.
+
+### 3.2a Typography and the rest of the global CSS
+
+- **Prose.** Changing inherited text and `.prose a` is not enough: the
+  typography plugin colours body, code, quotes and list markers itself, and
+  several screens use `prose-invert`. Those are the Designer chat, lore,
+  NPCs and the importer previews. So `prose` gets theme-backed
+  `--tw-prose-*` values, defined once in `globals.css`, and `prose-invert`
+  goes wherever it appears. The story's own inline prose colour (`prettify`)
+  stays until this covers it.
+- **Global rules outside any layer.** These override the tokens and would
+  leave Paper White controls dark. Slice 1 converts them:
+  - the select arrows;
+  - the purple focus and hover;
+  - the dark `option` and the `!important` selected background;
+  - `.focus-ring`;
+  - `.fade-edge-right`, which reads the deleted `--background`.
 
 ### 3.3 A few shared classes, not a component library
 
@@ -147,6 +173,15 @@ fails on a hard-coded colour class:
 - a hex or `rgb(` inside a `className`;
 - `dark:`.
 
+A plain substring regex would flag words like "history" for `to-`, and
+identifiers like `grayed`. It would also miss classes built in `cn()`,
+template branches, constants and helper returns. So the test instead:
+- tokenises every string literal and template piece;
+- checks each class-like token, covering every Tailwind colour family (not
+  only the eight above: orange, cyan, emerald, rose and the rest);
+- checks inline `style` colours and SVG `fill` / `stroke`;
+- carries fixtures for both the false positives and the misses.
+
 It works from an explicit list of the files each slice converts. The list
 only grows, so a later change cannot quietly bring back `bg-gray-800`. Red,
 green and amber are allowed only as `ys-danger`, `ys-success` and
@@ -158,9 +193,20 @@ when its slice comes).
 
 ## 4. What stays the same, and what is out of scope
 
-- One `storyTheme` key, synced, with Ink as the default. Party phones keep
-  their own (decision 140); the phone page already runs the same
-  initialiser.
+- One `storyTheme` key, synced, with Ink as the default.
+- Party phones keep their own theme (decision 140). The phone page runs the
+  same initialiser, but Settings is hidden there. So it gains a small theme
+  picker of its own (the preset swatches), saved to that phone's
+  `storyTheme`.
+- **One thing applies the theme at runtime.** Today two things fight the
+  bootstrap script:
+  - the picker's effect applies the initial Ink before it has read the
+    saved theme;
+  - `initializeFonts` waits on IndexedDB before applying colours.
+
+  Both are fixed. Colours now apply from the saved theme only, separately
+  from font loading, and again when `storyTheme` changes (another tab, a
+  sync).
 - The reading font settings still apply to story prose only.
 - The dice tray's 3D dice and the couch co-op player colours do not change.
 - Out of scope: new themes, a theme editor, a "follow the OS" option, and the
