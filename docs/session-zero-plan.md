@@ -437,3 +437,60 @@ the code and taken in:
   7,871) against the 36,000 default GM-stage input budget. The reply is
   reserved separately. Round-by-round growth within a turn is the tool
   results, as for any turn.
+
+### 2026-10-23, slice 4
+
+- **Progress is judged from tool results, with one derived check.** An
+  answered `ask_question` (`success`, i.e. not all skipped), `confirm_setup`
+  approved and `start_game` succeeded read straight off `GMToolResult`. For
+  sheet and plan notes, a `create_note` / `edit_note` that succeeded counts
+  only if `currentSetupHashes(story)` differs before and after the batch, so a
+  note of another type, an unchanged edit or a disabled note is no progress.
+  `conceptDone` and `questionsAsked` (+1 per answered call, not per question)
+  are written by the `ask_question` case in `executeGMTools` on the working
+  copy, only while `sessionZeroActive`.
+- **`sessionZeroTurn` is read once, before the round loop,** from the story as
+  the turn found it. The M2 and plan gates are off for the whole turn on that
+  flag (including the rounds after `start_game`, which is harmless: a fresh
+  game has no combat and no plan beat pending). Buffering and the "no
+  narration" rule use the live `startGameSucceededThisTurn` instead.
+- **Approved this turn but not started is a violation even though approval
+  counts as progress** (`setupApprovedThisTurn && next === "start_game"`): the
+  approval result already told the model to call `start_game`, and prose then
+  would strand the player on a finished setup. Uses the same counter.
+- **Turn text stays "all non-rejected rounds' prose joined",** as outside
+  session zero (the plan's "the final round's text is the turn's text" is read
+  as "no separate narration call"). Prose written alongside tool calls in
+  rounds that were not rejected is kept.
+- **Rejection** truncates `gmThinking`, `gmAccumulatedStory`,
+  `allGMContextParts` and `conversationHistory` back to marks taken when the
+  round returned, so the next request and the saved `gmConversation` never
+  hold it. The gate's user message stays in the model-facing history but is
+  filtered from storage (as the M2 messages already are). On exhaustion (cap or
+  round limit with no progress) all accumulated prose, `gmThinking` and the
+  `content` of earlier assistant tool-call messages are cleared too.
+- **Buffering stops at `start_game`:** the live callbacks (`onGMContent`,
+  `onLiveNarrationUpdate`) are held while `sessionZeroTurn &&
+  !startGameSucceededThisTurn` and stream normally after, since the intro is
+  the story and no later round can be rejected. Reasoning and tool-result
+  callbacks are not held. Held text reaches the player once, through the usual
+  `onStoryContent` / `onStoryComplete`.
+- **Engine line wording** uses a plain label per step (`setupEngineLine` in
+  `campaignPlan.ts`: "a few questions about the game", "the character sheet",
+  "the campaign plan", "your OK on the setup card", "starting the game"). It is
+  also used when a session-zero turn without a started game ends with empty
+  text after real progress (otherwise the separate narration call would run);
+  it goes through the normal story-content path, so it is saved as the turn's
+  text and the GM sees it next turn.
+- **Forced choice:** `gmModelRejectsForcedToolChoice(modelKey)` (generation.ts)
+  resolves an `AI_MODELS` key or custom UUID and calls
+  `modelRejectsForcedToolChoice`. Only Qwen 3.8 is skipped here, as the plan
+  says; `providerCall` still downgrades Claude and Z.ai to `auto` for every
+  forced round, so those get the message plus a no-op header.
+- **Not covered:** the retry path (`precomputedGMConversation`) and the
+  no-user-choice first turn skip the GM loop and are untouched, so a session-
+  zero retry can still run the separate narration call. Neither runs tools or
+  the gate; left alone to avoid breaking an opening that has no player line.
+- **Tests:** `tests/generation.setupGate.test.ts` (13). The forced-choice case
+  stubs `localStorage` and sets the Advanced slot (session zero runs on tier 3)
+  to Qwen 3.8 Max.

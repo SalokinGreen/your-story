@@ -1070,6 +1070,16 @@ export async function executeGMTools(
             params as AskQuestionParams,
             interaction
           );
+          // An answered question is session zero's progress: the concept has
+          // begun, and the count feeds the "enough questions" nudge. On the
+          // working copy, so it reaches StoryData like any other state change.
+          if (result.success && modified.sessionZeroActive === true) {
+            modified.setup = {
+              ...modified.setup,
+              conceptDone: true,
+              questionsAsked: (modified.setup?.questionsAsked ?? 0) + 1,
+            };
+          }
           break;
         case "opposed_formula":
           result = await executeOpposedFormula(

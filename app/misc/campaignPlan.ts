@@ -370,3 +370,49 @@ export function getSetupProgress(
 
   return { concept, character, campaign, approved, started, next, missingSheetFor };
 }
+
+// ============================================
+// THE SETUP GATE'S WORDS (docs/session-zero-plan.md, slice 4)
+// ============================================
+
+/** How many times the setup gate re-prompts one turn before ending it. */
+export const MAX_SETUP_PROMPTS = 2;
+
+/** What the player reads for a step, in the engine line. */
+const SETUP_STEP_LABEL: Record<SetupStep, string> = {
+  concept: "a few questions about the game",
+  character: "the character sheet",
+  campaign: "the campaign plan",
+  confirm: "your OK on the setup card",
+  start_game: "starting the game",
+};
+
+/**
+ * The user message the setup gate adds when a session-zero turn is about to
+ * end on prose without moving setup forward. Names the next step and the tool
+ * that does it.
+ */
+export function setupGateMessage(next: SetupStep | null): string {
+  const head =
+    "Setup is not finished and this turn has not moved it forward, so the turn cannot end on prose alone.";
+  switch (next) {
+    case "concept":
+      return `${head} Next step: ask the player your setup questions with ask_question (their answers set the concept), then continue.`;
+    case "character":
+      return `${head} Next step: write the character sheet with create_note (type "character_sheet"), then continue.`;
+    case "campaign":
+      return `${head} Next step: write the campaign plan with create_note (type "gm_plan"), then continue.`;
+    case "confirm":
+      return `${head} Next step: call confirm_setup so the player can review the sheet and the plan and press Start.`;
+    case "start_game":
+      return `${head} The player has approved. Call start_game now, then write the campaign intro.`;
+    default:
+      return `${head} Call the tool for the next setup step.`;
+  }
+}
+
+/** The line a session-zero turn ends with when the gate's prompts ran out. */
+export function setupEngineLine(next: SetupStep | null): string {
+  const what = next ? SETUP_STEP_LABEL[next] : "the setup";
+  return `(Let's finish setting up first: next is ${what}.)`;
+}
