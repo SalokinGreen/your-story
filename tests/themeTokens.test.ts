@@ -1,41 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { THEME_PRESETS } from "@/app/components/FontSettingsTab";
-import { INK, mixRgb, themeTokens } from "@/app/story/themeTokens";
+import {
+  INK,
+  THEME_PRESETS,
+  contrastRatio,
+  isLightTheme,
+  mixRgb,
+  themeTokens,
+} from "@/app/story/themeTokens";
 
-function channels(color: string): [number, number, number] {
-  const hex = /^#([0-9a-f]{6})$/i.exec(color);
-  if (hex) {
-    const n = parseInt(hex[1], 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  }
-  const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(color);
-  if (!m) throw new Error(`unparsable colour ${color}`);
-  return [Number(m[1]), Number(m[2]), Number(m[3])];
-}
-
-// WCAG 2.x relative luminance and contrast ratio.
-function luminance(color: string): number {
-  const [r, g, b] = channels(color).map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
+const contrast = contrastRatio;
 
 describe("themeTokens", () => {
   it("Ink has the design's values", () => {
-    expect(themeTokens(INK)).toEqual({
+    const t = themeTokens(INK);
+    expect(t).toMatchObject({
       bg: "#121212",
       surface: "#1c1c1c",
+      surface2: "#262626",
       text: "#ececec",
       muted: "#9a9a9a",
       border: "#2a2a2a",
       accent: "#e8dcc4",
+      scheme: "dark",
     });
+    expect(Object.keys(t).sort()).toEqual(
+      [
+        "accent",
+        "bg",
+        "border",
+        "danger",
+        "gradient",
+        "muted",
+        "onAccent",
+        "scheme",
+        "success",
+        "surface",
+        "surface2",
+        "text",
+        "warning",
+      ].sort(),
+    );
   });
 
   it("Ink is the first preset", () => {
@@ -50,7 +54,7 @@ describe("themeTokens", () => {
     expect(mixRgb("#102030", "rgb(16, 32, 48)", 0.7)).toBe("rgb(16, 32, 48)");
   });
 
-  it("derives surface, muted and border when a preset names none", () => {
+  it("derives surface, surface-2, muted and border when a preset names none", () => {
     const t = themeTokens({
       id: "x",
       name: "X",
@@ -59,22 +63,78 @@ describe("themeTokens", () => {
       accent: "rgb(1, 2, 3)",
     });
     expect(t.surface).toBe("rgb(6, 6, 6)");
+    expect(t.surface2).toBe("rgb(11, 11, 11)");
     expect(t.muted).toBe("rgb(62, 62, 62)");
     expect(t.border).toBe("rgb(14, 14, 14)");
+  });
+
+  it("a preset's own onAccent wins over the derived one", () => {
+    const t = themeTokens({
+      id: "x",
+      name: "X",
+      background: "#000000",
+      text: "#ffffff",
+      accent: "#808080",
+      onAccent: "#123456",
+    });
+    expect(t.onAccent).toBe("#123456");
+  });
+
+  it("falls back to near-black or near-white when neither bg nor text reaches 4.5:1 on the accent", () => {
+    const t = themeTokens({
+      id: "x",
+      name: "X",
+      background: "#222222",
+      text: "#dddddd",
+      accent: "#888888",
+    });
+    expect(["#111111", "#fafafa"]).toContain(t.onAccent);
+    expect(contrast(t.onAccent, "#888888")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("only Paper White is a light theme", () => {
+    const light = THEME_PRESETS.filter(isLightTheme).map((p) => p.id);
+    expect(light).toEqual(["paper"]);
+    expect(themeTokens(THEME_PRESETS.find((p) => p.id === "paper")!).scheme).toBe(
+      "light",
+    );
   });
 
   describe.each(THEME_PRESETS.map((p) => [p.name, p] as const))(
     "%s",
     (_name, preset) => {
       const t = themeTokens(preset);
+      const grounds = [
+        ["bg", t.bg],
+        ["surface", t.surface],
+        ["surface-2", t.surface2],
+      ] as const;
+
       it("text on bg is at least 7:1", () => {
         expect(contrast(t.text, t.bg)).toBeGreaterThanOrEqual(7);
       });
-      it("muted on bg is at least 4.5:1", () => {
-        expect(contrast(t.muted, t.bg)).toBeGreaterThanOrEqual(4.5);
+      it.each(grounds)("text and muted reach 4.5:1 on %s", (_n, ground) => {
+        expect(contrast(t.text, ground)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(t.muted, ground)).toBeGreaterThanOrEqual(4.5);
       });
-      it("accent on bg is at least 3:1", () => {
-        expect(contrast(t.accent, t.bg)).toBeGreaterThanOrEqual(3);
+      // The accent is a UI and large-text colour, so 3:1, as before. On
+      // surface-2 (hover) Ocean Blue and Forest sit at 2.9 and 2.6; the plan's
+      // 4.5:1 would mean new accents, which is a visual call (plan, slice 1).
+      it.each(grounds.slice(0, 2))("accent reaches 3:1 on %s", (_n, ground) => {
+        expect(contrast(t.accent, ground)).toBeGreaterThanOrEqual(3);
+      });
+      it("onAccent reaches 4.5:1 on the accent", () => {
+        expect(contrast(t.onAccent, t.accent)).toBeGreaterThanOrEqual(4.5);
+      });
+      it.each([
+        ["danger", t.danger],
+        ["success", t.success],
+        ["warning", t.warning],
+      ] as const)("%s reads on bg, surface and its own 15% fill", (_n, c) => {
+        expect(contrast(c, t.bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(c, t.surface)).toBeGreaterThanOrEqual(4.5);
+        const fill = mixRgb(t.bg, c, 0.15);
+        expect(contrast(c, fill)).toBeGreaterThanOrEqual(4.5);
       });
     },
   );

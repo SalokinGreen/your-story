@@ -6,8 +6,9 @@ import {
   DEFAULT_READING_FONT,
   DEFAULT_THEME_ID,
   INK,
-  themeTokens,
-  type ThemePreset,
+  THEME_PRESETS,
+  applyThemeVars,
+  findThemePreset,
 } from "../story/themeTokens";
 
 interface CustomFont {
@@ -138,68 +139,6 @@ const DEFAULT_FONTS = [
   { name: "Cursive", value: "'Segoe Script', 'Brush Script MT', cursive" },
 ];
 
-// Theme presets for story background and text colors
-export const THEME_PRESETS: ThemePreset[] = [
-  INK,
-  {
-    id: "default",
-    name: "Ocean Blue",
-    background: "rgb(23, 37, 84)", // blue-950
-    text: "rgb(239, 246, 255)", // blue-50
-    accent: "rgb(59, 130, 246)", // blue-500
-  },
-  {
-    id: "sepia",
-    name: "Sepia",
-    background: "rgb(68, 52, 35)",
-    text: "rgb(245, 235, 220)",
-    accent: "rgb(194, 154, 108)",
-  },
-  {
-    id: "dark",
-    name: "Pure Dark",
-    background: "rgb(17, 17, 17)",
-    text: "rgb(229, 229, 229)",
-    accent: "rgb(168, 162, 158)",
-  },
-  {
-    id: "paper",
-    name: "Paper White",
-    background: "rgb(250, 250, 248)",
-    text: "rgb(41, 37, 36)",
-    accent: "rgb(87, 83, 78)",
-    muted: "rgb(100, 96, 92)", // derived mix is 4.3:1; this is about 6:1
-  },
-  {
-    id: "forest",
-    name: "Forest",
-    background: "rgb(20, 30, 22)",
-    text: "rgb(220, 237, 222)",
-    accent: "rgb(74, 124, 89)",
-  },
-  {
-    id: "sunset",
-    name: "Sunset",
-    background: "rgb(45, 25, 30)",
-    text: "rgb(255, 235, 230)",
-    accent: "rgb(220, 120, 95)",
-  },
-  {
-    id: "nord",
-    name: "Nord",
-    background: "rgb(46, 52, 64)",
-    text: "rgb(236, 239, 244)",
-    accent: "rgb(136, 192, 208)",
-  },
-  {
-    id: "solarized",
-    name: "Solarized Dark",
-    background: "rgb(0, 43, 54)",
-    text: "rgb(253, 246, 227)",
-    accent: "rgb(38, 139, 210)",
-  },
-];
-
 // Font size presets
 const FONT_SIZE_PRESETS = [
   { name: "Small", value: 14 },
@@ -208,22 +147,6 @@ const FONT_SIZE_PRESETS = [
   { name: "Extra Large", value: 20 },
   { name: "Huge", value: 24 },
 ];
-
-// Set the six colour tokens (--ys-*) the story screen reads, plus the three
-// older --story-* colours, which a synced older device may still read.
-function applyThemeVars(themeData: ThemePreset) {
-  const root = document.documentElement.style;
-  const tokens = themeTokens(themeData);
-  root.setProperty("--ys-bg", tokens.bg);
-  root.setProperty("--ys-surface", tokens.surface);
-  root.setProperty("--ys-text", tokens.text);
-  root.setProperty("--ys-muted", tokens.muted);
-  root.setProperty("--ys-border", tokens.border);
-  root.setProperty("--ys-accent", tokens.accent);
-  root.setProperty("--story-bg-color", themeData.background);
-  root.setProperty("--story-text-color", themeData.text);
-  root.setProperty("--story-accent-color", themeData.accent);
-}
 
 export default function FontSettingsTab({
   addNotification,
@@ -235,6 +158,10 @@ export default function FontSettingsTab({
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  // False until the load effect below has read the saved settings. The apply
+  // effect waits for it: until then `theme` is the initial Ink, and applying
+  // it would overwrite the saved theme the bootstrap script already painted.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get current theme colors
@@ -258,6 +185,7 @@ export default function FontSettingsTab({
       if (savedParagraphSpacing)
         setParagraphSpacing(parseFloat(savedParagraphSpacing));
       if (savedTheme) setTheme(savedTheme);
+      setSettingsLoaded(true);
 
       // Load custom fonts from IndexedDB
       getAllFonts()
@@ -320,6 +248,7 @@ export default function FontSettingsTab({
 
   // Apply settings whenever they change
   useEffect(() => {
+    if (!settingsLoaded) return;
     applyFontSettings(
       fontSize,
       fontFamily,
@@ -333,6 +262,7 @@ export default function FontSettingsTab({
     lineHeight,
     paragraphSpacing,
     theme,
+    settingsLoaded,
     applyFontSettings,
   ]);
 
@@ -801,9 +731,22 @@ export function useFontSettings() {
   return settings;
 }
 
+/** Paint the saved theme (Ink when none is saved). Synchronous, so the colours never wait on IndexedDB. */
+export function applySavedTheme() {
+  if (typeof window === "undefined") return;
+  try {
+    applyThemeVars(findThemePreset(localStorage.getItem("storyTheme")));
+  } catch (error) {
+    console.error("Failed to apply the saved theme:", error);
+  }
+}
+
 // Initialize fonts on app load
 export async function initializeFonts() {
   if (typeof window === "undefined") return;
+
+  // Colours first and at once: they do not need the font database.
+  applySavedTheme();
 
   try {
     const fonts = await getAllFonts();
@@ -814,9 +757,6 @@ export async function initializeFonts() {
     const fontFamily = localStorage.getItem("storyFontFamily");
     const lineHeight = localStorage.getItem("storyLineHeight");
     const paragraphSpacing = localStorage.getItem("storyParagraphSpacing");
-    const themeId = localStorage.getItem("storyTheme") || DEFAULT_THEME_ID;
-    const themeData =
-      THEME_PRESETS.find((t) => t.id === themeId) || THEME_PRESETS[0];
 
     if (fontSize) {
       document.documentElement.style.setProperty(
@@ -840,7 +780,6 @@ export async function initializeFonts() {
         `${paragraphSpacing}em`
       );
     }
-    applyThemeVars(themeData);
   } catch (error) {
     console.error("Failed to initialize fonts:", error);
   }

@@ -7,6 +7,8 @@ import NotificationContainer from "./components/NotificationContainer";
 import SiteHeader from "./components/SiteHeader";
 import FontInitializer from "./components/FontInitializer";
 import NativeBackButton from "./components/NativeBackButton";
+import InlineScript from "./components/InlineScript";
+import { THEME_BOOTSTRAP_SCRIPT } from "./misc/themeBootstrap";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,6 +46,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Paints the saved theme before first paint. A plain synchronous
+            script, not next/script (its beforeInteractive does not run before
+            paint); see app/misc/themeBootstrap.ts and InlineScript. */}
+        <InlineScript html={THEME_BOOTSTRAP_SCRIPT} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

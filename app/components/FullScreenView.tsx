@@ -74,35 +74,35 @@ export default function FullScreenView({
 
   return (
     <div
-      className={`fixed inset-0 ${className} flex flex-col h-dvh bg-[#0a1628] animate-fade-in`}
+      className={`fixed inset-0 ${className} flex flex-col h-dvh bg-ys-bg text-ys-text animate-fade-in`}
       style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
     >
-      <div className="shrink-0 flex items-center justify-between gap-3 px-3 sm:px-6 py-3 sm:py-4 border-b border-white/10 bg-[#0a1628]/95 backdrop-blur-2xl">
+      <div className="shrink-0 flex items-center justify-between gap-3 px-3 sm:px-6 py-3 sm:py-4 border-b border-ys-border bg-ys-bg/95 backdrop-blur-2xl">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {onBack && (
             <button
               onClick={onBack}
               title="Back"
               aria-label="Back"
-              className="p-2 -ml-1 text-blue-300/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              className="p-2 -ml-1 text-ys-muted hover:text-ys-text hover:bg-ys-surface-2 rounded-lg transition-colors"
             >
               <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
             </button>
           )}
           {icon && (
-            <span className="p-1.5 sm:p-2 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20 shrink-0">
+            <span className="p-1.5 sm:p-2 rounded-lg bg-ys-accent/10 ring-1 ring-ys-accent/20 shrink-0">
               <DynamicIcon
                 name={icon}
-                className="w-4 h-4 sm:w-5 sm:h-5 text-purple-300"
+                className="w-4 h-4 sm:w-5 sm:h-5 text-ys-accent"
               />
             </span>
           )}
           <div className="min-w-0">
-            <h2 className="text-base sm:text-xl font-bold text-white truncate">
+            <h2 className="text-base sm:text-xl font-bold text-ys-text truncate">
               {title}
             </h2>
             {subtitle && (
-              <p className="text-xs text-blue-300/60 truncate">{subtitle}</p>
+              <p className="text-xs text-ys-muted truncate">{subtitle}</p>
             )}
           </div>
         </div>
@@ -112,7 +112,7 @@ export default function FullScreenView({
             onClick={onClose}
             title="Close"
             aria-label="Close"
-            className="p-2 text-blue-300/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 text-ys-muted hover:text-ys-text hover:bg-ys-surface-2 rounded-lg transition-colors"
           >
             <DynamicIcon name="X" className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
@@ -120,7 +120,7 @@ export default function FullScreenView({
       </div>
 
       {tabs && (
-        <div className="shrink-0 border-b border-white/10 overflow-x-auto scrollbar-hide">
+        <div className="shrink-0 border-b border-ys-border overflow-x-auto scrollbar-hide">
           {tabs}
         </div>
       )}
@@ -128,7 +128,7 @@ export default function FullScreenView({
       <div className="flex-1 flex overflow-hidden min-h-0">
         {nav && (
           <nav
-            className={`shrink-0 border-r border-white/10 overflow-y-auto bg-white/[0.02] ${navClassName ?? ""}`}
+            className={`shrink-0 border-r border-ys-border overflow-y-auto bg-ys-surface ${navClassName ?? ""}`}
           >
             {nav}
           </nav>
@@ -141,7 +141,7 @@ export default function FullScreenView({
       </div>
 
       {footer && (
-        <div className="shrink-0 border-t border-white/10 bg-white/[0.02]">
+        <div className="shrink-0 border-t border-ys-border bg-ys-surface">
           {footer}
         </div>
       )}

@@ -334,3 +334,57 @@ in:
 ## Decisions made during implementation
 
 (Filled in as slices land.)
+
+### Slice 1 — 2026-10-23
+
+**Dependency inventory.** The shells slice 1's consumers render through:
+`FullScreenView` (Settings, Notes, NPCs, menus, PDF importer, pickers; its
+background, header, tab strip, side nav and footer converted), `ConfirmDialog`
+(backdrop and card now `ys-modal-backdrop` / `ys-modal`), `LoadingButton`,
+`Skeleton`, `ModelSelect` and `NotificationContainer` (all converted, none
+was already clean). `FontSettingsTab` holds colours too, but they are slice 2's
+and its swatches. Not in the slice, found while inventorying: callers of
+`ConfirmDialog` still pass `confirmButtonClass="bg-red-600 …"` (Library tabs,
+slice 4); the dialog now reads any value as "destructive" and ignores the
+string.
+
+**Judgment calls.**
+- *Accent contrast.* The plan asks for accent at 4.5:1 on bg, surface and
+  surface-2. The presets cannot meet that without new accents (Ocean Blue is
+  4.0 on bg, Forest 3.5, Solarized 4.1), which would change the story screen.
+  The test keeps the old floor, 3:1, on bg and surface; on surface-2 (hover
+  only) Ocean Blue is 2.9 and Forest 2.6, left unasserted. A call for the
+  author if they want new accents.
+- *Muted* is now named for Sepia (`rgb(205, 190, 168)`), Nord
+  (`rgb(190, 198, 212)`) and Ocean Blue (`rgb(174, 183, 204)`; the derived mix
+  was 4.43:1 on surface-2). Text, muted reach 4.5:1 on bg, surface and
+  surface-2 for every preset.
+- *Meaning colours.* Dark themes: `#fca5a5` / `#4ade80` / `#fbbf24` (red-300,
+  not red-400: red-400 failed 4.5:1 on Sepia, Nord, Ocean Blue). Paper White:
+  `#b91c1c` / `#166534` / `#92400e`. All reach 4.5:1 on bg, surface and as
+  text on their own 15% fill over bg, for every preset.
+- *onAccent* per preset (contrast with accent): Ink `#121212` 13.8; Ocean Blue
+  `#111111` 5.1; Sepia bg 4.6; Pure Dark bg 7.5; Paper White bg 7.3 (`#fafaf8`);
+  Forest `#fafafa` 4.7; Sunset bg 5.4; Nord bg 6.2; Solarized `#111111` 5.1.
+- *The script* is a hand-copied ES5 version of `themeTokens()` with the preset
+  list serialised in, as the design says (a toString of the real functions
+  does not survive minification). It does not set the `theme-color` meta:
+  adding a <head> child from outside React risks a hydration mismatch, so
+  `applyThemeVars` sets it after load. `color-scheme` is also in `:root`
+  (dark), so a page with no script is Ink.
+- *New exports* in themeTokens.ts beyond the plan: `relativeLuminance`,
+  `contrastRatio`, `findThemePreset`, `themeVarEntries`, `MEANING_DARK/LIGHT`;
+  and `applySavedTheme()` in FontSettingsTab.tsx, which `initializeFonts` calls
+  synchronously before its IndexedDB wait and `FontInitializer` calls on
+  `storage` (key `storyTheme`, or null) and on `SYNC_COMPLETED_EVENT`.
+- *Select arrow* is two CSS gradients in `--ys-muted` (a data-URI image cannot
+  read a custom property); the separate disabled-arrow rule is gone (opacity
+  covers it).
+- *`ys-modal-backdrop`* is the theme background pushed toward black, 70%
+  opaque, with the old blur; `ys-modal` is surface, border, `rounded-2xl`.
+- *Ratchet:* the "every .tsx is listed or exempt" case is written and
+  `it.skip`. The exempt list holds `palette.ts` and `diceColors.ts` (both
+  `.ts`, so the walk would not see them; they are listed for slice 5). The
+  picker swatches live in FontSettingsTab.tsx, which is not listed until slice
+  2, so no region exemption exists yet; slice 2 records how.
+- `FontInitializer.tsx` and `layout.tsx` are on the ratchet list too.
