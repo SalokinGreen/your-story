@@ -95,7 +95,7 @@ export default function AdventuresLibraryTab({
         "Are you sure you want to delete this adventure? This action cannot be undone.",
       icon: "Trash2",
       confirmText: "Delete Adventure",
-      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      confirmButtonClass: "ys-button--danger",
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
@@ -147,8 +147,8 @@ export default function AdventuresLibraryTab({
   const chipClass = (active: boolean) =>
     `px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
       active
-        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-        : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+        ? "bg-ys-accent text-ys-on-accent hover:opacity-90"
+        : "bg-ys-surface text-ys-muted hover:bg-ys-surface-2"
     }`;
 
   return (
@@ -157,20 +157,20 @@ export default function AdventuresLibraryTab({
         <div className="flex-1 relative">
           <DynamicIcon
             name="Search"
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400/50"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ys-muted"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search adventures..."
-            className="w-full pl-10 pr-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-blue-900/70 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-ys-surface border border-ys-border rounded-xl text-ys-text placeholder:text-ys-muted focus:outline-none focus:border-ys-accent focus:bg-ys-surface-2 transition-all"
           />
         </div>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as AdventureSortBy)}
-          className="px-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white focus:outline-none focus:border-purple-500/50 transition-all"
+          className="px-4 py-2.5 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:border-ys-accent transition-all"
         >
           <option value="updated">Recent</option>
           <option value="title">A-Z</option>
@@ -212,7 +212,7 @@ export default function AdventuresLibraryTab({
           ))}
           <button
             onClick={() => setShowNewFolderDialog(true)}
-            className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-blue-900/30 text-blue-300/70 hover:bg-blue-800/50 transition-all flex items-center gap-1.5 border border-dashed border-blue-700/50"
+            className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-ys-surface text-ys-muted hover:bg-ys-surface-2 transition-all flex items-center gap-1.5 border border-dashed border-ys-border"
           >
             <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
             New Folder
@@ -221,15 +221,15 @@ export default function AdventuresLibraryTab({
       )}
 
       {filteredAdventures.length === 0 ? (
-        <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
+        <div className="bg-ys-surface rounded-2xl p-12 text-center border border-ys-border">
           <DynamicIcon
             name="Gamepad2"
-            className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
+            className="w-16 h-16 text-ys-muted mx-auto mb-4"
           />
           <h3 className="text-xl font-bold mb-2">
             {adventures.length === 0 ? "No Adventures Yet" : "Nothing Here"}
           </h3>
-          <p className="text-blue-200/60 mb-6">
+          <p className="text-ys-muted mb-6">
             {adventures.length === 0
               ? "Create your first adventure!"
               : "Try adjusting your search, or file an adventure here."}
@@ -237,7 +237,7 @@ export default function AdventuresLibraryTab({
           {adventures.length === 0 && (
             <button
               onClick={() => router.push("/creator")}
-              className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
+              className="px-6 py-3 font-semibold rounded-xl transition-colors bg-ys-accent text-ys-on-accent hover:opacity-90"
             >
               Create Adventure
             </button>
@@ -250,7 +250,7 @@ export default function AdventuresLibraryTab({
             return (
               <div
                 key={adventure.id}
-                className="group relative bg-blue-950/50 rounded-xl overflow-hidden border border-blue-800/30 hover:border-blue-700/50 transition-all cursor-pointer"
+                className="group relative bg-ys-surface rounded-xl overflow-hidden border border-ys-border hover:border-ys-accent/50 transition-all cursor-pointer"
                 onClick={() => onPlayAdventure(adventure)}
               >
                 <div className="relative h-32">
@@ -262,13 +262,13 @@ export default function AdventuresLibraryTab({
                       }}
                     />
                   ) : (
-                    <div className="absolute inset-0 bg-linear-to-br from-purple-800/60 via-blue-900/60 to-gray-900" />
+                    <div className="absolute inset-0 bg-ys-surface-2" />
                   )}
-                  <div className="absolute inset-0 bg-linear-to-t from-gray-900/90 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-linear-to-t from-ys-bg/90 via-transparent to-transparent" />
 
                   {scope.kind === "all" && folder && (
                     <span
-                      className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/50 backdrop-blur text-xs rounded flex items-center gap-1"
+                      className="absolute top-2 right-2 px-1.5 py-0.5 bg-ys-surface backdrop-blur text-xs rounded flex items-center gap-1"
                       style={{ color: folder.color }}
                     >
                       <DynamicIcon name={folder.icon} className="w-3 h-3" />
@@ -281,7 +281,7 @@ export default function AdventuresLibraryTab({
                   <h3 className="font-semibold truncate mb-1">
                     {adventure.title}
                   </h3>
-                  <p className="text-xs text-blue-200/50 line-clamp-2 mb-2">
+                  <p className="text-xs text-ys-muted line-clamp-2 mb-2">
                     {adventure.description}
                   </p>
 
@@ -291,14 +291,14 @@ export default function AdventuresLibraryTab({
                       .map((tag: string) => (
                         <span
                           key={tag}
-                          className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded"
+                          className="px-1.5 py-0.5 bg-ys-accent/20 text-ys-accent text-xs rounded"
                         >
                           {tag}
                         </span>
                       ))}
                   </div>
 
-                  <div className="text-xs text-blue-200/40 mb-3">
+                  <div className="text-xs text-ys-muted mb-3">
                     {getRelativeTime(String(adventure.updatedAt))}
                   </div>
 
@@ -308,7 +308,7 @@ export default function AdventuresLibraryTab({
                   >
                     <button
                       onClick={() => onPlayAdventure(adventure)}
-                      className="flex-1 px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-sm rounded-lg transition-colors"
+                      className="flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors bg-ys-accent text-ys-on-accent hover:opacity-90"
                     >
                       Play
                     </button>
@@ -316,14 +316,14 @@ export default function AdventuresLibraryTab({
                       onClick={() =>
                         router.push(`/creator?edit=${adventure.id}`)
                       }
-                      className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
+                      className="px-3 py-1.5 bg-ys-surface hover:bg-ys-surface-2 text-sm rounded-lg transition-colors"
                       title="Edit"
                     >
                       <DynamicIcon name="Pencil" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setMovingAdventure(adventure.id)}
-                      className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
+                      className="px-3 py-1.5 bg-ys-surface hover:bg-ys-surface-2 text-sm rounded-lg transition-colors"
                       title="Move to folder"
                     >
                       <DynamicIcon name="Folder" className="w-4 h-4" />
@@ -331,7 +331,7 @@ export default function AdventuresLibraryTab({
                     <button
                       onClick={() => handleDeleteAdventure(adventure.id)}
                       disabled={deleting === adventure.id}
-                      className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg transition-colors"
+                      className="px-3 py-1.5 bg-ys-danger/15 hover:bg-ys-danger/25 text-ys-danger rounded-lg transition-colors"
                       title="Delete"
                     >
                       <DynamicIcon
@@ -358,13 +358,13 @@ export default function AdventuresLibraryTab({
       />
 
       {movingAdventure && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 ys-modal-backdrop flex items-center justify-center z-50 p-4">
+          <div className="ys-modal p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Move to Folder</h2>
             <div className="space-y-2 max-h-96 overflow-y-auto">
               <button
                 onClick={() => handleMoveAdventure(movingAdventure, null)}
-                className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+                className="w-full p-3 text-left rounded-lg border-2 border-ys-border hover:border-ys-accent transition-colors"
               >
                 <span className="flex items-center gap-2">
                   <DynamicIcon name="FolderOpen" className="w-5 h-5" />
@@ -375,7 +375,7 @@ export default function AdventuresLibraryTab({
                 <button
                   key={folder.id}
                   onClick={() => handleMoveAdventure(movingAdventure, folder.id)}
-                  className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+                  className="w-full p-3 text-left rounded-lg border-2 border-ys-border hover:border-ys-accent transition-colors"
                   style={{
                     borderLeftColor: folder.color,
                     borderLeftWidth: "4px",
@@ -390,7 +390,7 @@ export default function AdventuresLibraryTab({
             </div>
             <button
               onClick={() => setMovingAdventure(null)}
-              className="w-full mt-4 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 font-semibold rounded-lg transition-colors"
+              className="w-full mt-4 px-4 py-2 bg-ys-surface-2 hover:bg-ys-border font-semibold rounded-lg transition-colors"
             >
               Cancel
             </button>

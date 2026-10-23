@@ -75,6 +75,24 @@ const TOKENISED_TSX: string[] = [
   "app/components/TTSControls.tsx",
   "app/components/SyncConflictModal.tsx",
   "app/components/ProfilePickerModal.tsx",
+  // slice 4: Library and Designer
+  "app/components/DraggableScroll.tsx",
+  "app/library/AdventuresLibraryTab.tsx",
+  "app/library/BuiltinSystemsSection.tsx",
+  "app/library/FolderDetailView.tsx",
+  "app/library/LibraryHome.tsx",
+  "app/library/NotesLibraryTab.tsx",
+  "app/library/StoriesLibraryTab.tsx",
+  "app/library/page.tsx",
+  "app/creator/AdventureInspector.tsx",
+  "app/creator/DesignerChat.tsx",
+  "app/creator/page.tsx",
+  "app/components/LibraryPickerModal.tsx",
+  "app/components/NewFolderDialog.tsx",
+  "app/components/FolderActionSheet.tsx",
+  "app/components/ExportFolderModal.tsx",
+  "app/components/JoinGameModal.tsx",
+  "app/components/HostGameModal.tsx",
 ];
 
 /** Stylesheets: no hex colour outside the `:root` token block. */

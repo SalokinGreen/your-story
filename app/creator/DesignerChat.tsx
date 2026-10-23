@@ -58,25 +58,25 @@ export default function DesignerChat({
         {messages.map((message) =>
           message.role === "user" ? (
             <div key={message.id} className="flex justify-end">
-              <div className="max-w-[85%] bg-purple-600/25 border border-purple-400/25 rounded-2xl rounded-br-md px-4 py-2.5">
-                <p className="text-sm text-white whitespace-pre-wrap">
+              <div className="max-w-[85%] bg-ys-accent/25 border border-ys-accent rounded-2xl rounded-br-md px-4 py-2.5">
+                <p className="text-sm text-ys-text whitespace-pre-wrap">
                   {message.content}
                 </p>
               </div>
             </div>
           ) : (
             <div key={message.id} className="flex gap-3">
-              <div className="w-7 h-7 rounded-full bg-linear-to-br from-purple-500 to-pink-600 flex items-center justify-center shrink-0 mt-0.5">
-                <DynamicIcon name="Feather" className="w-3.5 h-3.5 text-white" />
+              <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-ys-accent text-ys-on-accent">
+                <DynamicIcon name="Feather" className="w-3.5 h-3.5" />
               </div>
               <div className="min-w-0 flex-1">
                 {message.pending && !message.content ? (
-                  <div className="flex items-center gap-2 text-white/40 text-sm">
+                  <div className="flex items-center gap-2 text-ys-muted text-sm">
                     <span className="flex gap-1">
                       {[0, 150, 300].map((delay) => (
                         <span
                           key={delay}
-                          className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce"
+                          className="w-1.5 h-1.5 rounded-full bg-ys-muted animate-bounce"
                           style={{ animationDelay: `${delay}ms` }}
                         />
                       ))}
@@ -85,8 +85,8 @@ export default function DesignerChat({
                   </div>
                 ) : (
                   <div
-                    className={`prose prose-invert prose-sm max-w-none prose-p:my-2 prose-headings:mt-3 prose-headings:mb-1.5 prose-ul:my-2 prose-li:my-0.5 ${
-                      message.error ? "text-red-300" : "text-white/85"
+                    className={`prose prose-sm max-w-none prose-p:my-2 prose-headings:mt-3 prose-headings:mb-1.5 prose-ul:my-2 prose-li:my-0.5 ${
+                      message.error ? "text-ys-danger" : "text-ys-text"
                     }`}
                   >
                     <ReactMarkdown>{message.content}</ReactMarkdown>
@@ -98,7 +98,7 @@ export default function DesignerChat({
                     {message.changes.map((change, index) => (
                       <div
                         key={index}
-                        className="flex items-start gap-2 text-xs text-emerald-300/75"
+                        className="flex items-start gap-2 text-xs text-ys-success"
                       >
                         <DynamicIcon
                           name="Check"
@@ -121,7 +121,7 @@ export default function DesignerChat({
                 <button
                   key={suggestion}
                   onClick={() => submit(suggestion)}
-                  className="px-3 py-1.5 rounded-full border border-white/12 text-xs text-white/60 hover:text-white hover:border-purple-400/50 hover:bg-purple-500/10 transition-colors"
+                  className="px-3 py-1.5 rounded-full border border-ys-border text-xs text-ys-muted hover:text-ys-text hover:border-ys-accent hover:bg-ys-accent/15 transition-colors"
                 >
                   {suggestion}
                 </button>
@@ -132,17 +132,17 @@ export default function DesignerChat({
                 from that material rather than from a blank premise. */}
             <button
               onClick={onImport}
-              className="w-full text-left px-3 py-2.5 rounded-xl border border-white/12 hover:border-purple-400/50 hover:bg-purple-500/10 transition-colors flex items-center gap-2.5"
+              className="w-full text-left px-3 py-2.5 rounded-xl border border-ys-border hover:border-ys-accent hover:bg-ys-accent/15 transition-colors flex items-center gap-2.5"
             >
               <DynamicIcon
                 name="Library"
-                className="w-4 h-4 text-purple-300 shrink-0"
+                className="w-4 h-4 text-ys-accent shrink-0"
               />
               <span className="min-w-0">
-                <span className="block text-xs text-white/75">
+                <span className="block text-xs text-ys-muted">
                   Already have notes? Import them
                 </span>
-                <span className="block text-[11px] text-white/40">
+                <span className="block text-[11px] text-ys-muted">
                   Pull rules, lore, character sheets or tables out of your notes
                   library and build from those.
                 </span>
@@ -154,8 +154,8 @@ export default function DesignerChat({
         <div ref={endRef} />
       </div>
 
-      <div className="shrink-0 border-t border-white/10 p-3">
-        <div className="flex items-end gap-2 bg-black/30 border border-white/10 rounded-2xl px-3 py-2 focus-within:border-purple-400/50 transition-colors">
+      <div className="shrink-0 border-t border-ys-border p-3">
+        <div className="flex items-end gap-2 bg-ys-surface border border-ys-border rounded-2xl px-3 py-2 focus-within:border-ys-accent transition-colors">
           <textarea
             ref={textareaRef}
             value={input}
@@ -167,12 +167,12 @@ export default function DesignerChat({
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Talk through the adventure…"
-            className="flex-1 bg-transparent text-sm text-white placeholder:text-white/25 resize-none focus:outline-none py-1.5 max-h-50"
+            className="flex-1 bg-transparent text-sm text-ys-text placeholder:text-ys-muted resize-none focus:outline-none py-1.5 max-h-50"
           />
           {loading ? (
             <button
               onClick={onStop}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/15 text-white/70 transition-colors shrink-0"
+              className="p-2 rounded-xl bg-ys-surface-2 hover:bg-ys-border text-ys-muted transition-colors shrink-0"
               title="Stop"
             >
               <DynamicIcon name="Square" className="w-4 h-4" />
@@ -181,7 +181,7 @@ export default function DesignerChat({
             <button
               onClick={() => submit(input)}
               disabled={!input.trim()}
-              className="p-2 rounded-xl bg-linear-to-br from-purple-600 to-pink-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:from-purple-500 hover:to-pink-500 transition-all shrink-0"
+              className="p-2 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0 bg-ys-accent text-ys-on-accent hover:opacity-90"
               title="Send"
             >
               <DynamicIcon name="ArrowUp" className="w-4 h-4" />

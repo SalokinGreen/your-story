@@ -1,5 +1,6 @@
 "use client";
 
+import { UNFILED_FOLDER_COLOR } from "@/app/misc/folderColors";
 import { useMemo, useState } from "react";
 import { useNotification } from "@/app/misc/NotificationContext";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
@@ -113,7 +114,7 @@ export default function FolderDetailView({
       message: `Are you sure? Items in "${folder.name}" will not be deleted, just uncategorized.`,
       icon: "Trash2",
       confirmText: "Delete Folder",
-      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      confirmButtonClass: "ys-button--danger",
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
@@ -163,7 +164,7 @@ export default function FolderDetailView({
       },
     ];
 
-  const color = folder?.color ?? "#64748b";
+  const color = folder?.color ?? UNFILED_FOLDER_COLOR;
   const icon = folder?.icon ?? "FileText";
 
   return (
@@ -188,8 +189,8 @@ export default function FolderDetailView({
               onClick={() => setTab(t.key)}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${
                 tab === t.key
-                  ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/25"
-                  : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50 hover:text-white"
+                  ? "shadow-lg bg-ys-accent text-ys-on-accent hover:opacity-90"
+                  : "bg-ys-surface text-ys-muted hover:bg-ys-surface-2 hover:text-ys-text"
               }`}
             >
               <DynamicIcon name={t.icon} className="w-4 h-4" />
@@ -202,7 +203,7 @@ export default function FolderDetailView({
           <button
             onClick={() => setShowActionSheet(true)}
             title="Rename, recolour, export or delete this folder"
-            className="flex items-center gap-2 px-3 py-2 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl text-sm font-medium transition-colors shrink-0"
+            className="flex items-center gap-2 px-3 py-2 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border rounded-xl text-sm font-medium transition-colors shrink-0"
           >
             <DynamicIcon name="Settings2" className="w-4 h-4" />
             <span className="hidden sm:inline">Manage</span>

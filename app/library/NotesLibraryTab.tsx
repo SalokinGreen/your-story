@@ -310,7 +310,7 @@ export default function NotesLibraryTab({
       message: "Are you sure you want to delete this note? This action cannot be undone.",
       icon: "Trash2",
       confirmText: "Delete Note",
-      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      confirmButtonClass: "ys-button--danger",
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
@@ -380,7 +380,7 @@ export default function NotesLibraryTab({
       message: `Are you sure you want to delete ${ids.length} note${ids.length === 1 ? "" : "s"}? This action cannot be undone.`,
       icon: "Trash2",
       confirmText: `Delete ${ids.length} Note${ids.length === 1 ? "" : "s"}`,
-      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      confirmButtonClass: "ys-button--danger",
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
@@ -627,8 +627,8 @@ export default function NotesLibraryTab({
   const chipClass = (active: boolean) =>
     `px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
       active
-        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-        : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+        ? "bg-ys-accent text-ys-on-accent hover:opacity-90"
+        : "bg-ys-surface text-ys-muted hover:bg-ys-surface-2"
     }`;
 
   /**
@@ -658,27 +658,27 @@ export default function NotesLibraryTab({
         <div className="flex-1 relative">
           <DynamicIcon
             name="Search"
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400/50"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ys-muted"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search notes..."
-            className="w-full pl-10 pr-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-blue-900/70 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-ys-surface border border-ys-border rounded-xl text-ys-text placeholder:text-ys-muted focus:outline-none focus:border-ys-accent focus:bg-ys-surface-2 transition-all"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={openNewNote}
-            className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl transition-colors text-sm font-medium bg-ys-accent text-ys-on-accent hover:opacity-90"
           >
             <DynamicIcon name="Plus" className="w-4 h-4" />
             New Note
           </button>
           <button
             onClick={startPdfImport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-purple-900/30 to-blue-900/30 hover:from-purple-800/40 hover:to-blue-800/40 border border-purple-700/50 rounded-xl transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2.5 border border-ys-border rounded-xl transition-colors text-sm font-medium bg-ys-surface-2"
           >
             <DynamicIcon name="FileUp" className="w-4 h-4" />
             Import from PDF
@@ -696,7 +696,7 @@ export default function NotesLibraryTab({
           )}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2.5 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border rounded-xl transition-colors text-sm font-medium"
           >
             <DynamicIcon name="Upload" className="w-4 h-4" />
             Import File
@@ -710,7 +710,7 @@ export default function NotesLibraryTab({
           />
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2.5 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border rounded-xl transition-colors text-sm font-medium"
           >
             <DynamicIcon name="Download" className="w-4 h-4" />
             Export
@@ -758,7 +758,7 @@ export default function NotesLibraryTab({
                   onExportFolder(folder);
                 }}
                 title="Export folder"
-                className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 p-0.5 rounded-full bg-blue-800 hover:bg-purple-600 border border-blue-950 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 p-0.5 rounded-full bg-ys-surface-2 hover:bg-ys-accent/15 border border-ys-border opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
               >
                 <DynamicIcon name="Download" className="w-3 h-3" />
               </button>
@@ -766,7 +766,7 @@ export default function NotesLibraryTab({
           ))}
           <button
             onClick={() => setShowNewFolderDialog(true)}
-            className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-blue-900/30 text-blue-300/70 hover:bg-blue-800/50 transition-all flex items-center gap-1.5 border border-dashed border-blue-700/50"
+            className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-ys-surface text-ys-muted hover:bg-ys-surface-2 transition-all flex items-center gap-1.5 border border-dashed border-ys-border"
           >
             <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
             New Folder
@@ -783,8 +783,8 @@ export default function NotesLibraryTab({
               onClick={toggleSelectionMode}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
                 selectionMode
-                  ? "bg-purple-600 text-white"
-                  : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
+                  ? "bg-ys-accent text-ys-on-accent"
+                  : "bg-ys-surface text-ys-muted hover:bg-ys-surface-2"
               }`}
             >
               <DynamicIcon
@@ -795,7 +795,7 @@ export default function NotesLibraryTab({
             </button>
             <button
               onClick={selectAllNotes}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-ys-surface text-ys-muted hover:bg-ys-surface-2"
             >
               Select All
             </button>
@@ -804,25 +804,25 @@ export default function NotesLibraryTab({
       </div>
 
       {selectionMode && selectedNotes.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-purple-900/30 border border-purple-700/30 rounded-xl flex-wrap">
+        <div className="flex items-center gap-3 p-3 bg-ys-accent/15 border border-ys-border rounded-xl flex-wrap">
           <span className="text-sm font-medium">{selectedNotes.size} selected</span>
           <div className="flex-1" />
           <div className="relative">
             <button
               onClick={() => setShowMassMoveDropdown(!showMassMoveDropdown)}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+              className="px-3 py-1.5 bg-ys-accent text-ys-on-accent hover:opacity-90 text-sm rounded-lg transition-colors flex items-center gap-2"
             >
               <DynamicIcon name="FolderOpen" className="w-4 h-4" />
               Move
             </button>
             {showMassMoveDropdown && (
-              <div className="absolute top-full right-0 mt-1 bg-blue-950 border border-blue-800/50 rounded-lg shadow-xl p-2 min-w-[180px] z-50">
+              <div className="absolute top-full right-0 mt-1 bg-ys-surface border border-ys-border rounded-lg shadow-xl p-2 min-w-[180px] z-50">
                 <button
                   onClick={() => {
                     handleMassMove(null);
                     setShowMassMoveDropdown(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-blue-900/50 rounded-lg text-sm"
+                  className="w-full text-left px-3 py-2 hover:bg-ys-surface-2 rounded-lg text-sm"
                 >
                   Uncategorized
                 </button>
@@ -833,7 +833,7 @@ export default function NotesLibraryTab({
                       handleMassMove(folder.id);
                       setShowMassMoveDropdown(false);
                     }}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-900/50 rounded-lg text-sm"
+                    className="w-full text-left px-3 py-2 hover:bg-ys-surface-2 rounded-lg text-sm"
                     style={{ borderLeft: `3px solid ${folder.color}` }}
                   >
                     {folder.name}
@@ -844,21 +844,21 @@ export default function NotesLibraryTab({
           </div>
           <button
             onClick={handleExport}
-            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors flex items-center gap-2"
+            className="px-3 py-1.5 bg-ys-surface hover:bg-ys-surface-2 text-sm rounded-lg transition-colors flex items-center gap-2"
           >
             <DynamicIcon name="Download" className="w-4 h-4" />
             Export
           </button>
           <button
             onClick={handleMassDelete}
-            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+            className="px-3 py-1.5 bg-ys-danger/15 hover:bg-ys-danger/25 text-ys-danger text-sm rounded-lg transition-colors flex items-center gap-2"
           >
             <DynamicIcon name="Trash2" className="w-4 h-4" />
             Delete
           </button>
           <button
             onClick={deselectAllNotes}
-            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
+            className="px-3 py-1.5 bg-ys-surface hover:bg-ys-surface-2 text-sm rounded-lg transition-colors"
           >
             Clear
           </button>
@@ -867,15 +867,15 @@ export default function NotesLibraryTab({
 
       {/* Notes Grid */}
       {filteredNotes.length === 0 ? (
-        <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
+        <div className="bg-ys-surface rounded-2xl p-12 text-center border border-ys-border">
           <DynamicIcon
             name="NotebookText"
-            className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
+            className="w-16 h-16 text-ys-muted mx-auto mb-4"
           />
           <h3 className="text-xl font-bold mb-2">
             {notes.length === 0 ? "No Notes Yet" : "No Notes Match Filters"}
           </h3>
-          <p className="text-blue-200/60 mb-6">
+          <p className="text-ys-muted mb-6">
             {notes.length === 0
               ? "Write a note or import a PDF to build your library."
               : "Try adjusting your search or folder filter."}
@@ -883,7 +883,7 @@ export default function NotesLibraryTab({
           {notes.length === 0 && (
             <button
               onClick={openNewNote}
-              className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
+              className="px-6 py-3 font-semibold rounded-xl transition-colors bg-ys-accent text-ys-on-accent hover:opacity-90"
             >
               New Note
             </button>
@@ -899,8 +899,8 @@ export default function NotesLibraryTab({
               }
               className={`group relative p-4 rounded-xl border transition-all cursor-pointer ${
                 selectionMode && selectedNotes.has(note.id)
-                  ? "bg-purple-900/30 border-purple-500"
-                  : "bg-blue-950/50 border-blue-800/30 hover:bg-blue-900/50 hover:border-blue-700/50"
+                  ? "bg-ys-accent/15 border-ys-accent"
+                  : "bg-ys-surface border-ys-border hover:bg-ys-surface-2 hover:border-ys-accent/50"
               }`}
             >
               <div className="flex items-start gap-3">
@@ -908,12 +908,12 @@ export default function NotesLibraryTab({
                   <div
                     className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
                       selectedNotes.has(note.id)
-                        ? "bg-purple-600 border-purple-600"
-                        : "border-blue-600"
+                        ? "bg-ys-accent border-ys-accent"
+                        : "border-ys-border"
                     }`}
                   >
                     {selectedNotes.has(note.id) && (
-                      <DynamicIcon name="Check" className="w-3 h-3" />
+                      <DynamicIcon name="Check" className="w-3 h-3 text-ys-on-accent" />
                     )}
                   </div>
                 )}
@@ -922,16 +922,16 @@ export default function NotesLibraryTab({
                     {note.pinned && (
                       <DynamicIcon
                         name="Pin"
-                        className="w-3.5 h-3.5 text-yellow-400 shrink-0"
+                        className="w-3.5 h-3.5 text-ys-warning shrink-0"
                       />
                     )}
                     <h3 className="font-semibold truncate">{note.title}</h3>
-                    <span className="px-1.5 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded shrink-0">
+                    <span className="px-1.5 py-0.5 bg-ys-surface-2 text-ys-muted text-xs rounded shrink-0">
                       {noteTypeLabel(note.type)}
                     </span>
                     {note.source === "ocr" && (
                       <span
-                        className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded flex items-center gap-1 shrink-0"
+                        className="px-1.5 py-0.5 bg-ys-accent/20 text-ys-accent text-xs rounded flex items-center gap-1 shrink-0"
                         title="Extracted via OCR"
                       >
                         <DynamicIcon name="ScanText" className="w-3 h-3" />
@@ -939,10 +939,10 @@ export default function NotesLibraryTab({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-blue-200/50 line-clamp-2 mb-2">
+                  <p className="text-xs text-ys-muted line-clamp-2 mb-2">
                     {note.content || "No content"}
                   </p>
-                  <div className="flex items-center gap-3 text-xs text-blue-200/40">
+                  <div className="flex items-center gap-3 text-xs text-ys-muted">
                     <span>{getRelativeTime(note.updatedAt)}</span>
                     {note.tags.length > 0 && (
                       <span className="truncate">
@@ -958,17 +958,17 @@ export default function NotesLibraryTab({
                   >
                     <button
                       onClick={() => handleTogglePin(note)}
-                      className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
+                      className="p-1.5 hover:bg-ys-surface-2 rounded-lg transition-colors"
                       title={note.pinned ? "Unpin" : "Pin"}
                     >
                       <DynamicIcon
                         name="Pin"
-                        className={`w-4 h-4 ${note.pinned ? "text-yellow-400" : ""}`}
+                        className={`w-4 h-4 ${note.pinned ? "text-ys-warning" : ""}`}
                       />
                     </button>
                     <button
                       onClick={() => setMovingNote(note.id)}
-                      className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
+                      className="p-1.5 hover:bg-ys-surface-2 rounded-lg transition-colors"
                       title="Move"
                     >
                       <DynamicIcon name="Folder" className="w-4 h-4" />
@@ -976,7 +976,7 @@ export default function NotesLibraryTab({
                     <button
                       onClick={() => handleDeleteNote(note.id)}
                       disabled={deleting === note.id}
-                      className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                      className="p-1.5 hover:bg-ys-danger/25 text-ys-danger rounded-lg transition-colors"
                       title="Delete"
                     >
                       {deleting === note.id ? (
@@ -996,7 +996,7 @@ export default function NotesLibraryTab({
       {visibleNotes.length < filteredNotes.length && (
         <button
           onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-          className="w-full py-3 bg-blue-900/40 hover:bg-blue-800/50 border border-blue-800/50 rounded-xl text-sm font-medium transition-colors"
+          className="w-full py-3 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border rounded-xl text-sm font-medium transition-colors"
         >
           Show more ({filteredNotes.length - visibleNotes.length} left)
         </button>
@@ -1012,14 +1012,14 @@ export default function NotesLibraryTab({
             <div className="max-w-lg mx-auto flex gap-3 p-4">
               <button
                 onClick={closeNoteEditor}
-                className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 bg-ys-surface-2 hover:bg-ys-border rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveNote}
                 disabled={!editNote.title?.trim() || savingNote}
-                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-ys-accent text-ys-on-accent hover:opacity-90 font-semibold rounded-lg transition-colors disabled:opacity-50"
               >
                 {savingNote ? "Saving..." : "Save"}
               </button>
@@ -1028,31 +1028,31 @@ export default function NotesLibraryTab({
         >
           <div className="max-w-lg mx-auto space-y-4">
               <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                <label className="block text-sm font-medium text-ys-muted mb-1">
                   Title
                 </label>
                 <input
                   type="text"
                   value={editNote.title || ""}
                   onChange={(e) => setEditNote({ ...editNote, title: e.target.value })}
-                  className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text placeholder:text-ys-muted focus:outline-none focus:border-ys-accent"
                   placeholder="Note title"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                <label className="block text-sm font-medium text-ys-muted mb-1">
                   Content
                 </label>
                 <textarea
                   value={editNote.content || ""}
                   onChange={(e) => setEditNote({ ...editNote, content: e.target.value })}
-                  className="w-full h-40 px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500 resize-none"
+                  className="w-full h-40 px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text placeholder:text-ys-muted focus:outline-none focus:border-ys-accent resize-none"
                   placeholder="Note content (supports Markdown)"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                <label className="block text-sm font-medium text-ys-muted mb-1">
                   Type
                 </label>
                 <select
@@ -1060,7 +1060,7 @@ export default function NotesLibraryTab({
                   onChange={(e) =>
                     setEditNote({ ...editNote, type: e.target.value as LoreType })
                   }
-                  className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:border-ys-accent"
                 >
                   {NOTE_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -1070,7 +1070,7 @@ export default function NotesLibraryTab({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                <label className="block text-sm font-medium text-ys-muted mb-1">
                   Folder
                 </label>
                 <select
@@ -1078,7 +1078,7 @@ export default function NotesLibraryTab({
                   onChange={(e) =>
                     setEditNote({ ...editNote, folderId: e.target.value || undefined })
                   }
-                  className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:border-ys-accent"
                 >
                   <option value="">Uncategorized</option>
                   {folders.map((folder) => (
@@ -1089,7 +1089,7 @@ export default function NotesLibraryTab({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                <label className="block text-sm font-medium text-ys-muted mb-1">
                   Tags (comma-separated)
                 </label>
                 <input
@@ -1104,11 +1104,11 @@ export default function NotesLibraryTab({
                         .filter(Boolean),
                     })
                   }
-                  className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text placeholder:text-ys-muted focus:outline-none focus:border-ys-accent"
                   placeholder="npc, faction, backstory"
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-blue-200">
+              <label className="flex items-center gap-2 text-sm text-ys-muted">
                 <input
                   type="checkbox"
                   checked={editNote.pinned || false}
@@ -1129,13 +1129,13 @@ export default function NotesLibraryTab({
       />
 
       {movingNote && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 ys-modal-backdrop flex items-center justify-center z-50 p-4">
+          <div className="ys-modal p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Move to Folder</h2>
             <div className="space-y-2 max-h-96 overflow-y-auto">
               <button
                 onClick={() => movingNote && handleMoveNote(movingNote, null)}
-                className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+                className="w-full p-3 text-left rounded-lg border-2 border-ys-border hover:border-ys-accent transition-colors"
               >
                 <span className="flex items-center gap-2">
                   <DynamicIcon name="FolderOpen" className="w-5 h-5" />
@@ -1146,7 +1146,7 @@ export default function NotesLibraryTab({
                 <button
                   key={folder.id}
                   onClick={() => movingNote && handleMoveNote(movingNote, folder.id)}
-                  className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+                  className="w-full p-3 text-left rounded-lg border-2 border-ys-border hover:border-ys-accent transition-colors"
                   style={{ borderLeftColor: folder.color, borderLeftWidth: "4px" }}
                 >
                   <span className="flex items-center gap-2">
@@ -1158,7 +1158,7 @@ export default function NotesLibraryTab({
             </div>
             <button
               onClick={() => setMovingNote(null)}
-              className="w-full mt-4 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 font-semibold rounded-lg transition-colors"
+              className="w-full mt-4 px-4 py-2 bg-ys-surface-2 hover:bg-ys-border font-semibold rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -1167,10 +1167,10 @@ export default function NotesLibraryTab({
       )}
 
       {showOcrFolderPrompt && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 ys-modal-backdrop flex items-center justify-center z-50 p-4">
+          <div className="ys-modal p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-1">Import from PDF</h2>
-            <p className="text-sm text-blue-200/60 mb-4">
+            <p className="text-sm text-ys-muted mb-4">
               Which folder should the extracted notes and tables be saved to?
             </p>
             <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -1181,7 +1181,7 @@ export default function NotesLibraryTab({
                   setOcrImporterKey((k) => k + 1);
                   setOcrImporterOpen(true);
                 }}
-                className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+                className="w-full p-3 text-left rounded-lg border-2 border-ys-border hover:border-ys-accent transition-colors"
               >
                 <span className="flex items-center gap-2">
                   <DynamicIcon name="FolderOpen" className="w-5 h-5" />
@@ -1197,7 +1197,7 @@ export default function NotesLibraryTab({
                     setOcrImporterKey((k) => k + 1);
                     setOcrImporterOpen(true);
                   }}
-                  className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+                  className="w-full p-3 text-left rounded-lg border-2 border-ys-border hover:border-ys-accent transition-colors"
                   style={{ borderLeftColor: folder.color, borderLeftWidth: "4px" }}
                 >
                   <span className="flex items-center gap-2">
@@ -1209,7 +1209,7 @@ export default function NotesLibraryTab({
             </div>
             <button
               onClick={() => setShowOcrFolderPrompt(false)}
-              className="w-full mt-4 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 font-semibold rounded-lg transition-colors"
+              className="w-full mt-4 px-4 py-2 bg-ys-surface-2 hover:bg-ys-border font-semibold rounded-lg transition-colors"
             >
               Cancel
             </button>

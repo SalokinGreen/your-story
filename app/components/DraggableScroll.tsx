@@ -247,11 +247,11 @@ export function DraggableScroll({
       {showScrollUI && canScrollLeft && (
         <button
           onClick={() => scrollBy("left")}
-          className="absolute left-0 top-0 bottom-0 z-10 w-12 flex items-center justify-start pl-1 bg-linear-to-r from-blue-950 via-blue-950/80 to-transparent hover:from-blue-900 hover:via-blue-900/80 transition-colors"
+          className="absolute left-0 top-0 bottom-0 z-10 w-12 flex items-center justify-start pl-1 bg-linear-to-r from-ys-bg via-ys-bg/80 to-transparent hover:from-ys-surface hover:via-ys-surface/80 transition-colors"
           aria-label="Scroll left"
         >
           <svg
-            className="w-4 h-4 text-blue-300 animate-pulse"
+            className="w-4 h-4 text-ys-accent animate-pulse"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -270,11 +270,11 @@ export function DraggableScroll({
       {showScrollUI && canScrollRight && (
         <button
           onClick={() => scrollBy("right")}
-          className="absolute right-0 top-0 bottom-0 z-10 w-12 flex items-center justify-end pr-1 bg-linear-to-l from-blue-950 via-blue-950/80 to-transparent hover:from-blue-900 hover:via-blue-900/80 transition-colors"
+          className="absolute right-0 top-0 bottom-0 z-10 w-12 flex items-center justify-end pr-1 bg-linear-to-l from-ys-bg via-ys-bg/80 to-transparent hover:from-ys-surface hover:via-ys-surface/80 transition-colors"
           aria-label="Scroll right"
         >
           <svg
-            className="w-4 h-4 text-blue-300 animate-pulse"
+            className="w-4 h-4 text-ys-accent animate-pulse"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -307,14 +307,14 @@ export function DraggableScroll({
       {showScrollUI && (
         <div
           ref={progressBarRef}
-          className="mt-2 w-full h-2 bg-blue-900/40 rounded-full overflow-hidden cursor-pointer hover:bg-blue-900/60 transition-colors"
+          className="mt-2 w-full h-2 bg-ys-surface-2 rounded-full overflow-hidden cursor-pointer hover:bg-ys-border transition-colors"
           onMouseDown={handleProgressMouseDown}
           onTouchStart={handleProgressTouchStart}
           onTouchMove={handleProgressTouchMove}
           onTouchEnd={handleProgressTouchEnd}
         >
           <div
-            className={`h-full bg-purple-500/70 rounded-full ${
+            className={`h-full bg-ys-accent/70 rounded-full ${
               isDraggingProgress ? "" : "transition-all duration-150"
             }`}
             style={{

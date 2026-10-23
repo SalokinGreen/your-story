@@ -385,21 +385,21 @@ export default function LibraryPage() {
 
   if (loading && localStories.length === 0 && localAdventures.length === 0) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[image:var(--ys-gradient)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ys-accent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 text-white">
+    <div className="min-h-screen text-ys-text bg-[image:var(--ys-gradient)]">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-50 bg-blue-950/80 backdrop-blur-xl border-b border-blue-800/30">
+      <header className="sticky top-0 z-50 bg-ys-surface/80 backdrop-blur-xl border-b border-ys-border">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={goBack}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors shrink-0"
+              className="p-2 hover:bg-ys-surface-2 rounded-lg transition-colors shrink-0"
               aria-label={view.kind === "home" ? "Back to home" : "Back to library"}
             >
               <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
@@ -410,7 +410,7 @@ export default function LibraryPage() {
             <button
               onClick={() => setShowJoinGameModal(true)}
               title="Join someone else's online room with a room code"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border rounded-xl transition-colors text-sm font-medium"
             >
               <DynamicIcon name="Wifi" className="w-4 h-4" />
               <span className="hidden sm:inline">Join a Game</span>
@@ -419,7 +419,7 @@ export default function LibraryPage() {
               <button
                 onClick={() => setPendingPlay({ kind: "freeform" })}
                 title="Skip adventure setup - talk to the GM and build the world as you play"
-                className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors text-sm font-medium bg-ys-accent text-ys-on-accent hover:opacity-90"
               >
                 <DynamicIcon name="MessageCircle" className="w-4 h-4" />
                 <span className="hidden sm:inline">Freeform Story</span>
@@ -428,7 +428,7 @@ export default function LibraryPage() {
             {showNewAdventureButton && (
               <button
                 onClick={() => router.push("/creator")}
-                className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors text-sm font-medium bg-ys-accent text-ys-on-accent hover:opacity-90"
               >
                 <DynamicIcon name="Plus" className="w-4 h-4" />
                 <span className="hidden sm:inline">New Adventure</span>

@@ -51,11 +51,11 @@ export default function FolderActionSheet({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+      className="fixed inset-0 ys-modal-backdrop z-50 flex items-end sm:items-center justify-center"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md bg-blue-950 border-t sm:border border-blue-800/50 rounded-t-2xl sm:rounded-2xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[90vh] overflow-y-auto"
+        className="w-full sm:max-w-md bg-ys-surface border-t sm:border border-ys-border rounded-t-2xl sm:rounded-2xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -70,14 +70,14 @@ export default function FolderActionSheet({
           </div>
           <button
             onClick={onClose}
-            className="p-2 -mr-2 text-blue-300/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-2 -mr-2 text-ys-muted hover:text-ys-text hover:bg-ys-surface-2 rounded-lg transition-colors"
             aria-label="Close"
           >
             <DynamicIcon name="X" className="w-5 h-5" />
           </button>
         </div>
 
-        <p className="text-xs text-blue-200/50 mb-4">
+        <p className="text-xs text-ys-muted mb-4">
           {totalItems === 0
             ? "Empty folder"
             : [
@@ -95,14 +95,14 @@ export default function FolderActionSheet({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-blue-200/70 mb-1">
+            <label className="block text-sm font-medium text-ys-muted mb-1">
               Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-ys-surface-2 border border-ys-border rounded-lg text-ys-text placeholder:text-ys-muted focus:outline-none focus:border-ys-accent"
               placeholder="Folder name"
             />
           </div>
@@ -110,14 +110,14 @@ export default function FolderActionSheet({
             <IconPicker label="Icon" value={icon} onChange={setIcon} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-blue-200/70 mb-1">
+            <label className="block text-sm font-medium text-ys-muted mb-1">
               Color
             </label>
             <input
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              className="w-full h-10 rounded-lg cursor-pointer bg-blue-900/50"
+              className="w-full h-10 rounded-lg cursor-pointer bg-ys-surface-2"
             />
           </div>
         </div>
@@ -125,22 +125,22 @@ export default function FolderActionSheet({
         <button
           onClick={handleSave}
           disabled={!name.trim() || !dirty}
-          className="w-full mt-5 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-40"
+          className="w-full mt-5 px-4 py-2.5 bg-ys-accent text-ys-on-accent hover:opacity-90 font-semibold rounded-lg transition-colors disabled:opacity-40"
         >
           Save Changes
         </button>
 
-        <div className="mt-3 pt-3 border-t border-blue-800/40 space-y-2">
+        <div className="mt-3 pt-3 border-t border-ys-border space-y-2">
           <button
             onClick={onExport}
-            className="w-full flex items-center gap-3 px-3 py-2.5 bg-blue-900/50 hover:bg-blue-800/60 rounded-lg transition-colors text-sm font-medium"
+            className="w-full flex items-center gap-3 px-3 py-2.5 bg-ys-surface-2 hover:bg-ys-border rounded-lg transition-colors text-sm font-medium"
           >
             <DynamicIcon name="Download" className="w-4 h-4" />
             Export Folder
           </button>
           <button
             onClick={onDelete}
-            className="w-full flex items-center gap-3 px-3 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors text-sm font-medium"
+            className="w-full flex items-center gap-3 px-3 py-2.5 bg-ys-danger/15 hover:bg-ys-danger/25 text-ys-danger rounded-lg transition-colors text-sm font-medium"
           >
             <DynamicIcon name="Trash2" className="w-4 h-4" />
             Delete Folder

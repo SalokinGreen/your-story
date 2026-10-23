@@ -204,8 +204,8 @@ function CreatorPage() {
 
   if (session.loadingAdventure) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-white/50">
+      <div className="min-h-screen flex items-center justify-center bg-[image:var(--ys-gradient)]">
+        <div className="flex items-center gap-3 text-ys-muted">
           <DynamicIcon name="Loader2" className="w-5 h-5 animate-spin" />
           Loading adventure…
         </div>
@@ -214,13 +214,13 @@ function CreatorPage() {
   }
 
   return (
-    <div className="h-dvh flex flex-col bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 text-white overflow-hidden">
+    <div className="h-dvh flex flex-col text-ys-text overflow-hidden bg-[image:var(--ys-gradient)]">
       {/* Header */}
-      <header className="shrink-0 border-b border-white/10 bg-black/20 backdrop-blur-md">
+      <header className="shrink-0 border-b border-ys-border bg-ys-surface backdrop-blur-md">
         <div className="flex items-center gap-3 px-3 sm:px-4 h-14">
           <Link
             href="/library"
-            className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors shrink-0"
+            className="p-2 rounded-lg hover:bg-ys-surface-2 text-ys-muted hover:text-ys-text transition-colors shrink-0"
             title="Back to library"
           >
             <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
@@ -233,37 +233,37 @@ function CreatorPage() {
               </h1>
               {dirty && (
                 <span
-                  className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+                  className="w-1.5 h-1.5 rounded-full bg-ys-warning shrink-0"
                   title="Unsaved changes"
                 />
               )}
             </div>
-            <p className="text-[11px] text-white/35">Game designer</p>
+            <p className="text-[11px] text-ys-muted">Game designer</p>
           </div>
 
           <button
             onClick={() => setShowImport(true)}
-            className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors shrink-0"
+            className="p-2 rounded-lg hover:bg-ys-surface-2 text-ys-muted hover:text-ys-text transition-colors shrink-0"
             title="Import notes and tables from your library"
           >
             <DynamicIcon name="Import" className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowSettings((v) => !v)}
-            className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors shrink-0"
+            className="p-2 rounded-lg hover:bg-ys-surface-2 text-ys-muted hover:text-ys-text transition-colors shrink-0"
             title="Model settings"
           >
             <DynamicIcon name="Settings2" className="w-4 h-4" />
           </button>
           <button
             onClick={handleSave}
-            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-sm transition-colors shrink-0"
+            className="px-3 py-1.5 rounded-lg bg-ys-surface-2 hover:bg-ys-border text-sm transition-colors shrink-0"
           >
             Save
           </button>
           <button
             onClick={handleSaveAndPlay}
-            className="flex px-3 py-1.5 rounded-lg bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-sm font-medium transition-all items-center gap-1.5 shrink-0"
+            className="flex px-3 py-1.5 rounded-lg text-sm font-medium transition-all items-center gap-1.5 shrink-0 bg-ys-accent text-ys-on-accent hover:opacity-90"
             title="Save and play"
           >
             <DynamicIcon name="Play" className="w-3.5 h-3.5" />
@@ -272,7 +272,7 @@ function CreatorPage() {
         </div>
 
         {showSettings && (
-          <div className="px-4 py-3 border-t border-white/10 bg-black/30 space-y-3">
+          <div className="px-4 py-3 border-t border-ys-border bg-ys-surface space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <select
                 value={activeModel}
@@ -281,7 +281,7 @@ function CreatorPage() {
                   persistSetting("designerModel", e.target.value);
                 }}
                 disabled={!hasAnyKey}
-                className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-400/50 disabled:opacity-50"
+                className="bg-ys-surface border border-ys-border rounded-lg px-3 py-1.5 text-xs text-ys-text focus:outline-none focus:border-ys-accent disabled:opacity-50"
               >
                 {hasAnyKey ? (
                   availableModels.map(([key, name]) => (
@@ -294,7 +294,7 @@ function CreatorPage() {
                 )}
               </select>
 
-              <label className="flex items-center gap-2 text-xs text-white/50">
+              <label className="flex items-center gap-2 text-xs text-ys-muted">
                 Effort
                 <select
                   value={reasoningEffort}
@@ -305,7 +305,7 @@ function CreatorPage() {
                     setDesignerReasoningEffort(value);
                   }}
                   title="How hard the Designer's model thinks. Higher effort means slower, dearer replies; 'none' is the cheapest each model allows."
-                  className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white capitalize focus:outline-none focus:border-purple-400/50"
+                  className="bg-ys-surface border border-ys-border rounded-lg px-3 py-1.5 text-xs text-ys-text capitalize focus:outline-none focus:border-ys-accent"
                 >
                   {REASONING_EFFORTS.map((effort) => (
                     <option key={effort} value={effort}>
@@ -315,7 +315,7 @@ function CreatorPage() {
                 </select>
               </label>
 
-              <label className="flex items-center gap-2 text-xs text-white/50">
+              <label className="flex items-center gap-2 text-xs text-ys-muted">
                 Response length
                 <input
                   type="range"
@@ -328,20 +328,20 @@ function CreatorPage() {
                     setMaxOutputTokens(value);
                     persistSetting("designerMaxOutput", String(value));
                   }}
-                  className="accent-purple-500"
+                  className="accent-ys-accent"
                 />
-                <span className="tabular-nums text-white/40">
+                <span className="tabular-nums text-ys-muted">
                   {(maxOutputTokens / 1000).toFixed(0)}k
                 </span>
               </label>
             </div>
             {!hasAnyKey && (
-              <p className="text-xs text-amber-300/80">
+              <p className="text-xs text-ys-warning">
                 No API key saved yet — the Designer runs on your own provider
                 key.{" "}
                 <button
                   onClick={() => setShowAPIKeys(true)}
-                  className="underline hover:text-amber-200"
+                  className="underline hover:text-ys-warning"
                 >
                   Add one now
                 </button>
@@ -353,15 +353,15 @@ function CreatorPage() {
       </header>
 
       {/* Mobile pane switcher */}
-      <div className="md:hidden shrink-0 flex border-b border-white/10 bg-black/20">
+      <div className="md:hidden shrink-0 flex border-b border-ys-border bg-ys-surface">
         {(["chat", "adventure"] as MobilePane[]).map((pane) => (
           <button
             key={pane}
             onClick={() => setMobilePane(pane)}
             className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
               mobilePane === pane
-                ? "text-purple-300 border-b-2 border-purple-400"
-                : "text-white/40"
+                ? "text-ys-accent border-b-2 border-ys-accent"
+                : "text-ys-muted"
             }`}
           >
             {pane === "chat" ? "Conversation" : "Adventure"}
@@ -387,7 +387,7 @@ function CreatorPage() {
         </div>
 
         <div
-          className={`w-full md:w-[380px] lg:w-[440px] shrink-0 md:border-l border-white/10 ${
+          className={`w-full md:w-[380px] lg:w-[440px] shrink-0 md:border-l border-ys-border ${
             mobilePane === "adventure" ? "block" : "hidden"
           } md:block`}
         >
@@ -416,10 +416,10 @@ export default function CreatorPageWrapper() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center bg-[image:var(--ys-gradient)]">
           <DynamicIcon
             name="Loader2"
-            className="w-5 h-5 animate-spin text-white/50"
+            className="w-5 h-5 animate-spin text-ys-muted"
           />
         </div>
       }

@@ -520,3 +520,67 @@ lobby's QR code. The places most likely to read wrong in Paper White: the
 tinted `/15` action buttons, the accent-tinted panels in the AI Context, and
 the image lightbox (its backdrop is the theme's `ys-modal-backdrop`, dark text
 on a mid-grey in Paper White).
+
+### Slice 4 — 2026-10-23
+
+**Dependency inventory.** The Library page (`app/library/page.tsx`) renders the
+three tabs, `LibraryHome`, `FolderDetailView` and `BuiltinSystemsSection`, and
+opens `LibraryPickerModal`, `JoinGameModal`, `HostGameModal`,
+`ExportFolderModal` and `NewFolderDialog`; the tabs also open `ConfirmDialog`
+(slice 1), `FolderActionSheet` and `NewFolderDialog`, and `NotesLibraryTab`
+opens `FullScreenView` (slice 1) and `PDFImporter` (**not converted: slice
+5**). The Designer page renders `DesignerChat`, `AdventureInspector`,
+`LibraryPickerModal` (converted here, since both screens open it),
+`APIKeysModal` (slice 2) and `ClaudeSubscriptionPanel` (slice 2). No data
+module supplies colours; the folder colours are player data.
+`DynamicIcon`, `DraggableScroll` and `Skeleton` were already clean.
+Converted and on the ratchet: 7 files in `app/library/`, 3 in `app/creator/`,
+and `LibraryPickerModal`, `NewFolderDialog`, `FolderActionSheet`,
+`ExportFolderModal`, `JoinGameModal`, `HostGameModal`. (`LibraryPickerModal`
+is also opened from the note editor in the story, so that path is now themed.)
+
+**Judgment calls.**
+- *Method.* The same as slices 2 and 3: a script mapped class tokens, then every
+  diff was read and the things it cannot know were fixed by hand (text on an
+  accent fill, dialog buttons on a modal surface, check marks, dots).
+- *Gradient.* The Library page, its loading frame and the Designer page (and
+  its loading frames) are `bg-[image:var(--ys-gradient)]`. Gradient cards (the
+  recent-story tiles, the rules-pack banner) are plain `bg-ys-surface-2` /
+  `bg-ys-warning/15`; gradient buttons are `bg-ys-accent text-ys-on-accent`.
+- *Surfaces.* The translucent blue panels (`bg-blue-950/50` and the like) lost
+  their alpha and became `bg-ys-surface`; hover is `bg-ys-surface-2`. Inside a
+  `ys-modal` (the delete/new-folder/export/host/join dialogs) secondary buttons
+  and inputs are `bg-ys-surface-2` (hover `bg-ys-border`), since a surface fill
+  on a surface panel would vanish. In the Designer's inspector (a surface
+  panel) its cards and inputs are `bg-ys-surface-2` for the same reason.
+- *Backdrops.* Every `fixed inset-0 bg-black/..` overlay is `ys-modal-backdrop`;
+  the dialog panels are `ys-modal` (the ExportFolderModal's hard-coded `#0d1829`
+  went with that).
+- *White-alpha text in the Designer* (`text-white/25..60`, about 50 uses)
+  is `text-ys-muted`, and 70% and up is `text-ys-text`: alpha on text cannot
+  reach 4.5:1 on Paper White.
+- *`ConfirmDialog` callers.* The four Library files pass
+  `confirmButtonClass: "ys-button--danger"`, a marker the dialog reads as
+  "destructive" (it ignores the string, slice 1); the prop's shape is unchanged.
+- *Note types in the Inspector* follow slice 3's grouping: lore and the
+  character sheet accent; the GM's own notes (mechanics, DM, story and summary
+  instructions, plan) muted on surface-2; secrets warning. NPC attitudes:
+  hostile danger, unfriendly warning, friendly success, allied accent, neutral
+  muted.
+- *Folder colours stay data.* The per-folder inline colours (stripes, tinted icon
+  tiles, the colour inputs) are untouched. The two fixed fallbacks that were
+  hex literals in `.tsx` (`#9333ea` for a new folder, `#64748b` for Unfiled)
+  moved to `app/misc/folderColors.ts` (`NEW_FOLDER_COLOR`,
+  `UNFILED_FOLDER_COLOR`), outside the ratchet's reach and next to the default
+  `localFolderManager` already uses.
+- *Ratchet.* 16 files added; no test needed a markup change; the suite grew by
+  the 16 entries (2,747 to 2,763 passed, one skipped as before).
+- *Scrollbars / prose.* The one `prose-invert` (`DesignerChat`) is gone.
+
+**Not verified here (the preview was not run, by instruction).** Each screen in
+Ink and Paper White: Library home, a folder, each tab, selection mode, the
+dialogs (new folder, folder actions, export, host, join, delete confirm), the
+notes picker, and the Designer with a draft open. Likeliest to read wrong in
+Paper White: the `/15` danger and warning tints on `bg-ys-surface`, the
+`bg-ys-surface/80` Library header over the gradient, and the Designer's
+message bubble (`bg-ys-accent/25` on the gradient).

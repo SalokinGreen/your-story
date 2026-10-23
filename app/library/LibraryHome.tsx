@@ -1,5 +1,6 @@
 "use client";
 
+import { UNFILED_FOLDER_COLOR } from "@/app/misc/folderColors";
 import { useMemo } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { DraggableScroll } from "@/app/components/DraggableScroll";
@@ -83,7 +84,7 @@ export default function LibraryHome({
             <h2 className="text-lg font-bold">Jump back in</h2>
             <button
               onClick={onOpenStories}
-              className="text-sm text-blue-300/70 hover:text-white transition-colors"
+              className="text-sm text-ys-muted hover:text-ys-text transition-colors"
             >
               All stories ({stories.length})
             </button>
@@ -95,9 +96,9 @@ export default function LibraryHome({
                 <button
                   key={story.id}
                   onClick={() => onContinueStory(story.id)}
-                  className="w-56 shrink-0 text-left p-4 rounded-xl bg-linear-to-br from-blue-900/60 to-purple-900/30 border border-blue-800/40 hover:border-purple-500/50 transition-all active:scale-[0.98]"
+                  className="w-56 shrink-0 text-left p-4 rounded-xl border border-ys-border hover:border-ys-accent transition-all active:scale-[0.98] bg-ys-surface-2"
                 >
-                  <div className="flex items-center gap-2 mb-2 text-xs text-blue-200/50">
+                  <div className="flex items-center gap-2 mb-2 text-xs text-ys-muted">
                     <DynamicIcon name="Clock" className="w-3.5 h-3.5" />
                     {getRelativeTime(String(story.updatedAt))}
                   </div>
@@ -105,7 +106,7 @@ export default function LibraryHome({
                     {story.title}
                   </h3>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-blue-200/60">
+                    <span className="text-xs text-ys-muted">
                       Ch. {(story.storyData?.currentChapter ?? 0) + 1}
                     </span>
                     {folder && (
@@ -121,7 +122,7 @@ export default function LibraryHome({
                       </span>
                     )}
                   </div>
-                  <div className="mt-3 flex items-center gap-1.5 text-sm font-medium text-purple-300">
+                  <div className="mt-3 flex items-center gap-1.5 text-sm font-medium text-ys-accent">
                     <DynamicIcon name="Play" className="w-4 h-4" />
                     Continue
                   </div>
@@ -147,14 +148,14 @@ export default function LibraryHome({
           <div className="flex gap-2">
             <button
               onClick={onImportFolder}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-lg text-sm transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border rounded-lg text-sm transition-colors"
             >
               <DynamicIcon name="Upload" className="w-4 h-4" />
               <span className="hidden sm:inline">Import</span>
             </button>
             <button
               onClick={onNewFolder}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-ys-accent text-ys-on-accent hover:opacity-90"
             >
               <DynamicIcon name="Plus" className="w-4 h-4" />
               New Folder
@@ -163,19 +164,19 @@ export default function LibraryHome({
         </div>
 
         {folders.length === 0 && !hasUnfiled ? (
-          <div className="bg-blue-950/50 rounded-2xl p-10 text-center border border-blue-800/30">
+          <div className="bg-ys-surface rounded-2xl p-10 text-center border border-ys-border">
             <DynamicIcon
               name="FolderPlus"
-              className="w-14 h-14 text-blue-400/30 mx-auto mb-4"
+              className="w-14 h-14 text-ys-muted mx-auto mb-4"
             />
             <h3 className="text-lg font-bold mb-2">No Folders Yet</h3>
-            <p className="text-blue-200/60 mb-6">
+            <p className="text-ys-muted mb-6">
               Folders hold a campaign&apos;s stories, adventures and notes
               together in one place.
             </p>
             <button
               onClick={onNewFolder}
-              className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
+              className="px-6 py-3 font-semibold rounded-xl transition-colors bg-ys-accent text-ys-on-accent hover:opacity-90"
             >
               New Folder
             </button>
@@ -200,7 +201,7 @@ export default function LibraryHome({
             {hasUnfiled && (
               <FolderTile
                 icon="FileText"
-                color="#64748b"
+                color={UNFILED_FOLDER_COLOR}
                 name="Uncategorized"
                 counts={unfiledCounts}
                 onClick={() => onOpenFolder({ kind: "unfiled" })}
@@ -268,7 +269,7 @@ function FolderTile({
   return (
     <button
       onClick={onClick}
-      className="text-left p-4 rounded-xl border bg-blue-950/50 border-blue-800/30 hover:bg-blue-900/50 hover:border-blue-700/50 transition-all active:scale-[0.98]"
+      className="text-left p-4 rounded-xl border bg-ys-surface border-ys-border hover:bg-ys-surface-2 hover:border-ys-accent/50 transition-all active:scale-[0.98]"
       style={{ borderTop: `3px solid ${color}` }}
     >
       <span
@@ -278,7 +279,7 @@ function FolderTile({
         <DynamicIcon name={icon} className="w-5 h-5" style={{ color }} />
       </span>
       <h3 className="font-semibold truncate mb-1">{name}</h3>
-      <p className="text-xs text-blue-200/50 line-clamp-2">
+      <p className="text-xs text-ys-muted line-clamp-2">
         {parts.length === 0 ? "Empty" : parts.join(" · ")}
       </p>
     </button>
@@ -299,15 +300,15 @@ function BrowseRow({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 p-4 rounded-xl bg-blue-950/50 border border-blue-800/30 hover:bg-blue-900/50 hover:border-blue-700/50 transition-all active:scale-[0.98]"
+      className="flex items-center gap-3 p-4 rounded-xl bg-ys-surface border border-ys-border hover:bg-ys-surface-2 hover:border-ys-accent/50 transition-all active:scale-[0.98]"
     >
-      <DynamicIcon name={icon} className="w-5 h-5 text-blue-300/70" />
+      <DynamicIcon name={icon} className="w-5 h-5 text-ys-muted" />
       <span className="font-medium">{label}</span>
-      <span className="text-sm text-blue-200/50">{count}</span>
+      <span className="text-sm text-ys-muted">{count}</span>
       <div className="flex-1" />
       <DynamicIcon
         name="ChevronRight"
-        className="w-4 h-4 text-blue-300/50"
+        className="w-4 h-4 text-ys-muted"
       />
     </button>
   );
