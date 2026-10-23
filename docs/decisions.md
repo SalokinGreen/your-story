@@ -197,6 +197,19 @@ tier slots (0–3) and the narration voice. The design is
 | 123 | After Codex's review (2026-10-23): "Default runs everyday turns and combat/rules on GLM 5.3. Today combat and rules think at 'high' and everyday turns at 'low'. How should the Default slot's single effort work?" | **"Combat never below 'high' (Recommended)."** The Default effort applies to every Default turn, but a combat or rules turn (tier 2) never thinks below `high`; the picker's help says so. A narrowing of decision 120. |
 | 124 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"approved"** — built as planned on `claude/model-picker`. |
 
+### Interview — removing the arcade leftovers (2026-10-23)
+
+After the model picker merged (#228), the author asked: "The next project will be to remove all legacy features from the game especially UI. All the deprecated stuff like most of the features from when this was an arcade instead of proper AI gm. Like the attributes, inventory, etc. I noticed with our new default system adventure it's still the deprecated menu." The design is [`legacy-removal-design.md`](legacy-removal-design.md), the plan [`legacy-removal-plan.md`](legacy-removal-plan.md).
+
+| # | question | decision |
+|---|---|---|
+| 125 | "Which screen showed you the old menu in the Hollow Hour story?" | **"Character creation form."** The pre-play form sorts the sheet template's fields into arcade categories by name (Heart and Power under "Attributes", Gear under "Equipment", the other nineteen under "Other") instead of the template's own headings; reproduced in the browser preview on a fresh Hollow Hour story. |
+| 126 | "Old saves still hold structured stats, resources, inventory and abilities. What should happen to them?" | **"Drop them."** The arrays are deleted when a story loads; old arcade saves lose their structured stats and items. Rejected: fold them into the sheet note; leave them in storage unused. |
+| 127 | "Variables are half-alive: boolean variables can gate lore notes, but only the hand editor sets them and no GM tool does. Keep or remove?" | **"Remove them (Recommended)."** The editor, the prompt section and the variable-gated lore triggers (`var_on_triggers`, `var_off_triggers`) go; note visibility covers reveals. |
+| 128 | "Besides the dead arcade data and UI, what else should go in this cleanup?" (several allowed) | **All four:** the unoffered GM tools (game_over, delegate_task with its Web Research toggle and Brave key, reaction_check, negotiate_price, the ability tools, request_continuation, end_gm_thinking, add_memory); `take_rest`; New Game+ and the game-over screen; `rpgSystems.ts` and the skill trees. |
+| 129 | "What should character creation be for an adventure with a sheet template like Blood & Bone's?" | **"No form, session zero builds it."** The pre-play form is deleted; the GM walks the player through the adventure's sheet template in session zero. Rejected: the form grouped by the template's headings; one page with the sheet as written. |
+| 130 | "The 'Choose your character' screen shows only a Custom card when an adventure has no pre-made characters. What then?" | **"Skip it when Custom is the only choice (Recommended)."** The picker shows only when the adventure has pre-made characters, and the "Default Stats" / "Starter Items" badges go everywhere. |
+
 ### Interview — the story screen (2026-10-22)
 
 The author showed two phone screenshots of OOC, another AI story app, and said
