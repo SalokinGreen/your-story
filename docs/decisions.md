@@ -197,6 +197,17 @@ tier slots (0–3) and the narration voice. The design is
 | 123 | After Codex's review (2026-10-23): "Default runs everyday turns and combat/rules on GLM 5.3. Today combat and rules think at 'high' and everyday turns at 'low'. How should the Default slot's single effort work?" | **"Combat never below 'high' (Recommended)."** The Default effort applies to every Default turn, but a combat or rules turn (tier 2) never thinks below `high`; the picker's help says so. A narrowing of decision 120. |
 | 124 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"approved"** — built as planned on `claude/model-picker`. |
 
+### Interview — the reading themes reach the whole app (2026-10-23)
+
+The author: "After the deprecation pruning, I want to work on making the themes reach all of the platform with ink being the default." Only the story screen uses the `ys-*` tokens today. The design is [`whole-app-themes-design.md`](whole-app-themes-design.md), the plan [`whole-app-themes-plan.md`](whole-app-themes-plan.md).
+
+| # | question | decision |
+|---|---|---|
+| 137 | "How far should the themes reach?" | **"Everything (Recommended)."** Every screen: Library, Designer, Settings and its tabs, Notes/NPCs/Goals, AI Context and Logs, the PDF importer, home, terms/privacy, the party phone page, and the page background itself (today it follows the OS light/dark). Rejected: everything but the debug views; play screens only. |
+| 138 | "Paper White is the only light theme. When it's picked, should every screen go light too?" | **"Yes, all screens (Recommended)."** Every screen has to work on a light background. Rejected: story text only; drop Paper White. |
+| 139 | "The home page, Library and site header use blue-to-purple gradients today. What should they become?" | **"A subtle theme gradient."** A gentle gradient made from the theme's own colours, so it changes with the theme. Rejected: flat theme colours. |
+| 140 | "Should party-mode phones follow the table's theme?" | **"Each phone its own."** Phones use their own saved theme (Ink by default). Rejected: follow the table. |
+
 ### Interview — Android: turns that survive leaving the app, and the back gesture (2026-10-23)
 
 The author: "I want to be able to leave the app while it generates and it finishing generating instead of breaking. And when I use the back gesture I want it to work in the app instead of closing the app." The design is [`android-background-design.md`](android-background-design.md), the plan [`android-background-plan.md`](android-background-plan.md).
