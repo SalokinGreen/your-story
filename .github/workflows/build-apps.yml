@@ -143,8 +143,10 @@ jobs:
       - run: npx cap sync ios
       - name: Build unsigned simulator build
         working-directory: ios/App
+        # Capacitor 8 uses Swift Package Manager: no CocoaPods workspace,
+        # only App.xcodeproj.
         run: |
-          xcodebuild -workspace App.xcworkspace -scheme App \
+          xcodebuild -project App.xcodeproj -scheme App \
             -configuration Release -sdk iphonesimulator \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
       - uses: actions/upload-artifact@v4
