@@ -3,8 +3,7 @@
 // the 1-3 MB a provider's PNG weighs. Uses createImageBitmap and OffscreenCanvas
 // (both in WebView2, WKWebView and current Android WebViews). Where either is
 // missing the original bytes are kept, so an older WebView stores a bigger
-// picture rather than none. Kept apart from imageCompression.ts, which pulls
-// in compressorjs (a DOM-only import) and works on Files.
+// picture rather than none.
 
 export const MAX_STORED_EDGE = 1024;
 

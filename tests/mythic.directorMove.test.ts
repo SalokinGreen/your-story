@@ -729,7 +729,7 @@ describe("classifyToolActivityStyle", () => {
   });
 
   it("returns null when no called tools match any bucket", () => {
-    expect(classifyToolActivityStyle(["formula_roll", "add_memory"])).toBeNull();
+    expect(classifyToolActivityStyle(["formula_roll", "generate_name"])).toBeNull();
   });
 
   it("returns null for an empty tool list", () => {

@@ -253,10 +253,6 @@ export function outputToScenePart(text: string): ScenePart {
         tag: "!!! end story !!!",
         index: lowerSrc.indexOf("!!! end story !!!"),
       },
-      {
-        tag: "!!! game over !!!",
-        index: lowerSrc.indexOf("!!! game over !!!"),
-      },
     ].filter((m) => m.index !== -1);
 
     if (tagMatches.length > 0) {
@@ -270,116 +266,10 @@ export function outputToScenePart(text: string): ScenePart {
     return stripThinkingTags(rawContent);
   };
 
-  const parseChoice = (line: string): Choice => {
-    // Extract metadata from angle brackets: <use_skill: ...; use_item: ...; etc>
-    const metaMatch = line.match(/<([^>]+)>/);
-    const text = line.replace(/\s*<[^>]*>\s*$/, "").trim();
-
-    const choice: Choice = { text };
-
-    if (metaMatch) {
-      const metadata = metaMatch[1];
-
-      // Parse use_skill: name (DC number/tier) or (X success(es) needed/required)
-      // Supports: "Stealth (DC 25)", "Stealth (hard)", "Stealth (DC hard)", "Stealth (2 successes needed)"
-      const skillMatch = metadata.match(
-        /use_skill:\s*([^(;]+?)(?:\s*\((?:(?:DC\s*)?(\d+|trivial|easy|average|hard|very_hard|impossible)|(?:needs?\s*)?(\d+)\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)\))?(?:;|$)/i
-      );
-      if (skillMatch) {
-        const skillName = skillMatch[1].trim();
-        if (skillName.toLowerCase() !== "none") {
-          choice.skill_used = skillName;
-          // Try DC format first (group 2), then success count format (group 3)
-          const dc = skillMatch[2] || skillMatch[3];
-          if (dc) {
-            // If it's a tier name, store as string; parser will convert later
-            const numericDC = parseInt(dc, 10);
-            if (!isNaN(numericDC)) {
-              choice.skill_dc = numericDC;
-            } else {
-              // Store tier name as string - will be converted to number by game logic
-              choice.skill_dc_tier = dc.toLowerCase() as any;
-            }
-          }
-        }
-      }
-
-      // Parse use_resource: name (automatically at risk on failure)
-      const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
-      if (resourceMatch) {
-        // Strip DC notation like "(DC 6)" and clean up the name
-        let resourceName = resourceMatch[1]
-          .trim()
-          .replace(/\s*\(DC\s*\d+\)/gi, "")
-          .replace(
-            /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
-            ""
-          )
-          .trim();
-        if (resourceName.toLowerCase() !== "none" && resourceName.length > 0) {
-          choice.resource_used = resourceName;
-        }
-      }
-
-      // Parse use_item: name
-      const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
-      if (itemMatch) {
-        // Strip DC notation like "(DC 6)" and clean up the name
-        let itemName = itemMatch[1]
-          .trim()
-          .replace(/\s*\(DC\s*\d+\)/gi, "")
-          .replace(
-            /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
-            ""
-          )
-          .trim();
-        if (itemName.toLowerCase() !== "none" && itemName.length > 0) {
-          choice.item_used = itemName;
-        }
-      }
-
-      // Parse item_loss: true/false - DEPRECATED, kept for backward compatibility
-      // item_loss was intended to signal if item_used should be consumed
-      const lossMatch = metadata.match(/item_loss:\s*(true|false)/i);
-      if (lossMatch && lossMatch[1].toLowerCase() === "true") {
-        // If item_loss is true and item_used is set, store item name as item_loss
-        if (choice.item_used) {
-          choice.item_loss = choice.item_used;
-        }
-      }
-
-      // Parse agmt_check: question (likelihood)
-      const agmtCheckMatch = metadata.match(/agmt_check:\s*([^;]+?)(?:;|$)/i);
-      if (agmtCheckMatch) {
-        const agmtCheck = agmtCheckMatch[1].trim();
-        if (agmtCheck.toLowerCase() !== "none") {
-          choice.agmt_check = agmtCheck;
-        }
-      }
-
-      // Parse agmt_table: category
-      const agmtTableMatch = metadata.match(/agmt_table:\s*([^;]+?)(?:;|$)/i);
-      if (agmtTableMatch) {
-        const agmtTable = agmtTableMatch[1].trim();
-        if (agmtTable.toLowerCase() !== "none") {
-          choice.agmt_table = agmtTable;
-        }
-      }
-
-      // Parse custom_table: table name
-      const customTableMatch = metadata.match(
-        /custom_table:\s*([^;]+?)(?:;|$)/i
-      );
-      if (customTableMatch) {
-        const customTable = customTableMatch[1].trim();
-        if (customTable.toLowerCase() !== "none") {
-          choice.custom_table = customTable;
-        }
-      }
-    }
-
-    return choice;
-  };
+  // A choice is its line. Any <tag: ...> a model still writes stays in the
+  // text: the arcade tags (skill, item, resource, oracle and table checks)
+  // are no longer read.
+  const parseChoice = (line: string): Choice => ({ text: line });
 
   const blockToChoiceList = (block: string | null): Choice[] => {
     if (!block) return [];
@@ -419,7 +309,6 @@ export function outputToScenePart(text: string): ScenePart {
   // Check for markers
   const endChapter = /!!!\s*END\s+CHAPTER\s*!!!/i.test(text);
   const endStory = /!!!\s*END\s+STORY\s*!!!/i.test(text);
-  const gameOver = /!!!\s*GAME\s+OVER\s*!!!/i.test(text);
 
   const part: ScenePart = {
     content: content,
@@ -432,7 +321,6 @@ export function outputToScenePart(text: string): ScenePart {
     ...(commands.length ? { commands } : {}),
     ...(endChapter ? { endChapter: true } : {}),
     ...(endStory ? { endStory: true } : {}),
-    ...(gameOver ? { gameOver: true } : {}),
   };
 
   return part;

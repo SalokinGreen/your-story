@@ -45,14 +45,8 @@ import {
   FLOOR_STEAL_COOLDOWN_MS,
 } from "../misc/multiplayer/floorControl";
 import {
-  askFate,
-  generateElement,
-  generateEventFocus,
-  generateEventMeaning,
   classifyPlayerStyle,
   classifyToolActivityStyle,
-  type Likelihood,
-  type ElementCategory,
 } from "../misc/mythic";
 import {
   getEffectiveNarrationEffort,
@@ -152,7 +146,6 @@ import { GMNPCReactionResult } from "../misc/gmExecutor";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
 import { useViewportHeight } from "../misc/useViewportHeight";
-import { MAX_DICE_COUNT, MAX_DICE_SIDES } from "../misc/diceFormula";
 import { SYNC_COMPLETED_EVENT, SyncResult } from "../misc/syncManager";
 
 // Cryptographically secure random number generator
@@ -1308,18 +1301,13 @@ function StoryPageContent() {
       hasLoadedStoryRef.current = storyId;
 
       // Migrate AGMT state to include new performance tracking fields
-      // Also migrate "mythic" item grades to "mythic" for backward compatibility
-      import("@/app/misc/mythicChaos").then(
-        ({ migrateAGMTState, migrateItemGrades }) => {
-          if (loadedStoryData.agmtState) {
-            loadedStoryData.agmtState = migrateAGMTState(
-              loadedStoryData.agmtState!,
-            );
-          }
-          // Migrate item grades from "mythic" to "mythic"
-          migrateItemGrades(loadedStoryData);
-        },
-      );
+      import("@/app/misc/mythicChaos").then(({ migrateAGMTState }) => {
+        if (loadedStoryData.agmtState) {
+          loadedStoryData.agmtState = migrateAGMTState(
+            loadedStoryData.agmtState!,
+          );
+        }
+      });
 
       // Backfill the arrays StoryData requires. Older saves can lack goals,
       // and a story started from a Designer-made adventure before the fix
@@ -3498,139 +3486,11 @@ function StoryPageContent() {
       return;
     }
 
-    // Build the player-facing text: the choice itself, plus lightweight
-    // flavor annotations (oracle question, table roll, context dice).
-    // No mechanical resolution happens client-side anymore - the GM decides
-    // whether/how to roll via its own formula_roll tool once it reads this.
+    // Build the player-facing text: the choice itself, plus a line for an
+    // authored opening. No mechanical resolution happens client-side - the GM
+    // decides whether/how to roll via its own formula_roll tool once it reads
+    // this.
     const flavorLines: string[] = [];
-
-    if (choice.agmt_check) {
-      try {
-        const LIKELIHOODS: Likelihood[] = [
-          "Impossible",
-          "No Way",
-          "Very Unlikely",
-          "Unlikely",
-          "50/50",
-          "Somewhat Likely",
-          "Likely",
-          "Very Likely",
-          "Near Sure Thing",
-          "A Sure Thing",
-          "Has To Be",
-        ];
-        const match = choice.agmt_check.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-        const question = (match ? match[1] : choice.agmt_check).trim();
-        const rawLikelihood = (match ? match[2] : "50/50").trim();
-        const likelihood: Likelihood =
-          LIKELIHOODS.find(
-            (l) => l.toLowerCase() === rawLikelihood.toLowerCase(),
-          ) || "50/50";
-        const chaosFactor = storyData.agmtState?.chaosFactor ?? 5;
-        const fateResult = askFate(likelihood, chaosFactor);
-
-        flavorLines.push(`[AGMT Question: ${question}]`);
-        const answerLine = fateResult.randomEvent
-          ? `[AGMT Answer: ${fateResult.answer} - RANDOM EVENT TRIGGERED!]`
-          : `[AGMT Answer: ${fateResult.answer}]`;
-        flavorLines.push(answerLine);
-
-        if (fateResult.randomEvent) {
-          const focus = generateEventFocus();
-          const meaning = generateEventMeaning();
-          flavorLines.push(
-            `[Random Event: ${focus.focus} - ${meaning.action} ${meaning.subject}]`,
-          );
-        }
-      } catch (error) {
-        console.error("Error processing agmt_check:", error);
-      }
-    }
-
-    // Table roll: unified `table` field, with legacy fallbacks
-    const tableForChoice = choice.table || choice.agmt_table || choice.custom_table;
-    if (tableForChoice) {
-      try {
-        if (storyData.customTables) {
-          const { getTableByName, rollOnCustomTable } =
-            await import("../misc/tableRoller");
-          const customTable = getTableByName(
-            storyData.customTables,
-            tableForChoice,
-          );
-          if (customTable) {
-            const result = rollOnCustomTable(customTable);
-            if (result) {
-              flavorLines.push(`[${customTable.name}: ${result.text}]`);
-            } else {
-              addNotification(`Table "${customTable.name}" is empty`, "warning");
-            }
-          } else {
-            const result = generateElement(tableForChoice as ElementCategory);
-            if (result) {
-              flavorLines.push(`[${tableForChoice} Table: ${result.element}]`);
-            }
-          }
-        } else {
-          const result = generateElement(tableForChoice as ElementCategory);
-          if (result) {
-            flavorLines.push(`[${tableForChoice} Table: ${result.element}]`);
-          }
-        }
-      } catch (error) {
-        console.error("Error processing table roll:", error);
-      }
-    }
-
-    // Context rolls from action analysis (flavor dice unrelated to skill checks)
-    if (choice.rolls && choice.rolls.length > 0) {
-      for (const roll of choice.rolls) {
-        if (!roll.dice) continue;
-        try {
-          const diceMatch = roll.dice.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
-          if (diceMatch) {
-            const count = parseInt(diceMatch[1] || "1");
-            const sides = parseInt(diceMatch[2]);
-            const modifier = parseInt(diceMatch[3] || "0");
-
-            // Same bound diceFormula.ts enforces on every other roll in the
-            // app - this flavor-dice path parses its own notation instead
-            // of going through diceFormula.ts, so it needs the same DoS
-            // guard applied explicitly rather than inheriting it.
-            if (count < 1 || count > MAX_DICE_COUNT) {
-              throw new Error(
-                `Invalid dice count in "${roll.dice}": must be between 1 and ${MAX_DICE_COUNT}`,
-              );
-            }
-            if (sides < 1 || sides > MAX_DICE_SIDES) {
-              throw new Error(
-                `Invalid dice sides in "${roll.dice}": must be between 1 and ${MAX_DICE_SIDES}`,
-              );
-            }
-
-            let total = modifier;
-            const diceResults: number[] = [];
-            for (let i = 0; i < count; i++) {
-              const dieRoll = Math.floor(Math.random() * sides) + 1;
-              diceResults.push(dieRoll);
-              total += dieRoll;
-            }
-
-            const rollStr =
-              count > 1 ? `(${diceResults.join("+")})` : `${diceResults[0]}`;
-            const modStr =
-              modifier !== 0 ? `${modifier > 0 ? "+" : ""}${modifier}` : "";
-            flavorLines.push(
-              `[Context: ${roll.description} (${roll.dice}) = ${rollStr}${modStr} → ${total}]`,
-            );
-          } else {
-            console.warn(`Invalid dice notation: ${roll.dice}`);
-          }
-        } catch (error) {
-          console.error("Error processing context roll:", error);
-        }
-      }
-    }
 
     // A starting choice with an authored opening, picked during session zero:
     // the GM gets it as the opening to narrate once setup is done.

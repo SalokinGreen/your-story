@@ -4,7 +4,7 @@
  * inline in every AI message) so players see "Rolling dice" instead of a
  * raw tool name like "formula_roll".
  */
-const TOOL_LABELS: Record<string, string> = {
+export const TOOL_LABELS: Record<string, string> = {
   // Dice / checks
   formula_roll: "Rolling dice",
   ask_for_roll: "Waiting for your roll",
@@ -20,7 +20,6 @@ const TOOL_LABELS: Record<string, string> = {
   generate_image: "Painting a picture",
   start_challenge: "Starting a challenge",
   cancel_challenge: "Cancelling the challenge",
-  take_rest: "Resting",
 
   // Notes / memory lookup
   read_notes: "Reading notes",
@@ -36,7 +35,6 @@ const TOOL_LABELS: Record<string, string> = {
   edit_lore_insert: "Editing a note",
   merge_lore: "Merging notes",
   duplicate_lore: "Duplicating a note",
-  add_memory: "Recording a memory",
 
   // Combat
   start_combat: "Starting combat",
@@ -74,8 +72,6 @@ const TOOL_LABELS: Record<string, string> = {
   abandon_thread: "Abandoning story thread",
 
   // Flow control
-  request_continuation: "Continuing",
-  end_gm_thinking: "Wrapping up",
   start_game: "Starting the game",
 };
 

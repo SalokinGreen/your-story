@@ -845,46 +845,6 @@ export interface RestState {
   lastRestTimestamp?: number; // When last rest was taken
 }
 
-// Rest configuration per difficulty level
-export interface RestConfig {
-  // Cooldown reduction (turns)
-  cooldownReduction: { quick: number; short: number; long: number };
-  // Stress reduction (YZE only)
-  stressReduction: { quick: number; short: number; long: number };
-  // Max uses before long rest required
-  maxQuickRests: number;
-  maxShortRests: number;
-}
-
-// Default rest configuration scaled by difficulty
-// Harder difficulties = less effective rests, fewer uses
-export const REST_CONFIG: Record<AdventureDifficulty, RestConfig> = {
-  easy: {
-    cooldownReduction: { quick: 2, short: 999, long: 999 }, // 999 = full reset
-    stressReduction: { quick: 2, short: 5, long: 10 },
-    maxQuickRests: 4,
-    maxShortRests: 3,
-  },
-  medium: {
-    cooldownReduction: { quick: 1, short: 3, long: 999 },
-    stressReduction: { quick: 1, short: 3, long: 10 },
-    maxQuickRests: 3,
-    maxShortRests: 2,
-  },
-  hard: {
-    cooldownReduction: { quick: 1, short: 2, long: 999 },
-    stressReduction: { quick: 1, short: 2, long: 8 },
-    maxQuickRests: 2,
-    maxShortRests: 2,
-  },
-  expert: {
-    cooldownReduction: { quick: 1, short: 2, long: 999 },
-    stressReduction: { quick: 0, short: 1, long: 5 },
-    maxQuickRests: 2,
-    maxShortRests: 1,
-  },
-};
-
 // Custom random tables
 //
 // DEPRECATED - backward compat only. Random tables are now `StoryLore`

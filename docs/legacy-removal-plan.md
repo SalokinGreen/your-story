@@ -344,3 +344,78 @@ staying up for all of session zero covers the gap this change opens.
   removed so the file's lint count does not rise. The props stay on `StoryProps`
   (page.tsx still passes them); trimming them is not worth a page.tsx churn.
 - No test changed: the suite stays at 180 files / 2,740 tests.
+
+
+### 2026-10-23, slice 3
+
+- **An unknown tool name needed no new code.** `executeGMTools`' default branch
+  hands the call to `executeTools`, which answers a name with no schema with
+  `Unknown tool: <name> ...` (a failed result, nothing mutated). Two tests hold
+  it: `toolExecution.test.ts` (state executor) and `gmTools.sixPlaces.test.ts`
+  (all 19 removed names through `executeGMTools`).
+- **`end_gm_thinking` and the timers.** The completion branch in `generation.ts`,
+  `requestsContinuation`/`isComplete`/`finalSummary`/... on `GMExecutionResult`,
+  and the "premature end_gm_thinking" rejection are gone. The only ticking code
+  (`auto_advance`, §6.1) lived in that branch and never ran; it is deleted, and a
+  comment in `executeGMTools` marks where a once-per-GM-turn tick would go. No
+  ticking was added. `generation.ts` keeps its own local `isComplete` (the round
+  loop's exit flag, still set when a round makes no tool call).
+- **`SubagentContext` went with `subagentExecutor.ts`.** `executeGMTools`' fifth
+  argument is now `GMToolContext { imageJobs?: ImageToolContext }` (new, in
+  `gmExecutor.ts`); `generation.ts` passes `{ imageJobs }` and the API keys and
+  token it used to pass are gone (nothing read them). `webSearchFetch.ts` was
+  deleted with `webSearchCall.ts` and `app/api/web-search/` (its only caller was
+  the sub-agent). The `webResearchEnabled`/`braveSearchKey` generation options
+  are gone. `tests/sideModelCall.test.ts` still has `braveSearchKey` in a fixture
+  (harmless, left, as slice 2 noted).
+- **Removed by the coordinating session: `https://api.search.brave.com/*` in
+  `src-tauri/capabilities/default.json`.** Nothing calls it any more. It is
+  native configuration, so `tauri build` and a launch run with slice 4's
+  checks.
+- **`commandResponses.ts`** lost every ability and resource handler
+  (`applyRemoveAbility` ... `applyAdjustResource`, 412 lines) and its imports; only
+  the goal handlers and `applyDeleteNote` remain, with `TOOL_DISPATCH`'s
+  `complete_goal`/`fail_goal`/`update_goal`/`delete_goal`/`delete_note`.
+- **`lore.ts`:** with `checkVarTriggers` gone, `var_on_triggers` no longer counts
+  as "a trigger is defined". A note that had only variable triggers now falls into
+  the "no triggers: on" default instead of staying off for ever. The fields
+  themselves go in slice 4.
+- **`parseChoices` lost its `storyData` parameter** (it read none), and it, like
+  `outputToScenePart`, no longer strips a trailing `<...>` from a choice: the line
+  is the text. `outputToScenePart` also stopped treating `!!! GAME OVER !!!` as
+  the end of the story text, so the marker, if a model writes one, now stays in
+  the prose. Choice/ScenePart fields (`skill_used`, `gameOver`, ...) stay for
+  slice 4.
+- **Also touched, not in the plan:** `mythic.ts` (`update_challenge` and
+  `resolve_challenge` out of `TACTICAL_TOOL_NAMES`; they can no longer be called),
+  `imageShrink.ts` (a comment naming the deleted `imageCompression.ts`),
+  `GOOGLE_ESSENTIAL_TOOLS` and `TOOL_LABELS` are now exported so the new drift test
+  can read them (`add_memory` and `end_gm_thinking` left the first; `take_rest`,
+  `add_memory`, `request_continuation`, `end_gm_thinking` left the second).
+- **Extra deletions confirmed by grep:** `imageCompression.ts` and
+  `sample_adventures.ts` (no importers), plus `REST_CONFIG`/`RestConfig` in
+  `structs.ts`. `RestType`/`RestState` and the `restState`, `incidentalReactions`,
+  `skillTrees` fields stay for slice 4. menu.tsx's restart no longer writes
+  `restState` (the spread keeps whatever the old save had).
+- **The drift test cannot read the whitelist arrays directly** (they are local to
+  `buildGMStagePrompt`), so `gmTools.sixPlaces.test.ts` takes the union of the
+  tools `buildGMStagePrompt` returns for a default story, Manual Dice Mode, a
+  system story and pictures-on. The executor check reads `gmExecutor.ts`
+  (`case "name":`) and `toolExecutor.ts` (an inline `function.name === "name"`
+  block or a `TOOL_DISPATCH` entry) as text.
+- **Removed by the coordinating session:** the "Important event happens: Add
+  a memory entry" line under Creating Records (the GM has had no `add_memory`
+  since the Memory Keeper).
+- **After the engine review:** `manage_timer`'s `auto_advance` parameter text
+  said "Tick each GM turn" while the tool description says it does not tick
+  yet; it now matches. Old notes that had only variable triggers now default
+  to on (accepted: no editor writes those triggers, and the GM prompt goes by
+  type and `enabled`). `compressorjs` lost its only importer
+  (`imageCompression.ts`) and goes in slice 5.
+- **Counts:** 180 files / 2,740 tests to 172 / 2,551. Nine files deleted
+  (180 cases: rpgSystems.core 67, explosive 33, yze 30, advantageStacking 16,
+  subagentExecutor 7, reactionCheck 8, negotiatePrice 5, addMemory 7, statIntegrity
+  7), `toolExecution` -5, `dispatchTable` -9, `ai.outputToScenePart` -2, new
+  `gmTools.sixPlaces` +7. No `take_rest`, `end_combat` stat-sync or `reverseDC`
+  test existed that needed changing (the `reverseDC` line only asserts a field is
+  absent, still true).

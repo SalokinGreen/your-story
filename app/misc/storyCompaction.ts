@@ -343,9 +343,6 @@ export async function buildCondensedStorySeed(
   seed.pendingDirectorMoves = [];
   seed.incidentalReactions = {};
   seed.newGamePlusMode = false;
-  if (seed.restState) {
-    seed.restState = { quickRestsUsed: 0, shortRestsUsed: 0 };
-  }
   if (seed.agmtState) {
     seed.agmtState = {
       ...seed.agmtState,

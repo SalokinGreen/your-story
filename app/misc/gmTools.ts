@@ -38,11 +38,6 @@ export interface CalculateParams {
   display_name?: string;
 }
 
-export interface TakeRestParams {
-  type: "quick" | "short" | "long";
-  narrative_context?: string;
-}
-
 // ============================================
 // FORMULA-BASED GM TOOL INTERFACES
 // ============================================
@@ -78,11 +73,6 @@ export interface FormulaRollParams {
     success?: string;
     failure?: string;
   };
-  // Name of the stat/resource this roll's flat modifier is claimed to be
-  // derived from (e.g. "Strength", "Stamina"). Optional; when it matches a
-  // structured storyData.stats/resources entry, the executor cross-checks
-  // the claimed modifier against that value as an integrity check (H8).
-  stat_name?: string;
 }
 
 /**
@@ -149,9 +139,6 @@ export interface OpposedFormulaParams {
     opponent_wins?: string;
     tie?: string;
   };
-  // Name of the stat/resource the player's flat modifier is claimed to be
-  // derived from. See FormulaRollParams.stat_name (H8 integrity check).
-  player_stat_name?: string;
 }
 
 /**
@@ -261,16 +248,6 @@ export interface GenerateImageParams {
 }
 
 /**
- * Request Continuation - Ask for another GM round after seeing results
- * Use when you need to chain actions (e.g., attack roll → damage roll)
- */
-export interface RequestContinuationParams {
-  reason: string; // Why another round is needed
-  context: string; // What info you need to process
-  next_action?: string; // What you plan to do next
-}
-
-/**
  * Ask Question - Pause and ask the player(s) one or more questions, each
  * with predefined answer choices plus an always-available free-text
  * fallback. The game pauses until answered (or skipped); answers come back
@@ -327,17 +304,6 @@ export type GameStateSection =
 export interface GetGameStateParams {
   // Optional filter: return only these sections. Omit for all volatile state.
   sections?: GameStateSection[];
-}
-
-/**
- * Respond to Player - TERMINAL TOOL that ends the GM stage loop
- * Called when all mechanics are resolved and ready to narrate
- */
-export interface RespondToPlayerParams {
-  summary: string; // Summary of all mechanical results for the story stage
-  outcome: "success" | "failure" | "mixed" | "neutral"; // Overall outcome
-  narrative_hints?: string; // Optional guidance for the story stage
-  dramatic_moment?: boolean; // Mark as particularly dramatic (affects narration style)
 }
 
 /**
@@ -475,13 +441,12 @@ export interface AdvanceTurnParams {
 }
 
 /**
- * End Combat - Close the combat state and sync player stats
- * Copies player combatant stats back to character resources
+ * End Combat - Close the combat state. Lasting changes to the player go in
+ * the sheet note.
  */
 export interface EndCombatParams {
   outcome: "victory" | "defeat" | "fled" | "truce" | "interrupted";
   summary: string; // Summary of combat outcome for narrative
-  sync_player_stats?: boolean; // Copy player combatant stats to resources (default: true)
 }
 
 // ============================================
@@ -678,68 +643,11 @@ export interface NPCReactionParams {
   context?: string; // What triggered the reaction (shown as subtext)
 }
 
-/**
- * Reaction Check - GURPS-style deterministic disposition roll for an NPC
- * the GM hasn't necessarily added to the persistent NPC tracker (a merchant,
- * a guard, a noble met once). Rolls 3d6, applies a baseline bias plus
- * GM-declared situational modifiers, and returns a hard behavioral mandate
- * the GM must narrate the NPC as actually having - not a suggestion the
- * model can talk itself out of. Exists specifically to counteract LLM
- * sycophancy drift (RLHF-tuned helpfulness softening antagonists over a
- * long conversation) for NPCs too minor to warrant a full tracked NPC entry.
- */
-export interface ReactionCheckParams {
-  npc_name: string; // Name of the NPC reacting (need not exist in NPCs list)
-  bias?: "hostile" | "neutral" | "favorable"; // Baseline disposition skew before the roll
-  modifiers?: number; // Sum of situational/trait bonuses (charisma, reputation, prior favors, an established grudge, etc.) - GM-declared, like formula_roll's formula
-  reason: string; // What's being reacted to (e.g., "player asks the guard to look the other way")
-  // Force a fresh roll even if this NPC already has a cached reaction this
-  // scene (see incidentalReactions in structs.ts / executeReactionCheck) -
-  // use only when circumstances have genuinely changed (a bribe paid, a
-  // favor delivered), not just because the player asked again.
-  force_reroll?: boolean;
-}
-
-/**
- * Delegate Task - Hand off a self-contained generation/research job to a
- * separate, narrowly-scoped sub-call instead of doing it inline. Mirrors
- * how a human GM might jot "flesh this out later" and come back to it with
- * fresh focus: the sub-call gets its own small prompt and context (not the
- * full turn history), so it can spend more effort on one job without
- * bloating the main GM context. Its output is converted into ordinary
- * tools (add_npc, create_note) or a plain summary - it never writes to
- * StoryData directly.
- */
-export interface DelegateTaskParams {
-  task_type: "generate_npc" | "generate_location" | "research" | "web_research";
-  brief: string; // What to produce, e.g. "an NPC called Bob, a dockworker who owes the player money"
-  scope?: string[]; // Optional note titles to restrict sub-context to (keeps the call cheap and focused)
-}
-
-/**
- * Negotiate Price - GURPS-style structured haggling. Reduces a price
- * negotiation to a deterministic procedure instead of GM-improvised
- * economic judgment: an opposed Quick Contest (Merchant/Diplomacy/
- * Fast-Talk vs. the seller's resistance) where each point of margin of
- * success shaves a fixed percentage off the list price, bounded by the
- * seller's hard floor.
- */
-export interface NegotiatePriceParams {
-  item_name: string; // What's being negotiated over
-  list_price: number; // Seller's asking price, AFTER you've already applied any local economic modifiers (storefront vs. warehouse, taxes, etc.) - describe those in `reason`, this tool doesn't recompute them
-  player_formula: string; // Player's negotiation roll with actual numbers, e.g. "1d20+4" (Merchant/Diplomacy/Fast-Talk)
-  seller_formula: string; // Seller's resistance roll with actual numbers, e.g. "1d20+3"
-  seller_min_price?: number; // Seller's hard floor - the deal can never land below this
-  player_target_price?: number; // Optional: what the player is explicitly asking for. If this is below seller_min_price, the negotiation fails outright before any roll - no amount of skill closes a gap neither party's parameters allow
-  reason: string; // What's being negotiated and why (haggling over a sword, bribing a guard, etc.)
-}
-
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "start_challenge"; params: StartChallengeParams }
   | { name: "cancel_challenge"; params: CancelChallengeParams }
   | { name: "calculate"; params: CalculateParams }
-  | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
   | { name: "gm_roll"; params: GMRollParams }
   | { name: "ask_for_roll"; params: AskForRollParams }
@@ -754,8 +662,6 @@ export type GMToolParams =
   | { name: "read_notes"; params: ReadNotesParams }
   | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "get_game_state"; params: GetGameStateParams }
-  | { name: "request_continuation"; params: RequestContinuationParams }
-  | { name: "end_gm_thinking"; params: RespondToPlayerParams }
   // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
   | { name: "manage_timer"; params: ManageTimerParams }
   // System tools (meters, tracks, sessions, action rolls)
@@ -780,9 +686,6 @@ export type GMToolParams =
   | { name: "update_npc"; params: UpdateNPCParams }
   | { name: "remove_npc"; params: RemoveNPCParams }
   | { name: "npc_reaction"; params: NPCReactionParams }
-  | { name: "reaction_check"; params: ReactionCheckParams }
-  | { name: "negotiate_price"; params: NegotiatePriceParams }
-  | { name: "delegate_task"; params: DelegateTaskParams }
   | { name: "start_game"; params: StartGameParams };
 
 // ============================================
@@ -902,29 +805,6 @@ const calculateTool: ToolSchema = {
   },
 };
 
-const takeRestTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "take_rest",
-    description: `Process a rest: quick (~30 min), short (4-8 hours) or long (several days). Cannot rest during an active challenge.`,
-    parameters: {
-      type: "object",
-      properties: {
-        type: {
-          type: "string",
-          enum: ["quick", "short", "long"],
-          description: "Rest type",
-        },
-        narrative_context: {
-          type: "string",
-          description: "How the rest happens narratively",
-        },
-      },
-      required: ["type"],
-    },
-  },
-};
-
 // ============================================
 // FORMULA-BASED TOOL SCHEMAS
 // ============================================
@@ -983,11 +863,6 @@ const formulaRollTool: ToolSchema = {
             success: { type: "string", description: "What happens on success" },
             failure: { type: "string", description: "What happens on failure" },
           },
-        },
-        stat_name: {
-          type: "string",
-          description:
-            "Optional: the tracked stat the modifier comes from, cross-checked as an integrity check",
         },
       },
       required: ["formulas", "reason"],
@@ -1182,11 +1057,6 @@ const opposedFormulaTool: ToolSchema = {
             opponent_wins: { type: "string" },
             tie: { type: "string" },
           },
-        },
-        player_stat_name: {
-          type: "string",
-          description:
-            "Optional: the tracked stat the modifier comes from (integrity check)",
         },
       },
       required: [
@@ -1425,101 +1295,6 @@ Write \`description\` as what a camera would see: who is there, where, the light
         },
       },
       required: ["subject", "description"],
-    },
-  },
-};
-
-const requestContinuationTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "request_continuation",
-    description: `Request another GM stage round after seeing the current roll results.
-
-Use when:
-- You need to chain multiple rolls (attack → damage)
-- The outcome of one check determines what check comes next
-- You want to see roll results before deciding what to do
-- Complex multi-step mechanics need sequential resolution
-
-The GM stage will run again with the current results available.
-
-Example flow:
-1. First GM call: formula_roll for attack
-2. GM sees SUCCESS, calls request_continuation for damage
-3. Second GM call: formula_roll for damage calculation
-4. Story stage receives both attack and damage results`,
-    parameters: {
-      type: "object",
-      properties: {
-        reason: {
-          type: "string",
-          description:
-            "Why another GM round is needed (e.g., 'Need to roll damage after successful attack')",
-        },
-        context: {
-          type: "string",
-          description:
-            "What information from this round you need (e.g., 'Attack succeeded with margin +5')",
-        },
-        next_action: {
-          type: "string",
-          description:
-            "What you plan to do in the next round (e.g., 'Roll 2d6+3 damage')",
-        },
-      },
-      required: ["reason", "context"],
-    },
-  },
-};
-
-const endGmThinkingTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "end_gm_thinking",
-    description: `**TERMINAL TOOL** - Ends the GM thinking stage and hands off to the Story stage.
-
-Call this when ALL mechanical resolution is complete and you're ready for narration.
-
-This tool MUST be called to end the GM stage loop. Without it, the GM stage will continue.
-
-The summary you provide becomes context for the Story stage to write the narrative.
-
-WHEN TO CALL:
-- All necessary rolls have been made
-- All state changes (items, stats, conditions) have been applied
-- You have a clear picture of what happened mechanically
-- You're ready for the story to be narrated
-
-DO NOT call if:
-- You still need to make rolls
-- You need to see results before deciding next action
-- You want to ask the player something (use OOC brackets instead, then continue)`,
-    parameters: {
-      type: "object",
-      properties: {
-        summary: {
-          type: "string",
-          description:
-            "Comprehensive summary of all mechanical results. Include: roll outcomes, damage dealt/taken, items used/gained, conditions applied, challenge progress, etc. This is what the Story stage uses to write the narrative.",
-        },
-        outcome: {
-          type: "string",
-          enum: ["success", "failure", "mixed", "neutral"],
-          description:
-            "Overall outcome: success (player achieved goal), failure (player failed), mixed (partial success or success with cost), neutral (no clear win/loss, e.g., roleplay or information gathering)",
-        },
-        narrative_hints: {
-          type: "string",
-          description:
-            "Optional guidance for the Story stage: tone, specific details to emphasize, dramatic beats to hit, etc.",
-        },
-        dramatic_moment: {
-          type: "boolean",
-          description:
-            "Mark as a particularly dramatic moment (critical hit, near-death, major revelation). Story stage will write with more gravitas.",
-        },
-      },
-      required: ["summary", "outcome"],
     },
   },
 };
@@ -1894,7 +1669,7 @@ const endCombatTool: ToolSchema = {
   type: "function",
   function: {
     name: "end_combat",
-    description: `End the active combat (victory, defeat, fled, truce, interrupted) and, by default, copy the player's stats back to matching character resources. Always end it explicitly; don't let combat fade out.`,
+    description: `End the active combat (victory, defeat, fled, truce, interrupted). Lasting changes to the player (wounds, spent resources, gear) go in the character sheet note with edit_note. Always end it explicitly; don't let combat fade out.`,
     parameters: {
       type: "object",
       properties: {
@@ -1906,11 +1681,6 @@ const endCombatTool: ToolSchema = {
         summary: {
           type: "string",
           description: "Summary of what happened for the narrative",
-        },
-        sync_player_stats: {
-          type: "boolean",
-          description:
-            "Copy the player's stats back to resources (default true)",
         },
       },
       required: ["outcome", "summary"],
@@ -1957,7 +1727,7 @@ const manageTimerTool: ToolSchema = {
         auto_advance: {
           type: "boolean",
           description:
-            "Tick each GM turn (default true). create only.",
+            "Reserved: timers do not tick on their own yet. create only.",
         },
         visibility: {
           type: "string",
@@ -2289,200 +2059,9 @@ const npcReactionTool: ToolSchema = {
   },
 };
 
-const reactionCheckTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "reaction_check",
-    description: `Roll a deterministic disposition check for an NPC (GURPS Reaction Table style).
-
-Use this for INCIDENTAL NPCs - a merchant, guard, noble, or stranger the
-player is dealing with, especially for the first time - where you need an
-externally-imposed, non-negotiable read on how they feel about the player
-RIGHT NOW. This is not for NPCs already tracked with an "attitude" in the
-NPCs list (use update_npc/npc_reaction for those) - it's for everyone else,
-and specifically for moments where the player is trying to talk, bribe, or
-charm their way past someone.
-
-WHY THIS EXISTS: left to your own judgment, you will tend to soften
-antagonists and let players talk their way past resistance, because you're
-tuned to be helpful. This tool takes that decision out of your hands. Roll
-it, then narrate the NPC as GENUINELY having the resulting disposition -
-do not let them warm up within the same scene just because the player asked
-nicely again. A bad reaction should feel bad. It can only change via another
-reaction_check (a new roll, on a new attempt, with new circumstances) or a
-clear in-fiction reason (a bribe paid, a favor delivered, a persuasive
-formula_roll that specifically targets changing their mind).
-
-Rolls 3d6, applies the chosen baseline bias, adds any modifiers you declare
-(charisma, reputation, an established grudge, local politics - be honest
-about what actually applies), and returns a category from Disastrous to
-Excellent with a specific behavioral mandate. Treat that mandate as a hard
-constraint on what you narrate next, the same way you treat a failed
-formula_roll.
-
-If you call this again for the SAME named NPC later in the SAME scene, you
-get back the SAME cached result instead of a fresh roll - this is
-intentional, so the player can't wear an NPC down by asking the same thing
-repeatedly. Only pass force_reroll: true when circumstances have genuinely
-changed (a bribe paid, a favor delivered, new leverage) - not just because
-the player tried again.
-
-Examples:
-- { npc_name: "the gate guard", bias: "neutral", modifiers: 2, reason: "player tries to talk their way past the checkpoint" }
-- { npc_name: "Duke Ashford", bias: "hostile", modifiers: -3, reason: "player, a known thief, requests an audience" }`,
-    parameters: {
-      type: "object",
-      properties: {
-        npc_name: {
-          type: "string",
-          description:
-            "Name of the NPC reacting (doesn't need to exist in the NPCs list)",
-        },
-        bias: {
-          type: "string",
-          enum: ["hostile", "neutral", "favorable"],
-          description:
-            "Baseline disposition before the roll - hostile for enemies/rivals, favorable for allies/friends, neutral for strangers (default: neutral)",
-        },
-        modifiers: {
-          type: "number",
-          description:
-            "Sum of situational/trait modifiers you're declaring (e.g. +2 for high charisma, -3 for a known grudge, +1 for a prior favor). Be honest and specific in `reason`.",
-        },
-        reason: {
-          type: "string",
-          description:
-            "What's being reacted to, in enough detail to justify your modifiers",
-        },
-        force_reroll: {
-          type: "boolean",
-          description:
-            "Force a fresh roll even if this NPC already has a cached reaction this scene. Only use when circumstances have genuinely changed - a bribe, a favor, new leverage - not because the player just asked again.",
-        },
-      },
-      required: ["npc_name", "reason"],
-    },
-  },
-};
-
-const negotiatePriceTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "negotiate_price",
-    description: `Resolve a price negotiation deterministically (GURPS-style haggling).
-
-Use this instead of improvising a discount whenever the player is
-haggling, bribing, or trying to talk down a price - buying gear from a
-merchant, negotiating a bounty, bribing a guard. It reduces the whole
-back-and-forth to one deterministic Quick Contest instead of you deciding
-the outcome by feel.
-
-You set the list price first, having already folded in any local economic
-factors (storefront markup vs. warehouse discount, taxes, scarcity) - just
-describe those in \`reason\`, this tool doesn't recompute them for you. Then
-both sides roll: the player's negotiation skill (Merchant/Diplomacy/
-Fast-Talk - whatever fits) against the seller's resistance. If the player
-wins, each point of margin removes 10% of the price. If the player loses
-or ties, the price doesn't move - the seller holds firm, it doesn't get
-WORSE. If you set seller_min_price, the deal can never land below it, no
-matter how good the roll. If you also set player_target_price and it's
-already below seller_min_price, the negotiation fails outright before any
-dice are rolled - some gaps no amount of skill closes.
-
-Example:
-{ item_name: "steel longsword", list_price: 150, player_formula: "1d20+5", seller_formula: "1d20+3", seller_min_price: 100, reason: "player haggles with the blacksmith over a used but well-maintained sword" }`,
-    parameters: {
-      type: "object",
-      properties: {
-        item_name: {
-          type: "string",
-          description: "What's being negotiated over",
-        },
-        list_price: {
-          type: "number",
-          description:
-            "Seller's asking price, AFTER you've already applied any local economic modifiers - describe those in `reason`",
-        },
-        player_formula: {
-          type: "string",
-          description:
-            "Player's negotiation roll with actual numbers, e.g. '1d20+4' (Merchant/Diplomacy/Fast-Talk)",
-        },
-        seller_formula: {
-          type: "string",
-          description:
-            "Seller's resistance roll with actual numbers, e.g. '1d20+3'",
-        },
-        seller_min_price: {
-          type: "number",
-          description:
-            "Seller's hard floor - the final price can never land below this, however good the roll",
-        },
-        player_target_price: {
-          type: "number",
-          description:
-            "Optional: what the player is explicitly asking for. If this is already below seller_min_price, the negotiation fails immediately, no roll needed.",
-        },
-        reason: {
-          type: "string",
-          description:
-            "What's being negotiated and why, including any economic factors already folded into list_price",
-        },
-      },
-      required: [
-        "item_name",
-        "list_price",
-        "player_formula",
-        "seller_formula",
-        "reason",
-      ],
-    },
-  },
-};
-
 // ============================================
 // DELEGATE TASK TOOL SCHEMA
 // ============================================
-
-const delegateTaskTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "delegate_task",
-    description: `Hand off a self-contained generation or research job to a separate, focused sub-call instead of doing it inline.
-
-Use when a job is meaty enough to deserve its own undivided attention (a whole NPC, a whole location, tracking down scattered information) rather than something to improvise in passing.
-
-task_type options:
-- "generate_npc": Produces a fully fleshed-out NPC from a short brief, then registers it automatically (equivalent to add_npc, but with more thought put into who they are).
-- "generate_location": Produces a detailed location writeup (layout, atmosphere, notable features/dangers) and saves it as a note automatically.
-- "research": Re-reads this adventure's own notes/lore/memory and synthesizes a focused answer to a question - use for "what do we know about X" when the answer might be scattered across many notes.
-- "web_research": Like research, but searches the real internet for grounding facts (how something historically/technically works) - only for real-world facts, not in-fiction content. Only available if the player has enabled Web Research and configured a search key in Settings; if not, this call will fail and you should proceed without it.
-
-Each call costs an extra round-trip - use it for jobs worth the wait, not simple lookups (use search_notes/read_notes for those).`,
-    parameters: {
-      type: "object",
-      properties: {
-        task_type: {
-          type: "string",
-          enum: ["generate_npc", "generate_location", "research", "web_research"],
-          description: "What kind of job to delegate",
-        },
-        brief: {
-          type: "string",
-          description:
-            "What to produce or find out, in plain language, e.g. 'an NPC called Bob, a grizzled dockworker who owes the player money' or 'everything we know about the Sunken Cathedral'",
-        },
-        scope: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Optional: exact titles of notes to restrict the sub-call's context to, keeping it cheap and focused. Omit to let it consider everything relevant.",
-        },
-      },
-      required: ["task_type", "brief"],
-    },
-  },
-};
 
 // ============================================
 // EXPORT
@@ -2495,7 +2074,6 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   startChallengeTool,
   cancelChallengeTool,
   calculateTool,
-  takeRestTool,
   // Formula-based tools (primary dice mechanics)
   formulaRollTool,
   gmRollTool,
@@ -2514,7 +2092,6 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   readNotesTool,
   searchMemoryTool,
   getGameStateTool,
-  requestContinuationTool,
   // Countdown timer tool (create/advance/toggle_pause/cancel/trigger via `action`)
   manageTimerTool,
   // System tools: offered only to stories that use a system (decision 79, see buildGMStagePrompt)
@@ -2536,12 +2113,6 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   updateNPCTool,
   removeNPCTool,
   npcReactionTool,
-  reactionCheckTool,
-  negotiatePriceTool,
-  // Sub-agent delegation
-  delegateTaskTool,
-  // Terminal tool - ends GM loop
-  endGmThinkingTool,
   // Reasoning-tier self-escalation
   setReasoningTierTool,
   // Session zero -> real play handoff

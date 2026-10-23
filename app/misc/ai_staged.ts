@@ -3,7 +3,6 @@
   Choice,
   CommandResponse,
   StoryLore,
-  REST_CONFIG,
   getMemoryContent,
   MemoryEntry,
   CombatState,
@@ -864,34 +863,6 @@ ${pendingEvents
 ${pendingMoves.map(formatDirectorMoveLine).join("\n")}`
     : "";
 
-  // Build variables section if any exist - clean, simple format
-  const variablesSection =
-    storyData.variables && storyData.variables.length > 0
-      ? `## Variables\n${storyData.variables
-          .map((v) => {
-            if (v.type === "number") {
-              return `- ${v.name}: ${v.value}${
-                v.description ? ` (${v.description})` : ""
-              }`;
-            } else if (v.type === "boolean") {
-              return `- ${v.name}: ${v.value ? "true" : "false"}${
-                v.description ? ` (${v.description})` : ""
-              }`;
-            } else if (v.type === "string") {
-              return `- ${v.name}: "${v.value}"${
-                v.description ? ` (${v.description})` : ""
-              }`;
-            } else {
-              // list type
-              const items = v.items.length ? v.items.join(", ") : "empty";
-              return `- ${v.name}: [${items}]${
-                v.description ? ` (${v.description})` : ""
-              }`;
-            }
-          })
-          .join("\n")}`
-      : "";
-
   // Build threads section - show active storylines/quests being tracked
   const activeThreads =
     storyData.threads?.filter((t) => t.status === "active") || [];
@@ -951,7 +922,6 @@ ${
     memorySection,
     // Other game state
     goalsSection,
-    variablesSection,
     threadsSection,
     agmtSection,
     pendingEventsSection,
@@ -1446,7 +1416,7 @@ export function buildGMStagePrompt({
     }
   }
   if (characterSheetLore.length > 0) {
-    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details - traits, background, abilities, resources.\nThis is not opening-scene set dressing: the player picked these, and they expect them to keep mattering. Every turn, let the sheet decide something concrete - which skill/stat a roll uses and at what difficulty, whether an NPC recognises a title or a reputation, what a flaw or bond costs them right now, what their background lets them notice that someone else wouldn't. If a turn could have gone the same way for any character at all, you didn't use it.\nTo update: edit_note("title", content="new content") - Keep stats, HP, XP, etc. current!\n`;
+    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details - traits, background and whatever the sheet note tracks (wounds, resources, gear).\nThis is not opening-scene set dressing: the player picked these, and they expect them to keep mattering. Every turn, let the sheet decide something concrete - which skill/stat a roll uses and at what difficulty, whether an NPC recognises a title or a reputation, what a flaw or bond costs them right now, what their background lets them notice that someone else wouldn't. If a turn could have gone the same way for any character at all, you didn't use it.\nTo update: edit_note("title", content="new content") - keep what changes (wounds, resources, gear) current in the sheet!\n`;
     for (const l of characterSheetLore) {
       loreSection += `\n### ${l.title}.md\n${pinnedContent(l)}\n`;
     }
@@ -1854,7 +1824,6 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
 - Know which one is which: the player character is named in the PLAYER CHARACTER section of the game state below, and "you" in your narration always means them. Give NPCs all the dialogue and initiative you like - that's your job - but the moment a line puts words, a decision, or a next move into the player character's mouth, you've taken their turn for them.
 - Use the character sheet and their chosen traits every turn (see the CHARACTER SHEET section): pick difficulties from it, let NPCs react to who they actually are, and give their traits, flaws, and background something to push against. Referencing what a character IS is not the same as deciding what they DO.
 - Resolve ONE beat at a time: the current action and its immediate consequence. Don't chain a second unrequested event, enemy turn, or complication onto the same turn "for free" - stop and hand control back at the next decision point.
-- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.
 
 ## LENGTH & PACING
 A real tabletop GM talks in a few sentences and hands the mic back - they don't narrate a mini scene around every action. Match your narration length to the moment, and end the instant the player has something to react to:
@@ -1912,14 +1881,13 @@ You and the player can talk OOC by wrapping text in (round brackets).
 
 ### Creating Records
 - **New enemy encountered without stats**: Create a note with their combat stats (HP, attacks, abilities)
-- **Important event happens**: Add a memory entry (discoveries, decisions, plot twists)
 - **Meet a named NPC**: Use \`add_npc\` to track them (name, role, attitude, description)
 - **Discover new location/faction/item**: Create a note documenting it
 
 ### Updating Records
 - **Enemy HP changes**: Use \`update_combatant_stat\` during combat
 - **NPC attitude/relationship changes**: Use \`update_npc\`
-- **Character sheet changes**: Use \`edit_note\` to keep stats, resources, abilities current
+- **Character sheet changes**: Use \`edit_note\` to keep the character sheet note current (wounds, resources, gear)
 - **Small note edits**: Use \`edit_lore_replace\` (find/replace), \`edit_lore_append\` (add to end), \`edit_lore_prepend\` (add to top), or \`edit_lore_insert\` (insert near a pattern)
 - **Large note rewrites**: Use \`edit_note\` with full new content
 - **Merge related notes**: Use \`merge_lore\` to combine multiple entries
@@ -2059,7 +2027,6 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     // Flow control
     "start_challenge",
     "cancel_challenge",
-    "take_rest",
     // Combat tools
     "start_combat",
     "add_combatant",
