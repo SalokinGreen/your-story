@@ -209,6 +209,7 @@ After the model picker merged (#228), the author asked: "The next project will b
 | 128 | "Besides the dead arcade data and UI, what else should go in this cleanup?" (several allowed) | **All four:** the unoffered GM tools (game_over, delegate_task with its Web Research toggle and Brave key, reaction_check, negotiate_price, the ability tools, request_continuation, end_gm_thinking, add_memory); `take_rest`; New Game+ and the game-over screen; `rpgSystems.ts` and the skill trees. |
 | 129 | "What should character creation be for an adventure with a sheet template like Blood & Bone's?" | **"No form, session zero builds it."** The pre-play form is deleted; the GM walks the player through the adventure's sheet template in session zero. Rejected: the form grouped by the template's headings; one page with the sheet as written. |
 | 130 | "The 'Choose your character' screen shows only a Custom card when an adventure has no pre-made characters. What then?" | **"Skip it when Custom is the only choice (Recommended)."** The picker shows only when the adventure has pre-made characters, and the "Default Stats" / "Starter Items" badges go everywhere. |
+| 131 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"Plan approved"** — built as planned on `claude/legacy-removal`. |
 
 ### Interview — the story screen (2026-10-22)
 

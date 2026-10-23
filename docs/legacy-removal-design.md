@@ -1,6 +1,6 @@
 # Removing the arcade leftovers — design
 
-Status: **draft, waiting for the author's approval.** The implementation plan is
+Status: **approved (decision 131), being built.** The implementation plan is
 [`legacy-removal-plan.md`](legacy-removal-plan.md). Decisions 125–130 in
 [`decisions.md`](decisions.md).
 
