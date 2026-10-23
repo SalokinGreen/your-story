@@ -155,6 +155,12 @@ import {
   getSetupProgress,
   recordSetupReference,
 } from "./campaignPlan";
+import {
+  getCreationProgress,
+  getCreationSteps,
+  setupParticipants,
+  type MissingCreationStep,
+} from "./setupSteps";
 
 // ============================================
 // RESULT INTERFACES
@@ -176,6 +182,23 @@ export interface GMToolContext {
   // better than StoryData does (party seats). Default: couch players, else
   // one sheet (getSetupProgress).
   setupPlayers?: { id: string; name: string }[];
+}
+
+/**
+ * Whether a tool result started the game: a successful start_game, or a
+ * confirm_setup the player approved that the engine started in the same call
+ * (`started`, set by the executor, never parsed from text).
+ */
+export function resultStartedGame(r: {
+  toolName: string;
+  success: boolean;
+  result?: unknown;
+}): boolean {
+  if (r.toolName === "start_game") return r.success;
+  if (r.toolName === "confirm_setup") {
+    return (r.result as { started?: boolean } | undefined)?.started === true;
+  }
+  return false;
 }
 
 export interface GMToolResult {
@@ -483,6 +506,10 @@ export interface GMConfirmSetupResult {
   type: "confirm_setup";
   outcome: "approved" | "changes" | "dismissed" | "stopped" | "refused";
   note?: string; // The player's requested changes, for "changes"
+  // Set by the executor, never parsed from text: the player approved and the
+  // engine started the game in the same call (generation.ts treats this like
+  // a successful start_game).
+  started?: boolean;
 }
 
 // ============================================
@@ -1086,7 +1113,9 @@ export async function executeGMTools(
           result = await executeAskQuestion(
             call.id,
             params as AskQuestionParams,
-            interaction
+            interaction,
+            modified,
+            toolContext.setupPlayers
           );
           // An answered question is session zero's progress: the concept has
           // begun, and the count feeds the "enough questions" nudge. On the
@@ -2340,7 +2369,9 @@ async function executeAskForRoll(
 async function executeAskQuestion(
   toolCallId: string,
   params: AskQuestionParams,
-  interaction: GMInteractionHandlers
+  interaction: GMInteractionHandlers,
+  storyData?: StoryData,
+  setupPlayers?: { id: string; name: string }[]
 ): Promise<GMToolResult> {
   const emptyResult: GMAskQuestionResult = {
     type: "ask_question",
@@ -2413,6 +2444,12 @@ async function executeAskQuestion(
     "]",
   ].join("\n");
 
+  // Session zero: count the answered creation step and say where setup stands.
+  const progressNote =
+    storyData && storyData.sessionZeroActive === true
+      ? recordCreationSteps(storyData, params.questions, answers, setupPlayers)
+      : "";
+
   return {
     toolName: "ask_question",
     toolCallId,
@@ -2426,8 +2463,112 @@ async function executeAskQuestion(
         skipped: a.skipped,
       })),
     },
-    contextForStory,
+    contextForStory: progressNote
+      ? `${contextForStory}\n${progressNote}`
+      : contextForStory,
   };
+}
+
+/** "connections (Nik)" / "setting": the id the GM tags with, and who for. */
+function stepRef(m: MissingCreationStep): string {
+  return m.player ? `${m.step.id} (${m.player})` : m.step.id;
+}
+
+/**
+ * Records the creation steps an answered ask_question covered, on the working
+ * copy (docs/session-zero-detail-design.md 3.2), and returns the line the GM
+ * reads: what was recorded and what is next. Each tag counts only when every
+ * item carrying it was answered and, for a player step, the engine can name
+ * the player (the question's target, or solo). Table steps may be batched, and
+ * in quick mode so may anything; in full mode a player step (the per-character
+ * build) is asked one at a time, so a call mixing it with other tags records
+ * the table tags and refuses the player ones. Returns "" when no question
+ * carried a tag.
+ */
+function recordCreationSteps(
+  story: StoryData,
+  questions: AskQuestionItem[],
+  answers: { skipped: boolean }[],
+  setupPlayers?: { id: string; name: string }[]
+): string {
+  const tagged = questions
+    .map((q, i) => ({ q, i, tag: q.setup_step?.trim() ?? "" }))
+    .filter((x) => x.tag);
+  if (tagged.length === 0) return "";
+
+  const tags = [...new Set(tagged.map((x) => x.tag))];
+  const steps = getCreationSteps(story, setupPlayers);
+  const people = setupParticipants(story, setupPlayers);
+  const fullMode = story.setup?.mode === "full";
+
+  const prev = story.setup?.covered ?? { table: [], players: {} };
+  const covered = { table: [...prev.table], players: { ...prev.players } };
+  const recordedList: string[] = [];
+  const notes: string[] = [];
+
+  for (const tag of tags) {
+    const mine = tagged.filter((x) => x.tag === tag);
+    const step = steps.find((s) => s.id === tag);
+    if (!step) {
+      notes.push(
+        `unknown setup_step "${tag}" ignored, nothing recorded. This story's steps: ${steps.map((s) => s.id).join(", ")}.`
+      );
+      continue;
+    }
+    if (fullMode && tags.length > 1 && step.scope === "player") {
+      notes.push(
+        `${tag} not recorded - this call carried ${tags.length} different setup_step tags (${tags.join(", ")}). Ask one setup step at a time.`
+      );
+      continue;
+    }
+    if (mine.some((x) => answers[x.i]?.skipped !== false)) {
+      notes.push(`${tag} not recorded - the player skipped it. Ask it again.`);
+      continue;
+    }
+    if (step.scope === "table") {
+      if (!covered.table.includes(step.id)) covered.table.push(step.id);
+      recordedList.push(step.id);
+      continue;
+    }
+    let who: { id: string; name: string } | undefined;
+    if (people.length === 1) {
+      who = people[0];
+    } else {
+      const named = new Set(
+        mine.map((x) =>
+          people.find(
+            (p) =>
+              p.name.trim().toLowerCase() ===
+              (x.q.target_player_name ?? "").trim().toLowerCase()
+          )?.id
+        )
+      );
+      const id = named.size === 1 ? [...named][0] : undefined;
+      who = people.find((p) => p.id === id);
+    }
+    if (!who) {
+      notes.push(
+        `${tag} not recorded - say which player it is for with target_player_name on every ${tag} question (${people.map((p) => p.name).join(", ")}).`
+      );
+      continue;
+    }
+    const have = covered.players[who.id] ?? [];
+    covered.players[who.id] = have.includes(step.id) ? have : [...have, step.id];
+    recordedList.push(`${step.id} (${who.name})`);
+  }
+
+  if (recordedList.length === 0) return `[Setup: nothing recorded - ${notes.join(" ")}]`;
+
+  story.setup = { ...story.setup, covered };
+  const progress = getCreationProgress(story, setupPlayers);
+  const next = progress.missing[0];
+  const tail = next
+    ? `Next: ${stepRef(next)}.`
+    : story.setup?.mode === "full"
+      ? "Every step is covered: write the sheet and the plan."
+      : "Every required step is covered.";
+  const extra = notes.length ? ` Not recorded: ${notes.join(" ")}` : "";
+  return `[Setup: Recorded: ${recordedList.join(", ")}.${extra} ${tail}]`;
 }
 
 /** The labels of a multi_select answer that are really among the options, once each, in option order. */
@@ -3811,7 +3952,8 @@ async function executeConfirmSetup(
     success: boolean,
     outcome: GMConfirmSetupResult["outcome"],
     contextForStory: string,
-    note?: string
+    note?: string,
+    started?: boolean
   ): GMToolResult => ({
     toolName: "confirm_setup",
     toolCallId,
@@ -3820,6 +3962,7 @@ async function executeConfirmSetup(
       type: "confirm_setup",
       outcome,
       ...(note ? { note } : {}),
+      ...(started !== undefined ? { started } : {}),
     } as GMConfirmSetupResult,
     contextForStory,
   });
@@ -3829,6 +3972,20 @@ async function executeConfirmSetup(
   }
 
   const progress = getSetupProgress(storyData, setupPlayers);
+  if (progress.creation.missing.length > 0) {
+    // Group by who still has to be asked: "Nik about connections, burden".
+    const groups = new Map<string, string[]>();
+    for (const m of progress.creation.missing) {
+      const key = m.player ?? "the table";
+      groups.set(key, [...(groups.get(key) ?? []), m.step.id]);
+    }
+    const parts = [...groups].map(([who, ids]) => `${who} about ${ids.join(", ")}`);
+    return make(
+      false,
+      "refused",
+      `[ERROR: Not yet: you haven't asked ${parts.join("; ")}. Ask the next one with ask_question (setup_step "${progress.creation.missing[0].step.id}"), one step per call, then call confirm_setup.]`
+    );
+  }
   const missing: string[] = [];
   if (!progress.character) {
     missing.push(
@@ -3891,10 +4048,40 @@ async function executeConfirmSetup(
     ...storyData.setup,
     approval: currentSetupHashes(storyData),
   };
+  // Pressing Start starts the game: run start_game on the same working copy
+  // and fold its answer into this one result (results are matched to calls by
+  // position), flagged `started` for generation.ts.
+  const fallbackName = storyData.story_name?.trim();
+  const started = executeStartGame(
+    toolCallId,
+    {
+      story_name:
+        params.story_name?.trim() ||
+        (fallbackName && fallbackName !== "New Story" ? fallbackName : "Untitled Story"),
+      premise: params.premise?.trim() || undefined,
+    },
+    storyData,
+    setupPlayers
+  );
+  if (started.success) {
+    return make(
+      true,
+      "approved",
+      `[Approved: the player pressed Start the story, and the game has started. ${started.contextForStory}]`,
+      undefined,
+      true
+    );
+  }
+  // Believed unreachable: the approval just above made the hashes current, and
+  // the checks start_game runs (sheet, plan, approval, session zero still on)
+  // were all satisfied before the card opened. Kept so a future start_game
+  // refusal reads as a plain 'did not start' instead of a false start.
   return make(
     true,
     "approved",
-    "[Approved: the player pressed Start the story. Call start_game now, then write the campaign intro: first a short briefing in the story's voice (who the player is, where, what's at stake, why they are here), then the opening scene, ending on a clear first choice.]"
+    `[Approved, but the game did NOT start. ${started.contextForStory}]`,
+    undefined,
+    false
   );
 }
 

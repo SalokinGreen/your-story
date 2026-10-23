@@ -125,9 +125,9 @@ export default function AskQuestionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center ys-modal-backdrop p-4">
-      <div className="bg-ys-surface border border-ys-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+      <div className="bg-ys-surface border border-ys-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]">
         {/* Header */}
-        <div className="px-5 pt-5 pb-4 bg-ys-text/5 text-center">
+        <div className="px-5 pt-5 pb-4 bg-ys-text/5 text-center shrink-0">
           <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-ys-text text-ys-bg flex items-center justify-center shadow-lg">
             <DynamicIcon name="HelpCircle" className="w-6 h-6" />
           </div>
@@ -152,7 +152,12 @@ export default function AskQuestionModal({
           )}
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto min-h-0 overscroll-contain">
+          {question.intro?.trim() && (
+            <p className="text-sm text-ys-muted whitespace-pre-line">
+              {question.intro.trim()}
+            </p>
+          )}
           {/* Predefined options */}
           <div className="space-y-2">
             {multi && (
@@ -209,7 +214,7 @@ export default function AskQuestionModal({
               <button
                 onClick={submitPicks}
                 disabled={picked.length === 0}
-                className="w-full py-2.5 rounded-xl bg-ys-text text-ys-bg hover:opacity-90 active:scale-[0.99] disabled:opacity-40 font-semibold text-sm transition-all"
+                className="sticky bottom-0 w-full py-2.5 rounded-xl bg-ys-text text-ys-bg hover:opacity-90 active:scale-[0.99] disabled:opacity-40 font-semibold text-sm transition-all"
               >
                 Done
               </button>

@@ -686,6 +686,7 @@ function QuestionCard({
       {request.questions.map((q, i) => (
         <div key={i} className="space-y-2">
           <h2 className="text-lg font-semibold">{q.question}</h2>
+          {q.intro && <p className="whitespace-pre-line text-sm text-ys-muted">{q.intro}</p>}
           {q.multiSelect && <p className="text-sm text-ys-muted">Pick as many as you like.</p>}
           <div className="flex flex-col gap-2">
             {q.options.map((option) => {

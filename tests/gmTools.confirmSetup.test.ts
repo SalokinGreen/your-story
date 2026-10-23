@@ -41,7 +41,11 @@ function story(overrides: Partial<StoryData> = {}): StoryData {
     lore: [sheet(), plan()],
     memory: [],
     npcs: [],
-    setup: { mode: "quick", conceptDone: true },
+    setup: {
+      mode: "quick",
+      conceptDone: true,
+      covered: { table: ["setting", "tone"], players: {} },
+    },
     ...overrides,
   } as unknown as StoryData;
 }
@@ -162,8 +166,11 @@ describe("confirm_setup: the four outcomes", () => {
     const input = story();
     const out = await executeGMTools([call("confirm_setup", CONFIRM_ARGS)], input, {}, h);
     expect(out.results[0].success).toBe(true);
-    expect(out.results[0].contextForStory).toContain("Call start_game now");
+    // Pressing Start starts the game in the same call (plan 3.5).
+    expect(out.results[0].contextForStory).toContain("the game has started");
     expect(out.results[0].contextForStory).toContain("campaign intro");
+    expect((out.results[0].result as { started?: boolean }).started).toBe(true);
+    expect(out.modifiedStoryData.sessionZeroActive).toBe(false);
     expect(out.modifiedStoryData.setup?.approval).toEqual(currentSetupHashes(input));
     expect(out.modifiedStoryData.setup?.mode).toBe("quick");
     expect(getSetupProgress(out.modifiedStoryData).approved).toBe(true);
@@ -209,14 +216,19 @@ describe("confirm_setup: the four outcomes", () => {
   it("an approval and start_game in one batch starts the game", async () => {
     const { h } = handlers({ approved: true });
     const out = await executeGMTools(
-      [call("confirm_setup", CONFIRM_ARGS), call("start_game", { story_name: "Vienna" })],
+      [
+        call("confirm_setup", { ...CONFIRM_ARGS, story_name: "Vienna", premise: "A vow." }),
+        call("start_game", { story_name: "Too Late" }),
+      ],
       story(),
       {},
       h,
     );
-    expect(out.results.map((r) => r.success)).toEqual([true, true]);
+    // The approval started the game; a direct start_game after it is refused.
+    expect(out.results.map((r) => r.success)).toEqual([true, false]);
     expect(out.modifiedStoryData.sessionZeroActive).toBe(false);
     expect(out.modifiedStoryData.story_name).toBe("Vienna");
+    expect(out.modifiedStoryData.premise).toBe("A vow.");
   });
 });
 

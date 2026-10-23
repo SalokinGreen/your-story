@@ -11,6 +11,68 @@ file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
 
+## 2026-10-24 — session zero detail (decision 148)
+
+Built from [`session-zero-detail-design.md`](session-zero-detail-design.md).
+Every check below needs a real GM turn with a real key, on the Android APK
+(party mode's phone check on the desktop app), so each waits for the author's go. The suite and `tsc` cover the step lists, the
+recording rules, the card's refusal, the auto-start flag, the latest-round text
+and the phone redaction. They do not cover whether a real model tags its
+questions, writes a good intro, or what the modal looks like with the keyboard
+open.
+
+- **Full Blood & Bone setup, step by step (APK).** New story from *The Hollow
+  Hour*, tap **Step by step**, one solo player. *Expected:* each creation step
+  is asked in turn, one question per step for the character (Kind, Archetype,
+  stats, Vow, connections, burden, Power, Path, gear), then name and look,
+  history and drives; each question opens with a sentence or two and its options
+  say what they do in play. The strip reads **Setup 0/15** and counts up to
+  **Setup 15/15**. Before the last step is covered, **Start the story** cannot
+  be reached: the card does not open, and the GM says which step it still needs.
+  *Failure looks like:* a step skipped, two character steps in one question, a
+  question with no intro or with bare option labels, the strip showing a total
+  other than 15, the card opening early, or the GM narrating before the card.
+- **Start the story starts the game (APK).** From the card of the run above,
+  press **Start the story**. *Expected:* the card closes, and in the same turn
+  the GM writes the campaign briefing, then the opening scene, ending on a clear
+  first choice. No "Let's go" is needed. *Failure looks like:* the line "(Let's
+  finish setting up first: next is starting the game.)", a turn that waits for
+  the player to type, or a second card.
+- **No old text re-shown during setup (APK).** During the run above, read each
+  turn's text. *Expected:* each turn shows only the question for the next step;
+  the first step's question ("what kind of creature…") does not come back after
+  later steps. *Failure looks like:* an earlier step's line appearing again at
+  the end of a turn, or an empty turn that stops setup.
+- **Quick setup asks setting and tone once (APK).** New story, tap **Quick
+  setup**, answer two to four questions. *Expected:* setting and tone are asked
+  (possibly in one question, with tone as multi-select), neither is asked a
+  second time, and the GM then proposes. The strip shows the old four items, not
+  "Setup n/total". *Failure looks like:* setting or tone asked again after it was
+  answered, a "Setup n/total" item in quick mode, or the GM still asking after
+  about six questions.
+- **Closing the card, then silence (APK).** Open the card and dismiss it with
+  the X. Then, if the GM says nothing more, the turn ends on the line
+  "(What would you like to change?)". *Expected:* that line, and the card does
+  not open again by itself. *Failure looks like:* the card reopening on its own,
+  or the line "(Let's finish setting up first: …)" instead.
+- **Long intro with the keyboard open (APK).** In a full-mode setup, get a
+  question whose intro is several sentences, then tap a text box to type a
+  custom answer so the Android keyboard opens. *Expected:* the intro, the
+  options, the custom box and the Send and Done buttons can all be reached by
+  scrolling inside the modal, and none is hidden behind the keyboard.
+  *Failure looks like:* a button that cannot be scrolled to or tapped, or the
+  modal running off the top of the screen.
+- **Party phone shows the intro (party mode, desktop table and phone).** Open a
+  table with two players, go to a step-by-step setup and wait for a question
+  addressed to a phone. *Expected:* the phone shows the question's intro above
+  its options. *Failure looks like:* the options with no intro line, or the
+  phone showing the table's secrets (any setup note's text it should not have).
+- **A starter with a pre-made character (APK).** Pick a starter that has a
+  pre-made character, choose **Step by step**. *Expected:* the GM asks only the
+  world steps (setting, tone, campaign) and the strip reads **Setup 0/3**, with
+  no Kind, Archetype or name questions for the pre-made character. *Failure
+  looks like:* the character steps asked again, or a total other than 3.
+
 ## 2026-10-23 — Session zero (claude/session-zero, decision 147)
 
 Built from [`session-zero-plan.md`](session-zero-plan.md). Every check below

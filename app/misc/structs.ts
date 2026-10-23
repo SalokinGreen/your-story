@@ -775,6 +775,16 @@ export interface SetupState {
   };
   referenceTitles?: string[]; // notes read during setup, newest first
   questionsAsked?: number; // setup questions answered this session zero
+  // Creation steps asked and answered (setupSteps.ts), recorded by
+  // ask_question's `setup_step`. `table` holds table-scope step ids, `players`
+  // the player-scope ones by player id ("solo" in solo play). Absent means
+  // nothing is covered.
+  covered?: { table: string[]; players: Record<string, string[]> };
+  // Players (ids as setupParticipants gives them, "solo" in solo play) who
+  // already had a populated character sheet when the setup style was chosen.
+  // They are not asked the per-character steps; table and world steps still
+  // apply. Set once, with `mode` (premadePlayerIds in campaignPlan.ts).
+  premadeFor?: string[];
 }
 
 export interface StoryData {

@@ -13,6 +13,7 @@ import {
   estimateTokens,
 } from "@/app/misc/ai_staged";
 import { executeGMTools } from "@/app/misc/gmExecutor";
+import { getCreationSteps } from "@/app/misc/setupSteps";
 import {
   SETUP_REFERENCE_MAX_TITLES,
   currentSetupHashes,
@@ -89,16 +90,20 @@ function bnStory(
   ]);
 }
 
+const QUICK_COVERED = { table: ["setting", "tone"], players: {} };
+
 const approvedSetup = (s: StoryData, extra: Partial<SetupState> = {}): SetupState => ({
   mode: "quick",
   conceptDone: true,
+  covered: QUICK_COVERED,
   approval: currentSetupHashes(s),
   ...extra,
 });
 
 describe("buildSessionZeroBlock: the checklist and the next step", () => {
   it("starts on the concept, with ask_question and multi_select", () => {
-    const block = buildSessionZeroBlock(story({ setup: { mode: "quick" } }));
+    // No mode chosen yet: no creation step is required, so the concept leads.
+    const block = buildSessionZeroBlock(story());
     expect(block).toContain("→ Concept");
     expect(block).toContain("· Character");
     expect(block).toContain("NEXT: the concept");
@@ -115,7 +120,7 @@ describe("buildSessionZeroBlock: the checklist and the next step", () => {
 
   it("moves to the character once a question was answered", () => {
     const block = buildSessionZeroBlock(
-      story({ setup: { mode: "quick", conceptDone: true } }),
+      story({ setup: { mode: "quick", conceptDone: true, covered: QUICK_COVERED } }),
     );
     expect(block).toContain("✓ Concept");
     expect(block).toContain("→ Character");
@@ -126,7 +131,7 @@ describe("buildSessionZeroBlock: the checklist and the next step", () => {
 
   it("moves to the campaign once the sheet exists", () => {
     const block = buildSessionZeroBlock(
-      story({ setup: { mode: "quick" } }, [SHEET]),
+      story({ setup: { mode: "quick", covered: QUICK_COVERED } }, [SHEET]),
     );
     expect(block).toContain("✓ Concept");
     expect(block).toContain("✓ Character");
@@ -137,7 +142,7 @@ describe("buildSessionZeroBlock: the checklist and the next step", () => {
 
   it("asks for confirm_setup when sheet and plan exist but are not approved", () => {
     const block = buildSessionZeroBlock(
-      story({ setup: { mode: "quick", conceptDone: true } }, [SHEET, PLAN]),
+      story({ setup: { mode: "quick", conceptDone: true, covered: QUICK_COVERED } }, [SHEET, PLAN]),
     );
     expect(block).toContain("✓ Campaign");
     expect(block).toContain("→ Approval");
@@ -167,7 +172,7 @@ describe("buildSessionZeroBlock: the checklist and the next step", () => {
     const block = buildSessionZeroBlock(
       story(
         {
-          setup: { mode: "quick", conceptDone: true },
+          setup: { mode: "quick", conceptDone: true, covered: QUICK_COVERED },
           multiplayer: {
             enabled: true,
             couchPlayers: [
@@ -205,12 +210,23 @@ describe("buildSessionZeroBlock: the rule and the mode", () => {
   it("full mode: one ask_question per creation step", () => {
     const block = buildSessionZeroBlock(story({ setup: { mode: "full" } }));
     expect(block).toContain("MODE: step by step");
-    expect(block).toContain("one `ask_question` per creation step");
+    expect(block).toContain("character steps one per `ask_question` call");
     expect(block).not.toContain("MODE: quick setup");
-    const character = buildSessionZeroBlock(
-      story({ setup: { mode: "full", conceptDone: true } }),
-    );
-    expect(character).toContain("one creation step at a time");
+    expect(block).toContain("SETUP STEPS");
+    expect(block).toContain("NEXT STEP TO ASK: setting");
+    const done = story({ setup: { mode: "full" } });
+    done.setup = {
+      mode: "full",
+      covered: {
+        table: getCreationSteps(done).filter((x) => x.scope === "table").map((x) => x.id),
+        players: {
+          solo: getCreationSteps(done).filter((x) => x.scope === "player").map((x) => x.id),
+        },
+      },
+    };
+    const character = buildSessionZeroBlock(done);
+    expect(character).toContain("Every step is covered: write the sheet and the plan");
+    expect(character).toContain("NEXT: the character");
   });
 
   it("nudges to propose from the sixth setup question", () => {

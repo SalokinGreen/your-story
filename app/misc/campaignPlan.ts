@@ -25,6 +25,12 @@
  * prompt nudge for a story that's several turns old with setup still unfinished.
  */
 import type { StoryData, StoryLore, PlanState, SpineLength } from "./structs";
+import {
+  describeMissing,
+  getCreationProgress,
+  setupParticipants,
+  type CreationProgress,
+} from "./setupSteps";
 
 /** One-shot / short-arc spine: a few sessions, no room for a slow build. */
 export const CAMPAIGN_SPINE_SHORT = [
@@ -289,6 +295,7 @@ export function recordSetupReference(
 
 export type SetupStep =
   | "concept"
+  | "interview"
   | "character"
   | "campaign"
   | "confirm"
@@ -304,10 +311,45 @@ export interface SetupProgress {
   next: SetupStep | null;
   /** Players still without a sheet (names), when more than one is required. */
   missingSheetFor: string[];
+  /**
+   * The creation steps this mode requires (setupSteps.ts): how many are
+   * covered, how many there are, and which are missing, in the order to ask.
+   */
+  creation: CreationProgress;
 }
 
 function normaliseTitle(t: string): string {
   return t.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** A sheet belongs to a player by `ownerCouchPlayerId` or a "Character: <name>" title. */
+function playerHasSheet(
+  sheets: StoryLore[],
+  p: { id: string; name: string },
+): boolean {
+  const title = normaliseTitle(`Character: ${p.name}`);
+  return sheets.some(
+    (s) =>
+      s.ownerCouchPlayerId === p.id ||
+      (!s.ownerCouchPlayerId && normaliseTitle(s.title) === title),
+  );
+}
+
+/**
+ * The players who already have a populated, enabled sheet right now (ids as
+ * setupParticipants gives them; solo is "solo"). Recorded as
+ * `setup.premadeFor` when the setup style is first chosen, so a pre-made
+ * character is not asked the per-character steps.
+ */
+export function premadePlayerIds(
+  story: StoryData,
+  players?: ReadonlyArray<{ id: string; name: string }>,
+): string[] {
+  const sheets = populatedSheets(story);
+  if (sheets.length === 0) return [];
+  const people = setupParticipants(story, players);
+  if (people.length === 1) return [people[0].id];
+  return people.filter((p) => playerHasSheet(sheets, p)).map((p) => p.id);
 }
 
 /**
@@ -332,13 +374,7 @@ export function getSetupProgress(
   const missingSheetFor: string[] = [];
   if (required.length > 1) {
     for (const p of required) {
-      const title = normaliseTitle(`Character: ${p.name}`);
-      const has = sheets.some(
-        (s) =>
-          s.ownerCouchPlayerId === p.id ||
-          (!s.ownerCouchPlayerId && normaliseTitle(s.title) === title),
-      );
-      if (!has) missingSheetFor.push(p.name);
+      if (!playerHasSheet(sheets, p)) missingSheetFor.push(p.name);
     }
     character = missingSheetFor.length === 0;
   } else {
@@ -350,7 +386,9 @@ export function getSetupProgress(
   const setup = story.setup;
   // No mode dependency: nothing writes setup.mode (it only shapes the strip
   // and the prompt), so a sheet or an answered concept is what ticks Concept.
-  const concept = !!setup?.conceptDone || sheets.length > 0;
+  const creation = getCreationProgress(story, players);
+  const concept =
+    !!setup?.conceptDone || sheets.length > 0 || creation.covered > 0;
 
   const approval = setup?.approval;
   let approved = false;
@@ -363,14 +401,26 @@ export function getSetupProgress(
   const started = story.sessionZeroActive !== true;
   let next: SetupStep | null = null;
   if (!started) {
-    if (!concept) next = "concept";
+    // Missing creation steps come first: they ARE the concept questions, and
+    // the card must never be pushed while one is outstanding.
+    if (creation.missing.length > 0) next = "interview";
+    else if (!concept) next = "concept";
     else if (!character) next = "character";
     else if (!campaign) next = "campaign";
     else if (!approved) next = "confirm";
     else next = "start_game";
   }
 
-  return { concept, character, campaign, approved, started, next, missingSheetFor };
+  return {
+    concept,
+    character,
+    campaign,
+    approved,
+    started,
+    next,
+    missingSheetFor,
+    creation,
+  };
 }
 
 // ============================================
@@ -383,6 +433,7 @@ export const MAX_SETUP_PROMPTS = 2;
 /** What the player reads for a step, in the engine line. */
 const SETUP_STEP_LABEL: Record<SetupStep, string> = {
   concept: "a few questions about the game",
+  interview: "the next setup question",
   character: "the character sheet",
   campaign: "the campaign plan",
   confirm: "your OK on the setup card",
@@ -394,10 +445,20 @@ const SETUP_STEP_LABEL: Record<SetupStep, string> = {
  * end on prose without moving setup forward. Names the next step and the tool
  * that does it.
  */
-export function setupGateMessage(next: SetupStep | null): string {
+export function setupGateMessage(
+  next: SetupStep | null,
+  creation?: CreationProgress,
+): string {
   const head =
     "Setup is not finished and this turn has not moved it forward, so the turn cannot end on prose alone.";
   switch (next) {
+    case "interview": {
+      const m = creation?.missing[0];
+      if (!m) {
+        return `${head} Next step: ask the player the next setup question with ask_question, tagged with its setup_step.`;
+      }
+      return `${head} Next step: ask ${describeMissing(m)} with ask_question, tagged setup_step "${m.step.id}"${m.player ? ` and target_player_name "${m.player}" if the table has several players` : ""}. ${m.step.hint} Do not call confirm_setup yet.`;
+    }
     case "concept":
       return `${head} Next step: ask the player your setup questions with ask_question (their answers set the concept), then continue.`;
     case "character":
@@ -413,8 +474,23 @@ export function setupGateMessage(next: SetupStep | null): string {
   }
 }
 
+/**
+ * The line a session-zero turn ends with when the player closed or sent back
+ * the setup card and the GM then said nothing: the player has the floor, and
+ * the card is not forced open again.
+ */
+export const SETUP_CARD_HANDED_BACK_LINE = "(What would you like to change?)";
+
 /** The line a session-zero turn ends with when the gate's prompts ran out. */
-export function setupEngineLine(next: SetupStep | null): string {
-  const what = next ? SETUP_STEP_LABEL[next] : "the setup";
+export function setupEngineLine(
+  next: SetupStep | null,
+  creation?: CreationProgress,
+): string {
+  const m = next === "interview" ? creation?.missing[0] : undefined;
+  const what = m
+    ? describeMissing(m)
+    : next
+      ? SETUP_STEP_LABEL[next]
+      : "the setup";
   return `(Let's finish setting up first: next is ${what}.)`;
 }

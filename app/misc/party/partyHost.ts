@@ -808,6 +808,7 @@ function requestView(req: PartyRequest): PartyRequestView {
     kind: "question",
     questions: req.request.questions.map((q) => ({
       question: q.question,
+      ...(q.intro?.trim() ? { intro: q.intro.trim() } : {}),
       options: q.options.map((o) => ({
         label: o.label,
         ...(o.description ? { description: o.description } : {}),

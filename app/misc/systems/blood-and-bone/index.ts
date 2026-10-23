@@ -12,6 +12,7 @@ import { ASSET_NOTES } from "./assets";
 import { CORE_NOTE } from "./core";
 import { CREATION_NOTE } from "./creation";
 import { CREATION_PROMPT_NOTES } from "./creationPrompts";
+import { BLOOD_AND_BONE_CREATION_STEPS } from "./creationSteps";
 import { EUROPE_NOTES } from "./europe";
 import { buildHollowHour } from "./hollowHour";
 import { KIND_NOTES } from "./kinds";
@@ -65,6 +66,7 @@ export const BLOOD_AND_BONE: BuiltinSystem = {
   ],
   sheetTemplate: BLOOD_AND_BONE_SHEET_TEMPLATE,
   creationNoteId: "builtin:blood-and-bone:character-creation",
+  creationSteps: BLOOD_AND_BONE_CREATION_STEPS,
   meterSets: BLOOD_AND_BONE_METER_SETS,
   endOfSessionReminder:
     "Dawn. Run the Reckoning for each character now: formula_roll [\"<Stress>d6\"] (skip it at Stress 0: no 1s), count the 1s, manage_meter adjust Beast by that count. Then: Wendigo Slipping Mask +1 (+2 Graverobber) for a foodless night; Heat -1 if nobody breached and someone suppressed attention; offer two downtime actions; clear every \"used tonight\" on the sheets.",

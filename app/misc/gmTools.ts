@@ -264,6 +264,8 @@ export interface AskQuestionItem {
   allow_custom?: boolean; // Allow a free-text answer too (default true)
   multi_select?: boolean; // The player may pick several options (default false)
   target_player_name?: string; // Couch co-op only: which player this question is directed at
+  setup_step?: string; // Session zero: the creation step this question covers
+  intro?: string; // A sentence or two shown above the options
 }
 
 export interface AskQuestionParams {
@@ -338,6 +340,8 @@ export interface StartGameParams {
 export interface ConfirmSetupParams {
   character_summary: string; // A short summary of the character(s)
   campaign_hook: string; // The campaign's premise in a sentence or two
+  story_name?: string; // The title the story gets when the player presses Start
+  premise?: string; // Optional 1-3 sentence premise, stored on Start
 }
 
 // ============================================
@@ -1007,6 +1011,14 @@ const askQuestionTool: ToolSchema = {
                 type: "string",
                 description: "Couch co-op: the player it is for",
               },
+              setup_step: {
+                type: "string",
+                description: "Session zero: the setup step id this covers",
+              },
+              intro: {
+                type: "string",
+                description: "1-2 sentences shown above the options",
+              },
             },
             required: ["question", "options"],
           },
@@ -1344,7 +1356,7 @@ const confirmSetupTool: ToolSchema = {
   type: "function",
   function: {
     name: "confirm_setup",
-    description: `Session zero only. Once the character sheet(s) and the Campaign Plan exist, show the player a card with both and wait for their OK or their changes. Required before start_game. Editing a sheet or the plan afterwards cancels the OK.`,
+    description: `Session zero only. Once the character sheet(s) and the Campaign Plan exist, show the player a card with both and wait for their OK or their changes. The player's OK starts the game: pass story_name and premise. Editing a sheet or the plan afterwards cancels the OK.`,
     parameters: {
       type: "object",
       properties: {
@@ -1357,6 +1369,14 @@ const confirmSetupTool: ToolSchema = {
           type: "string",
           description: "The campaign's premise in a sentence or two",
         },
+        story_name: {
+          type: "string",
+          description: "Short title; the story starts with it on OK",
+        },
+        premise: {
+          type: "string",
+          description: "Optional 1-3 sentence premise",
+        },
       },
       required: ["character_summary", "campaign_hook"],
     },
@@ -1367,7 +1387,7 @@ const startGameTool: ToolSchema = {
   type: "function",
   function: {
     name: "start_game",
-    description: `Call ONCE, when session zero is done and you are about to narrate the opening scene. It names the story and hands off from session zero to real play. Requires the character sheet(s), the "Campaign Plan" gm_plan note (only its Opening Image beat detailed) and the player's OK through confirm_setup (an error otherwise). Order: character(s), Campaign Plan, confirm_setup, start_game, then the campaign intro.`,
+    description: `Direct path only: confirm_setup already starts the game on the player's OK. Call ONCE, when session zero is done. It names the story and hands off from session zero to real play. Requires the character sheet(s), the "Campaign Plan" gm_plan note (only its Opening Image beat detailed) and the player's OK through confirm_setup (an error otherwise).`,
     parameters: {
       type: "object",
       properties: {

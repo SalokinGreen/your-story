@@ -41,12 +41,20 @@ function story(overrides: Partial<StoryData> = {}): StoryData {
   } as unknown as StoryData;
 }
 
+/** Quick setup's two required steps, asked and answered. */
+const QUICK_COVERED = { table: ["setting", "tone"], players: {} };
+
 /** A story with the sheet, the plan and an approval of exactly those. */
 function approvedStory(overrides: Partial<StoryData> = {}): StoryData {
   const base = story({ lore: [sheet(), plan()], ...overrides });
   return {
     ...base,
-    setup: { mode: "quick", conceptDone: true, approval: currentSetupHashes(base) },
+    setup: {
+      mode: "quick",
+      conceptDone: true,
+      covered: QUICK_COVERED,
+      approval: currentSetupHashes(base),
+    },
   };
 }
 
@@ -72,11 +80,17 @@ describe("getSetupProgress: the steps", () => {
   });
 
   it("counts a pre-made sheet as the concept, with or without a mode", () => {
-    const s = story({ lore: [sheet()], setup: { mode: "full" } });
+    const s = story({
+      lore: [sheet()],
+      setup: { mode: "quick", covered: QUICK_COVERED },
+    });
     const p = getSetupProgress(s);
     expect(p.concept).toBe(true);
     expect(p.character).toBe(true);
     expect(p.next).toBe("campaign");
+    // Step by step still asks every step, a sheet or not (plan 3.1).
+    const full = getSetupProgress(story({ lore: [sheet()], setup: { mode: "full" } }));
+    expect(full.next).toBe("interview");
     const noMode = getSetupProgress(story({ lore: [sheet()] }));
     expect(noMode.concept).toBe(true);
     expect(noMode.next).toBe("campaign");
@@ -89,7 +103,9 @@ describe("getSetupProgress: the steps", () => {
   });
 
   it("walks concept, character, campaign, confirm, start_game", () => {
-    const answered = story({ setup: { mode: "quick", conceptDone: true } });
+    const answered = story({
+      setup: { mode: "quick", conceptDone: true, covered: QUICK_COVERED },
+    });
     expect(getSetupProgress(answered).next).toBe("character");
 
     const withSheet = { ...answered, lore: [sheet()] } as StoryData;
