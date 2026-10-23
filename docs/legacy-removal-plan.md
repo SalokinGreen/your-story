@@ -8,6 +8,10 @@ from `master` at 3f66c9a (2026-10-23) and will drift as slices land.
 The order is chosen so the compiler does the hunting: slices 1–3 remove the
 readers (screens, tools, modules), and slice 4 deletes the fields from
 `structs.ts`, where `tsc` then fails on anything the earlier slices missed.
+**Every slice ends with `tsc` clean and the suite green**, so a change that
+only type-checks once the fields are optional (a writer that stops filling a
+required field, such as `write_presets` or `DEFAULT_PRESET`) waits for
+slice 4 (Codex's review).
 
 Baseline before slice 1: Vitest 178 files / 2,727 tests, `tsc` clean, lint
 counted per touched file (`verify` skill).
@@ -23,12 +27,18 @@ counted per touched file (`verify` skill).
 - `handlePresetSelect` Custom branch (`1606-1646`): delete the template/form
   branch and the dead `sourceAdventureId` refetch (`608`, `1617-1631`; the id
   is never set). Custom = `startCustomStory()`: push the intro (as
-  `1712-1718`), set `sessionZeroActive: true` when
-  `!story.lore.some(l => l.type === "character_sheet")`, save. Delete the
+  `1712-1718`), set `sessionZeroActive: true`, save. Delete the
   "Customize your character" toast and the menu auto-open (`1740-1746`).
 - Pre-made branch (`1654-1692`): keep the `characterSheet` → note and the
   `authorNotes`; delete the legacy array copies (`1676-1689`). Set
-  `sessionZeroActive: true` when the preset has no `characterSheet` either.
+  `sessionZeroActive: true` here too: every new adventure starts in session
+  zero (design §3.2).
+- The starting-choice shortcut (`handleChoice`, `3588`): when
+  `storyData.sessionZeroActive`, skip the `intro_override` branch and send the
+  choice to the GM, with the override passed as the authored opening (a line
+  in the player's turn text: "The adventure's opening for this choice, to
+  narrate once setup is done: …"). After `start_game` the branch runs as
+  today.
 - `handleCharacterCreate` (`1124-1199`), the `CHARACTER_CREATION` state and
   its render (`5603-5608`), the `CharacterCreationForm` import (`150`): delete.
   Remove `StoryState.CHARACTER_CREATION` if nothing else uses it.
@@ -39,32 +49,37 @@ counted per touched file (`verify` skill).
 
 **`app/misc/ai_staged.ts`**
 - New `buildSheetTemplateBlock(storyData)`: when
-  `characterSheetLore.length === 0 && storyData.characterSheetTemplate?.template`,
+  `storyData.sessionZeroActive && storyData.characterSheetTemplate?.template`,
   returns the "CHARACTER SHEET TEMPLATE" block (design §3.3) with the
-  template's markdown; else `""`. Placed in `buildLiveBlock` next to the
+  template's markdown; else `""`. It stays for all of session zero, so every
+  player at a shared table gets it. Placed in `buildLiveBlock` next to the
   setup blocks (the FRESH STORY block, `1709-1718`), never in the stable block.
 - FRESH STORY text (`1714`): "name, starting stats/resources/abilities
   fitting the genre and tone" → "the character sheet — from the CHARACTER
   SHEET TEMPLATE below when there is one, otherwise fitting the genre and
   tone".
 
-**`app/misc/designer_executor.ts`** `write_presets` (`478-515`): stop writing
-the empty legacy arrays (the type loses them in slice 4).
-
 **Tests.** New `tests/storyStart.presets.test.ts`: `hasPremadeCharacters`
-(no presets, only `"custom"`, one real). New cases in
-`tests/campaignPlan.setupReminder.test.ts` or a new
-`tests/sheetTemplateBlock.test.ts`: the block appears with a template and no
-sheet, carries the template text, is absent once a `character_sheet` note
-exists or with no template, and sits in the live block (the shared-prefix
-test in `tests/tokenBudget.test.ts` must still pass). A Hollow Hour story
-built by `startAdventureLocally` gets the block on its first GM prompt.
+(no presets, only `"custom"`, one real). New `tests/sheetTemplateBlock.test.ts`:
+the block appears in session zero with a template, carries the template
+text, stays after a first `character_sheet` note exists, is absent after
+`start_game` or with no template, and sits in the live block (the
+shared-prefix test in `tests/tokenBudget.test.ts` must still pass). A Hollow
+Hour story built by `startAdventureLocally` gets the block on its first GM
+prompt. The story-start and starting-choice logic lives in `page.tsx`, which
+has no tests; pull the two decisions out as pure helpers in `presets.ts`
+(`hasPremadeCharacters`, and
+`shouldUseIntroOverride(story, choice)`) so they are tested, and cover the
+rest in the preview.
 
 **Check.** Browser preview: Library → The Hollow Hour → Play → Start Without
 Notes lands on the story with the intro and no picker or form; the AI
 Context view shows the template block in the live message. A Designer
 adventure with one preset still shows the picker; Custom there starts the
-story. Screenshots for the devlog.
+story; the pre-made card starts it with its sheet and the START OF PLAY
+reminder in the AI Context. A Designer adventure with starting choices:
+picking one during session zero sends it to the GM rather than inserting the
+authored opening. Screenshots for the devlog.
 
 ## Slice 2 — Screens and dead components (decisions 127, 128)
 
@@ -127,6 +142,14 @@ observer):
   `skip_tools`, `list_inactive_notes`, `toggle_lore` (`952`, `397`, `548`,
   `685`, `756`, `1584`).
 - Fix the stale comment at `gmExecutor.ts:1435`.
+- `end_combat` stays, but its resource bridge goes: the copy of the player
+  combatant's stats into `resources` (`gmExecutor.ts:5310`), the
+  `sync_player_stats` parameter (`gmTools.ts:1910`, `structs.ts:484`) and
+  "copy the player's stats back to matching character resources" in its
+  description (`gmTools.ts:1897`). The description says to record lasting
+  changes in the sheet note instead.
+- The `stat_name` parameter of `formula_roll` / `opposed_formula`, which only
+  fed H8 (`gmTools.ts:84, 153, 990, 1189`), goes with H8.
 
 **Prompt text** (`ai_staged.ts`): delete the `request_continuation` line
 (`1834`); "keep stats, resources, abilities current" (`1899`) and the
@@ -142,7 +165,8 @@ tags.
 - `commandResponses.ts`: delete the stat, resource and ability handlers
   (`339-693` range); keep the goal handlers and their dispatch.
 - `presets.ts`: delete `createPresetFromCurrentSettings`, `applyPreset`,
-  `getPresetById`; `DEFAULT_PRESET` loses the legacy arrays.
+  `getPresetById` (`DEFAULT_PRESET` loses its legacy arrays in slice 4, with
+  the type).
 - `mythicChaos.ts`: delete `migrateItemGrades` and its call (`page.tsx:1406`).
 - The stat-integrity check H8 (`gmExecutor.ts:2295-2304`, calls at `2554`,
   `2920`): delete.
@@ -160,7 +184,10 @@ tags.
 (5), `toolExecution.addMemory` (7), `gmTools.statIntegrity` (7). **To trim:**
 `advanced.commands` (the Resource and Stat sections), `toolExecutor.dispatchTable`
 (the ability cases), `gmTools.challengeParity` (`reverseDC`), any `take_rest`
-cases. **To add:** one test that every name in the GM whitelist has a schema
+cases, `toolExecution.test.ts` (its mixed execution and error tests call
+`add_memory` at `217` and `game_over` at `366`: swap in a kept tool so the
+coverage survives), `gmToolLabels.test.ts:9` (expects a removed label), and
+the `end_combat` tests that assert the stat sync. **To add:** one test that every name in the GM whitelist has a schema
 and an executor and nothing outside it is in `GOOGLE_ESSENTIAL_TOOLS` or the
 labels (the six-places drift check), and one that a call to a removed name
 returns the unknown-tool result.
@@ -183,13 +210,28 @@ stat-change tiers and `ItemGrade` when `tsc` shows nothing else uses them).
 `customTables` stays, commented as migration input only (design §5).
 
 **`app/misc/storyDataDefaults.ts`**: `ensureStoryDataArrays()` stops
-backfilling the removed arrays (`22-29`) and deletes the removed keys:
-`stripRemovedFields(story)` over a `REMOVED_STORY_FIELDS` list, run first.
-It already runs on every load (`localStoryManager.ts:196`, `page.tsx:1413`).
-Check the online guest's receive path (`app/misc/multiplayer/`) and run it
-there too if a guest does not already.
+backfilling the removed arrays (`22-29`) and first calls
+`stripRemovedFields(story)`, which deletes the removed top-level keys
+(`REMOVED_STORY_FIELDS`) and the nested ones: each preset's legacy arrays,
+each note's `var_on_triggers` / `var_off_triggers`, `agmtState.threads`, each
+scene part's `gameOver` and its choices' arcade fields, and the same on
+`starting_choices`. It already runs on every load (`localStoryManager.ts:196`,
+`page.tsx:1413`); synced blobs are stripped on that load too.
 
-**`localStoryManager.ts`** (`419-425`, `471-477`): stop writing the arrays.
+**Undo and Retry.** `getUndoStack()` (`localStoryManager.ts:594`) returns
+old snapshots, and Undo restores one with `Object.assign` (`page.tsx:4650`):
+run `stripRemovedFields` on the snapshot before it is applied.
+
+**Older online guests.** The host's snapshot broadcast gets
+`withLegacyGuestShim(story)`: a copy with empty `stats`, `resources`,
+`inventory`, `abilities`, `relationships` and `variables`, so an older
+guest's Story Editor does not crash (design §6). Only the broadcast copy;
+the host's own story stays stripped. A new guest strips it on receive
+(`onSnapshot`, `page.tsx:824`, through `ensureStoryDataArrays`).
+
+**`designer_executor.ts`** `write_presets` (`478-515`) and `DEFAULT_PRESET`
+stop writing the legacy arrays. **`localStoryManager.ts`** (`419-425`,
+`471-477`) stops writing them.
 
 Then `tsc`, and fix every remaining reader it names (expected: none that
 slices 1–3 did not already remove; anything it finds is listed in the
@@ -198,7 +240,9 @@ decisions-made section below).
 **Tests.** New `tests/storyDataDefaults.stripRemoved.test.ts`: an old arcade
 save with every removed key loads without them, keeps its notes, sheet,
 NPCs, goals, scene parts and `customTables` (which the table migration then
-converts); a save without them is unchanged. Update
+converts); a save without them is unchanged; the nested fields go;
+load → Undo restores a snapshot without them; `withLegacyGuestShim` adds the
+empty arrays to the copy and leaves the original untouched. Update
 `tests/designerAdventureStart.test.ts:123-164` (it asserts the arrays are
 saved) and any fixture that builds a `StoryData` with the removed fields.
 
@@ -235,6 +279,22 @@ and plays to the composer.
   unread.
 - An older build on another device opening a synced story backfills empty
   arrays itself and keeps working.
+
+## Codex's review (2026-10-23)
+
+Codex (gpt-6.1-sol, high) reviewed the first draft against the code. All
+eight findings were checked and seven taken in, above: older online guests
+crashing on missing arrays (the broadcast shim); slice 1 not type-checking
+before slice 4 (writers moved to slice 4, `tsc` after every slice); an
+adventure with a sheet but no plan never asked for `start_game` (every new
+adventure starts in session zero); the template vanishing after the first
+player's sheet (it stays for all of session zero); starting choices skipping
+session zero (the shortcut waits for `start_game`); Undo restoring removed
+fields and nested fields escaping a top-level strip; `end_combat`'s resource
+bridge and H8's `stat_name` parameter; and the missing test updates. Not
+taken: tracking which players still lack a sheet and gating `start_game` on
+it. That is new party-mode behaviour rather than removal; the template
+staying up for all of session zero covers the gap this change opens.
 
 ## Decisions made during implementation
 

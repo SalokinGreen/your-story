@@ -40,7 +40,7 @@ export sanitiser), which every audit has to re-establish are dead.
   adventure's intro and the GM starts session zero. No picker, no form
   (decisions 129, 130).
 - **Session zero builds the sheet.** The GM is shown the adventure's sheet
-  template while the story has no character sheet, and fills it in
+  template for all of session zero, and fills it in
   conversation with the player — one `character_sheet` note, or one per
   player titled "Character: <name>" at a shared table — then writes the plan
   and calls `start_game`, as session zero already does for freeform stories.
@@ -78,24 +78,40 @@ otherwise pushes the intro and opens the menu with a "Customize your
 character" toast. Both go. Custom now always:
 
 1. pushes the adventure's intro as the first part (as today),
-2. sets `sessionZeroActive = true` when the story has no `character_sheet`
-   note, so the observer stays suspended and `start_game` closes setup, the
-   same lifecycle the Hollow Hour and freeform stories already have,
+2. sets `sessionZeroActive = true`, so the observer stays suspended and
+   `start_game` closes setup, the same lifecycle the Hollow Hour and freeform
+   stories already have,
 3. saves, and leaves the player on the story with the composer focused.
 
-Designer adventures never set `sessionZeroActive` today; with this change any
-story that starts without a sheet is in session zero until `start_game`.
+**Every newly started adventure starts in session zero**, Custom or pre-made,
+with a sheet or without (revised after Codex's review: a pre-made or attached
+sheet with no Campaign Plan would otherwise start play with nothing asking
+for the plan `start_game` requires). Designer adventures never set
+`sessionZeroActive` today. A story that starts with a sheet gets the existing
+START OF PLAY reminder (plan, then `start_game`); one without gets the FRESH
+STORY block and the template (§3.3).
+
+**Starting choices during session zero.** A Designer adventure's starting
+choice can carry an authored opening (`intro_override`), which today skips
+the GM and inserts the prose directly. While session zero is active that
+shortcut is off: the choice goes to the GM as the player's action, with the
+authored opening attached as "the adventure's opening for this choice,
+narrate it once setup is done". After `start_game` the shortcut works as
+before.
 
 ### 3.3 The GM sees the template
 
 The GM is never told about `characterSheetTemplate` today; only the form read
-it. While the story has **no `character_sheet` note**, the live block carries
-the template's markdown (`characterSheetTemplate.template`) under a
-"CHARACTER SHEET TEMPLATE" heading, with one instruction: build the sheet with
-the player in this shape, fill every field in conversation (the `| default`
-values are examples, not choices made for the player), and write it with
-`create_note` type `character_sheet` — titled "Character: <name>" when more
-than one person is playing. Once a sheet exists the block disappears.
+it. **While the story is in session zero and the adventure has a template**,
+the live block carries the template's markdown
+(`characterSheetTemplate.template`) under a "CHARACTER SHEET TEMPLATE"
+heading, with one instruction: build each player's sheet in this shape, fill
+every field in conversation (the `| default` values are examples, not choices
+made for the player), and write it with `create_note` type `character_sheet`,
+titled "Character: <name>" when more than one person is playing, one per
+player. It stays for all of session zero, not just until the first sheet, so
+a second player at the table still gets it (Codex's review). `start_game`
+ends it.
 
 It goes in the live block, not the stable block or system prompt, because it
 appears and disappears with the story's state (CLAUDE.md, the cache layout,
@@ -134,7 +150,11 @@ unoffered ones: `game_over`, `delegate_task`, `reaction_check`,
 `negotiate_price`, `request_continuation`, `end_gm_thinking`, `add_memory`,
 the five ability tools, and the state tools `update_challenge`,
 `resolve_challenge`, `skip_tools`, `list_inactive_notes` and `toggle_lore`,
-which no list offers either. Each goes from all six places a tool lives
+which no list offers either. Two live tools lose a legacy part: `end_combat`
+no longer copies the player combatant's stats into structured resources
+(its `sync_player_stats` parameter and that half of its description go; what
+changed belongs in the sheet note), and `formula_roll` / `opposed_formula`
+lose the `stat_name` parameter that fed the stat-integrity check. Each goes from all six places a tool lives
 (schema, whitelist, executor, Google list, label, observer). A model that
 calls one by name gets the engine's ordinary "unknown tool" answer. The
 prompt line about `request_continuation` and the "keep stats, resources,
@@ -187,10 +207,20 @@ them on its next save. An old arcade save loses its structured stats and items
 - **Older builds on another device.** Sync carries the whole story; an older
   build that opens a story saved by this one runs its own
   `ensureStoryDataArrays()` on load and backfills empty arrays, so it does not
-  crash. An online guest on an older build receives the host's `StoryData`
-  without the arrays; its live screens do not read them (the explorers found
-  only dead or guarded readers), but the plan checks the guest path before
-  removing the fields.
+  crash.
+- **Older online guests.** A guest applies the host's snapshot as it arrives,
+  with no normalisation (`page.tsx:824`), and an older build's Story Editor
+  maps `resources` and spreads `relationships` unguarded. So for now the host
+  adds empty legacy arrays to what it **broadcasts** (never to what it
+  stores): `stats`, `resources`, `inventory`, `abilities`, `relationships`,
+  `variables`. A later cleanup can drop the shim once old builds are gone.
+- **Removed data coming back.** The Undo and Retry snapshots saved with a
+  story still hold the old fields, and Undo restores them with
+  `Object.assign` (`page.tsx:4650`). The strip runs on a restored snapshot
+  too, and reaches the nested places (presets, a note's variable triggers,
+  `AGMTState.threads`, a saved choice's arcade fields, `ScenePart.gameOver`),
+  not only top-level keys. A synced blob from an older build is stripped when
+  it is loaded, like any other.
 - **Old saves mid-session-zero** with no sheet now get the template block;
   that is the intended behaviour.
 - **The GM must now actually fill the template.** A model that skips the
