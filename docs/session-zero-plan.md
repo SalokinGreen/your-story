@@ -1,7 +1,7 @@
 # Campaign setup that actually sets up — implementation plan
 
-Status: **approved (decision 147), revised after Codex's review, being
-built.** Design: [`session-zero-design.md`](session-zero-design.md).
+Status: **built (decision 147) on `claude/session-zero`, 2026-10-23.**
+Revised after Codex's review. Design: [`session-zero-design.md`](session-zero-design.md).
 Decisions 142–146. Branch `claude/session-zero`, one PR, six slices. Line
 numbers are from `master` at the merge of #233 (2026-10-23).
 
@@ -103,7 +103,9 @@ the tool that grants it (Codex's ordering point).
   - `handleStop` resolves it with `{ stopped: true }`;
   - in party mode and online play it shows on the table or host screen and
     is never relayed;
-  - a guest sees "The host is reviewing the setup".
+  - a guest sees "The host is reviewing the setup" (skipped in the build:
+    it needs a protocol change; guests see the turn as generating, see the
+    slice-2 entry).
 - **Tests:** the modal's pure pieces (if extracted), and the stopped
   resolution.
 

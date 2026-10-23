@@ -11,6 +11,70 @@ file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
 
+## 2026-10-23 — Session zero (claude/session-zero, decision 147)
+
+Built from [`session-zero-plan.md`](session-zero-plan.md). Every check below
+needs a real GM turn, so each one spends the author's key and waits for the
+author's go. The suite, `tsc` and the engine unit tests cover the state, the
+tools, the gate's counting and the buffering. They do not cover what a real
+model does with the prompt, or what the screen shows. The style buttons and the
+checklist strip were seen in the preview (see the devlog); the setup card and
+the multi-select modal were not seen on screen, because they need a GM turn.
+
+- **Quick setup on Blood & Bone, default ladder (desktop app).** Start a new
+  story from *The Hollow Hour* or from a freeform story with the Blood & Bone
+  rules. Tap **Quick setup**, answer two to four questions (include one
+  multi-select question and tick two options), and let the GM propose.
+  *Expected:* the GM asks by tapping choices, not by prose; the checklist ticks
+  Concept, then Character (a sheet appears), then Campaign (a plan appears); a
+  setup card opens showing the sheet and the plan; **Start the story** closes it
+  and the GM writes a short briefing, then the opening scene ending on a clear
+  first choice. *Failure looks like:* story narration before the card; the line
+  "(Let's finish setting up first: next is …)" in the timeline (the gate ran
+  out, so a step was not finished); the card reopening after Start; the Debug
+  Logs showing a `read_notes` of the creation rules on every turn (the block
+  should carry them).
+- **Step by step on Blood & Bone, default ladder (desktop app).** As above with
+  **Step by step**. *Expected:* one question per creation step (Kind, Archetype,
+  stats, powers, connections, background), the creation rules visible in the AI
+  Context's live block and not read again each turn, then the same card and the
+  same briefing. *Failure looks like:* several steps in one question, a step
+  skipped, or the creation rules read again on every turn.
+- **The same two runs on the Android APK**, from the `build-apps.yml` build.
+  *Expected:* the same flow and the same card, on the phone's own screen. *Failure
+  looks like:* the card missing, the style buttons not responding, or a
+  rejected round's text showing before the card.
+- **Change something on the card.** Tap **Change something…**, type "make her
+  older", press Send. *Expected:* the GM edits the sheet, the card opens again
+  with the new text, and Start on that card starts the story. *Failure looks
+  like:* the card showing the old text; or `start_game` refusing after Start with
+  "the sheet or the plan changed after the player's OK" (the second card did not
+  bind the new text).
+- **Stop while the card is open.** Press Stop. *Expected:* the card closes, the
+  turn stops, the sheet and the plan are as they were before the turn, and the
+  story has not started. **Dismiss** (the X, or tapping outside) instead: the GM
+  asks in chat what to change, and nothing is written or started. *Failure
+  looks like:* a sheet or plan appearing after Stop, the story starting, or the
+  card coming back by itself.
+- **A Claude model as the GM.** Set the Default slot to a Claude model through
+  OpenRouter (no forced tool choice; the message does the forcing) and run quick
+  setup. *Expected:* setup still ends with the card before any story text.
+  *Failure looks like:* prose before the card. An engine line is a weaker
+  failure, not a pass: note it and the model.
+- **Couch with two players.** Two players, two sheets. *Expected:* the checklist
+  ticks Character only once both sheets exist, and **Start** cannot be reached
+  with one. The refusal names the missing player. *Failure looks like:* Character
+  ticked after one sheet, or the card opening with only one.
+- **Online, host and a guest.** The host runs quick setup, a guest joins.
+  *Expected:* the guest sees no card and no style buttons (the strip reads "The
+  host is choosing how to set up."), and gets each setup turn's text once, when
+  the turn ends. *Failure looks like:* the guest sees the card, sees prose from a
+  turn the engine rejected, or gets buttons that do nothing.
+- **Not yet seen on screen:** the setup card (`SetupConfirmModal`) and the
+  multi-select question modal. Both open only during a GM turn, so the first
+  real session above is their first look. Check the card on Ink and on Paper
+  White, and the checkboxes with a long option label.
+
 ## 2026-10-23 — Downloads on the phone, and the AI Context height (claude/ai-context-phone)
 
 - **AI Context -> the download (JSON) and TXT buttons, on the Android APK.**

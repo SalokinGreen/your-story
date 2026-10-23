@@ -381,7 +381,7 @@ always runs **before** the story stage:
    looped through the provider and `executeGMTools()` (`gmExecutor.ts`, which
    works on a `structuredClone` and hands state tools to
    `toolExecutor.executeTools`) until the model stops calling tools or hits
-   `maxToolLoops` (default 10). The roll gate (M2) and the plan gate can force
+   `maxToolLoops` (default 10). The roll gate (M2), the plan gate and, in session zero, the setup gate can force
    `tool_choice: "required"`. This is the "brain": it reads the character
    sheet and mechanics notes and decides on rolls and state changes. Its
    budget comes from `computeGMStageBudget()`: the Memory Size slider
@@ -429,8 +429,9 @@ OpenRouter, Mistral, DeepInfra, Google AI Studio, Z.ai) and normalise each
 provider's response into one shape. They know nothing about `StoryData`, prompts or tools. **The
 standalone build has no API routes**: `providerFetch()` calls the provider
 in-process when `isStandalone()`. Google gets a filtered tool list
-(`GOOGLE_ESSENTIAL_TOOLS`), which is still stale (§6.14: it has `start_game`
-and the challenge tools now, not the plan, timer, thread or goal tools).
+(`GOOGLE_ESSENTIAL_TOOLS`), which is still stale (§6.14: it has `start_game`,
+`confirm_setup`, `ask_question` and the challenge tools now, not the plan,
+timer, thread or goal tools).
 
 **Claude reaches the app through OpenRouter** (Haiku, Sonnet and Opus 5.5,
 `anthropic/…` ids; decision 10) and has its own branch in `providerCall.ts`,
@@ -687,20 +688,25 @@ report's §11.3. The ones that shape play:
   it per scene and refuses with a reason (see "Pictures in play" below).
 - `ask_question` / `ask_for_roll` — the GM asks the player a question, or
   asks them to roll (dice modes `ai` / `manual` / `physical`, with the 3D
-  tray).
+  tray). `multi_select: true` questions take several picks (`selectedLabels`,
+  decision 146; see "Session zero" below).
 - `start_game`, `advance_plan`, `open_side_beat` / `close_side_beat` —
   session zero ends with `start_game`, and play runs against a campaign plan
-  (`gm_plan` notes, `campaignPlan.ts`). Every new adventure starts in session
-  zero (`sessionZeroActive`), with or without pre-made characters. The preset
+  (`gm_plan` notes, `campaignPlan.ts`). `start_game` refuses until the
+  character sheet(s), the plan and the player's approval all exist (see
+  "Session zero"). Every new adventure starts in session zero
+  (`sessionZeroActive`), with or without pre-made characters. The preset
   picker shows only when the adventure has pre-made characters
   (`hasPremadeCharacters()`, `presets.ts`); otherwise the story starts as
-  Custom with no screen between. There is no character form. While session
-  zero is active the GM is shown the adventure's sheet template
-  (`buildSheetTemplateBlock()`, `ai_staged.ts`, in the live block) and builds
-  the sheet in conversation. A starting choice's `intro_override` waits for
-  `start_game` (`shouldUseIntroOverride()`, `presets.ts`); during session zero
-  the choice goes to the GM with the authored opening attached. Decisions 129,
-  130.
+  Custom with no screen between. There is no character form; the GM builds
+  the sheet in conversation (decision 129). A starting choice's
+  `intro_override` waits for `start_game` (`shouldUseIntroOverride()`,
+  `presets.ts`); during session zero the choice goes to the GM with the
+  authored opening attached (decision 130).
+- `confirm_setup` — session zero only. Shows the player a card with the
+  sheet(s) and the plan and waits for their OK or their changes (decision 143;
+  "Session zero" below). Always offered, like `start_game`, so the tool list
+  does not change at `start_game`.
 - `increment_scene`, `resolve_random_event`, `acknowledge_director_move` —
   the director's side of a turn.
 - `start_combat` / `add_combatant` / `remove_combatant` /
@@ -756,6 +762,144 @@ holds the six places a tool lives together.
 - `CustomTable[]` / `StoryData.customTables` — kept only as migration input:
   `tableNotes.ts` and `tablesLibraryMigration.ts` turn old tables into
   `type: "table"` notes on load. Nothing else reads the field.
+
+## Session zero: the setup has to happen before play
+
+A new adventure starts in **session zero** (`StoryData.sessionZeroActive`),
+and the GM may not narrate the story until setup is done (decisions 142–147,
+`docs/session-zero-design.md`, `docs/session-zero-plan.md`).
+
+**The state** is `StoryData.setup?` (`SetupState` in `structs.ts`, optional,
+absent on old saves): `mode` (`quick` or `full`, set by the style buttons;
+typing instead means quick), `conceptDone` (a setup question was answered),
+`approval` (the hashes of the sheet(s) and plan the player approved),
+`referenceTitles` (notes read during setup, newest first, at most 20) and
+`questionsAsked` (answered `ask_question` calls, counted as they happen).
+
+**The steps** are derived by `getSetupProgress(story, players?)`
+(`campaignPlan.ts`), which returns the five flags and `next`, the first step
+not done (`concept`, `character`, `campaign`, `confirm`, `start_game`, or
+`null` once started):
+- **Concept:** `conceptDone`, or a populated sheet already exists (pre-made
+  characters and old saves). `mode` plays no part.
+- **Character:** each player who needs one has a populated, enabled
+  `character_sheet`. Solo play needs one. Couch co-op and party need one per
+  player, matched by `ownerCouchPlayerId` or a "Character: <name>" title
+  (`missingSheetFor` names the rest).
+- **Campaign:** an enabled `gm_plan` note. A stale `planState` alone does not
+  count.
+- **Approved:** `approval` is set and its hashes match the current sheet(s)
+  and plan (`currentSetupHashes`, `hashNotes`: a stable FNV-1a string hash,
+  no crypto API). Any later edit cancels the approval.
+- **Started:** `sessionZeroActive` is false.
+
+**The block.** While `sessionZeroActive`, `buildSessionZeroBlock(story)`
+(`ai_staged.ts`) is the only setup text, in the **live block** (the cache
+rule). It replaces `freshStorySetupBlock`, `sessionZeroStartGameReminder`,
+`setupOverdueBlock` and `buildSheetTemplateBlock`, which still fire outside
+session zero. It holds, in order: the checklist, the next step with its tools,
+the rule that the GM does not narrate until `start_game` succeeds, the mode's
+lines, the sheet template, the creation rules, the setup reference, and after
+6 setup questions (`SETUP_QUESTION_NUDGE_AT`) a nudge to propose.
+- **Template precedence:** the story's own `characterSheetTemplate` if it has
+  one, else the resolved system's `sheetTemplate`. An explicit template always
+  wins.
+- **Creation rules:** the system's `creationNoteId` note
+  (`builtin:blood-and-bone:character-creation` for Blood & Bone), in full, if
+  the story holds it and it is enabled. Carried in quick mode too, for
+  grounding.
+- **Setup reference:** the notes read during setup, carried whole, newest
+  first, up to `SETUP_REFERENCE_CAP_TOKENS` (6,000). The first note that would
+  pass the cap, and every older one, is listed by title with the usual "read it
+  again" line. `read_notes` records its titles with `recordSetupReference()`,
+  only during session zero.
+- History is not touched. The history stubs are the same as before, and the
+  block and reference leave the request at `start_game`.
+
+**`confirm_setup({ character_summary, campaign_hook })`** refuses without the
+sheet(s) or the plan and names which. Otherwise it pauses the turn like
+`ask_question`. The card (`app/components/SetupConfirmModal.tsx`, opened from
+`requestSetupConfirmation` in `page.tsx`) shows the sheet(s) and the plan
+**from the executor's working copy**, passed with the request, not from page
+state. Its four outcomes:
+- **Start the story** (`approved`): the executor stores `setup.approval` with
+  the hashes of exactly what the card showed.
+- **Change something…** (`changes`): the player's note goes back to the GM,
+  which edits and calls `confirm_setup` again. Any edit cancels the approval
+  through the hashes.
+- **Dismiss**, by the X, the backdrop or Back (`dismissed`): "The player closed
+  the card; ask what they want to change." Dismiss is not Stop.
+- **Stop**, the page's Stop button (`stopped`): cancels the turn (see the
+  cancellation rule).
+
+Only `approved` is `success: true`. Outside session zero the tool refuses with
+"The game has already started." The card shows on the local screen (the couch's
+shared screen, the party table, the online host). It is **never relayed** to
+phones or guests.
+
+**`start_game`** refuses unless Character, Campaign and Approved all hold on
+the live state, and names what is missing. A stale approval is named as one.
+Outside session zero it refuses with "The game has already started." On success
+it clears `sessionZeroActive` and its result carries the campaign intro
+(decision 144): a short briefing in the story's voice, then the opening scene,
+ending on a clear first choice.
+
+**The setup gate** (`generation.ts`, `MAX_SETUP_PROMPTS` = 2). A session-zero
+turn may end only if, that turn, the tool **results** show progress: an
+answered `ask_question`; a `confirm_setup` that ended as `approved`,
+`changes` or `dismissed` (a refused or stopped one is not progress); a sheet
+or plan `create_note` / `edit_note` that changed the setup hashes; or a
+successful `start_game`. An approval with `start_game` still not called is a
+violation even though approval is progress, because the approval already said
+to call it. On a violation the turn's round is taken back out of every store
+it reached, and the GM gets `setupGateMessage(next)` with the next step and its
+tool, with `tool_choice: "required"` unless the model rejects a forced choice
+(Qwen 3.8, `gmModelRejectsForcedToolChoice`). Claude and Z.ai are downgraded to
+`auto` in `providerCall.ts`, so for them the message is the only forcing.
+- **No fail-open.** After 2 re-prompts the turn ends on
+  `setupEngineLine(next)`, "(Let's finish setting up first: next is …)", with
+  no narration. The round-limit path has the same guard.
+- **No narration stage** while session zero is on and `start_game` has not
+  succeeded. The turn's text is the GM's own prose, or the engine line when
+  the gate gave up or the text is empty.
+- **Other gates off.** The M2 roll gate and the plan gate are off for a whole
+  session-zero turn, including the round that calls `start_game`. They apply
+  again from the next turn.
+- **Buffering.** Until `start_game` succeeds, the live callbacks
+  (`onGMContent`, `onLiveNarrationUpdate`) are held. The validated text reaches
+  the timeline, online guests and read-aloud once, at the end. After
+  `start_game` the text streams as usual, since no later round can be
+  rejected. A rejected round's prose is removed from the turn's accumulated
+  text, `gmThinking`, the context and the replayed history, so it is never
+  shown, sent, spoken or kept. Outside session zero none of this applies.
+- **Retry.** A session-zero Retry or Reword runs the full GM loop, so the gate
+  applies. The precomputed-results path is guarded: in session zero with no
+  successful `start_game`, the narration call is skipped.
+
+**Cancellation.** A Stop during any pause (`ask_question`, `confirm_setup`, a
+dice request) commits nothing from that batch and runs no later tool.
+`executeGMTools` checks the turn's abort signal before and after every tool and
+returns `aborted: true` with the input story. `generation.ts` then throws
+"Generation cancelled by user" before it merges anything.
+
+**The strip and the style choice.** `SetupStrip.tsx` shows above the composer
+while session zero runs, from the pure `setupStripState(story)`
+(`app/misc/setupStrip.ts`). Until `setup.mode` is set it offers two buttons,
+"Quick setup" and "Step by step". `handleChooseSetupStyle` in `page.tsx` sets
+the mode and sends the player line from the same updated story object, and
+typing first picks quick through the same path. Then the checklist shows
+Concept, Character, Campaign and Start (Start ticks on approval). Character and
+Campaign open their notes. It hides while a turn is loading. Online guests get
+it read-only, with no buttons and no note links. Party phones do not render it.
+
+**`ask_question` with `multi_select`** (decision 146). The question shows
+checkboxes and a Done button in `AskQuestionModal.tsx`. The answer item carries
+`selectedLabels`. The executor (`gmExecutor.ts`) and the party host
+(`partyHost.ts`) keep only offered labels, once each, in option order, and the
+GM's line reads `→ "A", "C"`. Any custom text the player typed is kept
+alongside the picks (the modal offers the box only when `allow_custom` is set). `selectedLabels` is honoured only on a multi-select
+question. The phone protocol caps picks at 4 (`PARTY_MAX_PICKS`). Couch
+`target_player_name` routing is unchanged.
 
 ## The creator is conversational — a Game Designer, not a Game Master
 
@@ -1070,8 +1214,8 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 181 files and 2,790 tests (the count after the
-  whole-app themes, 2026-10-23), largely against `app/misc/`.
+- `tests/` — Vitest, 189 files and 2,933 tests (2026-10-23, after session
+  zero), largely against `app/misc/`.
   Deterministic tests seed `Math.random`; follow that for new dice and oracle
   tests.
 - `docs/` — mixed freshness (see the top of this file). The `*.sql` files are

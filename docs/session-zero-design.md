@@ -1,6 +1,6 @@
 # Campaign setup that actually sets up — design
 
-Status: **approved (decision 147), being built.** The implementation plan
+Status: **built (decision 147) on `claude/session-zero`, 2026-10-23.** The implementation plan
 is [`session-zero-plan.md`](session-zero-plan.md). Decisions 142–146 in
 [`decisions.md`](decisions.md).
 
@@ -110,6 +110,7 @@ interface SetupState {
     planHash: string;           // of the plan note the card showed
   };
   referenceTitles?: string[];   // notes read during setup, newest first (§3.4)
+  questionsAsked?: number;      // answered setup questions, for the nudge
 }
 ```
 
@@ -118,7 +119,7 @@ The steps are **derived** from live state. `getSetupProgress(story)` in
 
 | step | done when |
 |---|---|
-| Concept | `mode` is set, and either `conceptDone` (a setup question was answered) or a sheet already exists (a pre-made character or an old save) |
+| Concept | `conceptDone` (a setup question was answered) or a sheet already exists (a pre-made character or an old save). The mode is not required: it drives the strip and the prompt, and defaults to quick (changed after the engine review, so a story that never picked a style is not stuck) |
 | Character | each player who needs one has a populated, enabled `character_sheet` note. That is one for solo play; in couch co-op or party mode, one per player, matched by `ownerCouchPlayerId` or a "Character: <name>" title. |
 | Campaign | an existing, enabled `gm_plan` note. A stale `planState` with no note does not count during setup. |
 | Approved | `approval` is set **and** its hashes match the current sheet(s) and plan. Any later edit cancels the approval (Codex's review). |
@@ -258,6 +259,8 @@ reaches the timeline, online guests and read-aloud only when the turn ends
 validly, so a rejected round's prose is never shown, sent or spoken (Codex's
 review). It is also removed from the turn's accumulated narration and replay
 history. The cost: no live streaming during setup, whose replies are short.
+Once `start_game` succeeds in a turn, the intro that follows streams live:
+it is the story, and no later round in that turn can be rejected.
 
 **Cost.** Session zero already pins every turn to the top tier
 (`hardRuleFloor`: Sonnet at xhigh by default). The plan budgets a whole
