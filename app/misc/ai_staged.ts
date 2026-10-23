@@ -29,6 +29,13 @@ import {
 import { cleanString } from "@/app/misc/textUtils";
 import { currentThreshold, filledBoxes } from "@/app/misc/metersAndTracks";
 import { resolveSystem, SYSTEM_TOOL_NAMES } from "@/app/misc/systems/resolve";
+import {
+  getCreationProgress,
+  getRequiredSteps,
+  isStepCovered,
+  setupParticipants,
+  type CreationStep,
+} from "@/app/misc/setupSteps";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import {
   PINNED_TOTAL_CAP_TOKENS,
@@ -1216,6 +1223,14 @@ function referenceTitleKey(t: string): string {
 function setupChecklist(p: SetupProgress): string {
   const rows: Array<[string, boolean]> = [
     ["Concept (the player's style and idea)", p.concept],
+    ...(p.creation.total > 0
+      ? ([
+          [
+            `Setup steps (${p.creation.covered}/${p.creation.total} asked and answered)`,
+            p.creation.missing.length === 0,
+          ],
+        ] as Array<[string, boolean]>)
+      : []),
     ["Character (a sheet for every player)", p.character],
     ["Campaign (the Campaign Plan note)", p.campaign],
     ["Approval (the player pressed Start on the setup card)", p.approved],
@@ -1234,11 +1249,69 @@ function setupChecklist(p: SetupProgress): string {
     .join("\n");
 }
 
+/**
+ * The creation steps this mode requires, with a mark for each (step, player):
+ * ✓ covered, → the next to ask, · still to come (setupSteps.ts). Empty when
+ * the mode requires none.
+ */
+function creationStepList(story: StoryData): string {
+  const { missing, total } = getCreationProgress(story);
+  if (total === 0) return "";
+  const first = missing[0];
+  const people = setupParticipants(story);
+  const mark = (step: CreationStep, playerId?: string): string => {
+    if (isStepCovered(story, step, playerId)) return "✓";
+    return first && first.step.id === step.id && first.playerId === playerId
+      ? "→"
+      : "·";
+  };
+  const rows = getRequiredSteps(story).map((step) =>
+    step.scope === "table"
+      ? `- ${step.id}: ${mark(step)}`
+      : `- ${step.id}: ${people.map((p) => `${p.name} ${mark(step, p.id)}`).join(", ")}`,
+  );
+  return `SETUP STEPS (✓ asked and answered, → ask next, · still to come):\n${rows.join("\n")}`;
+}
+
+/** The rules for asking the steps, and the one to ask now. */
+function creationRules(
+  progress: SetupProgress,
+  mode: "quick" | "full",
+): string {
+  const next = progress.creation.missing[0];
+  const lines: string[] = [];
+  lines.push(
+    `TAGGING: put \`setup_step\` (the step's id, from the list) on every \`ask_question\` item that covers a step. The engine counts a step only when it is tagged and answered; an untagged question counts for nothing.${mode === "quick" ? " In quick setup the steps are setting and tone: ask both, tagged." : ""}`,
+  );
+  if (mode === "full") {
+    lines.push(
+      "- One step per call: never two different tags in one `ask_question`. Several questions under the same tag are fine (all must be answered).",
+      "- Always give `intro`: one or two sentences on what is being chosen and why it matters. Give 2-4 options whose descriptions say what each does in play, mechanics and flavour.",
+      "- Creative steps (the table, world, name and look, history, drives): offer 2-4 suggestions and set allow_custom true. Tone is a multi_select.",
+      "- With several players, a player step carries target_player_name (the player it is for) on every item; table steps are untargeted. Table steps first, then each player in turn.",
+    );
+  }
+  if (next) {
+    lines.push(
+      `NEXT STEP TO ASK: ${next.step.id}${next.player ? ` (${next.player})` : ""}. ${next.step.hint}`,
+    );
+  } else if (mode === "full") {
+    lines.push(
+      "Every step is covered: write the sheet and the plan from the answers, then confirm_setup.",
+    );
+  }
+  return lines.join("\n");
+}
+
 function setupNextStep(
   progress: SetupProgress,
   mode: "quick" | "full",
 ): string {
   switch (progress.next) {
+    case "interview":
+      return mode === "full"
+        ? `NEXT: the setup steps, one at a time (list and rules below). Do not write the sheet or the plan, and do not call confirm_setup, until every step is covered.`
+        : `NEXT: ask the setup questions below, tagged, with \`ask_question\` (2-4 short questions in all; choices the player can tap, a custom answer allowed). Then move on to the character.`;
     case "concept":
       return mode === "full"
         ? `NEXT: the concept. Ask the player the first creation step with \`ask_question\` (2-4 options plus a custom answer; allow several answers where that fits (multi_select)). One question per step.`
@@ -1249,13 +1322,13 @@ function setupNextStep(
           ? ` Still missing a sheet: ${progress.missingSheetFor.join(", ")}.`
           : "";
       return mode === "full"
-        ? `NEXT: the character, one creation step at a time. Ask each step with \`ask_question\` first; only when the last step is answered, write the sheet from the template with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one per player.${who}`
+        ? `NEXT: the character. Every step is covered, so write the sheet from the template with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one per player.${who}`
         : `NEXT: the character. Propose a complete one from the answers so far and write it from the template with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one per player.${who}`;
     }
     case "campaign":
       return `NEXT: the campaign. \`read_notes\` the existing lore, mechanics and setting notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (see the CAMPAIGN PLAN section for the rules).`;
     case "confirm":
-      return `NEXT: ask the player's OK. Call \`confirm_setup({ character_summary, campaign_hook })\` with a short summary of the character (name, kind, the hook of their background) and one or two sentences on the campaign. The player sees a card with Start the story / Change something. If they ask for changes, edit the sheet or the plan, then call \`confirm_setup\` again.`;
+      return `NEXT: ask the player's OK. Call \`confirm_setup({ character_summary, campaign_hook, story_name, premise })\` with a short summary of the character (name, kind, the hook of their background), one or two sentences on the campaign, a short title for the story and a one-to-three sentence premise. The player sees a card with Start the story / Change something. When they press Start the game starts by itself: write the campaign intro in that same turn. If they ask for changes, edit the sheet or the plan, then call \`confirm_setup\` again.`;
     case "start_game":
       return `NEXT: the player approved. Call \`start_game\` now with a title for the story and a short premise summary. After it succeeds, give the campaign intro: a short briefing (who they are, where they are, what is at stake and why they are here), then the opening scene, ending on a clear first choice.`;
     default:
@@ -1266,9 +1339,9 @@ function setupNextStep(
 function setupModeLines(mode: "quick" | "full"): string {
   if (mode === "full") {
     return `MODE: step by step.
-- Walk the system's creation rules (below) with the player in order, one \`ask_question\` per creation step, before writing anything.
+- Ask the setup steps (listed below) in order, one step per \`ask_question\` call, before writing anything.
 - Each question offers 2-4 options and a custom answer; never fill in a choice the player did not make.
-- Write the sheet only after the last step is answered, then the plan from what you learned.
+- Write the sheet only after every step is covered, then the plan from what you learned.
 - Keep each reply short: the question, no story.`;
   }
   return `MODE: quick setup.
@@ -1363,6 +1436,10 @@ export function buildSessionZeroBlock(story: StoryData): string {
   out += `RULE: until \`start_game\` succeeds you never narrate the story. Every turn you either ask the player (\`ask_question\`), do a setup step (write the sheet or the plan) or call \`confirm_setup\`. A short out-of-character line is fine. Do not describe scenes, play out events or roll for the story yet.\n\n`;
   out += setupModeLines(mode) + "\n";
 
+  const stepList = creationStepList(story);
+  if (stepList) out += `\n${stepList}\n`;
+  out += `\n${creationRules(progress, mode)}\n`;
+
   const template =
     story.characterSheetTemplate?.template || resolved.system?.sheetTemplate;
   if (template) {
@@ -1383,7 +1460,9 @@ export function buildSessionZeroBlock(story: StoryData): string {
   if (reference) out += "\n" + reference;
 
   const asked = story.setup?.questionsAsked ?? 0;
-  if (asked >= SETUP_QUESTION_NUDGE_AT) {
+  // Step by step has its own end: every step covered (creationRules). The
+  // nudge to propose is for quick setup only.
+  if (mode !== "full" && asked >= SETUP_QUESTION_NUDGE_AT) {
     out += `\nYou have asked ${asked} setup questions. Enough: stop asking, make the remaining choices yourself and propose the character and the campaign now.\n`;
   }
   return out;

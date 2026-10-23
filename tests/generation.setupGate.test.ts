@@ -55,9 +55,10 @@ function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
 }
 
 function sessionZeroStory(overrides: Partial<StoryData> = {}): StoryData {
+  // No mode chosen: no creation step is required (setupSteps.ts), so these
+  // tests exercise the gate itself. The steps have their own test files.
   return createTestStory({
     sessionZeroActive: true,
-    setup: { mode: "quick" },
     ...overrides,
   });
 }
@@ -294,11 +295,15 @@ describe("setup gate - a session-zero turn may not end on prose alone", () => {
         toolCalls: [
           {
             name: "confirm_setup",
-            arguments: { character_summary: "Mara", campaign_hook: "A debt." },
+            arguments: {
+              character_summary: "Mara",
+              campaign_hook: "A debt.",
+              story_name: "The Debt",
+            },
           },
         ],
       },
-      { toolCalls: [{ name: "start_game", arguments: { story_name: "The Debt" } }] },
+      // Approval starts the game itself: no start_game call is needed.
       { content: "INTRO: The rain on the courier road." },
     ]);
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -308,7 +313,7 @@ describe("setup gate - a session-zero turn may not end on prose alone", () => {
 
     expect(result.success).toBe(true);
     const calls = gmStageCalls();
-    expect(calls).toHaveLength(4); // no story-continuation call
+    expect(calls).toHaveLength(3); // no story-continuation call
     for (const call of calls) {
       expect(hasUser(call, GATE_TEXT)).toBe(false);
       expect(call.body.toolChoice).toBeUndefined();
@@ -321,7 +326,7 @@ describe("setup gate - a session-zero turn may not end on prose alone", () => {
     expect(rec.gmContent.join("|")).toContain("INTRO:");
   });
 
-  it("approved but not started: the gate asks for start_game, then the intro narrates", async () => {
+  it("approval starts the game: no start_game call, and the intro is the turn's text", async () => {
     const story = sessionZeroStory({
       lore: [
         note("Character: Mara", "character_sheet", "Mara, a courier."),
@@ -337,8 +342,6 @@ describe("setup gate - a session-zero turn may not end on prose alone", () => {
           },
         ],
       },
-      { content: "Great, you approved." }, // prose instead of start_game
-      { toolCalls: [{ name: "start_game", arguments: { story_name: "The Debt" } }] },
       { content: "INTRO: it begins." },
     ]);
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -347,13 +350,10 @@ describe("setup gate - a session-zero turn may not end on prose alone", () => {
     const result = await generateStoryTurn(story, "ok", baseOptions, cb);
 
     const calls = gmStageCalls();
-    expect(calls).toHaveLength(4);
-    expect(hasUser(calls[2], GATE_TEXT)).toBe(true);
-    expect(hasUser(calls[2], "Call start_game now")).toBe(true);
-    expect(calls[2].body.toolChoice).toBe("required");
+    expect(calls).toHaveLength(2);
+    for (const call of calls) expect(hasUser(call, GATE_TEXT)).toBe(false);
     expect(story.sessionZeroActive).toBe(false);
     expect(result.content).toBe("INTRO: it begins.");
-    expect(result.content).not.toContain("you approved");
   });
 
   it("a closed card is progress: prose ends the turn without re-opening it", async () => {

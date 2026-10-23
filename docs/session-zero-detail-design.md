@@ -338,3 +338,47 @@ Also from it: the `SetupStep` name collision (now `CreationStep`), and a
 Not taken: 2, making the online-guest redaction (§6.12) a prerequisite. It
 is a real, existing bug, but this change does not touch it and does not
 worsen it; it is noted in §3.7 for its own PR.
+
+## Decisions made during implementation
+
+### 2026-10-23, slice 1
+
+- **No mode chosen means no required steps.** `isStepRequired` returns
+  false for every step when `setup.mode` is unset (an old save, a bare test
+  story). Full requires all; quick requires `setting` and `tone`. The strip
+  and `handleChooseSetupStyle` always set a mode in play, so this only keeps
+  old saves and fixtures from being asked new questions.
+- **`next` is `interview` ahead of `concept`.** When required steps are
+  missing, the interview is the next step even if the concept flag is false;
+  the concept also ticks once any step is covered. The block's checklist gains
+  one row, "Setup steps (n/m asked and answered)", when the mode requires any.
+- **Signatures.** `setupGateMessage(next, creation?)` and
+  `setupEngineLine(next, creation?)` take the progress's `creation` as an
+  optional second argument (old one-argument calls are unchanged).
+  `getCreationSteps(story, players?)` takes the same roster `getSetupProgress`
+  does, so the table step appears for a party roster too. Blood & Bone's
+  steps sit in `blood-and-bone/creationSteps.ts`.
+- **`confirm_setup` without `story_name`.** The auto-start still runs: the
+  title falls back to the story's current name unless it is empty or the
+  "New Story" placeholder, then "Untitled Story". The schema keeps
+  `story_name` optional (the budget; the old call shape still validates).
+- **A refused auto-start** returns `success: true`, `outcome: "approved"`,
+  `started: false`, with the start's error text, so the gate's existing
+  approved-but-not-started path takes over.
+- **Dismissed and sent-back share one engine line**, "(What would you
+  like to change?)" (`SETUP_CARD_HANDED_BACK_LINE`).
+- **Pre-start text is dropped when a direct `start_game` succeeds too**, not
+  only on a card approval; one rule for both, via `resultStartedGame()`
+  (`gmExecutor.ts`). The Observer's suspension also counts a started
+  `confirm_setup` as a `start_game` for the no-snapshot case.
+- **A Retry's saved text** is the last assistant message whatever it called;
+  an empty one gives the engine line naming the step.
+- **Existing tests changed** because the rules changed: the gate and
+  `confirm_setup` tests no longer script a `start_game` after an approval, the
+  setup-progress and block tests give quick-mode fixtures their covered
+  `setting` and `tone`, and the gate tests' story has no mode so the gate is
+  tested on its own. Counts: 189 files / 2,933 tests became 193 / 2,990.
+- **Open question for the author:** a pre-made character (a starter's preset)
+  in *full* mode is still asked every step, since a populated sheet does not
+  waive any (the plan says full is all). Waiving player steps for a player who
+  already has a sheet is a small change if wanted.

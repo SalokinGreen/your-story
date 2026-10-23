@@ -264,6 +264,8 @@ export interface AskQuestionItem {
   allow_custom?: boolean; // Allow a free-text answer too (default true)
   multi_select?: boolean; // The player may pick several options (default false)
   target_player_name?: string; // Couch co-op only: which player this question is directed at
+  setup_step?: string; // Session zero: the creation step this question covers
+  intro?: string; // A sentence or two shown above the options
 }
 
 export interface AskQuestionParams {
@@ -338,6 +340,8 @@ export interface StartGameParams {
 export interface ConfirmSetupParams {
   character_summary: string; // A short summary of the character(s)
   campaign_hook: string; // The campaign's premise in a sentence or two
+  story_name?: string; // The title the story gets when the player presses Start
+  premise?: string; // Optional 1-3 sentence premise, stored on Start
 }
 
 // ============================================
@@ -1007,6 +1011,14 @@ const askQuestionTool: ToolSchema = {
                 type: "string",
                 description: "Couch co-op: the player it is for",
               },
+              setup_step: {
+                type: "string",
+                description: "Session zero: the setup step id this covers",
+              },
+              intro: {
+                type: "string",
+                description: "1-2 sentences shown above the options",
+              },
             },
             required: ["question", "options"],
           },
@@ -1356,6 +1368,14 @@ const confirmSetupTool: ToolSchema = {
         campaign_hook: {
           type: "string",
           description: "The campaign's premise in a sentence or two",
+        },
+        story_name: {
+          type: "string",
+          description: "Short title; the story starts with it on OK",
+        },
+        premise: {
+          type: "string",
+          description: "Optional 1-3 sentence premise",
         },
       },
       required: ["character_summary", "campaign_hook"],

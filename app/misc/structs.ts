@@ -775,6 +775,11 @@ export interface SetupState {
   };
   referenceTitles?: string[]; // notes read during setup, newest first
   questionsAsked?: number; // setup questions answered this session zero
+  // Creation steps asked and answered (setupSteps.ts), recorded by
+  // ask_question's `setup_step`. `table` holds table-scope step ids, `players`
+  // the player-scope ones by player id ("solo" in solo play). Absent means
+  // nothing is covered.
+  covered?: { table: string[]; players: Record<string, string[]> };
 }
 
 export interface StoryData {

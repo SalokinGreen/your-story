@@ -1,3 +1,4 @@
+import type { CreationStep } from "../setupSteps";
 import type {
   Adventure,
   LoreType,
@@ -38,6 +39,9 @@ export interface BuiltinSystem {
   // Built-in note id of the system's character-creation rules. Session zero
   // carries that note in full while it runs (buildSessionZeroBlock).
   creationNoteId?: string;
+  // The system's own character-creation steps, in order (setupSteps.ts). Full
+  // step-by-step setup asks each once per player and records it.
+  creationSteps?: CreationStep[];
   meterSets: MeterSet[];
   endOfSessionReminder?: string; // returned by end_session
 }
