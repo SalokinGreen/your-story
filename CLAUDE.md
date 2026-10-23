@@ -797,8 +797,10 @@ guest sees "Picture on the host's screen" (decision 60; guests are PR I2).
   Regenerate. A job writes its result against the *current* StoryData
   (`deps.patchStoryData`), logs a Debug Logs line for every terminal state and
   bills the turn that asked (the `image` stage, recorded at the catalog price,
-  since fal returns none). `StoryImage.tsx` shows it; `useStoredImage()` is the
-  hook for portraits and notes.
+  since fal returns none). `StoryImage.tsx` shows it, full width and
+  frameless in the feed, with the cost, the model and Regenerate in its
+  full-screen view (portalled to `<body>`); `useStoredImage()` is the hook for
+  portraits and notes.
 - **The engine disposes.** `executeGenerateImage` (`gmExecutor.ts`) checks the
   key, the per-scene cap (`StoryData.imageState`, reset by `computeSceneKey`),
   that the NPC or note exists and has no picture yet, and trims `featuring`;
@@ -966,10 +968,17 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   `stt/transcribe`, `creator/generate-image`, `web-search` (only reachable
   from the unoffered `delegate_task`).
 - `app/story/` — gameplay UI: `page.tsx` (the orchestration shell, ~5,000
-  lines), `story.tsx` (presentational), `menu.tsx` and `menu/` (the in-story
-  editors), `lore.tsx`, `npcs.tsx`, `goals.tsx`, `variables.tsx`,
-  `ContextViewer.tsx` and `LogViewer.tsx` (the debug views),
-  `NPCReactionToast.tsx`, `StoryTabBar.tsx`, `create-character/`.
+  lines), `story.tsx` (presentational: the feed, the edit panel and
+  `StoryComposer`), `StoryTurn.tsx` (how a turn renders: `PlayerLine`,
+  `GMTurn`, the folded work line, `TurnActions`, `prettify`), `turnWork.ts`
+  and `playerLine.ts` (the pure helpers behind them), `StoryHeader.tsx` and
+  `StoryMenuSheet.tsx` (the one-row header and the ☰ sheet that `MenuPage`
+  renders in), `themeTokens.ts` (the six `--ys-*` colour tokens and the Ink
+  default), `menu.tsx` and `menu/` (the in-story editors), `lore.tsx`,
+  `npcs.tsx`, `goals.tsx`, `variables.tsx`, `ContextViewer.tsx` and
+  `LogViewer.tsx` (the debug views), `NPCReactionToast.tsx`,
+  `create-character/`. The design is `docs/story-screen-design.md`
+  (decisions 112–117).
 - `app/creator/` — the Game Designer: `page.tsx`, `DesignerChat.tsx`,
   `AdventureInspector.tsx`, `useDesignerSession.ts`.
 - `app/library/` — folder-first browsing (`LibraryHome.tsx`,
@@ -996,6 +1005,14 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 
 ## Conventions
 
+- **The story screen's colours are the `ys-*` tokens** (`bg-ys-bg`,
+  `bg-ys-surface`, `text-ys-text`, `text-ys-muted`, `border-ys-border`,
+  `text-ys-accent`; `app/globals.css`, `app/story/themeTokens.ts`), set by
+  the reading theme, never `purple-*`/`blue-*` or a hex. Red, green and amber
+  stay where they mean danger, success or a warning. Prose sits in a
+  typography `prose` container whose own grey beats an inherited colour, so
+  `prettify` sets `color: var(--ys-text)` inline. The Notes, NPC, Goal,
+  Settings and Library pages have not moved to the tokens yet.
 - TypeScript strict mode. `any` is not allowed in new code — there are ~134
   existing uses, which are debt, not precedent. Path alias `@/*` → repo root
   (`import { StoryData } from "@/app/misc/structs"`).

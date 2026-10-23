@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { DynamicIcon } from "./DynamicIcon";
+import {
+  DEFAULT_READING_FONT,
+  DEFAULT_THEME_ID,
+  INK,
+  themeTokens,
+  type ThemePreset,
+} from "../story/themeTokens";
 
 interface CustomFont {
   id: string;
@@ -104,6 +111,7 @@ function removeInjectedFont(fontId: string) {
 
 // Default font options - only system/web-safe fonts (no CDN dependencies for GDPR compliance)
 const DEFAULT_FONTS = [
+  { name: "Book serif (default)", value: DEFAULT_READING_FONT },
   {
     name: "System Default",
     value:
@@ -131,7 +139,8 @@ const DEFAULT_FONTS = [
 ];
 
 // Theme presets for story background and text colors
-const THEME_PRESETS = [
+export const THEME_PRESETS: ThemePreset[] = [
+  INK,
   {
     id: "default",
     name: "Ocean Blue",
@@ -159,6 +168,7 @@ const THEME_PRESETS = [
     background: "rgb(250, 250, 248)",
     text: "rgb(41, 37, 36)",
     accent: "rgb(87, 83, 78)",
+    muted: "rgb(100, 96, 92)", // derived mix is 4.3:1; this is about 6:1
   },
   {
     id: "forest",
@@ -199,16 +209,30 @@ const FONT_SIZE_PRESETS = [
   { name: "Huge", value: 24 },
 ];
 
+// Set the six colour tokens (--ys-*) the story screen reads, plus the three
+// older --story-* colours, which a synced older device may still read.
+function applyThemeVars(themeData: ThemePreset) {
+  const root = document.documentElement.style;
+  const tokens = themeTokens(themeData);
+  root.setProperty("--ys-bg", tokens.bg);
+  root.setProperty("--ys-surface", tokens.surface);
+  root.setProperty("--ys-text", tokens.text);
+  root.setProperty("--ys-muted", tokens.muted);
+  root.setProperty("--ys-border", tokens.border);
+  root.setProperty("--ys-accent", tokens.accent);
+  root.setProperty("--story-bg-color", themeData.background);
+  root.setProperty("--story-text-color", themeData.text);
+  root.setProperty("--story-accent-color", themeData.accent);
+}
+
 export default function FontSettingsTab({
   addNotification,
 }: FontSettingsTabProps) {
   const [fontSize, setFontSize] = useState(16);
-  const [fontFamily, setFontFamily] = useState(
-    "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-  );
+  const [fontFamily, setFontFamily] = useState(DEFAULT_READING_FONT);
   const [lineHeight, setLineHeight] = useState(1.6);
   const [paragraphSpacing, setParagraphSpacing] = useState(0.5);
-  const [theme, setTheme] = useState("default");
+  const [theme, setTheme] = useState(DEFAULT_THEME_ID);
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -275,18 +299,7 @@ export default function FontSettingsTab({
           "--story-paragraph-spacing",
           `${pSpacing}em`
         );
-        document.documentElement.style.setProperty(
-          "--story-bg-color",
-          themeData.background
-        );
-        document.documentElement.style.setProperty(
-          "--story-text-color",
-          themeData.text
-        );
-        document.documentElement.style.setProperty(
-          "--story-accent-color",
-          themeData.accent
-        );
+        applyThemeVars(themeData);
 
         // Dispatch event so story page can react
         window.dispatchEvent(
@@ -297,11 +310,6 @@ export default function FontSettingsTab({
               lineHeight: height,
               paragraphSpacing: pSpacing,
               theme: themeId,
-              themeColors: {
-                background: themeData.background,
-                text: themeData.text,
-                accent: themeData.accent,
-              },
             },
           })
         );
@@ -448,7 +456,7 @@ export default function FontSettingsTab({
 
       // If this was the selected font, reset to default
       if (fontFamily === `"${font.name}"`) {
-        handleFontFamilyChange("system-ui, -apple-system, sans-serif");
+        handleFontFamilyChange(DEFAULT_READING_FONT);
       }
 
       addNotification(`Font "${font.name}" removed`, "success");
@@ -738,15 +746,14 @@ export default function FontSettingsTab({
 export function useFontSettings() {
   const [settings, setSettings] = useState({
     fontSize: 16,
-    fontFamily:
-      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: DEFAULT_READING_FONT,
     lineHeight: 1.6,
     paragraphSpacing: 0.5,
-    theme: "default",
+    theme: DEFAULT_THEME_ID,
     themeColors: {
-      background: "rgb(23, 37, 84)",
-      text: "rgb(239, 246, 255)",
-      accent: "rgb(59, 130, 246)",
+      background: INK.background,
+      text: INK.text,
+      accent: INK.accent,
     },
   });
 
@@ -755,15 +762,14 @@ export function useFontSettings() {
 
     // Load initial settings
     const loadSettings = () => {
-      const themeId = localStorage.getItem("storyTheme") || "default";
+      const themeId = localStorage.getItem("storyTheme") || DEFAULT_THEME_ID;
       const themeData =
         THEME_PRESETS.find((t) => t.id === themeId) || THEME_PRESETS[0];
 
       setSettings({
         fontSize: parseInt(localStorage.getItem("storyFontSize") || "16", 10),
         fontFamily:
-          localStorage.getItem("storyFontFamily") ||
-          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          localStorage.getItem("storyFontFamily") || DEFAULT_READING_FONT,
         lineHeight: parseFloat(
           localStorage.getItem("storyLineHeight") || "1.6"
         ),
@@ -808,7 +814,7 @@ export async function initializeFonts() {
     const fontFamily = localStorage.getItem("storyFontFamily");
     const lineHeight = localStorage.getItem("storyLineHeight");
     const paragraphSpacing = localStorage.getItem("storyParagraphSpacing");
-    const themeId = localStorage.getItem("storyTheme") || "default";
+    const themeId = localStorage.getItem("storyTheme") || DEFAULT_THEME_ID;
     const themeData =
       THEME_PRESETS.find((t) => t.id === themeId) || THEME_PRESETS[0];
 
@@ -818,12 +824,10 @@ export async function initializeFonts() {
         `${fontSize}px`
       );
     }
-    if (fontFamily) {
-      document.documentElement.style.setProperty(
-        "--story-font-family",
-        fontFamily
-      );
-    }
+    document.documentElement.style.setProperty(
+      "--story-font-family",
+      fontFamily || DEFAULT_READING_FONT
+    );
     if (lineHeight) {
       document.documentElement.style.setProperty(
         "--story-line-height",
@@ -836,18 +840,7 @@ export async function initializeFonts() {
         `${paragraphSpacing}em`
       );
     }
-    document.documentElement.style.setProperty(
-      "--story-bg-color",
-      themeData.background
-    );
-    document.documentElement.style.setProperty(
-      "--story-text-color",
-      themeData.text
-    );
-    document.documentElement.style.setProperty(
-      "--story-accent-color",
-      themeData.accent
-    );
+    applyThemeVars(themeData);
   } catch (error) {
     console.error("Failed to initialize fonts:", error);
   }

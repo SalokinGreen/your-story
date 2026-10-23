@@ -82,8 +82,9 @@ import Story from "./story";
 import LorePage from "./lore";
 import GoalsPage from "./goals";
 import NPCsPage from "./npcs";
-import MenuPage from "./menu";
-import { StoryTabBar } from "./StoryTabBar";
+import MenuPage, { type MenuNavTarget } from "./menu";
+import { StoryHeader } from "./StoryHeader";
+import { StoryMenuSheet } from "./StoryMenuSheet";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import OOCChatPanel from "../components/OOCChatPanel";
@@ -110,7 +111,7 @@ import {
   freezeBlocks,
 } from "../misc/turnTimeline";
 import { logger } from "../misc/logger";
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { getSubscriptionFallbacks } from "../misc/reasoningTiers";
 import { getLayerSubscriptionFallbacks } from "../misc/layerSettings";
@@ -465,6 +466,10 @@ function StoryPageContent() {
     falKey,
     braveSearchKey,
   } = apiKeys;
+  // The story menu is a sheet over the page (StoryMenuSheet), not a page of
+  // its own, so the story stays mounted underneath it.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuModalOpen, setMenuModalOpen] = useState(false);
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY,
   );
@@ -1226,6 +1231,11 @@ function StoryPageContent() {
   useEffect(() => {
     if (showOOCChat) setOOCLastSeenCount(oocMessages.length);
   }, [showOOCChat, oocMessages.length]);
+  const oocUnread = useMemo(
+    () =>
+      showOOCChat ? 0 : Math.max(0, oocMessages.length - oocLastSeenCount),
+    [showOOCChat, oocMessages.length, oocLastSeenCount],
+  );
 
   // Navigation handlers - only navigate through AI story parts with content
   function handleNavigateLeft() {
@@ -1554,7 +1564,7 @@ function StoryPageContent() {
             "success",
           );
           setAutoOpenOnlineSection(true);
-          setCurrentState(StoryState.MENU);
+          setMenuOpen(true);
         })
         .catch((error) => {
           addNotification(
@@ -1729,7 +1739,7 @@ function StoryPageContent() {
 
     // For custom preset, open the menu so user can customize their character
     if (isCustom) {
-      setCurrentState(StoryState.MENU);
+      setMenuOpen(true);
       addNotification(
         "Customize your character in the menu, then return to the story!",
         "success",
@@ -5385,60 +5395,66 @@ function StoryPageContent() {
     );
   }
 
+  // Off the story (Notes, NPCs, Goals, logs, context) the header's back
+  // button returns to the story and its title is the page's name.
+  const offStoryPageTitles: Partial<Record<StoryState, string>> = {
+    [StoryState.LORE]: "Notes",
+    [StoryState.NPCS]: "NPCs",
+    [StoryState.GOALS]: "Goals",
+    [StoryState.LOGS]: "Debug Logs",
+    [StoryState.CONTEXT]: "AI Context",
+  };
+  const offStoryPage = currentState in offStoryPageTitles;
+  const headerTitle =
+    offStoryPageTitles[currentState] ?? (storyData?.story_name || "Untitled Story");
+
+  // The story's window shortcuts (Enter/Space, Ctrl+Z, Ctrl+R, arrows) stand
+  // down while anything sits over the story: the menu sheet, the OOC panel
+  // or a play modal.
+  const shortcutsSuspended =
+    menuOpen ||
+    (showOOCChat && !!netSession) ||
+    partyLobbyOpen ||
+    profilePickerOpen ||
+    !!manualRollRequest ||
+    !!askQuestionRequest ||
+    !!diceThrowRequest ||
+    confirmDialog.isOpen ||
+    syncConflict.isOpen;
+
   return (
     <div
-      className="relative flex flex-col min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20"
+      className={`relative flex flex-col min-h-dvh py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20 ${
+        currentState === StoryState.STORY
+          ? "bg-ys-bg text-ys-text"
+          : "bg-linear-to-br from-gray-900 via-blue-950 to-purple-950"
+      }`}
       style={fullHeightStyle}
     >
-      {/* Ambient glow orbs - purely decorative, sits behind all content */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-700/20 blur-[100px]" />
-        <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-blue-700/15 blur-[110px]" />
-        <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full bg-indigo-600/10 blur-[100px]" />
-      </div>
-      <main className="flex flex-1 min-h-0 gap-2 sm:gap-4 w-full px-0 sm:px-2 sm:max-w-4xl mx-auto flex-col">
-        {/* Tab Navigation + leave/settings controls */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/library")}
-            className="focus-ring shrink-0 rounded-lg p-1.5 text-blue-300 hover:bg-white/10 hover:text-white transition-colors"
-            title="Leave to Library"
-            aria-label="Leave to Library"
-          >
-            <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <StoryTabBar
-              currentState={currentState}
-              onSelect={(state) => setCurrentState(state as StoryState)}
-              tabs={[
-                { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
-                { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
-                { state: StoryState.NPCS, icon: "Users", label: "NPCs" },
-                { state: StoryState.GOALS, icon: "Target", label: "Goals" },
-              ]}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setCurrentState(StoryState.MENU)}
-            aria-label="Menu"
-            aria-current={
-              currentState === StoryState.MENU ? "page" : undefined
-            }
-            title="Menu"
-            className={`focus-ring shrink-0 rounded-lg p-1.5 transition-colors ${
-              currentState === StoryState.MENU
-                ? "bg-purple-500/15 text-purple-300 ring-1 ring-purple-400/40 shadow-[0_0_10px_rgba(147,51,234,0.4)]"
-                : "text-blue-300 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            <DynamicIcon name="Settings" className="w-5 h-5" />
-          </button>
+      {/* Ambient glow orbs - purely decorative, sits behind all content. The
+          story itself sits on the theme's plain background; the Notes, NPC
+          and Goal pages keep the backdrop they were designed for. */}
+      {currentState !== StoryState.STORY && (
+        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+          <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-700/20 blur-[100px]" />
+          <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-blue-700/15 blur-[110px]" />
+          <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full bg-indigo-600/10 blur-[100px]" />
         </div>
+      )}
+      <main className="flex flex-1 min-h-0 gap-2 sm:gap-4 w-full px-0 sm:px-2 sm:max-w-4xl mx-auto flex-col">
+        <StoryHeader
+          title={headerTitle}
+          backLabel={offStoryPage ? "Back to the story" : "Leave to Library"}
+          onBack={() =>
+            offStoryPage
+              ? setCurrentState(StoryState.STORY)
+              : router.push("/library")
+          }
+          onOpenMenu={() => setMenuOpen(true)}
+          attention={
+            syncStatus === "conflict" || !!netSession || oocUnread > 0
+          }
+        />
 
         {/* Render current page */}
         <div
@@ -5476,13 +5492,9 @@ function StoryPageContent() {
             canUndo={canUndo}
             onStop={handleStop}
             onEdit={handleEdit}
-            viewingPartIndex={viewingPartIndex}
             onNavigateLeft={handleNavigateLeft}
             onNavigateRight={handleNavigateRight}
-            onNavigateToIndex={handleNavigateToIndex}
             onResetToCurrentPart={resetToCurrentPart}
-            syncStatus={syncStatus}
-            onOpenJournal={() => setCurrentState(StoryState.GOALS)}
             onOpenNote={handleOpenNote}
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
@@ -5492,7 +5504,7 @@ function StoryPageContent() {
             remoteActivity={netActivity}
             onLocalActivity={sendNetActivity}
             netSession={netSession}
-            netPeers={netPeers}
+            shortcutsSuspended={shortcutsSuspended}
             onViewportRecalc={updateHeights}
             // Party-voice floor (talking stick). Only meaningful in a
             // networked room; couch play runs its own local floor.
@@ -5627,7 +5639,19 @@ function StoryPageContent() {
           />
         )}
         {currentState === StoryState.GOALS && <GoalsPage {...storyData} />}
-        {currentState === StoryState.MENU && (
+        {currentState === StoryState.LOGS && <LogViewer />}
+        {currentState === StoryState.CONTEXT && (
+          <ContextViewer storyData={storyData} />
+        )}
+        </div>
+      </main>
+
+      {/* The story menu: a sheet over whatever page is showing. */}
+      <StoryMenuSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        modalOpen={menuModalOpen}
+      >
           <MenuPage
             {...storyData}
             storyDbId={storyDbId}
@@ -5636,9 +5660,19 @@ function StoryPageContent() {
               saveProgress(updatedStoryData || storyData)
             }
             onUpdateStoryData={updateStoryData}
-            onViewLogs={() => setCurrentState(StoryState.LOGS)}
-            onViewContext={() => setCurrentState(StoryState.CONTEXT)}
+            onNavigate={(target: MenuNavTarget) =>
+              setCurrentState(StoryState[target])
+            }
             onOpenOOCChat={() => setShowOOCChat(true)}
+            syncStatus={syncStatus}
+            oocUnread={oocUnread}
+            viewingPartIndex={viewingPartIndex}
+            onJumpToPart={(index) => {
+              handleNavigateToIndex(index);
+              setCurrentState(StoryState.STORY);
+            }}
+            onClose={() => setMenuOpen(false)}
+            onModalOpenChange={setMenuModalOpen}
             netSession={netSession}
             netPeers={netPeers}
             onCreateNetRoom={createNetRoom}
@@ -5662,13 +5696,7 @@ function StoryPageContent() {
             party={party}
             autoOpenSection={autoOpenOnlineSection ? "online" : undefined}
           />
-        )}
-        {currentState === StoryState.LOGS && <LogViewer />}
-        {currentState === StoryState.CONTEXT && (
-          <ContextViewer storyData={storyData} />
-        )}
-        </div>
-      </main>
+      </StoryMenuSheet>
 
       {/* OOC chat - rendered at page level to persist across tabs, only
           while an online multiplayer session is active. */}
@@ -5676,13 +5704,9 @@ function StoryPageContent() {
         <OOCChatPanel
           isOpen={showOOCChat}
           onClose={() => setShowOOCChat(false)}
-          onOpen={() => setShowOOCChat(true)}
           messages={oocMessages}
           myLocalPlayerId={netSession.myLocalPlayerId}
           onSend={sendNetOOCChat}
-          unreadCount={
-            showOOCChat ? 0 : Math.max(0, oocMessages.length - oocLastSeenCount)
-          }
         />
       )}
 

@@ -21,7 +21,7 @@ export default function ConfirmDialog({
   message,
   confirmText = "Confirm",
   cancelText = "Cancel",
-  confirmButtonClass = "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-md shadow-purple-950/40",
+  confirmButtonClass,
   onConfirm,
   onCancel,
   icon = "AlertTriangle",
@@ -51,20 +51,20 @@ export default function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 p-6 max-w-md w-full border border-white/10 animate-in zoom-in-95 duration-200">
+      <div className="bg-ys-surface rounded-2xl shadow-2xl shadow-black/50 p-6 max-w-md w-full border border-ys-border animate-in zoom-in-95 duration-200">
         {/* Icon & Title */}
         <div className="flex items-center gap-3 mb-4">
           <DynamicIcon
             name={icon as any}
-            className="w-10 h-10 text-white"
+            className="w-10 h-10 text-ys-text"
           />
-          <h3 className="text-xl font-bold text-white">
+          <h3 className="text-xl font-bold text-ys-text">
             {title}
           </h3>
         </div>
 
         {/* Message */}
-        <p className="text-blue-200/80 mb-6 leading-relaxed">
+        <p className="text-ys-muted mb-6 leading-relaxed">
           {message}
         </p>
 
@@ -72,13 +72,19 @@ export default function ConfirmDialog({
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-lg transition-colors"
+            className="flex-1 px-4 py-3 bg-ys-text/5 hover:bg-ys-text/10 border border-ys-border text-ys-text font-semibold rounded-lg transition-colors"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`flex-1 px-4 py-3 text-white font-semibold rounded-lg transition-colors ${confirmButtonClass}`}
+            // A caller's own class (red for danger) is a coloured fill with white text;
+            // the default is the theme's primary button.
+            className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-colors ${
+              confirmButtonClass
+                ? `text-white ${confirmButtonClass}`
+                : "bg-ys-text text-ys-bg hover:opacity-90"
+            }`}
           >
             {confirmText}
           </button>

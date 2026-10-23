@@ -22,7 +22,7 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
     lowercaseName.includes("health") ||
     lowercaseName.includes("life")
   ) {
-    return "text-red-400";
+    return "text-red-500";
   }
 
   // Defense-related stats
@@ -32,7 +32,7 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
     lowercaseName.includes("defense") ||
     lowercaseName.includes("ac")
   ) {
-    return "text-blue-400";
+    return "text-blue-500";
   }
 
   // Attack-related stats
@@ -41,7 +41,7 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
     lowercaseName.includes("damage") ||
     lowercaseName.includes("strength")
   ) {
-    return "text-orange-400";
+    return "text-orange-500";
   }
 
   // Magic-related stats
@@ -50,11 +50,11 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
     lowercaseName.includes("magic") ||
     lowercaseName.includes("spell")
   ) {
-    return "text-purple-400";
+    return "text-purple-500";
   }
 
   // Default color
-  return "text-blue-200/70";
+  return "text-ys-muted";
 }
 
 /**
@@ -81,15 +81,15 @@ function getCombatantIcon(type: Combatant["type"]): string {
 function getCombatantTypeColor(type: Combatant["type"]): string {
   switch (type) {
     case "player":
-      return "text-green-300 bg-green-500/10 border-green-400/20";
+      return "text-green-600 bg-green-500/10 border-green-400/20";
     case "ally":
-      return "text-blue-300 bg-blue-500/10 border-blue-400/20";
+      return "text-blue-500 bg-blue-500/10 border-blue-400/20";
     case "enemy":
-      return "text-red-300 bg-red-500/10 border-red-400/20";
+      return "text-red-500 bg-red-500/10 border-red-400/20";
     case "neutral":
-      return "text-yellow-300 bg-yellow-500/10 border-yellow-400/20";
+      return "text-yellow-600 bg-yellow-500/10 border-yellow-400/20";
     default:
-      return "text-blue-200/70 bg-white/5 border-white/10";
+      return "text-ys-muted bg-ys-text/5 border-ys-border";
   }
 }
 
@@ -98,7 +98,7 @@ function getCombatantTypeColor(type: Combatant["type"]): string {
  */
 function ConditionBadge({ condition }: { condition: CombatCondition }) {
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md bg-amber-500/10 text-amber-300 border border-amber-400/20">
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md bg-amber-500/10 text-amber-600 border border-amber-400/20">
       <span>{condition.name}</span>
       {condition.duration !== undefined && (
         <span className="text-amber-400/60">({condition.duration})</span>
@@ -170,7 +170,7 @@ function CombatantRow({
 
       {/* Inactive indicator */}
       {!combatant.isActive && (
-        <span className="text-xs text-blue-300/50 italic">Out</span>
+        <span className="text-xs text-ys-muted italic">Out</span>
       )}
     </div>
   );
@@ -215,22 +215,22 @@ export default function CombatDisplay({
         className="w-full flex items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 bg-red-500/10 hover:bg-red-500/15 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <DynamicIcon name="Swords" className="w-4 h-4 text-red-400" />
-          <span className="text-sm font-bold text-red-300">
+          <DynamicIcon name="Swords" className="w-4 h-4 text-red-500" />
+          <span className="text-sm font-bold text-red-500">
             ⚔️ COMBAT: {combatState.name || "Battle"}
           </span>
-          <span className="text-xs text-red-400/60 ml-2">
+          <span className="text-xs text-red-500/60 ml-2">
             Round {combatState.round}
             {currentCombatant && ` • ${currentCombatant.name}'s Turn`}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-red-400/80">
+          <span className="text-xs text-red-500/80">
             {activeCombatants.length} combatants
           </span>
           <DynamicIcon
             name={expanded ? "ChevronUp" : "ChevronDown"}
-            className="w-4 h-4 text-red-400"
+            className="w-4 h-4 text-red-500"
           />
         </div>
       </button>
@@ -240,7 +240,7 @@ export default function CombatDisplay({
         <div className="px-3 py-2 sm:px-4 sm:py-3 space-y-2 sm:space-y-3 max-h-40 sm:max-h-60 overflow-y-auto">
           {/* Turn Order Bar */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1">
-            <span className="text-xs text-blue-300/50 mr-1 shrink-0">
+            <span className="text-xs text-ys-muted mr-1 shrink-0">
               Turn Order:
             </span>
             {combatState.turnOrder.map((id, index) => {
@@ -278,7 +278,7 @@ export default function CombatDisplay({
             {/* Inactive combatants (collapsed) */}
             {inactiveCombatants.length > 0 && (
               <div className="mt-2 pt-2 border-t border-red-400/20">
-                <span className="text-xs text-blue-300/50 mb-1 block">
+                <span className="text-xs text-ys-muted mb-1 block">
                   Out of combat ({inactiveCombatants.length}):
                 </span>
                 <div className="space-y-1">
@@ -299,7 +299,7 @@ export default function CombatDisplay({
             <div className="border-t border-red-400/20 pt-2">
               <button
                 onClick={() => setShowLog(!showLog)}
-                className="flex items-center gap-1 text-xs text-blue-300/50 hover:text-blue-200/70 transition-colors"
+                className="flex items-center gap-1 text-xs text-ys-muted hover:text-ys-text transition-colors"
               >
                 <DynamicIcon
                   name={showLog ? "ChevronDown" : "ChevronRight"}
@@ -310,7 +310,7 @@ export default function CombatDisplay({
               {showLog && (
                 <div className="mt-1 max-h-32 overflow-y-auto space-y-0.5">
                   {combatState.log.slice(-10).map((entry, idx) => (
-                    <div key={idx} className="text-xs text-blue-200/70 font-mono">
+                    <div key={idx} className="text-xs text-ys-muted font-mono">
                       {entry}
                     </div>
                   ))}

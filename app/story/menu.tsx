@@ -30,6 +30,12 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { getLocalPlayerId } from "../misc/localPlayerId";
 import { DynamicIcon } from "../components/DynamicIcon";
 import ChatDisplaySettings from "./menu/ChatDisplaySettings";
+import SyncIndicator from "../components/SyncIndicator";
+import NetStatusBadge from "../components/NetStatusBadge";
+import { ChapterList } from "../components/ChapterNav";
+import { computeChapterSegments } from "../misc/chapterNav";
+import { getActiveObjectives } from "../misc/objectives";
+import type { SyncStatus } from "../misc/localStoryManager";
 import BasicSettings, { BasicSettingsForm } from "./menu/BasicSettings";
 import GoalEditor from "./menu/GoalEditor";
 import AbilitiesEditor from "./menu/AbilitiesEditor";
@@ -58,9 +64,23 @@ interface MenuProps extends StoryData {
   sourceAdventureId?: string | null;
   onSaveProgress: (updatedStoryData?: StoryData) => Promise<void>;
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
-  onViewLogs?: () => void;
-  onViewContext?: () => void;
+  /** Opens another page of the story screen; the sheet closes with it. */
+  onNavigate: (target: MenuNavTarget) => void;
   onOpenOOCChat?: () => void;
+  syncStatus?: SyncStatus;
+  /** Unread OOC chat messages (online co-op). */
+  oocUnread: number;
+  /** The scene part being read, or null for the live end. */
+  viewingPartIndex: number | null;
+  /** Jumps the story to a part (the Chapters row). */
+  onJumpToPart: (index: number) => void;
+  /** Closes the sheet this page lives in. */
+  onClose: () => void;
+  /**
+   * Reports whether a full-screen view or dialog the menu opened is showing,
+   * so the sheet leaves Escape and Tab to it.
+   */
+  onModalOpenChange?: (open: boolean) => void;
   netSession: NetSessionInfo | null;
   netPeers: GuestJoinedInfo[];
   onCreateNetRoom: (backend: MPBackend, displayName: string, color: string) => Promise<void>;
@@ -79,6 +99,18 @@ interface MenuProps extends StoryData {
   // arriving here via an auto-host deep link from the Library/home page.
   autoOpenSection?: MenuTab;
 }
+
+/** The pages the menu can send the player to. Values are `StoryState` names. */
+export type MenuNavTarget = "LORE" | "NPCS" | "GOALS" | "LOGS" | "CONTEXT";
+
+// Row styles for the sheet. They read the story screen's colour tokens, so
+// the menu is legible on a light theme as well as on Ink.
+const ROW =
+  "focus-ring w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-ys-text text-left hover:bg-ys-bg disabled:text-ys-muted disabled:hover:bg-transparent transition-colors";
+const DANGER_ROW =
+  "focus-ring w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-red-500 text-left hover:bg-red-500/10 disabled:text-ys-muted disabled:hover:bg-transparent transition-colors";
+const SECTION_LABEL =
+  "px-3 pt-5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ys-muted";
 
 type MenuTab =
   | "basic"
@@ -100,9 +132,14 @@ export default function MenuPage({
   sourceAdventureId,
   onSaveProgress,
   onUpdateStoryData,
-  onViewLogs,
-  onViewContext,
+  onNavigate,
   onOpenOOCChat,
+  syncStatus,
+  oocUnread,
+  viewingPartIndex,
+  onJumpToPart,
+  onClose,
+  onModalOpenChange,
   netSession,
   netPeers,
   onCreateNetRoom,
@@ -129,22 +166,7 @@ export default function MenuPage({
   const [showAPIKeysModal, setShowAPIKeysModal] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [playerNotes, setPlayerNotes] = useState(storyData.player_notes || "");
-  const [editingChatDisplay, setEditingChatDisplay] = useState(false);
-  const [chatDisplayName, setChatDisplayName] = useState(
-    storyData.displayName || "",
-  );
-  const [chatDisplayAvatar, setChatDisplayAvatar] = useState(
-    storyData.displayAvatar || "",
-  );
-
-  useEffect(() => {
-    if (!editingChatDisplay) {
-      setChatDisplayName(storyData.displayName || "");
-      setChatDisplayAvatar(storyData.displayAvatar || "");
-    }
-    // Only resync when persisted values change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storyData.displayName, storyData.displayAvatar]);
+  const [chaptersOpen, setChaptersOpen] = useState(false);
 
   // Auto-open the Story Editor once on mount when arriving via a deep link
   // (e.g. "Host" from the Library, which wants to land straight on Online
@@ -312,21 +334,6 @@ export default function MenuPage({
       addNotification("Notes saved!", "success");
     } catch (error) {
       addNotification("Failed to save notes", "failure");
-    }
-  };
-
-  const handleSaveChatDisplay = async () => {
-    try {
-      const updates: Partial<StoryData> = {
-        displayName: chatDisplayName.trim() || undefined,
-        displayAvatar: chatDisplayAvatar.trim() || undefined,
-      };
-      onUpdateStoryData(updates);
-      await onSaveProgress({ ...storyData, ...updates } as StoryData);
-      setEditingChatDisplay(false);
-      addNotification("Chat display settings saved!", "success");
-    } catch (error) {
-      addNotification("Failed to save chat display settings", "failure");
     }
   };
 
@@ -505,520 +512,419 @@ export default function MenuPage({
     });
   };
 
-  const calculateStoryProgress = () => {
-    const totalParts = storyData.scene.parts.length;
-    const goalCount = storyData.goals.length;
-    const fulfilledCount = storyData.goals.filter((g) => g.fulfilled).length;
+  // Rows carry their counts (the old header and quick stats are gone).
+  const chapterCount = computeChapterSegments(storyData.scene.parts).length;
+  const activeObjectiveCount = getActiveObjectives(
+    storyData as StoryData,
+  ).length;
 
-    return {
-      totalParts,
-      goalCount,
-      fulfilledCount,
-      progress:
-        goalCount > 0 ? Math.round((fulfilledCount / goalCount) * 100) : 0,
-    };
+  // Tell the sheet when something the menu opened is on top of it.
+  const modalOpen =
+    showSettings ||
+    showSaveCopyModal ||
+    showCompactModal ||
+    showAPIKeysModal ||
+    confirmDialog.isOpen;
+  useEffect(() => {
+    onModalOpenChange?.(modalOpen);
+  }, [modalOpen, onModalOpenChange]);
+  useEffect(() => () => onModalOpenChange?.(false), [onModalOpenChange]);
+
+  const goTo = (target: MenuNavTarget) => {
+    onNavigate(target);
+    onClose();
   };
 
-  const stats = calculateStoryProgress();
-
   return (
-    <div className="w-full space-y-4">
-      {/* Compact Header with Quick Stats */}
-      <div className="relative overflow-hidden bg-white/[0.04] backdrop-blur-xl rounded-2xl p-4 border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
-        <div className="pointer-events-none absolute -top-16 -right-16 w-40 h-40 rounded-full bg-purple-500/20 blur-3xl" />
-        <div className="relative flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
-              <DynamicIcon name="Settings" className="w-4 h-4 text-purple-300" />
+    <div className="w-full">
+      {/* 1. Status */}
+      <section aria-label="Status" className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm text-ys-muted">
+          {syncStatus && syncStatus !== "local-only" ? (
+            <span className="inline-flex items-center gap-2">
+              <SyncIndicator status={syncStatus} />
+              <span>
+                {syncStatus === "synced"
+                  ? "Synced with cloud"
+                  : syncStatus === "pending"
+                    ? "Syncing..."
+                    : "Sync conflict"}
+              </span>
             </span>
-            Story Menu
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-blue-200/50">
-              {stats.progress}% complete
+          ) : (
+            <span className="inline-flex items-center gap-2">
+              <DynamicIcon name="HardDrive" className="w-4 h-4" />
+              <span>Saved on this device</span>
             </span>
-            <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-linear-to-r from-purple-500 to-pink-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"
-                style={{ width: `${stats.progress}%` }}
-              />
-            </div>
-          </div>
+          )}
+          {netSession && (
+            <NetStatusBadge netSession={netSession} peers={netPeers} />
+          )}
         </div>
+        {onOpenOOCChat && netSession && (
+          <button
+            type="button"
+            onClick={() => {
+              // Close the sheet first, or it would stay over the chat.
+              onClose();
+              onOpenOOCChat();
+            }}
+            className={ROW}
+          >
+            <DynamicIcon
+              name="MessageCircle"
+              className="w-4 h-4 shrink-0 text-ys-muted"
+            />
+            <span className="flex-1 min-w-0 truncate">OOC Chat</span>
+            {oocUnread > 0 && (
+              <span className="min-w-5 h-5 px-1 flex items-center justify-center rounded-full bg-ys-accent text-ys-bg text-[11px] font-bold shrink-0">
+                {oocUnread > 9 ? "9+" : oocUnread}
+              </span>
+            )}
+            <DynamicIcon
+              name="ChevronRight"
+              className="w-4 h-4 shrink-0 text-ys-muted"
+            />
+          </button>
+        )}
+      </section>
 
-        {/* Quick Stats Row */}
-        <div className="relative grid grid-cols-2 gap-2 text-center">
-          <div className="bg-white/[0.03] rounded-xl py-2 px-1 border border-white/5">
-            <p className="text-lg font-bold text-blue-300">
-              {stats.totalParts}
-            </p>
-            <p className="text-[10px] text-blue-300/50">Parts</p>
-          </div>
-          <div className="bg-white/[0.03] rounded-xl py-2 px-1 border border-white/5">
-            <p className="text-lg font-bold text-purple-300">
-              {stats.fulfilledCount}/{stats.goalCount}
-            </p>
-            <p className="text-[10px] text-purple-300/50">Goals</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Primary Actions - 2x2 Grid */}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={() => setShowSettings(true)}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-950/40 hover:shadow-purple-500/25 text-sm"
-        >
-          <DynamicIcon name="Settings" className="w-4 h-4" />
-          <span>Story Editor</span>
+      {/* 2. Notes, NPCs, Goals, Chapters */}
+      <section
+        aria-label="Story pages"
+        className="space-y-1 pt-2 mt-2 border-t border-ys-border"
+      >
+        <button type="button" onClick={() => goTo("LORE")} className={ROW}>
+          <DynamicIcon name="Scroll" className="w-4 h-4 shrink-0 text-ys-muted" />
+          <span className="flex-1 min-w-0 truncate">Notes</span>
+          <span className="text-xs text-ys-muted shrink-0">
+            {storyData.lore.length}
+          </span>
+          <DynamicIcon
+            name="ChevronRight"
+            className="w-4 h-4 shrink-0 text-ys-muted"
+          />
         </button>
+        <button type="button" onClick={() => goTo("NPCS")} className={ROW}>
+          <DynamicIcon name="Users" className="w-4 h-4 shrink-0 text-ys-muted" />
+          <span className="flex-1 min-w-0 truncate">NPCs</span>
+          <span className="text-xs text-ys-muted shrink-0">
+            {storyData.npcs?.length ?? 0}
+          </span>
+          <DynamicIcon
+            name="ChevronRight"
+            className="w-4 h-4 shrink-0 text-ys-muted"
+          />
+        </button>
+        <button type="button" onClick={() => goTo("GOALS")} className={ROW}>
+          <DynamicIcon name="Target" className="w-4 h-4 shrink-0 text-ys-muted" />
+          <span className="flex-1 min-w-0 truncate">Goals</span>
+          <span className="text-xs text-ys-muted shrink-0">
+            {activeObjectiveCount > 0
+              ? `${activeObjectiveCount} active`
+              : "none active"}
+          </span>
+          <DynamicIcon
+            name="ChevronRight"
+            className="w-4 h-4 shrink-0 text-ys-muted"
+          />
+        </button>
+        {chapterCount >= 2 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setChaptersOpen((prev) => !prev)}
+              aria-expanded={chaptersOpen}
+              className={ROW}
+            >
+              <DynamicIcon
+                name="BookMarked"
+                className="w-4 h-4 shrink-0 text-ys-muted"
+              />
+              <span className="flex-1 min-w-0 truncate">Chapters</span>
+              <span className="text-xs text-ys-muted shrink-0">
+                {chapterCount}
+              </span>
+              <DynamicIcon
+                name={chaptersOpen ? "ChevronUp" : "ChevronDown"}
+                className="w-4 h-4 shrink-0 text-ys-muted"
+              />
+            </button>
+            {chaptersOpen && (
+              <div className="max-h-64 overflow-y-auto rounded-xl border border-ys-border bg-ys-bg py-1">
+                <ChapterList
+                  parts={storyData.scene.parts}
+                  currentIndex={viewingPartIndex}
+                  onJump={(index) => {
+                    onJumpToPart(index);
+                    onClose();
+                  }}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
+      {/* 3. Story */}
+      <section aria-label="Story" className="space-y-1">
+        <h3 className={SECTION_LABEL}>Story</h3>
         <button
+          type="button"
+          onClick={() => setShowSettings(true)}
+          className={ROW}
+        >
+          <DynamicIcon name="Settings" className="w-4 h-4 shrink-0 text-ys-muted" />
+          <span className="flex-1 min-w-0 truncate">Story Editor</span>
+        </button>
+        <button
+          type="button"
           onClick={handleSaveProgress}
           disabled={saving || !storyDbId}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/5 disabled:to-white/5 disabled:text-blue-300/30 text-white font-medium rounded-xl transition-all shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/20 disabled:shadow-none text-sm"
+          className={ROW}
         >
           {saving ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+            <div className="animate-spin rounded-full h-4 w-4 shrink-0 border-2 border-ys-muted border-t-transparent" />
           ) : (
-            <DynamicIcon name="Save" className="w-4 h-4" />
+            <DynamicIcon name="Save" className="w-4 h-4 shrink-0 text-ys-muted" />
           )}
-          <span>{saving ? "Saving..." : "Save"}</span>
+          <span className="flex-1 min-w-0 truncate">
+            {saving ? "Saving..." : "Save"}
+          </span>
         </button>
-
         <button
+          type="button"
           onClick={handleSaveAs}
           disabled={savingAs}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-teal-600 to-emerald-700 hover:from-teal-500 hover:to-emerald-600 disabled:from-white/5 disabled:to-white/5 disabled:text-blue-300/30 text-white font-medium rounded-xl transition-all shadow-lg shadow-emerald-950/30 hover:shadow-teal-500/20 disabled:shadow-none text-sm"
+          className={ROW}
           title="Create a copy of this story as a save point"
         >
           {savingAs ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+            <div className="animate-spin rounded-full h-4 w-4 shrink-0 border-2 border-ys-muted border-t-transparent" />
           ) : (
-            <DynamicIcon name="Copy" className="w-4 h-4" />
+            <DynamicIcon name="Copy" className="w-4 h-4 shrink-0 text-ys-muted" />
           )}
-          <span>{savingAs ? "Saving..." : "Save Copy"}</span>
+          <span className="flex-1 min-w-0 truncate">
+            {savingAs ? "Saving..." : "Save Copy"}
+          </span>
         </button>
-
-        {onViewContext && (
-          <button
-            onClick={onViewContext}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 text-white font-medium rounded-xl transition-all text-sm"
-          >
-            <DynamicIcon name="Eye" className="w-4 h-4" />
-            <span>AI Context</span>
-          </button>
-        )}
-
-        {onViewLogs && (
-          <button
-            onClick={onViewLogs}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 text-white font-medium rounded-xl transition-all text-sm"
-          >
-            <DynamicIcon name="Terminal" className="w-4 h-4" />
-            <span>Debug Logs</span>
-          </button>
-        )}
-      </div>
-
-      {/* Secondary Actions Row */}
-      <div className="grid grid-cols-2 gap-2">
         <button
-          onClick={() => setShowCompactModal(true)}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-sm text-blue-200 font-medium rounded-xl transition-all text-sm border border-white/10"
-          title="Shrink this story's storage, or spin off a lighter continuation"
-        >
-          <DynamicIcon name="Minimize2" className="w-3.5 h-3.5" />
-          <span>Compact Story</span>
-        </button>
-
-        <button
+          type="button"
           onClick={handleExportStory}
           disabled={exporting}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-sm text-blue-200 font-medium rounded-xl transition-all text-sm border border-white/10"
+          className={ROW}
         >
           {exporting ? (
-            <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-300 border-t-transparent" />
+            <div className="animate-spin rounded-full h-4 w-4 shrink-0 border-2 border-ys-muted border-t-transparent" />
           ) : (
-            <DynamicIcon name="Download" className="w-3.5 h-3.5" />
+            <DynamicIcon
+              name="Download"
+              className="w-4 h-4 shrink-0 text-ys-muted"
+            />
           )}
-          <span>{exporting ? "Exporting..." : "Export"}</span>
+          <span className="flex-1 min-w-0 truncate">
+            {exporting ? "Exporting..." : "Export"}
+          </span>
         </button>
-
         <button
-          onClick={handleReturnToExplorer}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-sm text-blue-200 font-medium rounded-xl transition-all text-sm border border-white/10"
+          type="button"
+          onClick={() => setShowCompactModal(true)}
+          className={ROW}
+          title="Shrink this story's storage, or spin off a lighter continuation"
         >
-          <DynamicIcon name="ArrowLeft" className="w-3.5 h-3.5" />
-          <span>Explorer</span>
+          <DynamicIcon
+            name="Minimize2"
+            className="w-4 h-4 shrink-0 text-ys-muted"
+          />
+          <span className="flex-1 min-w-0 truncate">Compact Story</span>
         </button>
+        <button type="button" onClick={handleReturnToExplorer} className={ROW}>
+          <DynamicIcon
+            name="ArrowLeft"
+            className="w-4 h-4 shrink-0 text-ys-muted"
+          />
+          <span className="flex-1 min-w-0 truncate">Explorer</span>
+        </button>
+      </section>
 
+      {/* 4. Settings */}
+      <section aria-label="Settings" className="space-y-1">
+        <h3 className={SECTION_LABEL}>App</h3>
         <button
+          type="button"
           onClick={() => setShowAPIKeysModal(true)}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-sm text-blue-200 font-medium rounded-xl transition-all text-sm border border-white/10"
+          className={ROW}
           title="App-wide settings: API keys, voices, fonts, display"
         >
-          <DynamicIcon name="Settings" className="w-3.5 h-3.5" />
-          <span>Settings</span>
+          <DynamicIcon name="Settings" className="w-4 h-4 shrink-0 text-ys-muted" />
+          <span className="flex-1 min-w-0 truncate">Settings</span>
         </button>
-      </div>
+      </section>
 
       <APIKeysModal
         isOpen={showAPIKeysModal}
         onClose={() => setShowAPIKeysModal(false)}
       />
 
-      {/* OOC Chat Button - only while online co-op is active */}
-      {onOpenOOCChat && netSession && (
-        <button
-          onClick={onOpenOOCChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-blue-600/80 to-cyan-600/80 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all border border-blue-400/20 shadow-lg shadow-blue-950/30 hover:shadow-cyan-500/20"
-        >
-          <DynamicIcon name="MessageCircle" className="w-5 h-5" />
-          <span>OOC Chat</span>
+      {/* 5. For the curious */}
+      <section aria-label="For the curious" className="space-y-1">
+        <h3 className={SECTION_LABEL}>For the curious</h3>
+        <button type="button" onClick={() => goTo("CONTEXT")} className={ROW}>
+          <DynamicIcon name="Eye" className="w-4 h-4 shrink-0 text-ys-muted" />
+          <span className="flex-1 min-w-0 truncate">AI Context</span>
         </button>
-      )}
-
-      {/* Player Notes - Collapsible */}
-      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
-        <button
-          onClick={() => setEditingNotes(!editingNotes)}
-          className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
-        >
-          <span className="text-sm font-medium text-white flex items-center gap-2">
-            <DynamicIcon
-              name="StickyNote"
-              className="w-4 h-4 text-yellow-400"
-            />
-            Player Notes
-          </span>
+        <button type="button" onClick={() => goTo("LOGS")} className={ROW}>
           <DynamicIcon
-            name={editingNotes ? "ChevronUp" : "ChevronDown"}
-            className="w-4 h-4 text-blue-300/60"
+            name="Terminal"
+            className="w-4 h-4 shrink-0 text-ys-muted"
           />
+          <span className="flex-1 min-w-0 truncate">Debug Logs</span>
         </button>
+      </section>
 
-        {editingNotes && (
-          <div className="p-3 pt-0 space-y-2">
-            <textarea
-              value={playerNotes}
-              onChange={(e) => setPlayerNotes(e.target.value)}
-              placeholder="Write your notes, strategies, or thoughts..."
-              className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none"
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => {
-                  setPlayerNotes(storyData.player_notes || "");
-                  setEditingNotes(false);
-                }}
-                className="px-3 py-1.5 text-xs bg-white/5 text-blue-200 rounded-lg hover:bg-white/10 border border-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveNotes}
-                className="px-3 py-1.5 text-xs bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!editingNotes && playerNotes && (
-          <div className="px-3 pb-3">
-            <p className="text-xs text-blue-200/70 whitespace-pre-wrap line-clamp-2">
-              {playerNotes}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Chat Display Settings - Collapsible */}
-      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+      {/* 6. Danger */}
+      <section aria-label="Danger" className="space-y-1">
+        <h3 className={SECTION_LABEL}>Danger</h3>
         <button
-          onClick={() => setEditingChatDisplay(!editingChatDisplay)}
-          className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
-        >
-          <span className="text-sm font-medium text-white flex items-center gap-2">
-            <DynamicIcon
-              name="MessageCircle"
-              className="w-4 h-4 text-purple-300"
-            />
-            Chat Display Settings
-          </span>
-          <DynamicIcon
-            name={editingChatDisplay ? "ChevronUp" : "ChevronDown"}
-            className="w-4 h-4 text-blue-300/60"
-          />
-        </button>
-
-        {editingChatDisplay && (
-          <div className="p-3 pt-0 space-y-3">
-            <p className="text-xs text-blue-200/60">
-              Leave empty to use your account defaults.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-blue-200/70 mb-1">
-                  Display Name
-                </label>
-                <input
-                  type="text"
-                  value={chatDisplayName}
-                  onChange={(e) => setChatDisplayName(e.target.value)}
-                  placeholder={storyData.player_name || "Your name"}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-blue-200/70 mb-1">
-                  Avatar URL
-                </label>
-                <input
-                  type="url"
-                  value={chatDisplayAvatar}
-                  onChange={(e) => setChatDisplayAvatar(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40"
-                />
-              </div>
-            </div>
-
-            {chatDisplayAvatar.trim() && (
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-blue-200/60">Preview:</span>
-                <img
-                  src={chatDisplayAvatar}
-                  alt="Avatar preview"
-                  className="w-8 h-8 rounded-full object-cover border border-purple-400/40 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              </div>
-            )}
-
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => {
-                  setChatDisplayName(storyData.displayName || "");
-                  setChatDisplayAvatar(storyData.displayAvatar || "");
-                  setEditingChatDisplay(false);
-                }}
-                className="px-3 py-1.5 text-xs bg-white/5 text-blue-200 rounded-lg hover:bg-white/10 border border-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveChatDisplay}
-                className="px-3 py-1.5 text-xs bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!editingChatDisplay && (chatDisplayName || chatDisplayAvatar) && (
-          <div className="px-3 pb-3">
-            <p className="text-xs text-blue-200/70 whitespace-pre-wrap line-clamp-2">
-              {chatDisplayName ? `Name: ${chatDisplayName}` : ""}
-              {chatDisplayName && chatDisplayAvatar ? "\n" : ""}
-              {chatDisplayAvatar ? "Avatar: set" : ""}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Danger Zone - Compact */}
-      <div className="bg-red-500/[0.03] backdrop-blur-xl rounded-2xl border border-red-500/20 overflow-hidden">
-        <div className="p-3 border-b border-red-500/10">
-          <span className="text-sm font-medium text-red-400 flex items-center gap-2">
-            <DynamicIcon name="AlertTriangle" className="w-4 h-4" />
-            Danger Zone
-          </span>
-        </div>
-        <div className="p-3 grid grid-cols-2 gap-2">
-          <button
-            onClick={() => {
-              setConfirmDialog({
-                isOpen: true,
-                title: "Restart Story",
-                message: "All progress will be lost. Are you sure?",
-                icon: "RefreshCw",
-                confirmText: "Restart",
-                confirmButtonClass: "bg-orange-600 hover:bg-orange-700",
-                onConfirm: async () => {
-                  setConfirmDialog({ ...confirmDialog, isOpen: false });
-                  if (!storyDbId) return;
-                  try {
-                    // Try to fetch fresh adventure data if we have a source adventure
-                    let freshTemplate: Partial<StoryData> | null = null;
-                    if (sourceAdventureId) {
-                      try {
-                        const { getLocalAdventure } =
-                          await import("@/app/misc/localAdventureManager");
-                        const localAdv =
-                          await getLocalAdventure(sourceAdventureId);
-                        freshTemplate =
-                          (localAdv?.adventureData as Partial<Adventure>)
-                            ?.storyTemplate || null;
-                      } catch (e) {
-                        console.warn(
-                          "Could not fetch fresh adventure data, using current story values",
-                        );
-                      }
+          onClick={() => {
+            setConfirmDialog({
+              isOpen: true,
+              title: "Restart Story",
+              message: "All progress will be lost. Are you sure?",
+              icon: "RefreshCw",
+              confirmText: "Restart",
+              confirmButtonClass: "bg-orange-600 hover:bg-orange-700",
+              onConfirm: async () => {
+                setConfirmDialog({ ...confirmDialog, isOpen: false });
+                if (!storyDbId) return;
+                try {
+                  // Try to fetch fresh adventure data if we have a source adventure
+                  let freshTemplate: Partial<StoryData> | null = null;
+                  if (sourceAdventureId) {
+                    try {
+                      const { getLocalAdventure } =
+                        await import("@/app/misc/localAdventureManager");
+                      const localAdv =
+                        await getLocalAdventure(sourceAdventureId);
+                      freshTemplate =
+                        (localAdv?.adventureData as Partial<Adventure>)
+                          ?.storyTemplate || null;
+                    } catch (e) {
+                      console.warn(
+                        "Could not fetch fresh adventure data, using current story values",
+                      );
                     }
+                  }
 
-                    // Use fresh adventure data if available, otherwise fall back to current story values
-                    const resetStoryData = {
-                      ...storyData,
-                      // Reset dynamic fields from fresh adventure template or current story
-                      stats: freshTemplate?.stats || storyData.stats,
-                      resources:
-                        freshTemplate?.resources || storyData.resources,
-                      inventory:
-                        freshTemplate?.inventory || storyData.inventory,
-                      abilities:
-                        freshTemplate?.abilities || storyData.abilities,
-                      relationships:
-                        freshTemplate?.relationships || storyData.relationships,
-                      variables:
-                        freshTemplate?.variables || storyData.variables,
-                      skillTrees:
-                        freshTemplate?.skillTrees || storyData.skillTrees,
-                      agmtState:
-                        freshTemplate?.agmtState || storyData.agmtState,
-                      customTables:
-                        freshTemplate?.customTables || storyData.customTables,
-                      restState: freshTemplate?.restState || {
-                        quickRestsUsed: 0,
-                        shortRestsUsed: 0,
-                      },
-                      unlockedNodes:
-                        freshTemplate?.unlockedNodes || storyData.unlockedNodes,
-                      // Always reset these
-                      scene: { parts: [] },
-                      memory: [],
-                      currentChapter: 0,
-                      chapters: [],
-                      goals:
-                        (freshTemplate?.goals || storyData.goals)?.map(
-                          (g) => ({
-                            ...g,
-                            fulfilled: false,
-                            active: false,
-                          }),
-                        ) || [],
-                      lore: (freshTemplate?.lore || storyData.lore).map(
-                        (l) => ({
-                          ...l,
-                          on:
-                            l.on_triggers && l.on_triggers.length > 0
-                              ? false
-                              : true,
+                  // Use fresh adventure data if available, otherwise fall back to current story values
+                  const resetStoryData = {
+                    ...storyData,
+                    // Reset dynamic fields from fresh adventure template or current story
+                    stats: freshTemplate?.stats || storyData.stats,
+                    resources:
+                      freshTemplate?.resources || storyData.resources,
+                    inventory:
+                      freshTemplate?.inventory || storyData.inventory,
+                    abilities:
+                      freshTemplate?.abilities || storyData.abilities,
+                    relationships:
+                      freshTemplate?.relationships || storyData.relationships,
+                    variables:
+                      freshTemplate?.variables || storyData.variables,
+                    skillTrees:
+                      freshTemplate?.skillTrees || storyData.skillTrees,
+                    agmtState:
+                      freshTemplate?.agmtState || storyData.agmtState,
+                    customTables:
+                      freshTemplate?.customTables || storyData.customTables,
+                    restState: freshTemplate?.restState || {
+                      quickRestsUsed: 0,
+                      shortRestsUsed: 0,
+                    },
+                    unlockedNodes:
+                      freshTemplate?.unlockedNodes || storyData.unlockedNodes,
+                    // Always reset these
+                    scene: { parts: [] },
+                    memory: [],
+                    currentChapter: 0,
+                    chapters: [],
+                    goals:
+                      (freshTemplate?.goals || storyData.goals)?.map(
+                        (g) => ({
+                          ...g,
+                          fulfilled: false,
+                          active: false,
                         }),
-                      ),
-                      newGamePlusMode: false,
-                    };
-                    const { saveLocalStory } =
-                      await import("@/app/misc/localStoryManager");
-                    await saveLocalStory(storyDbId, resetStoryData);
-                    addNotification("Story restarted!", "success");
-                    window.location.reload();
-                  } catch (error) {
-                    addNotification("Failed to restart", "failure");
-                  }
-                },
-              });
-            }}
-            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 font-medium rounded-xl transition-all text-sm border border-orange-400/20"
-          >
-            <DynamicIcon name="RefreshCw" className="w-3.5 h-3.5" />
-            <span>Restart</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setConfirmDialog({
-                isOpen: true,
-                title: "Delete Story?",
-                message: "This action cannot be undone.",
-                icon: "AlertTriangle",
-                confirmText: "Delete",
-                confirmButtonClass: "bg-red-600 hover:bg-red-700",
-                onConfirm: async () => {
-                  setConfirmDialog({ ...confirmDialog, isOpen: false });
-                  if (!storyDbId) return;
-                  setDeleting(true);
-                  try {
-                    const { deleteLocalStory } =
-                      await import("../misc/localStoryManager");
-                    await deleteLocalStory(storyDbId);
-                    addNotification("Story deleted", "success");
-                    router.push("/library");
-                  } catch (error: any) {
-                    addNotification(
-                      error.message || "Failed to delete",
-                      "failure",
-                    );
-                    setDeleting(false);
-                  }
-                },
-              });
-            }}
-            disabled={deleting || !storyDbId}
-            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 disabled:bg-white/5 disabled:text-blue-300/30 text-red-300 font-medium rounded-xl transition-all text-sm border border-red-400/20"
-          >
-            {deleting ? (
-              <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-red-300 border-t-transparent" />
-            ) : (
-              <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
-            )}
-            <span>{deleting ? "Deleting..." : "Delete"}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Story Info Card */}
-      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.3)] p-6 border border-white/10">
-        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
-            <DynamicIcon name="Info" className="w-4 h-4 text-purple-300" />
+                      ) || [],
+                    lore: (freshTemplate?.lore || storyData.lore).map(
+                      (l) => ({
+                        ...l,
+                        on:
+                          l.on_triggers && l.on_triggers.length > 0
+                            ? false
+                            : true,
+                      }),
+                    ),
+                    newGamePlusMode: false,
+                  };
+                  const { saveLocalStory } =
+                    await import("@/app/misc/localStoryManager");
+                  await saveLocalStory(storyDbId, resetStoryData);
+                  addNotification("Story restarted!", "success");
+                  window.location.reload();
+                } catch (error) {
+                  addNotification("Failed to restart", "failure");
+                }
+              },
+            });
+          }}
+          className={DANGER_ROW}
+        >
+          <DynamicIcon name="RefreshCw" className="w-4 h-4 shrink-0" />
+          <span className="flex-1 min-w-0 truncate">Restart</span>
+        </button>
+        <button
+          onClick={() => {
+            setConfirmDialog({
+              isOpen: true,
+              title: "Delete Story?",
+              message: "This action cannot be undone.",
+              icon: "AlertTriangle",
+              confirmText: "Delete",
+              confirmButtonClass: "bg-red-600 hover:bg-red-700",
+              onConfirm: async () => {
+                setConfirmDialog({ ...confirmDialog, isOpen: false });
+                if (!storyDbId) return;
+                setDeleting(true);
+                try {
+                  const { deleteLocalStory } =
+                    await import("../misc/localStoryManager");
+                  await deleteLocalStory(storyDbId);
+                  addNotification("Story deleted", "success");
+                  router.push("/library");
+                } catch (error: any) {
+                  addNotification(
+                    error.message || "Failed to delete",
+                    "failure",
+                  );
+                  setDeleting(false);
+                }
+              },
+            });
+          }}
+          disabled={deleting || !storyDbId}
+          className={DANGER_ROW}
+        >
+          {deleting ? (
+            <div className="animate-spin rounded-full h-4 w-4 shrink-0 border-2 border-red-500 border-t-transparent" />
+          ) : (
+            <DynamicIcon name="Trash2" className="w-4 h-4 shrink-0" />
+          )}
+          <span className="flex-1 min-w-0 truncate">
+            {deleting ? "Deleting..." : "Delete"}
           </span>
-          Story Information
-        </h3>
-
-        <div className="space-y-1 text-sm">
-          <div className="flex justify-between py-2.5 border-b border-white/5">
-            <span className="text-blue-200/60">Story Name:</span>
-            <span className="font-semibold text-white">
-              {storyData.story_name}
-            </span>
-          </div>
-          <div className="flex justify-between py-2.5 border-b border-white/5">
-            <span className="text-blue-200/60">Player Name:</span>
-            <span className="font-semibold text-white">
-              {storyData.player_name}
-            </span>
-          </div>
-          <div className="flex justify-between py-2.5 border-b border-white/5">
-            <span className="text-blue-200/60">Total Memory Entries:</span>
-            <span className="font-semibold text-white">
-              {storyData.memory.length}
-            </span>
-          </div>
-          <div className="flex justify-between py-2.5">
-            <span className="text-blue-200/60">Notes:</span>
-            <span className="font-semibold text-white">
-              {storyData.lore.length}
-            </span>
-          </div>
-        </div>
-      </div>
+        </button>
+      </section>
 
       {/* Comprehensive Settings Modal */}
       {showSettings && (
@@ -1109,6 +1015,69 @@ export default function MenuPage({
                     form={settingsForm}
                     onChange={setSettingsForm}
                   />
+                  <div className="mt-5 space-y-5">
+                    <ChatDisplaySettings
+                      form={settingsForm}
+                      onChange={(updates) =>
+                        setSettingsForm((prev) => ({ ...prev, ...updates }))
+                      }
+                    />
+              {/* Player Notes - Collapsible */}
+              <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+                <button
+                  onClick={() => setEditingNotes(!editingNotes)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
+                >
+                  <span className="text-sm font-medium text-white flex items-center gap-2">
+                    <DynamicIcon
+                      name="StickyNote"
+                      className="w-4 h-4 text-yellow-400"
+                    />
+                    Player Notes
+                  </span>
+                  <DynamicIcon
+                    name={editingNotes ? "ChevronUp" : "ChevronDown"}
+                    className="w-4 h-4 text-blue-300/60"
+                  />
+                </button>
+
+                {editingNotes && (
+                  <div className="p-3 pt-0 space-y-2">
+                    <textarea
+                      value={playerNotes}
+                      onChange={(e) => setPlayerNotes(e.target.value)}
+                      placeholder="Write your notes, strategies, or thoughts..."
+                      className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none"
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => {
+                          setPlayerNotes(storyData.player_notes || "");
+                          setEditingNotes(false);
+                        }}
+                        className="px-3 py-1.5 text-xs bg-white/5 text-blue-200 rounded-lg hover:bg-white/10 border border-white/10"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveNotes}
+                        className="px-3 py-1.5 text-xs bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!editingNotes && playerNotes && (
+                  <div className="px-3 pb-3">
+                    <p className="text-xs text-blue-200/70 whitespace-pre-wrap line-clamp-2">
+                      {playerNotes}
+                    </p>
+                  </div>
+                )}
+              </div>
+                  </div>
                 </div>
 
                 <div

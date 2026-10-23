@@ -510,18 +510,18 @@ export default function DiceThrowModal({
   // unmounting keeps the canvas attached and its measured size stable.
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm ${
+      className={`fixed inset-0 z-50 flex flex-col bg-ys-bg/85 backdrop-blur-sm ${
         request ? "" : "invisible pointer-events-none"
       }`}
       aria-hidden={!request}
     >
       {/* Header */}
       {request && (
-        <div className="px-5 pt-5 pb-4 bg-linear-to-b from-blue-950 to-transparent text-center pointer-events-none">
-          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-linear-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-950/50">
-            <DynamicIcon name="Dices" className="w-6 h-6 text-white" />
+        <div className="px-5 pt-5 pb-4 bg-linear-to-b from-ys-bg to-transparent text-center pointer-events-none">
+          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-ys-text text-ys-bg flex items-center justify-center shadow-lg shadow-black/30">
+            <DynamicIcon name="Dices" className="w-6 h-6" />
           </div>
-          <p className="text-sm text-blue-100 max-w-sm mx-auto">
+          <p className="text-sm text-ys-text max-w-sm mx-auto">
             {request.reason}
           </p>
           {/* One chip per pool, tinted to match that pool's dice in the tray,
@@ -531,7 +531,7 @@ export default function DiceThrowModal({
             {request.groups.map((group, i) => (
               <span
                 key={`${group.count}d${group.sides}-${i}`}
-                className="px-3 py-1.5 rounded-lg border font-mono font-semibold text-white/95"
+                className="px-3 py-1.5 rounded-lg border font-mono font-semibold text-ys-text"
                 style={{
                   backgroundColor: `${colors[i]}33`,
                   borderColor: `${colors[i]}99`,
@@ -580,12 +580,12 @@ export default function DiceThrowModal({
           }
         `}</style>
         {request && phase === "loading" && (
-          <div className="absolute inset-0 flex items-center justify-center text-blue-200/70 text-sm">
+          <div className="absolute inset-0 flex items-center justify-center text-ys-muted text-sm">
             Loading dice...
           </div>
         )}
         {request && (phase === "ready" || phase === "held") && (
-          <div className="absolute inset-x-0 bottom-6 text-center text-blue-200/60 text-sm pointer-events-none px-6">
+          <div className="absolute inset-x-0 bottom-6 text-center text-ys-muted text-sm pointer-events-none px-6">
             {phase === "ready"
               ? "Press anywhere to pick up the dice"
               : "Let go to throw - the faster you flick, the harder they land"}
@@ -595,13 +595,13 @@ export default function DiceThrowModal({
 
       {/* Footer */}
       {request && (
-        <div className="px-5 pb-5 pt-3 bg-linear-to-t from-blue-950 to-transparent">
+        <div className="px-5 pb-5 pt-3 bg-linear-to-t from-ys-bg to-transparent">
           {phase === "settled" && settledFaces && (
             <div className="text-center mb-3 flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
               {settledFaces.map((faces, i) => (
                 <span
                   key={i}
-                  className="text-white font-bold text-lg"
+                  className="text-ys-text font-bold text-lg"
                   // Each pool keeps its own bracket - the whole point of
                   // separate pools is that their numbers don't merge - and its
                   // own colour, matching the dice it came from.
@@ -622,7 +622,7 @@ export default function DiceThrowModal({
           {phase === "settled" ? (
             <button
               onClick={confirm}
-              className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white font-semibold transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-ys-text text-ys-bg hover:opacity-90 active:scale-[0.99] font-semibold transition-all flex items-center justify-center gap-2"
             >
               <DynamicIcon name="Check" className="w-4 h-4" />
               Continue
@@ -630,7 +630,7 @@ export default function DiceThrowModal({
           ) : (
             <button
               onClick={() => onResolve(null)}
-              className="w-full py-2 text-xs text-blue-300/50 hover:text-blue-200 transition-colors"
+              className="w-full py-2 text-xs text-ys-muted hover:text-ys-text transition-colors"
             >
               Skip - let the GM roll for me
             </button>

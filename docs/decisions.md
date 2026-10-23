@@ -179,6 +179,21 @@ design's open questions.
 | 107 | Build the token-savings plan | **Approved** (2026-10-22, to the coordinating session: "Approved. Also pull from origin and do the token saving + default system plans."). `token-savings-implementation-plan.md` is built in three PRs, T1 (slices 1-4) first; each merge still waits for the author (decision 5). |
 | 110 | How the cap shortens always-loaded notes ("When always-loaded notes go over the 10k budget, the cap keeps the start of each note (decision 96). But the campaign plan grows at the end, so its current beat is the part that gets cut. How should the cap shorten notes?") | **Keep the current beat.** Every note keeps its start; the campaign plan also keeps its last `## Current beat` section whole, after the kept front and the pointer. Revises how decision 96 shortens the plan. |
 
+### Interview — the story screen (2026-10-22)
+
+The author showed two phone screenshots of OOC, another AI story app, and said
+"Let's work on the game UI. I like how simple OOC is." The design is
+[`story-screen-design.md`](story-screen-design.md).
+
+| # | question | decision |
+|---|---|---|
+| 112 | "Which parts of OOC's story screen do you want in ours?" (multiple choice) | **All four: "Plain prose page", "One slim header", "Quiet colours", "Composer with mode buttons."** No GM card around each turn, and the prose is in a book serif with pictures full width. The header is one row (back, title, menu), and the tab bar and title strip go into the menu. Near-black and white, with the accent kept for what needs attention. One input bar with a few small buttons. |
+| 113 | "Should a quality or model picker sit in the header, like OOC's 'Superb'?" | **"No, keep it in Settings (Recommended)."** The tiers switch by themselves each turn (decision 50), so a single picker would mislead. |
+| 114 | "Who is this mainly for: the phone, the desktop app, or both equally?" | **"Phone first (Recommended)."** Designed at 375 px; the desktop app uses the same layout in a centred reading column. |
+| 115 | "Which buttons should sit next to our input bar?" (multiple choice) and "Where do a turn's actions go (regenerate, edit, illustrate, read aloud)?" | **"Talk to the GM (OOC)" and "Microphone"**, and **"Tap the last turn to show them (Recommended)."** The OOC button sends the message in (round brackets), which the GM prompt already treats as out of character. The microphone replaces the floating solo mic bubble. "Suggest actions" and "Continue" were not chosen. Retry, Undo, Edit, Illustrate and Read aloud show when the latest turn is tapped, and earlier turns offer Edit only. |
+| 116 | The design handed over (2026-10-23), with its §8 list of calls made without asking | **"Okay go on with the plan."** The design is approved as written, its seven §8 calls included: the GM's working folds into one line, the player's action stays as a muted line, Ink is the default for new players only, couch co-op keeps its bubbles, the other pages keep their look, `ChoicesModal` is left alone, and earlier turns get Edit only if the edit handler copes. The implementation plan is [`story-screen-plan.md`](story-screen-plan.md). |
+| 117 | The implementation plan, after Codex's review (2026-10-23), including its call 7 (a spoken solo turn lands in the input to be read and sent) | **"Go."** Built as planned, on `claude/story-screen`. |
+
 ### Interview — picture quality (2026-10-22)
 
 The author tried Illustrate this on the phone and was "not very happy with the

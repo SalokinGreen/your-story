@@ -12,6 +12,38 @@ interface ChapterNavProps {
 }
 
 /**
+ * The chapter entries themselves, themed with the story screen's tokens.
+ * Shared by the ChapterNav dropdown and the story menu's Chapters row, which
+ * renders it inline. Renders nothing until there are at least 2 chapters.
+ */
+export function ChapterList({ parts, currentIndex, onJump }: ChapterNavProps) {
+  const segments = computeChapterSegments(parts);
+  if (segments.length < 2) return null;
+  const viewedIndex = currentIndex ?? parts.length - 1;
+  const currentChapter =
+    [...segments].reverse().find((s) => s.startIndex <= viewedIndex) ??
+    segments[0];
+  return (
+    <>
+      {segments.map((segment) => (
+        <button
+          key={segment.number}
+          onClick={() => onJump(segment.startIndex)}
+          className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-ys-border ${
+            segment.number === currentChapter.number
+              ? "bg-ys-border text-ys-text"
+              : "text-ys-muted"
+          }`}
+        >
+          <div className="font-medium">Chapter {segment.number}</div>
+          <div className="text-xs text-ys-muted truncate">{segment.preview}</div>
+        </button>
+      ))}
+    </>
+  );
+}
+
+/**
  * Compact "jump to chapter" dropdown, computed from ScenePart.endChapter
  * markers. Hidden entirely until there are at least 2 chapters - a single
  * ongoing chapter has nothing to navigate between.
@@ -55,26 +87,15 @@ export function ChapterNav({ parts, currentIndex, onJump }: ChapterNavProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-20 w-64 max-h-80 overflow-y-auto rounded-lg border border-blue-800/40 bg-gray-900 shadow-xl py-1">
-          {segments.map((segment) => (
-            <button
-              key={segment.number}
-              onClick={() => {
-                onJump(segment.startIndex);
-                setOpen(false);
-              }}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-blue-800/40 ${
-                segment.number === currentChapter.number
-                  ? "bg-blue-800/30 text-white"
-                  : "text-blue-200/80"
-              }`}
-            >
-              <div className="font-medium">Chapter {segment.number}</div>
-              <div className="text-xs text-blue-300/50 truncate">
-                {segment.preview}
-              </div>
-            </button>
-          ))}
+        <div className="absolute right-0 top-full mt-1 z-20 w-64 max-h-80 overflow-y-auto rounded-lg border border-ys-border bg-ys-surface shadow-xl py-1">
+          <ChapterList
+            parts={parts}
+            currentIndex={currentIndex}
+            onJump={(index) => {
+              onJump(index);
+              setOpen(false);
+            }}
+          />
         </div>
       )}
     </div>

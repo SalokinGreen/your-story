@@ -1,71 +1,53 @@
 "use client";
+import { DEFAULT_READING_FONT, DEFAULT_THEME_ID } from "./themeTokens";
 import {
   Choice,
   Choices,
   StoryData,
   CouchPlayer,
   SceneImageRef,
+  ScenePart,
 } from "../misc/structs";
 import React, { useState, useEffect, useRef } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import TTSControls, { TTSRelayHandle } from "../components/TTSControls";
-import StoryImage from "../components/StoryImage";
+import TTSControls, {
+  isTTSEnabled,
+  type TTSControlHandle,
+  type TTSRelayHandle,
+} from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
-import SyncIndicator from "../components/SyncIndicator";
-import NetStatusBadge from "../components/NetStatusBadge";
 import type {
-  GuestJoinedInfo,
   NetSessionInfo,
   TurnStatus,
 } from "../misc/multiplayer/session";
 import TurnLobbyOverlay from "../components/TurnLobbyOverlay";
-import PlayerBubbles from "../components/PlayerBubbles";
+import PlayerBubbles, { RecordingOverlay } from "../components/PlayerBubbles";
+import {
+  isSttEnabled,
+  useVoiceRecorder,
+} from "../components/useVoiceRecorder";
+import { appendTranscript, stillVoice } from "./composerDraft";
+import { wrapOutOfCharacter } from "./playerLine";
 import PartyTableStrip from "../components/PartyTableStrip";
 import type { PartyTable } from "../misc/party/partyRuntime";
 import CombatDisplay from "../components/CombatDisplay";
-import { ChapterNav } from "../components/ChapterNav";
-import { ObjectivesStrip } from "../components/ObjectivesStrip";
-import type { SyncStatus } from "../misc/localStoryManager";
+import { type TimelineBlock } from "../misc/turnTimeline";
 import {
-  type TimelineBlock,
-  buildSavedTimeline,
-  narrationCameFromGMStage,
-  extractVisibleText,
-} from "../misc/turnTimeline";
-import { getToolProgressLabel } from "../misc/gmToolLabels";
-import {
-  type MentionMatcher,
   buildMentionCandidates,
   buildMentionMatcher,
-  splitTextWithMentions,
 } from "../misc/noteMentions";
+import {
+  GMTurn,
+  PlayerLine,
+  TurnActions,
+  type ReasoningTierDisplay,
+} from "./StoryTurn";
 import { canObserverTriggerReset } from "../misc/observer";
 import {
   getObserverSettings,
   LAYER_SETTINGS_CHANGED_EVENT,
 } from "../misc/layerSettings";
-import {
-  type ResolvedTier,
-  getTierModelDisplayName,
-} from "../misc/reasoningTiers";
-
-// Display-only shape for the reasoning-tier badge next to "Game Master" -
-// covers both a saved ScenePart's stored fields and a live in-progress
-// ResolvedTier (see generation.ts:onReasoningTierResolved).
-interface ReasoningTierDisplay {
-  tier: number;
-  modelKey: string;
-  effort: string;
-}
-
-// Solo play has no CouchPlayer of its own (see structs.ts) - this stands in
-// for PlayerBubbles' `players` prop so voice input still gets a bubble
-// outside of couch co-op/multiplayer.
-const SOLO_VOICE_PLAYER: CouchPlayer[] = [
-  { id: "solo", name: "You", color: "#8b5cf6" },
-];
+import { type ResolvedTier } from "../misc/reasoningTiers";
 
 interface StoryProps {
   storyData: StoryData;
@@ -98,7 +80,6 @@ interface StoryProps {
   remoteActivity?: Record<string, "recording" | "processing" | "idle">;
   onLocalActivity?: (state: "recording" | "processing" | "idle") => void;
   netSession?: NetSessionInfo | null;
-  netPeers?: GuestJoinedInfo[];
   // Party-voice floor (talking stick), networked play only. When set, voice
   // bubbles obey the host-authoritative floor instead of couch-local state.
   floorHolderId?: string | null;
@@ -120,13 +101,13 @@ interface StoryProps {
   canUndo?: boolean;
   onStop?: () => void;
   onEdit?: (rawText: string, partIndex: number) => void;
-  viewingPartIndex?: number | null;
   onNavigateLeft?: () => void;
   onNavigateRight?: () => void;
-  onNavigateToIndex?: (index: number) => void;
+  // True while the story menu, the OOC panel or a play modal is open: the
+  // window shortcuts below then do nothing, so Enter/Space/Ctrl+Z/Ctrl+R
+  // do not act on the story behind them.
+  shortcutsSuspended?: boolean;
   onResetToCurrentPart?: () => void;
-  syncStatus?: SyncStatus;
-  onOpenJournal?: () => void;
   // Opens the Notes or NPC page pre-selected on the given entry, e.g. when
   // the player clicks a highlighted name/note title in the story prose.
   onOpenNote?: (kind: "lore" | "npc", id: string) => void;
@@ -144,7 +125,7 @@ interface StoryProps {
   liveNarrationText?: string;
   // Live reasoning-tier indicator for the turn currently generating - see
   // generation.ts:onReasoningTierResolved. Rendered as a small "T{n}" badge
-  // next to "Game Master" alongside the saved per-turn badge below.
+  // at the end of the turn's work line, like the saved per-turn badge.
   liveReasoningTier?: ResolvedTier | null;
   // Re-measure the page's keyboard-aware viewport height (see page.tsx) -
   // called on composer focus/blur since iOS can scroll/resize the visual
@@ -173,373 +154,27 @@ interface StoryProps {
   onRegenerateImage?: (partIndex: number, ref: SceneImageRef) => void;
 }
 
-// Font settings interface
-interface FontSettings {
-  fontSize: number;
-  fontFamily: string;
-  lineHeight: number;
-  paragraphSpacing: number;
-  theme?: string;
-  themeColors?: {
-    background: string;
-    text: string;
-    accent: string;
-  };
-}
-
-// A single minimized, expandable thinking/tool row - click to see the full
-// text or tool result. Modeled on how Claude's own UI shows thinking and
-// tool-use blocks: collapsed by default, inline with the reply, not
-// gated behind one all-or-nothing toggle.
-function TimelineEntryPill({ block }: { block: TimelineBlock }) {
-  // A thinking block streams its reasoning live and expanded (Claude-style)
-  // while it's generating, then collapses back to a compact pill once it's
-  // done - unless the player has explicitly toggled it, in which case their
-  // choice wins. `override === null` means "follow the streaming state".
-  const [override, setOverride] = React.useState<boolean | null>(null);
-  if (block.kind === "text") return null; // handled by the caller directly
-  // A roll made behind the GM's screen. Not rendered at all - not even as a
-  // collapsed pill, since the pill itself would tell the player the GM
-  // rolled for something.
-  if (block.hidden) return null;
-
-  const isTool = block.kind === "tool";
-  const isThinking = block.kind === "thinking";
-  const autoExpanded = isThinking && !!block.streaming;
-  const expanded = override ?? autoExpanded;
-
-  const label = isTool
-    ? getToolProgressLabel(block.toolName || "")
-    : block.streaming
-      ? "Thinking"
-      : block.isReasoning
-        ? "Thought"
-        : "Thinking";
-  const detail = isTool ? block.contextForStory : block.content;
-  const canExpand = !!detail;
-
-  return (
-    <div className="my-1 text-xs">
-      <button
-        type="button"
-        onClick={() => canExpand && setOverride(!expanded)}
-        className={`flex items-center gap-1.5 text-gray-400 ${
-          canExpand ? "hover:text-gray-300 cursor-pointer" : "cursor-default"
-        } transition-colors`}
-      >
-        {isTool ? (
-          <DynamicIcon
-            name={block.success === false ? "X" : "Check"}
-            className={`w-3.5 h-3.5 shrink-0 ${
-              block.success === false ? "text-red-400" : "text-green-400"
-            }`}
-          />
-        ) : (
-          <DynamicIcon
-            name="Brain"
-            className={`w-3.5 h-3.5 shrink-0 ${block.streaming ? "animate-pulse text-blue-400" : ""}`}
-          />
-        )}
-        <span>
-          {label}
-          {block.streaming ? "…" : ""}
-        </span>
-        {canExpand && (
-          <DynamicIcon
-            name={expanded ? "ChevronUp" : "ChevronDown"}
-            className="w-3 h-3 text-gray-500"
-          />
-        )}
-      </button>
-      {expanded && detail && (
-        <p className="mt-1 ml-5 pl-2 border-l-2 border-gray-700/50 text-gray-500 italic whitespace-pre-wrap max-h-60 overflow-y-auto">
-          {detail}
-          {block.streaming && (
-            <span className="animate-pulse text-blue-400">▌</span>
-          )}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// Renders a turn's timeline in reading order - thinking/tool blocks as
-// minimized pills, text blocks as normal flowing prose.
-function TimelineView({
-  blocks,
-  animate,
-  showHiddenMessages,
-  fontSettings,
-  mentionMatcher,
-  onMentionClick,
-}: {
-  blocks: TimelineBlock[];
-  animate: boolean;
-  showHiddenMessages: boolean;
-  fontSettings?: FontSettings;
-  mentionMatcher?: MentionMatcher | null;
-  onMentionClick?: (kind: "lore" | "npc", id: string) => void;
-}) {
-  return (
-    <>
-      {blocks.map((block) =>
-        block.kind === "text" ? (
-          <React.Fragment key={block.id}>
-            {prettify(
-              block.content || "",
-              animate,
-              showHiddenMessages,
-              fontSettings,
-              mentionMatcher,
-              onMentionClick,
-            )}
-            {block.streaming && (
-              <span className="animate-pulse text-blue-400">▌</span>
-            )}
-          </React.Fragment>
-        ) : (
-          <TimelineEntryPill key={block.id} block={block} />
-        ),
-      )}
-    </>
-  );
-}
-
-// Chat message bubble component
-interface ChatMessageProps {
-  isUser: boolean;
-  content: string;
-  displayName: string;
-  avatarUrl?: string;
-  isPrevious?: boolean;
-  isLoading?: boolean;
-  showHiddenMessages?: boolean;
-  fontSettings?: FontSettings;
-  messageType?: "normal" | "comment";
-  // Saved GM conversation for a historical turn - used to rebuild its
-  // timeline (see turnTimeline.ts:buildSavedTimeline)
-  gmConversation?: Array<{
-    role: "assistant" | "tool";
-    content: string;
-    reasoning?: string;
-    tool_calls?: Array<{
-      id: string;
-      function: { name: string; arguments: string };
-    }>;
-    tool_call_id?: string;
-  }>;
-  // Tool results lookup (keyed by tool_call_id)
-  toolResults?: Map<
-    string,
-    { success: boolean; contextForStory: string; toolName: string }
-  >;
-  // The story stage's own native reasoning (ScenePart.reasoning) - see
-  // turnTimeline.ts:buildSavedTimeline
-  storyReasoning?: string;
-  // Reasoning tier that adjudicated this turn (see reasoningTiers.ts) -
-  // rendered as a small "T{n}" badge next to displayName. Undefined for
-  // turns generated before this was tracked, and for the player's own
-  // messages (isUser).
-  reasoningTier?: ReasoningTierDisplay;
-  // Live timeline for the turn currently generating - undefined for
-  // historical messages (which rebuild their timeline from gmConversation).
-  liveTimeline?: TimelineBlock[];
-  isStreaming?: boolean;
-  mentionMatcher?: MentionMatcher | null;
-  onMentionClick?: (kind: "lore" | "npc", id: string) => void;
-  // Pictures made for this turn (ScenePart.images), shown under its prose.
-  images?: SceneImageRef[];
-  // True on an online guest, who holds no pictures (decision 60).
-  isGuest?: boolean;
-  onRegenerateImage?: (ref: SceneImageRef) => void;
-}
-
-function ChatMessage({
-  isUser,
-  content,
-  displayName,
-  avatarUrl,
-  isPrevious = false,
-  isLoading = false,
-  showHiddenMessages = false,
-  fontSettings,
-  messageType = "normal",
-  gmConversation,
-  toolResults,
-  storyReasoning,
-  reasoningTier,
-  liveTimeline,
-  isStreaming = false,
-  mentionMatcher,
-  onMentionClick,
-  images,
-  isGuest = false,
-  onRegenerateImage,
-}: ChatMessageProps) {
-  const opacity = isPrevious ? "opacity-50" : "opacity-100";
-  const isComment = messageType === "comment";
-
-  // Always stack vertically: avatar + name row at top, content below
-  const rowAlign = isUser ? "justify-end" : "justify-start";
-
-  // On the common path the GM stage narrates the story itself, so its
-  // visible (non-<thinking>) segments ARE `content` - rebuilding the
-  // timeline can extract them inline, interleaved with that round's tool
-  // calls, instead of showing "thinking" first and the narration
-  // separately afterward.
-  const narrationInline = React.useMemo(
-    () =>
-      !isUser && gmConversation
-        ? narrationCameFromGMStage(gmConversation, content)
-        : false,
-    [isUser, gmConversation, content],
-  );
-  const savedTimeline = React.useMemo(
-    () =>
-      !isUser && (gmConversation || storyReasoning)
-        ? buildSavedTimeline(
-            gmConversation,
-            toolResults,
-            narrationInline,
-            storyReasoning,
-          )
-        : [],
-    [isUser, gmConversation, toolResults, narrationInline, storyReasoning],
-  );
-
-  const isLive = !isUser && liveTimeline !== undefined;
-  const timeline = isLive ? liveTimeline! : savedTimeline;
-  // The separate story-stage path (GM stage didn't narrate anything
-  // itself) still needs `content` rendered on its own, after the timeline.
-  const showSeparateContent = !isUser && !isLive && !narrationInline;
-
-  const showBox =
-    isUser ||
-    timeline.length > 0 ||
-    !!content ||
-    isLoading ||
-    !isStreaming;
-
-  return (
-    <div
-      className={`flex flex-col gap-1 ${opacity} transition-opacity duration-300`}
-    >
-      {/* Avatar + Name row */}
-      <div className={`flex items-center gap-2 ${rowAlign}`}>
-        {isUser ? (
-          avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={displayName}
-              className="w-6 h-6 rounded-full object-cover border-2 border-blue-400/30"
-            />
-          ) : (
-            <div className="w-6 h-6 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center border-2 border-blue-400/30">
-              <DynamicIcon name="User" className="w-3 h-3 text-white" />
-            </div>
-          )
-        ) : (
-          <div className="w-6 h-6 rounded-full bg-linear-to-br from-purple-500 to-pink-600 flex items-center justify-center border-2 border-purple-400/30 shadow-[0_0_8px_rgba(147,51,234,0.5)]">
-            <DynamicIcon name="Sparkles" className="w-3 h-3 text-white" />
-          </div>
-        )}
-        <span
-          className={`text-xs font-semibold ${
-            isUser ? "text-blue-300" : "text-purple-300"
-          }`}
-        >
-          {displayName}
-        </span>
-        {!isUser && reasoningTier && (
-          <span
-            className="text-[10px] font-mono text-purple-300/60 border border-purple-400/20 rounded px-1 leading-tight cursor-default"
-            title={`${getTierModelDisplayName(reasoningTier.modelKey)} · ${reasoningTier.effort} effort`}
-          >
-            T{reasoningTier.tier}
-          </span>
-        )}
-        {isUser && isComment && (
-          <span className="text-[10px] text-blue-300/50">comment</span>
-        )}
-      </div>
-
-      {/* Message Content */}
-      <div className="w-full">
-        {showBox && (
-          <div
-            className={`rounded-xl p-2 sm:p-3 backdrop-blur-md ${
-              isUser
-                ? isComment
-                  ? "bg-blue-500/[0.06] border border-blue-400/15"
-                  : "bg-blue-500/[0.08] border border-blue-400/20"
-                : "bg-purple-500/[0.06] border border-purple-400/15"
-            }`}
-          >
-            {isLoading && timeline.length === 0 && !content ? (
-              <div className="flex items-center gap-2 text-purple-200/60">
-                <div className="w-4 h-4 border-2 border-purple-400/60 border-t-purple-300 rounded-full animate-spin" />
-                <span>Thinking...</span>
-              </div>
-            ) : isUser ? (
-              <p
-                className={`whitespace-pre-wrap ${
-                  isComment ? "text-blue-100/80 italic" : "text-blue-100"
-                }`}
-              >
-                {content}
-              </p>
-            ) : (
-              <>
-                <TimelineView
-                  blocks={timeline}
-                  animate={!isPrevious}
-                  showHiddenMessages={showHiddenMessages}
-                  fontSettings={fontSettings}
-                  mentionMatcher={mentionMatcher}
-                  onMentionClick={onMentionClick}
-                />
-                {showSeparateContent &&
-                  prettify(
-                    content,
-                    !isPrevious,
-                    showHiddenMessages,
-                    fontSettings,
-                    mentionMatcher,
-                    onMentionClick,
-                  )}
-                {images?.map((ref) => (
-                  <StoryImage
-                    key={ref.imageId}
-                    imageId={ref.imageId}
-                    isGuest={isGuest}
-                    onRegenerate={
-                      onRegenerateImage ? () => onRegenerateImage(ref) : undefined
-                    }
-                  />
-                ))}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 interface StoryComposerProps {
   choices: Choices;
   loading: boolean;
   loadingStage?: "gm" | "story" | "choices" | null;
   couchPlayers: CouchPlayer[];
+  // Party mode's table is open: phones are the input, and there is no mic here.
+  partyTableOpen?: boolean;
   onCustomInput?: StoryProps["onCustomInput"];
   onActionConfirm?: StoryProps["onActionConfirm"];
   onStop?: () => void;
   onFocusChange?: () => void;
 }
 
-// The chat input row - suggested-choice chips, couch co-op player switcher,
-// textarea, send/stop button - split out of Story so a keystroke only
-// re-renders this small subtree instead of the entire chat history above it.
+// Solo play has no CouchPlayer of its own (see structs.ts); the composer's mic
+// records as this stand-in, in the accent colour.
+const SOLO_RECORDER = { id: "solo", name: "You", color: "var(--ys-accent)" };
+
+// The chat input - suggested-choice chips, couch co-op player switcher, and one
+// bar holding the textarea, the out-of-character toggle, the mic (solo play)
+// and send/stop - split out of Story so a keystroke only re-renders this small
+// subtree instead of the entire chat history above it.
 const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
   function StoryComposer(
     {
@@ -547,6 +182,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       loading,
       loadingStage,
       couchPlayers,
+      partyTableOpen = false,
       onCustomInput,
       onActionConfirm,
       onStop,
@@ -556,6 +192,12 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
   ) {
     const [composerText, setComposerText] = React.useState("");
     const [composerBusy, setComposerBusy] = React.useState(false);
+    // Talk to the GM out of character: the next send is wrapped in ( ), then
+    // the toggle switches itself off.
+    const [ooc, setOoc] = React.useState(false);
+    // The draft holds text from the mic, so it goes out as voice input (the GM
+    // is told it may contain transcription errors). Typing from scratch doesn't.
+    const [draftIsVoice, setDraftIsVoice] = React.useState(false);
     const composerRef = useRef<HTMLTextAreaElement>(null);
     React.useImperativeHandle(
       forwardedRef,
@@ -578,14 +220,47 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       el.style.height = Math.min(el.scrollHeight, 140) + "px";
     };
 
+    // A transcript lands in the draft to be read, edited and sent with the
+    // arrow; it is never sent by itself.
+    const handleTranscript = React.useCallback(
+      (_owner: typeof SOLO_RECORDER, text: string) => {
+        setComposerText((prev) => appendTranscript(prev, text));
+        setDraftIsVoice(true);
+      },
+      [],
+    );
+    const recorder = useVoiceRecorder<typeof SOLO_RECORDER>({
+      onTranscript: handleTranscript,
+    });
+    const recording = recorder.activeOwnerId !== null;
+    const transcribing = recorder.processingIds.size > 0;
+
+    // The draft can grow from the mic as well as from typing. The textarea is
+    // not mounted while recording, so the height is measured when it returns.
+    React.useEffect(() => {
+      const el = composerRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 140) + "px";
+    }, [composerText, recording]);
+
+    // The mic is for solo play: couch co-op and online play keep the per-player
+    // bubbles, and party mode's players speak from their phones.
+    const showMic =
+      couchPlayers.length === 0 && !partyTableOpen && isSttEnabled();
+
     // Shared freeform submit path: submit the action as a plain Choice - the
     // GM stage determines mechanics (skill checks, items, tables) during
     // generation, so no client-side analysis step happens here.
-    const submitFreeformAction = (text: string) => {
+    const submitFreeformAction = (text: string, isVoice: boolean) => {
       const trimmed = text.trim();
       if (!trimmed) return;
 
-      if (onActionConfirm) {
+      // Only onCustomInput carries the voice kind, so a voice draft takes it
+      // even where typed text goes through onActionConfirm.
+      if (isVoice && onCustomInput) {
+        onCustomInput(trimmed, undefined, undefined, "voice");
+      } else if (onActionConfirm) {
         onActionConfirm({ text: trimmed });
       } else if (onCustomInput) {
         onCustomInput(trimmed);
@@ -593,10 +268,14 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
     };
 
     const handleComposerSubmit = async () => {
-      const text = composerText.trim();
-      if (!text || loading || loadingStage || composerBusy) return;
+      const typed = composerText.trim();
+      if (!typed || loading || loadingStage || composerBusy || recording) return;
 
+      const text = ooc ? wrapOutOfCharacter(typed) : typed;
+      const isVoice = draftIsVoice;
       setComposerText("");
+      setOoc(false);
+      setDraftIsVoice(false);
       if (composerRef.current) composerRef.current.style.height = "auto";
 
       setComposerBusy(true);
@@ -614,7 +293,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
           return;
         }
 
-        await submitFreeformAction(text);
+        await submitFreeformAction(text, isVoice);
       } finally {
         setComposerBusy(false);
       }
@@ -622,6 +301,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
 
     // Tapping a suggested-choice chip submits that choice directly (mechanics
     // like skill checks and intro overrides ride along on the Choice object).
+    // Never wrapped as out-of-character.
     const handleChipSelect = (choice: Choice) => {
       if (loading || loadingStage || composerBusy) return;
       if (onActionConfirm) {
@@ -636,6 +316,8 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       onFocusChange?.();
       window.setTimeout(() => onFocusChange?.(), 300);
     };
+
+    const generating = loading || !!loadingStage;
 
     return (
       <div
@@ -652,7 +334,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
                   key={`chip-${i}-${choice.text}`}
                   onClick={() => handleChipSelect(choice)}
                   disabled={composerBusy}
-                  className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-400/20 hover:border-purple-400/40 text-purple-100/90 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
+                  className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full border border-ys-border text-ys-text hover:bg-ys-text/10 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
                   title={choice.text}
                 >
                   {choice.text}
@@ -663,7 +345,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
 
         {/* Couch co-op: switch who's speaking */}
         {couchPlayers.length > 1 && (
-          <div className="flex items-center gap-1 p-1 bg-black/25 border border-white/10 rounded-full overflow-x-auto scrollbar-hide w-fit max-w-full">
+          <div className="flex items-center gap-1 p-1 bg-ys-surface border border-ys-border rounded-full overflow-x-auto scrollbar-hide w-fit max-w-full">
             {couchPlayers.map((player) => {
               const isActive = activeSpeaker?.id === player.id;
               return (
@@ -673,7 +355,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation ${
                     isActive
                       ? "text-white shadow-md"
-                      : "text-blue-200/60 hover:text-white"
+                      : "text-ys-muted hover:text-ys-text"
                   }`}
                   style={
                     isActive
@@ -701,83 +383,197 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
           </div>
         )}
 
-        {/* Input row - full width; voice input is the always-on bubble
-            (see PlayerBubbles below) instead of a mic button here. */}
-        <div className="flex items-end gap-2">
-          <div className="relative flex-1">
-            <textarea
-              ref={composerRef}
-              value={composerText}
-              onChange={(e) => {
-                setComposerText(e.target.value);
-                autoGrowComposer();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleComposerSubmit();
-                }
-              }}
-              onFocus={handleFocusChange}
-              onBlur={handleFocusChange}
-              rows={1}
-              placeholder={
-                loading || loadingStage
-                  ? loadingStage === "gm"
-                    ? "GM is thinking..."
-                    : loadingStage === "choices"
-                      ? "Preparing choices..."
-                      : "Writing the story..."
-                  : couchPlayers.length > 1 && activeSpeaker
-                    ? `What does ${activeSpeaker.name} do?`
-                    : "What do you do?"
-              }
-              className="w-full resize-none pl-4 pr-12 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/40 text-base leading-snug transition-colors"
-              style={
-                couchPlayers.length > 1 && activeSpeaker
-                  ? { borderColor: `${activeSpeaker.color}66` }
-                  : undefined
-              }
+        {/* One bar: [ textarea | ( ) | mic | send ]. While recording, the
+            recording bar takes the textarea's place. */}
+        <div
+          className={`flex items-end gap-1 rounded-3xl bg-ys-surface border border-ys-border pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-ys-muted ${
+            ooc ? "ring-1 ring-ys-accent" : ""
+          }`}
+          style={
+            couchPlayers.length > 1 && activeSpeaker
+              ? { borderColor: `${activeSpeaker.color}66` }
+              : undefined
+          }
+        >
+          {recording ? (
+            <RecordingOverlay
+              placement="inline"
+              player={SOLO_RECORDER}
+              analyserRef={recorder.analyserRef}
+              onCancel={recorder.cancelRecording}
+              onConfirm={recorder.stopRecording}
             />
+          ) : (
+            <>
+              <textarea
+                ref={composerRef}
+                value={composerText}
+                onChange={(e) => {
+                  setComposerText(e.target.value);
+                  setDraftIsVoice((v) => stillVoice(v, e.target.value));
+                  autoGrowComposer();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleComposerSubmit();
+                  }
+                }}
+                onFocus={handleFocusChange}
+                onBlur={handleFocusChange}
+                rows={1}
+                placeholder={
+                  generating
+                    ? loadingStage === "gm"
+                      ? "GM is thinking..."
+                      : loadingStage === "choices"
+                        ? "Preparing choices..."
+                        : "Writing the story..."
+                    : ooc
+                      ? "Talk to the GM…"
+                      : couchPlayers.length > 1 && activeSpeaker
+                        ? `What does ${activeSpeaker.name} do?`
+                        : "What do you do?"
+                }
+                className="flex-1 min-w-0 resize-none bg-transparent py-1.5 text-ys-text placeholder:text-ys-muted focus:outline-none text-base leading-snug"
+              />
 
-            {/* Send / Stop button, embedded like other chat UIs */}
-            {loading || loadingStage ? (
               <button
-                onClick={onStop}
-                className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full bg-red-500/15 hover:bg-red-500/30 border border-red-400/40 flex items-center justify-center transition-colors touch-manipulation"
-                title="Stop generating"
+                type="button"
+                onClick={() => setOoc((v) => !v)}
+                aria-pressed={ooc}
+                title="Talk to the GM out of character"
+                className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-colors touch-manipulation ${
+                  ooc
+                    ? "bg-ys-accent/20 text-ys-accent"
+                    : "text-ys-muted hover:text-ys-text"
+                }`}
               >
-                <span className="relative flex items-center justify-center">
-                  <span className="absolute w-7 h-7 border-2 border-red-400/30 border-t-red-300 rounded-full animate-spin" />
-                  <DynamicIcon
-                    name="Square"
-                    className="w-3 h-3 text-red-300 fill-current"
-                  />
-                </span>
+                ( )
               </button>
-            ) : (
-              <button
-                onClick={handleComposerSubmit}
-                disabled={!composerText.trim() || composerBusy}
-                className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full flex items-center justify-center transition-all bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 disabled:opacity-40 shadow-md shadow-purple-950/40 touch-manipulation"
-                title="Send"
-              >
-                {composerBusy ? (
-                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <DynamicIcon
-                    name="ArrowUp"
-                    className="w-4 h-4 text-white"
-                  />
-                )}
-              </button>
-            )}
-          </div>
+
+              {showMic && (
+                <button
+                  type="button"
+                  onClick={() => recorder.beginRecording(SOLO_RECORDER)}
+                  disabled={generating || transcribing}
+                  title="Speak your action"
+                  aria-label="Speak your action"
+                  className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-ys-muted hover:text-ys-text transition-colors touch-manipulation disabled:opacity-40"
+                >
+                  {transcribing ? (
+                    <div className="w-4 h-4 border-2 border-ys-muted/40 border-t-ys-muted rounded-full animate-spin" />
+                  ) : (
+                    <DynamicIcon name="Mic" className="w-5 h-5" />
+                  )}
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Send / Stop: the same white circle */}
+          {generating ? (
+            <button
+              onClick={onStop}
+              className="shrink-0 w-9 h-9 rounded-full bg-ys-text text-ys-bg flex items-center justify-center transition-all active:scale-95 touch-manipulation"
+              title="Stop generating"
+              aria-label="Stop generating"
+            >
+              <span className="relative flex items-center justify-center">
+                <span className="absolute w-7 h-7 border-2 border-ys-bg/30 border-t-ys-bg rounded-full animate-spin" />
+                <DynamicIcon
+                  name="Square"
+                  className="w-3 h-3 fill-current"
+                />
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={handleComposerSubmit}
+              disabled={!composerText.trim() || composerBusy || recording}
+              className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all bg-ys-text text-ys-bg active:scale-95 disabled:opacity-40 touch-manipulation"
+              title="Send"
+              aria-label="Send"
+            >
+              {composerBusy ? (
+                <div className="w-4 h-4 border-2 border-ys-bg/40 border-t-ys-bg rounded-full animate-spin" />
+              ) : (
+                <DynamicIcon name="Play" className="w-4 h-4 fill-current" />
+              )}
+            </button>
+          )}
         </div>
       </div>
     );
   },
 );
+
+type GMPartData = {
+  gmConversation: NonNullable<ScenePart["gmConversation"]>;
+  toolResults: Map<
+    string,
+    {
+      success: boolean;
+      contextForStory: string;
+      toolName: string;
+      hiddenFromPlayer?: boolean;
+    }
+  >;
+  storyReasoning: string | undefined;
+  reasoningTier: ReasoningTierDisplay | undefined;
+};
+
+const EMPTY_GM_DATA: GMPartData = {
+  gmConversation: [],
+  toolResults: new Map(),
+  storyReasoning: undefined,
+  reasoningTier: undefined,
+};
+
+// A GM part's saved conversation, tool results and tier, in the shapes GMTurn
+// rebuilds its timeline from.
+function buildGMDataForPart(part: ScenePart): GMPartData {
+  // Build toolResults map from gmToolCalls (keyed by toolCallId). Rolls
+  // made behind the GM's screen keep their `hiddenFromPlayer` flag here so
+  // buildSavedTimeline can drop them - they're carried in, not filtered
+  // out, precisely so the timeline knows to skip the tool call rather than
+  // falling back to rendering its raw name.
+  const toolResults = new Map<
+    string,
+    {
+      success: boolean;
+      contextForStory: string;
+      toolName: string;
+      hiddenFromPlayer?: boolean;
+    }
+  >();
+  if (part.gmToolCalls) {
+    for (const tc of part.gmToolCalls) {
+      if (tc.toolCallId) {
+        toolResults.set(tc.toolCallId, {
+          success: tc.success,
+          contextForStory: tc.contextForStory || "",
+          toolName: tc.toolName || "",
+          hiddenFromPlayer: tc.hiddenFromPlayer,
+        });
+      }
+    }
+  }
+
+  return {
+    gmConversation: part.gmConversation || EMPTY_GM_DATA.gmConversation,
+    toolResults,
+    storyReasoning: part.reasoning,
+    reasoningTier:
+      part.reasoningTier !== undefined
+        ? ({
+            tier: part.reasoningTier,
+            modelKey: part.reasoningTierModelKey || "",
+            effort: part.reasoningTierEffort || "none",
+          } as ReasoningTierDisplay)
+        : undefined,
+  };
+}
 
 export default function Story({
   storyData,
@@ -800,13 +596,10 @@ export default function Story({
   canUndo,
   onStop,
   onEdit,
-  viewingPartIndex,
   onNavigateLeft,
   onNavigateRight,
-  onNavigateToIndex,
+  shortcutsSuspended,
   onResetToCurrentPart,
-  syncStatus,
-  onOpenJournal,
   onOpenNote,
   pendingUserChoice,
   liveGMEntries,
@@ -816,7 +609,6 @@ export default function Story({
   remoteActivity,
   onLocalActivity,
   netSession,
-  netPeers,
   floorHolderId,
   floorLockedOutIds,
   onFloorTake,
@@ -838,7 +630,22 @@ export default function Story({
   onRegenerateImage,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
-  const [editMode, setEditMode] = React.useState(false);
+  // The part being edited (any GM turn, not only the last), or null.
+  const [editingPart, setEditingPart] = React.useState<number | null>(null);
+  // The part whose actions row is open (tap a turn, or its "Turn actions"
+  // button), or null.
+  const [actionsFor, setActionsFor] = React.useState<number | null>(null);
+  // Read aloud presses the same button the player's idle control would.
+  const ttsControlRef = useRef<TTSControlHandle>(null);
+  const readAloud = React.useCallback(() => ttsControlRef.current?.play(), []);
+  // A new turn starting closes the row (adjusted during render, not in an
+  // effect: it follows the props that say a turn is running).
+  const turnRunning = !!loading || !!loadingStage;
+  const [wasTurnRunning, setWasTurnRunning] = React.useState(turnRunning);
+  if (turnRunning !== wasTurnRunning) {
+    setWasTurnRunning(turnRunning);
+    if (turnRunning) setActionsFor(null);
+  }
   const [editedText, setEditedText] = React.useState("");
   const [isHovering, setIsHovering] = React.useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -916,16 +723,10 @@ export default function Story({
   // Font settings state
   const [fontSettings, setFontSettings] = useState({
     fontSize: 16,
-    fontFamily:
-      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: DEFAULT_READING_FONT,
     lineHeight: 1.6,
     paragraphSpacing: 0.5,
-    theme: "default",
-    themeColors: {
-      background: "rgb(23, 37, 84)",
-      text: "rgb(239, 246, 255)",
-      accent: "rgb(59, 130, 246)",
-    },
+    theme: DEFAULT_THEME_ID,
   });
 
   // Load font settings from localStorage and listen for changes
@@ -933,35 +734,17 @@ export default function Story({
     if (typeof window === "undefined") return;
 
     const loadFontSettings = () => {
-      // Get theme colors from CSS variables or use defaults
-      const computedStyle = getComputedStyle(document.documentElement);
-      const bgColor =
-        computedStyle.getPropertyValue("--story-bg-color").trim() ||
-        "rgb(23, 37, 84)";
-      const textColor =
-        computedStyle.getPropertyValue("--story-text-color").trim() ||
-        "rgb(239, 246, 255)";
-      const accentColor =
-        computedStyle.getPropertyValue("--story-accent-color").trim() ||
-        "rgb(59, 130, 246)";
-
       setFontSettings({
         fontSize: parseInt(localStorage.getItem("storyFontSize") || "16", 10),
         fontFamily:
-          localStorage.getItem("storyFontFamily") ||
-          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          localStorage.getItem("storyFontFamily") || DEFAULT_READING_FONT,
         lineHeight: parseFloat(
           localStorage.getItem("storyLineHeight") || "1.6",
         ),
         paragraphSpacing: parseFloat(
           localStorage.getItem("storyParagraphSpacing") || "0.5",
         ),
-        theme: localStorage.getItem("storyTheme") || "default",
-        themeColors: {
-          background: bgColor,
-          text: textColor,
-          accent: accentColor,
-        },
+        theme: localStorage.getItem("storyTheme") || DEFAULT_THEME_ID,
       });
     };
 
@@ -983,6 +766,16 @@ export default function Story({
   const couchPlayers =
     (storyData.multiplayer?.enabled && storyData.multiplayer.couchPlayers) ||
     [];
+  // Whether the floating voice bubbles are on screen (couch co-op and online
+  // play only; solo play has the composer's mic). They hang over the
+  // bottom of the feed, so the feed gets room to scroll its last lines (and
+  // a just-opened turn-actions row) clear of them. They step aside while a
+  // turn is being edited, where they would sit on the text box.
+  const showVoiceBubbles =
+    couchPlayers.length > 0 &&
+    !!onCustomInput &&
+    !partyTable &&
+    editingPart === null;
 
   // Kept at this level (rather than inside StoryComposer) so the "Enter/Space
   // jumps into the composer" keyboard shortcut below can reach it.
@@ -990,6 +783,7 @@ export default function Story({
 
   // Keyboard shortcuts
   React.useEffect(() => {
+    if (shortcutsSuspended) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs/textareas
       if (
@@ -998,6 +792,11 @@ export default function Story({
       ) {
         return;
       }
+      // Enter/Space on a focused button (or link) presses it; it must not
+      // also jump to the composer. Ctrl+Z, Ctrl+R and the arrows still apply.
+      const onControl =
+        e.target instanceof Element &&
+        !!e.target.closest('button, a, [role="button"]');
 
       // Escape to close modal
       if (e.key === "Escape" && showChoicesModal) {
@@ -1010,7 +809,8 @@ export default function Story({
       if (
         (e.key === "Enter" || e.key === " ") &&
         !showChoicesModal &&
-        !editMode
+        !onControl &&
+        editingPart === null
       ) {
         e.preventDefault();
         composerRef.current?.focus();
@@ -1068,18 +868,14 @@ export default function Story({
     onUndo,
     canRetry,
     onRetry,
-    editMode,
+    editingPart,
     onNavigateLeft,
     onNavigateRight,
+    shortcutsSuspended,
   ]);
 
   // Get selected choice from input state
   const selectedChoice = choices?.choices.find((c) => input[c.text]) || null;
-
-  // Get display name and avatar for chat display
-  const playerDisplayName =
-    storyData.displayName || storyData.player_name || "Player";
-  const playerAvatarUrl = storyData.displayAvatar;
 
   // Build chat messages from scene parts - pairs of user input + GM response
   const chatMessages: Array<{
@@ -1175,64 +971,21 @@ export default function Story({
     exchanges.push(currentExchange);
   }
 
-  // Show last 3 exchanges for context (2 previous + 1 current)
-  const visibleExchangeCount = 3;
-  const visibleExchanges = exchanges.slice(-visibleExchangeCount);
-  const previousExchanges = exchanges.slice(0, -visibleExchangeCount);
-  const currentExchangeIndex = visibleExchanges.length - 1;
+  // Every exchange renders the same way; only the latest one fades its prose in.
+  const latestExchangeIndex = exchanges.length - 1;
 
   // Helper to get GM conversation and tool results for a scene part
-  const getGMDataForPart = (partIndex: number) => {
-    const part = storyData.scene.parts[partIndex];
-    if (!part)
-      return {
-        gmConversation: [],
-        toolResults: new Map(),
-        storyReasoning: undefined,
-        reasoningTier: undefined as ReasoningTierDisplay | undefined,
-      };
+  // Built once per change to the parts, not per render: GMTurn memoizes its
+  // rebuilt timeline on these objects, and a timeline rebuilt with fresh
+  // block ids remounts the prose, which replays its fade-in on every state
+  // change on the page (tapping a turn, opening the menu).
+  const gmDataByPart = React.useMemo(
+    () => storyData.scene.parts.map((part) => buildGMDataForPart(part)),
+    [storyData.scene.parts],
+  );
+  const getGMDataForPart = (partIndex: number) =>
+    gmDataByPart[partIndex] ?? EMPTY_GM_DATA;
 
-    // Build toolResults map from gmToolCalls (keyed by toolCallId). Rolls
-    // made behind the GM's screen keep their `hiddenFromPlayer` flag here so
-    // buildSavedTimeline can drop them - they're carried in, not filtered
-    // out, precisely so the timeline knows to skip the tool call rather than
-    // falling back to rendering its raw name.
-    const toolResults = new Map<
-      string,
-      {
-        success: boolean;
-        contextForStory: string;
-        toolName: string;
-        hiddenFromPlayer?: boolean;
-      }
-    >();
-    if (part.gmToolCalls) {
-      for (const tc of part.gmToolCalls) {
-        if (tc.toolCallId) {
-          toolResults.set(tc.toolCallId, {
-            success: tc.success,
-            contextForStory: tc.contextForStory || "",
-            toolName: tc.toolName || "",
-            hiddenFromPlayer: tc.hiddenFromPlayer,
-          });
-        }
-      }
-    }
-
-    return {
-      gmConversation: part.gmConversation || [],
-      toolResults,
-      storyReasoning: part.reasoning,
-      reasoningTier:
-        part.reasoningTier !== undefined
-          ? ({
-              tier: part.reasoningTier,
-              modelKey: part.reasoningTierModelKey || "",
-              effort: part.reasoningTierEffort || "none",
-            } as ReasoningTierDisplay)
-          : undefined,
-    };
-  };
 
   // Pictures: a guest holds none (decision 60), and Regenerate is the host's.
   const isImageGuest = netSession?.role === "guest";
@@ -1252,6 +1005,55 @@ export default function Story({
     !loading &&
     !loadingStage;
 
+  const toggleActions = (partIndex: number) =>
+    setActionsFor((open) => (open === partIndex ? null : partIndex));
+
+  const startEditing = (partIndex: number) => {
+    const part = storyData.scene.parts[partIndex];
+    if (!part) return;
+    setActionsFor(null);
+    setEditedText(part.raw || part.content);
+    setEditingPart(partIndex);
+  };
+
+  // The row under a tapped turn. The latest turn gets all five actions on the
+  // conditions the old action bar used; an earlier turn gets Edit alone.
+  const renderTurnActions = (partIndex: number) => {
+    const busy = loading || !!loadingStage;
+    const isLatest = partIndex === lastPartIndex;
+    const closeThen = (fn: () => void) => () => {
+      setActionsFor(null);
+      fn();
+    };
+    return (
+      <TurnActions
+        disabled={busy}
+        onRetry={isLatest && canRetry && onRetry ? closeThen(onRetry) : undefined}
+        onUndo={isLatest && canUndo && onUndo ? closeThen(onUndo) : undefined}
+        undoLabel={observerRewriteOriginal ? "Undo revision" : "Undo"}
+        undoTitle={
+          observerRewriteOriginal
+            ? `The Observer revised this response (${observerRewriteOriginal.flag.detail}) - undo puts the GM's original back`
+            : "Undo last action"
+        }
+        onEdit={onEdit && !busy ? () => startEditing(partIndex) : undefined}
+        onIllustrate={
+          isLatest && canIllustrateLast
+            ? closeThen(() => onIllustrate?.(lastPartIndex))
+            : undefined
+        }
+        onReadAloud={
+          isLatest && storyText.trim() && isTTSEnabled()
+            ? () => {
+                setActionsFor(null);
+                readAloud();
+              }
+            : undefined
+        }
+      />
+    );
+  };
+
   // State for combat display expansion
   const [showCombat, setShowCombat] = React.useState(true);
 
@@ -1270,6 +1072,7 @@ export default function Story({
   // layout shift when suggested choices appear) yanked the view back down
   // even while someone was mid-scroll reading history.
   const stickToBottomRef = useRef(true);
+  const ignoreScrollRef = useRef(false);
   const NEAR_BOTTOM_THRESHOLD_PX = 80;
 
   useEffect(() => {
@@ -1279,10 +1082,38 @@ export default function Story({
       const distanceFromBottom =
         container.scrollHeight - container.scrollTop - container.clientHeight;
       stickToBottomRef.current = distanceFromBottom < NEAR_BOTTOM_THRESHOLD_PX;
+      // Scrolling hides the actions row - except the scroll that bringing
+      // the row into view causes (see the effect below).
+      if (!ignoreScrollRef.current) setActionsFor(null);
     };
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Opening the row under the latest turn adds height at the bottom: keep it
+  // in view when the player is already there, without that scroll closing it.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (actionsFor === null || !container || !stickToBottomRef.current) return;
+    ignoreScrollRef.current = true;
+    container.scrollTop = container.scrollHeight;
+    const frame = requestAnimationFrame(() => {
+      ignoreScrollRef.current = false;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [actionsFor]);
+
+  // A tap outside any turn closes the row; a tap on a turn is that turn's
+  // own toggle (GMTurn onTap), so it is left to it.
+  useEffect(() => {
+    if (actionsFor === null) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest("[data-turn]")) return;
+      setActionsFor(null);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [actionsFor]);
 
   // A fresh submission should always snap back to the bottom, even if the
   // player had scrolled up to reread something before acting.
@@ -1294,7 +1125,7 @@ export default function Story({
   // but only while the player is already at (or hasn't left) the bottom.
   // liveGMEntries is included because that's what actually grows token-by-
   // token while the GM stage is thinking/narrating (see liveTimeline in
-  // ChatMessage below) - storyText alone only changes once the turn's
+  // GMTurn below) - storyText alone only changes once the turn's
   // narration is fully assembled, so without this the view stayed put
   // through the entire streaming turn and only jumped at the very end.
   useEffect(() => {
@@ -1329,52 +1160,8 @@ export default function Story({
     <div className="w-full flex-1 min-h-0 flex flex-col px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 backdrop-blur-xl"
-        style={{
-          backgroundColor: fontSettings.themeColors?.background,
-        }}
+        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 bg-ys-bg"
       >
-        {/* Sync Status Indicator - top right corner */}
-        {syncStatus && syncStatus !== "local-only" && (
-          <div className="absolute top-3 right-3 z-10">
-            <SyncIndicator status={syncStatus} />
-          </div>
-        )}
-
-        {/* Networked multiplayer connection status - top left corner */}
-        {netSession && (
-          <div className="absolute top-3 left-3 z-10">
-            <NetStatusBadge netSession={netSession} peers={netPeers ?? []} />
-          </div>
-        )}
-
-        {/* Header with story name, chapter nav, and scroll indicator */}
-        <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-white/[0.03] border-b border-white/10">
-          <div className="flex items-center gap-2 min-w-0">
-            <DynamicIcon name="BookOpen" className="w-4 h-4 text-blue-300 shrink-0" />
-            <span className="text-sm font-medium text-blue-200 truncate max-w-[200px]">
-              {storyData.story_name || "Untitled Story"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {exchanges.length > visibleExchangeCount && (
-              <span className="text-xs text-blue-400/60 hidden sm:inline">
-                ↑ Scroll for history ({exchanges.length} turns)
-              </span>
-            )}
-            {onNavigateToIndex && (
-              <ChapterNav
-                parts={storyData.scene.parts}
-                currentIndex={viewingPartIndex ?? null}
-                onJump={onNavigateToIndex}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Objectives Strip - glanceable active quests/threads */}
-        <ObjectivesStrip storyData={storyData} onOpenJournal={onOpenJournal} />
-
         {/* Combat Display - shows active combat state */}
         {storyData.combatState?.active && (
           <CombatDisplay
@@ -1384,81 +1171,30 @@ export default function Story({
           />
         )}
 
-        {/* Chat Messages Area - Scrollable */}
+        {/* The feed: one plain page, no cards. Turns are told apart by space. */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-0 sm:min-h-[300px]"
-          style={{ color: fontSettings.themeColors?.text }}
+          className="flex-1 overflow-y-auto min-h-0 text-ys-text"
         >
-          {/* Previous exchanges (scrolled history) */}
-          {previousExchanges.map((exchange, idx) => (
-            <React.Fragment key={`old-${idx}`}>
-              {exchange.userMsg && (
-                <ChatMessage
-                  isUser={true}
-                  content={exchange.userMsg.content}
-                  displayName={playerDisplayName}
-                  avatarUrl={playerAvatarUrl}
-                  isPrevious={true}
-                  showHiddenMessages={showHiddenMessages}
-                  fontSettings={fontSettings}
-                  messageType={exchange.userMsg.messageType}
-                />
-              )}
-              {exchange.gmMsg && (
-                <ChatMessage
-                  isUser={false}
-                  content={exchange.gmMsg.content}
-                  displayName="Game Master"
-                  isPrevious={true}
-                  showHiddenMessages={showHiddenMessages}
-                  fontSettings={fontSettings}
-                  gmConversation={
-                    getGMDataForPart(exchange.gmMsg.partIndex).gmConversation
-                  }
-                  toolResults={
-                    getGMDataForPart(exchange.gmMsg.partIndex).toolResults
-                  }
-                  storyReasoning={
-                    getGMDataForPart(exchange.gmMsg.partIndex).storyReasoning
-                  }
-                  reasoningTier={
-                    getGMDataForPart(exchange.gmMsg.partIndex).reasoningTier
-                  }
-                  images={storyData.scene.parts[exchange.gmMsg.partIndex]?.images}
-                  isGuest={isImageGuest}
-                  onRegenerateImage={regenerateImageFor(exchange.gmMsg.partIndex)}
-                  mentionMatcher={mentionMatcher}
-                  onMentionClick={handleMentionClick}
-                />
-              )}
-            </React.Fragment>
-          ))}
-
-          {/* Visible exchanges (last 3) */}
-          {visibleExchanges.map((exchange, idx) => {
-            const isPrevious = idx < currentExchangeIndex;
-
-            return (
-              <React.Fragment key={`visible-${idx}`}>
+          <div
+            className={`px-4 pt-4 space-y-6 sm:max-w-[68ch] sm:mx-auto ${
+              showVoiceBubbles ? "pb-28" : "pb-4"
+            }`}
+          >
+            {exchanges.map((exchange, idx) => (
+              <div key={`exchange-${idx}`} className="space-y-3">
                 {exchange.userMsg && (
-                  <ChatMessage
-                    isUser={true}
+                  <PlayerLine
                     content={exchange.userMsg.content}
-                    displayName={playerDisplayName}
-                    avatarUrl={playerAvatarUrl}
-                    isPrevious={isPrevious}
-                    showHiddenMessages={showHiddenMessages}
+                    couchPlayers={couchPlayers}
+                    isComment={exchange.userMsg.messageType === "comment"}
                     fontSettings={fontSettings}
-                    messageType={exchange.userMsg.messageType}
                   />
                 )}
                 {exchange.gmMsg && (
-                  <ChatMessage
-                    isUser={false}
+                  <GMTurn
                     content={exchange.gmMsg.content}
-                    displayName="Game Master"
-                    isPrevious={isPrevious}
+                    animate={idx === latestExchangeIndex}
                     showHiddenMessages={showHiddenMessages}
                     fontSettings={fontSettings}
                     gmConversation={
@@ -1468,119 +1204,126 @@ export default function Story({
                       getGMDataForPart(exchange.gmMsg.partIndex).toolResults
                     }
                     storyReasoning={
-                      getGMDataForPart(exchange.gmMsg.partIndex)
-                        .storyReasoning
+                      getGMDataForPart(exchange.gmMsg.partIndex).storyReasoning
                     }
                     reasoningTier={
-                      getGMDataForPart(exchange.gmMsg.partIndex)
-                        .reasoningTier
+                      getGMDataForPart(exchange.gmMsg.partIndex).reasoningTier
                     }
-                    images={storyData.scene.parts[exchange.gmMsg.partIndex]?.images}
+                    images={
+                      storyData.scene.parts[exchange.gmMsg.partIndex]?.images
+                    }
                     isGuest={isImageGuest}
-                    onRegenerateImage={regenerateImageFor(exchange.gmMsg.partIndex)}
+                    onRegenerateImage={regenerateImageFor(
+                      exchange.gmMsg.partIndex,
+                    )}
                     mentionMatcher={mentionMatcher}
                     onMentionClick={handleMentionClick}
+                    onTap={() => toggleActions(exchange.gmMsg!.partIndex)}
+                    onToggleActions={() =>
+                      toggleActions(exchange.gmMsg!.partIndex)
+                    }
+                    actionsOpen={actionsFor === exchange.gmMsg.partIndex}
+                    actions={renderTurnActions(exchange.gmMsg.partIndex)}
                   />
                 )}
-              </React.Fragment>
-            );
-          })}
+              </div>
+            ))}
 
-          {/* Pending user choice (shown immediately when submitted) */}
-          {shouldShowPendingUserChoice && (
-            <ChatMessage
-              isUser={true}
-              content={pendingUserChoiceText}
-              displayName={playerDisplayName}
-              avatarUrl={playerAvatarUrl}
-              isPrevious={false}
-              showHiddenMessages={showHiddenMessages}
-              fontSettings={fontSettings}
-            />
-          )}
-
-          {/* Turn currently generating - one continuous message with
-              thinking/tool calls shown as minimized pills interleaved with
-              the streaming narration, in the order they actually happened. */}
-          {(loadingStage === "gm" || loadingStage === "story") && (
-            <ChatMessage
-              isUser={false}
-              content=""
-              displayName="Game Master"
-              isLoading={true}
-              showHiddenMessages={showHiddenMessages}
-              fontSettings={fontSettings}
-              liveTimeline={liveGMEntries || []}
-              isStreaming={true}
-              reasoningTier={
-                liveReasoningTier
-                  ? {
-                      tier: liveReasoningTier.tier,
-                      modelKey: String(liveReasoningTier.modelKey),
-                      effort: liveReasoningTier.reasoningEffort,
-                    }
-                  : undefined
-              }
-              mentionMatcher={mentionMatcher}
-              onMentionClick={handleMentionClick}
-            />
-          )}
-
-          {/* Reset warning: the Observer (observer.ts) reviews narration
-              only after it finishes streaming, and can silently discard and
-              regenerate it if flagged - jarring if the player has no idea
-              that's possible. Only shown while narration is actually
-              streaming, and only when the current settings make a reset
-              possible at all. */}
-          {loadingStage === "story" &&
-            observerCanReset &&
-            !storyData.sessionZeroActive && (
-              <p className="px-1 text-xs text-blue-200/40 italic">
-                Not final yet - the Observer may flag and rewrite this response. Don&apos;t get too attached.
-              </p>
+            {/* Pending user choice (shown immediately when submitted) */}
+            {shouldShowPendingUserChoice && (
+              <PlayerLine
+                content={pendingUserChoiceText}
+                couchPlayers={couchPlayers}
+                fontSettings={fontSettings}
+              />
             )}
+
+            {/* Turn currently generating - the work line says what the GM is
+                doing, and the narration streams in below it. */}
+            {(loadingStage === "gm" || loadingStage === "story") && (
+              <GMTurn
+                content=""
+                animate={true}
+                isStreaming={true}
+                showHiddenMessages={showHiddenMessages}
+                fontSettings={fontSettings}
+                liveTimeline={liveGMEntries || []}
+                reasoningTier={
+                  liveReasoningTier
+                    ? {
+                        tier: liveReasoningTier.tier,
+                        modelKey: String(liveReasoningTier.modelKey),
+                        effort: liveReasoningTier.reasoningEffort,
+                      }
+                    : undefined
+                }
+                mentionMatcher={mentionMatcher}
+                onMentionClick={handleMentionClick}
+              />
+            )}
+
+            {/* Reset warning: the Observer (observer.ts) reviews narration
+                only after it finishes streaming, and can silently discard and
+                regenerate it if flagged - jarring if the player has no idea
+                that's possible. Only shown while narration is actually
+                streaming, and only when the current settings make a reset
+                possible at all. */}
+            {loadingStage === "story" &&
+              observerCanReset &&
+              !storyData.sessionZeroActive && (
+                <p className="text-xs text-ys-muted italic">
+                  Not final yet - the Observer may flag and rewrite this response. Don&apos;t get too attached.
+                </p>
+              )}
+          </div>
         </div>
 
-        {/* Edit Mode */}
-        {editMode && (
-          <div className="p-4 bg-white/[0.03] border-t border-white/10">
+        {/* Edit panel: any GM turn, opened from its actions row. */}
+        {editingPart !== null && (
+          <div className="p-4 bg-ys-surface border-t border-ys-border">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <h3 className="text-base font-semibold text-ys-text flex items-center gap-2">
                   <DynamicIcon name="Pencil" className="w-4 h-4" />
                   Edit Response
                 </h3>
               </div>
+              {editingPart < (storyData.scene.summarizedThroughIndex ?? 0) && (
+                <p className="text-xs text-ys-muted">
+                  This turn is already in the summary. The GM reads the
+                  summary, not this text.
+                </p>
+              )}
               <textarea
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
-                className="w-full h-48 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 font-mono text-sm resize-none transition-colors"
+                className="w-full h-48 px-3 py-2 bg-ys-bg border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent font-mono text-sm resize-none transition-colors"
                 placeholder="Edit the raw AI output..."
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-blue-200/40">
+                <span className="text-xs text-ys-muted">
                   {editedText.length} characters
                 </span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      setEditMode(false);
+                      setEditingPart(null);
                       setEditedText("");
                     }}
-                    className="px-3 py-1.5 text-sm font-medium text-blue-200 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-ys-text bg-ys-bg hover:bg-ys-border border border-ys-border rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => {
                       if (onEdit && editedText.trim()) {
-                        onEdit(editedText, storyData.scene.parts.length - 1);
-                        setEditMode(false);
+                        onEdit(editedText, editingPart);
+                        setEditingPart(null);
                         setEditedText("");
                       }
                     }}
                     disabled={!editedText.trim()}
-                    className="px-3 py-1.5 text-sm font-medium bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-purple-950/40 disabled:shadow-none transition-all flex items-center gap-1.5"
+                    className="px-3 py-1.5 text-sm font-medium bg-ys-accent text-ys-bg hover:opacity-90 disabled:opacity-40 rounded-lg transition-opacity flex items-center gap-1.5"
                   >
                     <DynamicIcon name="Save" className="w-4 h-4" />
                     Save
@@ -1591,99 +1334,30 @@ export default function Story({
           </div>
         )}
 
-        {/* Action Buttons Bar */}
-        {!editMode && (
-          <div className="flex items-center justify-between px-4 py-2 bg-white/[0.03] border-t border-white/10">
-            {/* Left side: Retry, Undo & Edit */}
-            <div className="flex items-center gap-1.5 sm:gap-1">
-              {canUndo && onUndo && (
-                <button
-                  onClick={onUndo}
-                  disabled={loading || !!loadingStage}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                  title={
-                    observerRewriteOriginal
-                      ? `The Observer revised this response (${observerRewriteOriginal.flag.detail}) - undo puts the GM's original back`
-                      : "Undo last action"
-                  }
-                >
-                  <DynamicIcon name="Undo2" className="w-5 h-5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">
-                    {observerRewriteOriginal ? "Undo revision" : "Undo"}
-                  </span>
-                </button>
-              )}
-              {canRetry && onRetry && (
-                <button
-                  onClick={onRetry}
-                  disabled={loading || !!loadingStage}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/15 active:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                  title="Regenerate response"
-                >
-                  <DynamicIcon
-                    name="RotateCcw"
-                    className="w-5 h-5 sm:w-4 sm:h-4"
-                  />
-                  <span className="hidden sm:inline">Retry</span>
-                </button>
-              )}
-              {onEdit && !loading && !loadingStage && (
-                <button
-                  onClick={() => {
-                    setEditMode(true);
-                    const lastPart =
-                      storyData.scene.parts[storyData.scene.parts.length - 1];
-                    setEditedText(lastPart?.raw || storyText);
-                  }}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 touch-manipulation"
-                  title="Edit response"
-                >
-                  <DynamicIcon
-                    name="Pencil"
-                    className="w-5 h-5 sm:w-4 sm:h-4"
-                  />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
-              )}
-            </div>
-
-            {/* Right side: TTS - manual press waits for narration to finish;
-                auto-narrate (if enabled) starts reading live as the GM
-                streams instead of waiting - see storyTextReady prop. While
-                streaming, prefer liveNarrationText (grows as the GM writes,
-                even on the common path where storyText itself only jumps to
-                the full text once at the very end) over storyText - falls
-                back to storyText when there's nothing live yet (e.g. the
-                separate story-stage path, which already streams storyText
-                incrementally on its own). */}
-            <div className="flex items-center gap-1.5">
-            {canIllustrateLast && (
-              <button
-                onClick={() => onIllustrate?.(lastPartIndex)}
-                className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 touch-manipulation"
-                title="Paint a picture of this moment"
-              >
-                <DynamicIcon name="Image" className="w-5 h-5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Illustrate this</span>
-              </button>
-            )}
-            <TTSControls
-              text={
-                !storyTextReady && liveNarrationText
-                  ? liveNarrationText
-                  : storyText
-              }
-              disabled={loading || !storyTextReady}
-              storyTextReady={storyTextReady}
-              onAudioChunk={onTTSAudioChunk}
-              onAudioEnd={onTTSAudioEnd}
-              relayMode={ttsRelayMode}
-              relayHandleRef={ttsRelayHandleRef}
-              storyId={storyId}
-            />
-            </div>
-          </div>
-        )}
+        {/* Narration player: slim, only while a narration is unfinished. It
+            stays mounted when idle because it runs auto-narrate. Manual read
+            waits for narration to finish; auto-narrate (if enabled) starts
+            reading live as the GM streams instead of waiting - see
+            storyTextReady. While streaming, prefer liveNarrationText (grows
+            as the GM writes, even on the common path where storyText itself
+            only jumps to the full text once at the very end) over storyText -
+            falls back to storyText when there's nothing live yet (e.g. the
+            separate story-stage path, which already streams storyText
+            incrementally on its own). */}
+        <TTSControls
+          variant="slim"
+          controlHandleRef={ttsControlRef}
+          text={
+            !storyTextReady && liveNarrationText ? liveNarrationText : storyText
+          }
+          disabled={loading || !storyTextReady}
+          storyTextReady={storyTextReady}
+          onAudioChunk={onTTSAudioChunk}
+          onAudioEnd={onTTSAudioEnd}
+          relayMode={ttsRelayMode}
+          relayHandleRef={ttsRelayHandleRef}
+          storyId={storyId}
+        />
 
         {/* Collect-all-then-generate lobby: shown while the host is waiting
             on the table (host sees "Start now" / "Pass"; guests see who
@@ -1713,13 +1387,14 @@ export default function Story({
         )}
 
         {/* Composer: suggested choices, player switcher, and chat input */}
-        {!editMode && (
+        {editingPart === null && (
           <StoryComposer
             ref={composerRef}
             choices={choices}
             loading={loading}
             loadingStage={loadingStage}
             couchPlayers={couchPlayers}
+            partyTableOpen={!!partyTable}
             onCustomInput={onCustomInput}
             onActionConfirm={onActionConfirm}
             onStop={onStop}
@@ -1728,13 +1403,11 @@ export default function Story({
         )}
       </div>
 
-      {/* Voice input bubble(s): tap to speak a turn - the default voice
-          input UI now, replacing the old composer mic button. Couch
-          co-op/multiplayer get one bubble per player; solo play gets a
-          single default bubble instead. */}
-      {onCustomInput && !partyTable && (
+      {/* Voice input bubbles: couch co-op and online play get one per player.
+          Solo play speaks through the mic in the composer's bar instead. */}
+      {showVoiceBubbles && onCustomInput && (
         <PlayerBubbles
-          players={couchPlayers.length > 0 ? couchPlayers : SOLO_VOICE_PLAYER}
+          players={couchPlayers}
           onSubmit={(text, speakerIds) =>
             onCustomInput(text, undefined, speakerIds, "voice")
           }
@@ -1771,213 +1444,3 @@ export default function Story({
     </div>
   );
 }
-
-// Parse hidden text: ||hidden text|| becomes either hidden or visible based on setting
-const parseHiddenText = (text: string, showHidden: boolean): string => {
-  if (showHidden) {
-    // Show hidden text with special styling marker
-    // Use markers that won't be affected by markdown processing
-    return text.replace(/\|\|([\s\S]*?)\|\|/g, "⟦HIDDEN_START⟧$1⟦HIDDEN_END⟧");
-  } else {
-    // Remove hidden text entirely (use non-greedy match to handle nested ||)
-    return text.replace(/\|\|[\s\S]*?\|\|/g, "");
-  }
-};
-
-const prettify = (
-  text: string,
-  animate: boolean = true,
-  showHiddenMessages: boolean = false,
-  fontSettings?: FontSettings,
-  mentionMatcher?: MentionMatcher | null,
-  onMentionClick?: (kind: "lore" | "npc", id: string) => void,
-) => {
-  // Process tags and hidden text before rendering - defensive against a
-  // stray tag even though content is expected to already be clean by the
-  // time it reaches here (see turnTimeline.ts:extractVisibleText).
-  const cleanedText = extractVisibleText(text);
-  const processedText = parseHiddenText(cleanedText, showHiddenMessages);
-
-  const customStyle = fontSettings
-    ? {
-        fontSize: `${fontSettings.fontSize}px`,
-        fontFamily: fontSettings.fontFamily,
-        lineHeight: fontSettings.lineHeight,
-        color: fontSettings.themeColors?.text,
-      }
-    : undefined;
-
-  const paragraphStyle = fontSettings
-    ? {
-        marginBottom: `${fontSettings.paragraphSpacing}em`,
-      }
-    : undefined;
-
-  return (
-    <div
-      className={`prose prose-sm max-w-none ${
-        animate ? "animate-fade-in" : ""
-      }`}
-      style={customStyle}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          p: ({ node, children, ...props }) => {
-            // Track hidden state across all children
-            let inHidden = false;
-
-            // Process children to handle hidden text markers
-            const processChildren = (
-              child: React.ReactNode,
-              key: number | string,
-            ): React.ReactNode => {
-              if (typeof child === "string") {
-                const parts = child.split(/(⟦HIDDEN_START⟧|⟦HIDDEN_END⟧)/);
-                return parts.map((part, i) => {
-                  if (part === "⟦HIDDEN_START⟧") {
-                    inHidden = true;
-                    return null;
-                  }
-                  if (part === "⟦HIDDEN_END⟧") {
-                    inHidden = false;
-                    return null;
-                  }
-                  if (part === "") return null;
-                  if (inHidden) {
-                    return (
-                      <span
-                        key={`${key}-${i}`}
-                        className="bg-purple-500/30 text-purple-200 px-1 rounded border border-purple-500/50"
-                        title="Hidden message (only visible with setting enabled)"
-                      >
-                        {part}
-                      </span>
-                    );
-                  }
-                  return part;
-                });
-              }
-              // Handle React elements (like <em>, <strong>) that might be inside hidden text
-              if (React.isValidElement(child)) {
-                if (inHidden) {
-                  // Wrap the entire element in hidden styling
-                  return (
-                    <span
-                      key={key}
-                      className="bg-purple-500/30 text-purple-200 px-1 rounded border border-purple-500/50"
-                      title="Hidden message (only visible with setting enabled)"
-                    >
-                      {child}
-                    </span>
-                  );
-                }
-                return child;
-              }
-              return child;
-            };
-
-            const processedChildren: React.ReactNode[] = [];
-            React.Children.forEach(children, (child, index) => {
-              const result = processChildren(child, index);
-              if (Array.isArray(result)) {
-                processedChildren.push(...result);
-              } else if (result !== null) {
-                processedChildren.push(result);
-              }
-            });
-
-            // Second pass: highlight lore-title/NPC-name mentions within the
-            // plain-text segments (leaves hidden-text spans and other
-            // elements from the pass above untouched).
-            const withMentions: React.ReactNode[] = mentionMatcher
-              ? processedChildren.flatMap((node, idx): React.ReactNode[] => {
-                  if (typeof node !== "string" || !node) return [node];
-                  const segments = splitTextWithMentions(node, mentionMatcher);
-                  if (segments.length === 1 && !segments[0].mention) {
-                    return [node];
-                  }
-                  return segments.map((seg, i) =>
-                    seg.mention ? (
-                      <span
-                        key={`mention-${idx}-${i}`}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() =>
-                          onMentionClick?.(seg.mention!.kind, seg.mention!.id)
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            onMentionClick?.(seg.mention!.kind, seg.mention!.id);
-                          }
-                        }}
-                        className={`${seg.mention.colorClass} underline decoration-dotted decoration-1 underline-offset-2 cursor-pointer hover:brightness-125 transition-[filter]`}
-                        title={`Open note: ${seg.mention.label}`}
-                      >
-                        {seg.text}
-                      </span>
-                    ) : (
-                      seg.text
-                    ),
-                  );
-                })
-              : processedChildren;
-
-            return (
-              <p
-                className="leading-relaxed last:mb-0"
-                style={paragraphStyle}
-                {...props}
-              >
-                {withMentions}
-              </p>
-            );
-          },
-          h1: ({ node, ...props }) => (
-            <h1 className="text-xl font-bold mb-2 mt-3 first:mt-0" {...props} />
-          ),
-          h2: ({ node, ...props }) => (
-            <h2 className="text-lg font-bold mb-2 mt-3 first:mt-0" {...props} />
-          ),
-          h3: ({ node, ...props }) => (
-            <h3
-              className="text-base font-bold mb-1.5 mt-2 first:mt-0"
-              {...props}
-            />
-          ),
-          strong: ({ node, ...props }) => (
-            <strong className="font-bold" {...props} />
-          ),
-          em: ({ node, ...props }) => (
-            <em className="italic opacity-90" {...props} />
-          ),
-          ul: ({ node, ...props }) => (
-            <ul
-              className="list-disc ml-4 mb-2 space-y-0.5 last:mb-0"
-              {...props}
-            />
-          ),
-          ol: ({ node, ...props }) => (
-            <ol
-              className="list-decimal ml-4 mb-2 space-y-0.5 last:mb-0"
-              {...props}
-            />
-          ),
-          li: ({ node, ...props }) => (
-            <li className="leading-relaxed" {...props} />
-          ),
-          blockquote: ({ node, ...props }) => (
-            <blockquote
-              className="border-l-2 pl-3 italic opacity-70 my-2"
-              style={{ borderColor: "currentColor" }}
-              {...props}
-            />
-          ),
-        }}
-      >
-        {processedText}
-      </ReactMarkdown>
-    </div>
-  );
-};
