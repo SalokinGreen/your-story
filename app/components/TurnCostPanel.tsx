@@ -41,7 +41,12 @@ import {
 import { LAYER_SETTINGS_CHANGED_EVENT } from "@/app/misc/layerSettings";
 import { REASONING_CONFIG_CHANGED_EVENT } from "@/app/misc/reasoningTiers";
 import { SYNC_COMPLETED_EVENT } from "@/app/misc/syncManager";
-import { getTierModelDisplayName } from "@/app/misc/reasoningTiers";
+import { getTierModelDisplayName, slotForTier } from "@/app/misc/reasoningTiers";
+
+// The slot a tier belongs to, in the words Settings uses (decision 124).
+function slotLabel(tier: number): string {
+  return slotForTier(tier) === "advanced" ? "Advanced" : "Default";
+}
 
 interface TurnCostPanelProps {
   /**
@@ -175,7 +180,7 @@ export default function TurnCostPanel({
         </div>
         {predictedTier && (
           <p className="text-[11px] text-blue-200/50 mt-2">
-            Assuming tier {predictedTier.tier} (
+            Assuming {slotLabel(predictedTier.tier)} (
             {getTierModelDisplayName(predictedTier.modelKey)}, effort{" "}
             {predictedTier.reasoningEffort}) for the GM
             {storyData ? " on your next turn" : ""}.

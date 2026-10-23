@@ -365,3 +365,20 @@ folded into the slice it belongs to:
 - **The "Advanced settings" `<details>` lands in this commit holding only the
   "Recent Tier Calls" log**; the side-agent pickers join it in slice 3, which
   is what keeps each commit compiling.
+
+### 2026-10-23, slice 3
+
+- **`SideAgentPickers` lands in "Advanced settings" in this commit**, keyed on
+  a sync counter in `AIConfigTab` so an incoming sync remounts it (the pickers
+  read their state once, unlike the Models card).
+- **The work line's empty-line guard follows the tag.** `TurnWorkLine` hid
+  itself when a turn had no work *and* no tier badge; with the badge now
+  Advanced-only, that test uses the same condition, so a Default turn with no
+  work no longer renders an empty line.
+- **Copy that named the narration voice moved too:** the Observer's off-note
+  ("rewrites use the Default model and its effort"), the `StageOverrideCard`
+  comment, and the layer-card AI marker's tooltip ("configurable under AI >
+  Advanced settings"). The layer-card pointer line shows in each expanded
+  card whose layer is `aiDriven` (Director, Memory, Adjudication).
+- **Checked, no change:** `story/page.tsx` (~1015) prints `fallback.slot`
+  only; `ContextViewer` keeps its tiers.

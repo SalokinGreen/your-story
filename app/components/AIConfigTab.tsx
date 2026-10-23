@@ -30,6 +30,7 @@ import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
 import ModelSelect from "./ModelSelect";
 import TurnCostPanel from "./TurnCostPanel";
+import { SideAgentPickers } from "./ArchitectureSettingsTab";
 import ClaudeSubscriptionPanel, {
   useClaudeCliStatus,
   useOnlineSessionActive,
@@ -213,6 +214,15 @@ export default function AIConfigTab() {
   const [newModelId, setNewModelId] = useState("");
   const [newModelContext, setNewModelContext] = useState(128000);
   const [newModelMaxOutput, setNewModelMaxOutput] = useState(8000);
+
+  // The side-agent pickers read their state once; an incoming sync remounts
+  // them (key) so a choice made on another device shows without reopening.
+  const [syncTick, setSyncTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setSyncTick((n) => n + 1);
+    window.addEventListener(SYNC_COMPLETED_EVENT, bump);
+    return () => window.removeEventListener(SYNC_COMPLETED_EVENT, bump);
+  }, []);
 
   const refreshCustomModels = useCallback(
     () => setCustomModelsState(getCustomModels()),
@@ -632,6 +642,8 @@ export default function AIConfigTab() {
           Advanced settings
         </summary>
         <div className="mt-4 space-y-6">
+          <SideAgentPickers key={syncTick} customModels={customModels} />
+
           {/* Recent Reasoning Tier Calls */}
           {recentTierLogs.length > 0 && (
             <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-2">
