@@ -218,6 +218,89 @@ export function PlayerLine({
   );
 }
 
+// The button at the end of a turn's work line that opens the same actions row
+// a tap on the prose does, for keyboards and screen readers.
+export function TurnActionsToggle({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-label="Turn actions"
+      title="Turn actions"
+      className="ml-auto shrink-0 p-1 rounded text-ys-muted opacity-40 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ys-accent transition-opacity"
+    >
+      <DynamicIcon name="Ellipsis" className="w-4 h-4" />
+    </button>
+  );
+}
+
+// The row of actions under a tapped turn. Each handler is the condition: a
+// missing one hides its button (the page passes Retry, Undo, Illustrate and
+// Read aloud for the latest turn only; an earlier turn gets Edit alone).
+export interface TurnActionsProps {
+  onRetry?: () => void;
+  onUndo?: () => void;
+  // The Observer revised this turn: Undo puts the GM's original back.
+  undoTitle?: string;
+  undoLabel?: string;
+  onEdit?: () => void;
+  onIllustrate?: () => void;
+  onReadAloud?: () => void;
+  disabled?: boolean;
+}
+
+export function TurnActions({
+  onRetry,
+  onUndo,
+  undoTitle = "Undo last action",
+  undoLabel = "Undo",
+  onEdit,
+  onIllustrate,
+  onReadAloud,
+  disabled = false,
+}: TurnActionsProps) {
+  const action = (
+    label: string,
+    icon: string,
+    onClick: (() => void) | undefined,
+    title: string = label,
+    off: boolean = disabled,
+  ) =>
+    onClick && (
+      <button
+        key={label}
+        type="button"
+        onClick={onClick}
+        disabled={off}
+        aria-label={label}
+        title={title}
+        className="w-10 h-10 flex items-center justify-center rounded-lg text-ys-muted hover:text-ys-text hover:bg-ys-surface active:bg-ys-border focus-visible:ring-2 focus-visible:ring-ys-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+      >
+        <DynamicIcon name={icon} className="w-5 h-5" />
+      </button>
+    );
+  return (
+    <div
+      role="toolbar"
+      aria-label="Turn actions"
+      className="flex items-center gap-1 -ml-2"
+    >
+      {action("Retry", "RotateCcw", onRetry, "Regenerate response")}
+      {action(undoLabel, "Undo2", onUndo, undoTitle)}
+      {action("Edit", "Pencil", onEdit, "Edit response")}
+      {action("Illustrate", "Image", onIllustrate, "Paint a picture of this moment")}
+      {action("Read aloud", "Volume2", onReadAloud)}
+    </div>
+  );
+}
+
 // The GM's working, folded into one quiet line: dice spelled out, everything
 // else counted, the tier badge at its end. Tapping it opens the pills in
 // their original order. While the turn streams it shows what the GM is doing
@@ -226,15 +309,21 @@ export function TurnWorkLine({
   blocks,
   reasoningTier,
   streaming = false,
+  trailing,
 }: {
   blocks: TimelineBlock[];
   reasoningTier?: ReasoningTierDisplay;
   streaming?: boolean;
+  // The "Turn actions" button, which sits at the end of the line - or alone
+  // when the turn did no work worth a line.
+  trailing?: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
   const summary = summarizeTurnWork(blocks);
   const live = streaming ? (summary.live ?? "Thinking…") : undefined;
-  if (summary.isEmpty && !live && !reasoningTier) return null;
+  if (summary.isEmpty && !live && !reasoningTier) {
+    return trailing ? <div className="text-xs text-ys-muted">{trailing}</div> : null;
+  }
 
   const text = formatTurnWork(summary);
   const hasPills = blocks.some((b) => b.kind !== "text" && !b.hidden);
@@ -274,6 +363,7 @@ export function TurnWorkLine({
             T{reasoningTier.tier}
           </span>
         )}
+        {trailing}
       </div>
       {open && canOpen && (
         <div className="mt-1">
@@ -328,6 +418,27 @@ export interface GMTurnProps {
   images?: SceneImageRef[];
   isGuest?: boolean;
   onRegenerateImage?: (ref: SceneImageRef) => void;
+  // Turn actions on tap (slice 4). `onTap` fires for a tap that is not on a
+  // control; `onToggleActions` is the "Turn actions" button; `actions` is the
+  // row, shown under the prose while `actionsOpen`.
+  onTap?: () => void;
+  onToggleActions?: () => void;
+  actionsOpen?: boolean;
+  actions?: React.ReactNode;
+}
+
+// A tap that landed on something with its own job, or that ended a text
+// selection, is not a request for the actions row.
+export function isTurnTap(
+  target: EventTarget | null,
+  selectedText: string,
+): boolean {
+  if (selectedText.length > 0) return false;
+  const el = target as { closest?: (selector: string) => unknown } | null;
+  if (typeof el?.closest !== "function") return true;
+  return !el.closest(
+    'button, a, [role="button"], img, video, [data-no-turn-tap]',
+  );
 }
 
 // One GM turn: pictures first and full bleed, then the work line, then the
@@ -348,6 +459,10 @@ export function GMTurn({
   images,
   isGuest = false,
   onRegenerateImage,
+  onTap,
+  onToggleActions,
+  actionsOpen = false,
+  actions,
 }: GMTurnProps) {
   // The narration has exactly one source per turn:
   //  - streaming: the live blocks' text;
@@ -380,9 +495,21 @@ export function GMTurn({
   const showSeparateContent = !isLive && !narrationInline;
 
   return (
-    <div className="space-y-3">
+    <div
+      className="space-y-3"
+      data-turn=""
+      onClick={
+        onTap
+          ? (e) => {
+              if (isTurnTap(e.target, window.getSelection()?.toString() ?? "")) {
+                onTap();
+              }
+            }
+          : undefined
+      }
+    >
       {images && images.length > 0 && (
-        <div className="-mx-4 space-y-2">
+        <div className="-mx-4 space-y-2" data-no-turn-tap="">
           {images.map((ref) => (
             <StoryImage
               key={ref.imageId}
@@ -395,11 +522,21 @@ export function GMTurn({
           ))}
         </div>
       )}
-      <TurnWorkLine
-        blocks={timeline}
-        reasoningTier={reasoningTier}
-        streaming={isStreaming}
-      />
+      <div data-no-turn-tap="" className="empty:hidden">
+        <TurnWorkLine
+          blocks={timeline}
+          reasoningTier={reasoningTier}
+          streaming={isStreaming}
+          trailing={
+            onToggleActions ? (
+              <TurnActionsToggle
+                open={actionsOpen}
+                onToggle={onToggleActions}
+              />
+            ) : undefined
+          }
+        />
+      </div>
       {!showSeparateContent && (
         <TimelineView
           blocks={timeline}
@@ -420,6 +557,7 @@ export function GMTurn({
           mentionMatcher,
           onMentionClick,
         )}
+      {actionsOpen && actions}
     </div>
   );
 }

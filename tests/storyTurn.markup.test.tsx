@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { GMTurn, PlayerLine, TurnWorkLine } from "@/app/story/StoryTurn";
+import {
+  GMTurn,
+  PlayerLine,
+  TurnActions,
+  TurnWorkLine,
+  isTurnTap,
+} from "@/app/story/StoryTurn";
 import type { TimelineBlock } from "@/app/misc/turnTimeline";
 
 const HIDDEN_CONTEXT = "[Hidden Roll: 1d20 = 3 SECRETDICE]";
@@ -90,5 +96,98 @@ describe("story turn markup", () => {
     expect(html).toContain("#22c55e");
     expect(html).toContain("to the GM");
     expect(html).toContain("is this safe?");
+  });
+});
+
+describe("turn actions", () => {
+  const noop = () => {};
+  const labels = (html: string) =>
+    [...html.matchAll(/<button[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
+
+  it("the latest turn shows all five actions", () => {
+    const html = renderToStaticMarkup(
+      createElement(TurnActions, {
+        onRetry: noop,
+        onUndo: noop,
+        onEdit: noop,
+        onIllustrate: noop,
+        onReadAloud: noop,
+      }),
+    );
+    expect(labels(html)).toEqual([
+      "Retry",
+      "Undo",
+      "Edit",
+      "Illustrate",
+      "Read aloud",
+    ]);
+  });
+
+  it("an action whose condition fails is not shown", () => {
+    const html = renderToStaticMarkup(
+      createElement(TurnActions, { onRetry: noop, onEdit: noop }),
+    );
+    expect(labels(html)).toEqual(["Retry", "Edit"]);
+  });
+
+  it("an earlier turn shows Edit only", () => {
+    const html = renderToStaticMarkup(
+      createElement(TurnActions, { onEdit: noop }),
+    );
+    expect(labels(html)).toEqual(["Edit"]);
+  });
+
+  it("Undo can read as Undo revision and keeps its title", () => {
+    const html = renderToStaticMarkup(
+      createElement(TurnActions, {
+        onUndo: noop,
+        undoLabel: "Undo revision",
+        undoTitle: "The Observer revised this response",
+      }),
+    );
+    expect(labels(html)).toEqual(["Undo revision"]);
+    expect(html).toContain('title="The Observer revised this response"');
+  });
+
+  it("every button is disabled while a turn runs", () => {
+    const html = renderToStaticMarkup(
+      createElement(TurnActions, { onEdit: noop, onRetry: noop, disabled: true }),
+    );
+    expect(html.match(/disabled=""/g)).toHaveLength(2);
+  });
+
+  it("a GM turn gets a focusable Turn actions button, open or not", () => {
+    const closed = renderToStaticMarkup(
+      createElement(GMTurn, {
+        content: "The door opens.",
+        onToggleActions: () => {},
+        actions: createElement("i", null, "ROW"),
+      }),
+    );
+    expect(closed).toContain('aria-label="Turn actions"');
+    expect(closed).toContain('aria-expanded="false"');
+    expect(closed).not.toContain("ROW");
+    const open = renderToStaticMarkup(
+      createElement(GMTurn, {
+        content: "The door opens.",
+        onToggleActions: () => {},
+        actionsOpen: true,
+        actions: createElement("i", null, "ROW"),
+      }),
+    );
+    expect(open).toContain('aria-expanded="true"');
+    expect(open).toContain("ROW");
+  });
+
+  it("a turn without the handlers shows no Turn actions button", () => {
+    const html = renderToStaticMarkup(
+      createElement(GMTurn, { content: "The door opens." }),
+    );
+    expect(html).not.toContain("Turn actions");
+  });
+
+  it("a tap that ends a text selection is not a tap", () => {
+    expect(isTurnTap(null, "some words")).toBe(false);
+    expect(isTurnTap(null, "")).toBe(true);
   });
 });

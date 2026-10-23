@@ -8,7 +8,11 @@ import {
   SceneImageRef,
 } from "../misc/structs";
 import React, { useState, useEffect, useRef } from "react";
-import TTSControls, { TTSRelayHandle } from "../components/TTSControls";
+import TTSControls, {
+  isTTSEnabled,
+  type TTSControlHandle,
+  type TTSRelayHandle,
+} from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import type {
@@ -28,6 +32,7 @@ import {
 import {
   GMTurn,
   PlayerLine,
+  TurnActions,
   type ReasoningTierDisplay,
 } from "./StoryTurn";
 import { canObserverTriggerReset } from "../misc/observer";
@@ -457,7 +462,22 @@ export default function Story({
   onRegenerateImage,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
-  const [editMode, setEditMode] = React.useState(false);
+  // The part being edited (any GM turn, not only the last), or null.
+  const [editingPart, setEditingPart] = React.useState<number | null>(null);
+  // The part whose actions row is open (tap a turn, or its "Turn actions"
+  // button), or null.
+  const [actionsFor, setActionsFor] = React.useState<number | null>(null);
+  // Read aloud presses the same button the player's idle control would.
+  const ttsControlRef = useRef<TTSControlHandle>(null);
+  const readAloud = React.useCallback(() => ttsControlRef.current?.play(), []);
+  // A new turn starting closes the row (adjusted during render, not in an
+  // effect: it follows the props that say a turn is running).
+  const turnRunning = !!loading || !!loadingStage;
+  const [wasTurnRunning, setWasTurnRunning] = React.useState(turnRunning);
+  if (turnRunning !== wasTurnRunning) {
+    setWasTurnRunning(turnRunning);
+    if (turnRunning) setActionsFor(null);
+  }
   const [editedText, setEditedText] = React.useState("");
   const [isHovering, setIsHovering] = React.useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -594,6 +614,11 @@ export default function Story({
       ) {
         return;
       }
+      // Enter/Space on a focused button (or link) presses it; it must not
+      // also jump to the composer. Ctrl+Z, Ctrl+R and the arrows still apply.
+      const onControl =
+        e.target instanceof Element &&
+        !!e.target.closest('button, a, [role="button"]');
 
       // Escape to close modal
       if (e.key === "Escape" && showChoicesModal) {
@@ -606,7 +631,8 @@ export default function Story({
       if (
         (e.key === "Enter" || e.key === " ") &&
         !showChoicesModal &&
-        !editMode
+        !onControl &&
+        editingPart === null
       ) {
         e.preventDefault();
         composerRef.current?.focus();
@@ -664,7 +690,7 @@ export default function Story({
     onUndo,
     canRetry,
     onRetry,
-    editMode,
+    editingPart,
     onNavigateLeft,
     onNavigateRight,
     shortcutsSuspended,
@@ -841,6 +867,55 @@ export default function Story({
     !loading &&
     !loadingStage;
 
+  const toggleActions = (partIndex: number) =>
+    setActionsFor((open) => (open === partIndex ? null : partIndex));
+
+  const startEditing = (partIndex: number) => {
+    const part = storyData.scene.parts[partIndex];
+    if (!part) return;
+    setActionsFor(null);
+    setEditedText(part.raw || part.content);
+    setEditingPart(partIndex);
+  };
+
+  // The row under a tapped turn. The latest turn gets all five actions on the
+  // conditions the old action bar used; an earlier turn gets Edit alone.
+  const renderTurnActions = (partIndex: number) => {
+    const busy = loading || !!loadingStage;
+    const isLatest = partIndex === lastPartIndex;
+    const closeThen = (fn: () => void) => () => {
+      setActionsFor(null);
+      fn();
+    };
+    return (
+      <TurnActions
+        disabled={busy}
+        onRetry={isLatest && canRetry && onRetry ? closeThen(onRetry) : undefined}
+        onUndo={isLatest && canUndo && onUndo ? closeThen(onUndo) : undefined}
+        undoLabel={observerRewriteOriginal ? "Undo revision" : "Undo"}
+        undoTitle={
+          observerRewriteOriginal
+            ? `The Observer revised this response (${observerRewriteOriginal.flag.detail}) - undo puts the GM's original back`
+            : "Undo last action"
+        }
+        onEdit={onEdit && !busy ? () => startEditing(partIndex) : undefined}
+        onIllustrate={
+          isLatest && canIllustrateLast
+            ? closeThen(() => onIllustrate?.(lastPartIndex))
+            : undefined
+        }
+        onReadAloud={
+          isLatest && storyText.trim() && isTTSEnabled()
+            ? () => {
+                setActionsFor(null);
+                readAloud();
+              }
+            : undefined
+        }
+      />
+    );
+  };
+
   // State for combat display expansion
   const [showCombat, setShowCombat] = React.useState(true);
 
@@ -859,6 +934,7 @@ export default function Story({
   // layout shift when suggested choices appear) yanked the view back down
   // even while someone was mid-scroll reading history.
   const stickToBottomRef = useRef(true);
+  const ignoreScrollRef = useRef(false);
   const NEAR_BOTTOM_THRESHOLD_PX = 80;
 
   useEffect(() => {
@@ -868,10 +944,38 @@ export default function Story({
       const distanceFromBottom =
         container.scrollHeight - container.scrollTop - container.clientHeight;
       stickToBottomRef.current = distanceFromBottom < NEAR_BOTTOM_THRESHOLD_PX;
+      // Scrolling hides the actions row - except the scroll that bringing
+      // the row into view causes (see the effect below).
+      if (!ignoreScrollRef.current) setActionsFor(null);
     };
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Opening the row under the latest turn adds height at the bottom: keep it
+  // in view when the player is already there, without that scroll closing it.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (actionsFor === null || !container || !stickToBottomRef.current) return;
+    ignoreScrollRef.current = true;
+    container.scrollTop = container.scrollHeight;
+    const frame = requestAnimationFrame(() => {
+      ignoreScrollRef.current = false;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [actionsFor]);
+
+  // A tap outside any turn closes the row; a tap on a turn is that turn's
+  // own toggle (GMTurn onTap), so it is left to it.
+  useEffect(() => {
+    if (actionsFor === null) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest("[data-turn]")) return;
+      setActionsFor(null);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [actionsFor]);
 
   // A fresh submission should always snap back to the bottom, even if the
   // player had scrolled up to reread something before acting.
@@ -972,6 +1076,12 @@ export default function Story({
                     )}
                     mentionMatcher={mentionMatcher}
                     onMentionClick={handleMentionClick}
+                    onTap={() => toggleActions(exchange.gmMsg!.partIndex)}
+                    onToggleActions={() =>
+                      toggleActions(exchange.gmMsg!.partIndex)
+                    }
+                    actionsOpen={actionsFor === exchange.gmMsg.partIndex}
+                    actions={renderTurnActions(exchange.gmMsg.partIndex)}
                   />
                 )}
               </div>
@@ -1026,46 +1136,52 @@ export default function Story({
           </div>
         </div>
 
-        {/* Edit Mode */}
-        {editMode && (
-          <div className="p-4 bg-white/[0.03] border-t border-white/10">
+        {/* Edit panel: any GM turn, opened from its actions row. */}
+        {editingPart !== null && (
+          <div className="p-4 bg-ys-surface border-t border-ys-border">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <h3 className="text-base font-semibold text-ys-text flex items-center gap-2">
                   <DynamicIcon name="Pencil" className="w-4 h-4" />
                   Edit Response
                 </h3>
               </div>
+              {editingPart < (storyData.scene.summarizedThroughIndex ?? 0) && (
+                <p className="text-xs text-ys-muted">
+                  This turn is already in the summary. The GM reads the
+                  summary, not this text.
+                </p>
+              )}
               <textarea
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
-                className="w-full h-48 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 font-mono text-sm resize-none transition-colors"
+                className="w-full h-48 px-3 py-2 bg-ys-bg border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent font-mono text-sm resize-none transition-colors"
                 placeholder="Edit the raw AI output..."
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-blue-200/40">
+                <span className="text-xs text-ys-muted">
                   {editedText.length} characters
                 </span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      setEditMode(false);
+                      setEditingPart(null);
                       setEditedText("");
                     }}
-                    className="px-3 py-1.5 text-sm font-medium text-blue-200 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-ys-text bg-ys-bg hover:bg-ys-border border border-ys-border rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => {
                       if (onEdit && editedText.trim()) {
-                        onEdit(editedText, storyData.scene.parts.length - 1);
-                        setEditMode(false);
+                        onEdit(editedText, editingPart);
+                        setEditingPart(null);
                         setEditedText("");
                       }
                     }}
                     disabled={!editedText.trim()}
-                    className="px-3 py-1.5 text-sm font-medium bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-purple-950/40 disabled:shadow-none transition-all flex items-center gap-1.5"
+                    className="px-3 py-1.5 text-sm font-medium bg-ys-accent text-ys-bg hover:opacity-90 disabled:opacity-40 rounded-lg transition-opacity flex items-center gap-1.5"
                   >
                     <DynamicIcon name="Save" className="w-4 h-4" />
                     Save
@@ -1076,99 +1192,30 @@ export default function Story({
           </div>
         )}
 
-        {/* Action Buttons Bar */}
-        {!editMode && (
-          <div className="flex items-center justify-between px-4 py-2 bg-white/[0.03] border-t border-white/10">
-            {/* Left side: Retry, Undo & Edit */}
-            <div className="flex items-center gap-1.5 sm:gap-1">
-              {canUndo && onUndo && (
-                <button
-                  onClick={onUndo}
-                  disabled={loading || !!loadingStage}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                  title={
-                    observerRewriteOriginal
-                      ? `The Observer revised this response (${observerRewriteOriginal.flag.detail}) - undo puts the GM's original back`
-                      : "Undo last action"
-                  }
-                >
-                  <DynamicIcon name="Undo2" className="w-5 h-5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">
-                    {observerRewriteOriginal ? "Undo revision" : "Undo"}
-                  </span>
-                </button>
-              )}
-              {canRetry && onRetry && (
-                <button
-                  onClick={onRetry}
-                  disabled={loading || !!loadingStage}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/15 active:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                  title="Regenerate response"
-                >
-                  <DynamicIcon
-                    name="RotateCcw"
-                    className="w-5 h-5 sm:w-4 sm:h-4"
-                  />
-                  <span className="hidden sm:inline">Retry</span>
-                </button>
-              )}
-              {onEdit && !loading && !loadingStage && (
-                <button
-                  onClick={() => {
-                    setEditMode(true);
-                    const lastPart =
-                      storyData.scene.parts[storyData.scene.parts.length - 1];
-                    setEditedText(lastPart?.raw || storyText);
-                  }}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 touch-manipulation"
-                  title="Edit response"
-                >
-                  <DynamicIcon
-                    name="Pencil"
-                    className="w-5 h-5 sm:w-4 sm:h-4"
-                  />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
-              )}
-            </div>
-
-            {/* Right side: TTS - manual press waits for narration to finish;
-                auto-narrate (if enabled) starts reading live as the GM
-                streams instead of waiting - see storyTextReady prop. While
-                streaming, prefer liveNarrationText (grows as the GM writes,
-                even on the common path where storyText itself only jumps to
-                the full text once at the very end) over storyText - falls
-                back to storyText when there's nothing live yet (e.g. the
-                separate story-stage path, which already streams storyText
-                incrementally on its own). */}
-            <div className="flex items-center gap-1.5">
-            {canIllustrateLast && (
-              <button
-                onClick={() => onIllustrate?.(lastPartIndex)}
-                className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 touch-manipulation"
-                title="Paint a picture of this moment"
-              >
-                <DynamicIcon name="Image" className="w-5 h-5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Illustrate this</span>
-              </button>
-            )}
-            <TTSControls
-              text={
-                !storyTextReady && liveNarrationText
-                  ? liveNarrationText
-                  : storyText
-              }
-              disabled={loading || !storyTextReady}
-              storyTextReady={storyTextReady}
-              onAudioChunk={onTTSAudioChunk}
-              onAudioEnd={onTTSAudioEnd}
-              relayMode={ttsRelayMode}
-              relayHandleRef={ttsRelayHandleRef}
-              storyId={storyId}
-            />
-            </div>
-          </div>
-        )}
+        {/* Narration player: slim, only while a narration is unfinished. It
+            stays mounted when idle because it runs auto-narrate. Manual read
+            waits for narration to finish; auto-narrate (if enabled) starts
+            reading live as the GM streams instead of waiting - see
+            storyTextReady. While streaming, prefer liveNarrationText (grows
+            as the GM writes, even on the common path where storyText itself
+            only jumps to the full text once at the very end) over storyText -
+            falls back to storyText when there's nothing live yet (e.g. the
+            separate story-stage path, which already streams storyText
+            incrementally on its own). */}
+        <TTSControls
+          variant="slim"
+          controlHandleRef={ttsControlRef}
+          text={
+            !storyTextReady && liveNarrationText ? liveNarrationText : storyText
+          }
+          disabled={loading || !storyTextReady}
+          storyTextReady={storyTextReady}
+          onAudioChunk={onTTSAudioChunk}
+          onAudioEnd={onTTSAudioEnd}
+          relayMode={ttsRelayMode}
+          relayHandleRef={ttsRelayHandleRef}
+          storyId={storyId}
+        />
 
         {/* Collect-all-then-generate lobby: shown while the host is waiting
             on the table (host sees "Start now" / "Pass"; guests see who
@@ -1198,7 +1245,7 @@ export default function Story({
         )}
 
         {/* Composer: suggested choices, player switcher, and chat input */}
-        {!editMode && (
+        {editingPart === null && (
           <StoryComposer
             ref={composerRef}
             choices={choices}

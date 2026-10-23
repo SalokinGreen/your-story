@@ -610,3 +610,42 @@ None was dropped.
 - **`stripNode` helper in `StoryTurn.tsx`** replaces the destructured unused
   `node` props in the markdown components (ten lint warnings in a new file).
 - **Regenerate in the full-screen picture closes the dialog** before it runs.
+
+### 2026-10-23, slice 4
+
+- **The icon is `Ellipsis`**: lucide's `icons` map has no `MoreHorizontal`
+  (it is an alias only the named export carries), and `DynamicIcon` looks the
+  name up in the map.
+- **The keydown listener skips buttons only for Enter/Space**, not wholesale.
+  An early return for any button target would also drop Ctrl+Z, Ctrl+R and
+  the arrows after the player pressed Retry or Edit, which the plan says stay.
+  The check is `closest('button, a, [role="button"]')`, so a mention span
+  (`role="button"`) is covered too.
+- **Tap detection (`isTurnTap`, `StoryTurn.tsx`)**: GMTurn's `onClick` calls it
+  with the event target and `window.getSelection()?.toString()`. A non-empty
+  selection is not a tap; a target inside `button, a, [role=button], img,
+  video, [data-no-turn-tap]` is not a tap. The picture block and the work line
+  carry `data-no-turn-tap`. It duck-types `closest` so the node-env test can
+  call it.
+- **A tap outside closes the row** with a document `click` listener that
+  ignores clicks inside any `[data-turn]` (a tap on another turn is that turn's
+  own toggle). **Scrolling closes it** from the feed's scroll listener, except
+  the scroll the page makes itself to keep a just-opened row under the latest
+  turn in view (`ignoreScrollRef`, cleared on the next animation frame).
+- **A new turn starting closes the row** by adjusting state during render when
+  `loading || loadingStage` flips on (an effect would be a lint error,
+  `set-state-in-effect`).
+- **Slim visibility** needs no new state: `variant === "slim"` renders nothing
+  when `!hasController || centerTitle === "Replay"`. `hasController` is
+  `isPlaying || isLoading || isMuted || hasAudio`, and `centerTitle` is
+  "Replay" exactly when nothing is active or muted and `finishedRef` says the
+  playback ended; reading the ref again in render would add lint errors.
+- **`controlHandleRef` calls `handleToggle`**, the function the idle button's
+  `onClick` is. Pressed while narration plays it pauses, like that button.
+  The Read aloud action is offered for the latest turn when `storyText` is
+  non-empty and `isTTSEnabled()` (now exported) is true. The page-side
+  callback (`readAloud`) is a `useCallback` over the ref; passing it through a
+  helper made the ref lint rule fire on the feed's `map`.
+- **Hit areas**: the "Turn actions" button is a 24 px target with the icon,
+  dim (40%) until hover or focus, not the 40 px of the row's buttons; it sits
+  beside a text line that is itself small.
