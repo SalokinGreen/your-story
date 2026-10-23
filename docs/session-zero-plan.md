@@ -360,3 +360,32 @@ the code and taken in:
   `requestSetupConfirmation` is absent, as the brief said, so until slice 2
   wires the page, the GM is told to ask in chat (and `start_game` stays
   blocked: setup cannot finish on the live page until slice 2 lands).
+
+### 2026-10-23, slice 2
+
+- **Pure pieces live in `app/misc/setupConfirmAnswer.ts`** (`SETUP_APPROVED`,
+  `SETUP_DISMISSED`, `SETUP_STOPPED`, `changesAnswer`, `settleSetupResolver`),
+  tested in `tests/setupConfirmAnswer.test.ts`; Stop resolves through
+  `settleSetupResolver`, which is a no-op when no card is open. There is no
+  DOM test setup, so the modal and the page wiring are unverified until the
+  preview.
+- **Wiring:** `GenerateStoryTurnCallbacks.onRequestSetupConfirmation` feeds
+  `requestSetupConfirmation`, and `GenerateStoryTurnOptions.setupPlayers` feeds
+  `GMToolContext.setupPlayers`. Both page call sites that run the GM pass
+  them; the reword-retry call (precomputed GM results) does not run tools.
+- **`setupPlayers`** is the couch players mapped to `{id, name}`: party seats
+  are written into `multiplayer.couchPlayers` by `usePartyHost`, so they are
+  the same list. Equivalent to the default in `getSetupProgress`; passed
+  explicitly so a later change to the roster source has one place to edit.
+- **Card contents:** the sheet and plan text show as plain pre-wrapped text in
+  `<details>` sections (no markdown renderer is used for notes on the lore
+  page's editors). Closing it (X, backdrop, Back) is `{ dismissed: true }`;
+  Stop is the page's Stop button -> `{ stopped: true }`. A second request while
+  one is open dismisses the first. `notifyPlayerNeeded("question", ...)` fires
+  as for ask_question.
+- **Party mode / online:** the card renders on the page itself (the table or
+  the host's screen) and is never offered to a phone or relayed. **Guest
+  "The host is reviewing the setup" indicator: skipped.** The only guest
+  signal is `turn_status` (collecting/generating), which would need a
+  protocol change; a guest sees the turn generating as for any paused tool.
+  Add it with slice 4/5 if wanted.

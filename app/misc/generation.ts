@@ -108,6 +108,8 @@ import {
   DiceThrowRequest,
   AskQuestionRequest,
   AskQuestionAnswer,
+  SetupConfirmationRequest,
+  SetupConfirmationAnswer,
   GMExecutionResult,
   resolveCheckPerTurnVisibility,
   rollAwareToolName,
@@ -277,6 +279,9 @@ export interface GenerationOptions {
   replyLength?: ReplyLength;
   // Abort signal for cancelling generation
   abortSignal?: AbortSignal;
+  // Who needs a character sheet during session zero (couch players or party
+  // seats), passed on to the GM tool context for confirm_setup / start_game.
+  setupPlayers?: { id: string; name: string }[];
   // Layer 5 hardening (see observer.ts): set internally by generateStoryTurn's
   // observer retry loop, not meant to be passed in by callers. Injected into
   // the GM prompt to explain why the previous attempt at this turn was reset.
@@ -383,6 +388,12 @@ export interface GenerationCallbacks {
   onAskQuestion?: (
     request: AskQuestionRequest
   ) => Promise<AskQuestionAnswer | null>;
+  // The GM called confirm_setup (session zero): the UI shows the setup card
+  // and resolves with the player's decision (approved, changes, dismissed or
+  // stopped).
+  onRequestSetupConfirmation?: (
+    request: SetupConfirmationRequest
+  ) => Promise<SetupConfirmationAnswer>;
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,
@@ -2820,10 +2831,12 @@ async function generateStoryTurnOnce(
                 requestManualRoll: callbacks.onAskForRoll,
                 requestDiceThrow: callbacks.onRequestDiceThrow,
                 requestPlayerAnswer: callbacks.onAskQuestion,
+                requestSetupConfirmation: callbacks.onRequestSetupConfirmation,
               },
               {
                 imageJobs: options.imageToolContext,
                 abortSignal: options.abortSignal,
+                setupPlayers: options.setupPlayers,
               },
             );
 

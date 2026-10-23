@@ -67,6 +67,7 @@ const TOKENISED_TSX: string[] = [
   "app/components/DiceThrowModal.tsx",
   "app/components/ManualRollModal.tsx",
   "app/components/AskQuestionModal.tsx",
+  "app/components/SetupConfirmModal.tsx",
   "app/components/PlayerBubbles.tsx",
   "app/components/OOCChatPanel.tsx",
   "app/components/TurnLobbyOverlay.tsx",

@@ -90,12 +90,20 @@ import type { PartyPending } from "../misc/party/partyRuntime";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
 import AskQuestionModal from "../components/AskQuestionModal";
+import SetupConfirmModal from "../components/SetupConfirmModal";
+import {
+  SETUP_DISMISSED,
+  SETUP_STOPPED,
+  settleSetupResolver,
+} from "../misc/setupConfirmAnswer";
 import type {
   ManualRollRequest,
   ManualRollAnswer,
   DiceThrowRequest,
   AskQuestionRequest,
   AskQuestionAnswer,
+  SetupConfirmationRequest,
+  SetupConfirmationAnswer,
 } from "../misc/gmExecutor";
 import {
   type TimelineBlock,
@@ -707,6 +715,13 @@ function StoryPageContent() {
     useState<AskQuestionRequest | null>(null);
   const askQuestionResolveRef = useRef<
     ((answer: AskQuestionAnswer | null) => void) | null
+  >(null);
+  // Session zero: the setup card (confirm_setup). Shown on this screen only -
+  // the table or the host's, never relayed to a phone or an online guest.
+  const [setupConfirmRequest, setSetupConfirmRequest] =
+    useState<SetupConfirmationRequest | null>(null);
+  const setupConfirmResolveRef = useRef<
+    ((answer: SetupConfirmationAnswer) => void) | null
   >(null);
   // Party mode: the request id of a roll or question currently shown on a
   // player's phone rather than in the modals above (null when it isn't).
@@ -2512,6 +2527,7 @@ function StoryPageContent() {
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
           abortSignal: generationAbortRef.current.signal,
+          setupPlayers: setupRoster(),
           imageJobDeps: buildImageJobDeps(),
           scenePartId: partialPart.id,
         },
@@ -2526,6 +2542,7 @@ function StoryPageContent() {
           onReasoningTierResolved: (resolved) => setLiveReasoningTier(resolved),
           onAskForRoll: requestManualRoll,
           onAskQuestion: requestPlayerAnswer,
+          onRequestSetupConfirmation: requestSetupConfirmation,
           onRequestDiceThrow:
             storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
           onCompaction: (summary) => {
@@ -3105,6 +3122,7 @@ function StoryPageContent() {
           zaiKey,
           storyId: storyDbId || undefined,
           abortSignal: generationAbortRef.current.signal,
+          setupPlayers: setupRoster(),
           imageJobDeps: buildImageJobDeps(),
           scenePartId: partialPart.id,
           enableEmbeddings: embeddingsEnabled,
@@ -3129,6 +3147,7 @@ function StoryPageContent() {
           onReasoningTierResolved: (resolved) => setLiveReasoningTier(resolved),
           onAskForRoll: requestManualRoll,
           onAskQuestion: requestPlayerAnswer,
+          onRequestSetupConfirmation: requestSetupConfirmation,
           onRequestDiceThrow:
             storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
           onCompaction: (summary) => {
@@ -3771,6 +3790,32 @@ function StoryPageContent() {
     }
   }
 
+  // confirm_setup: show the setup card and wait for the decision.
+  function requestSetupConfirmation(request: SetupConfirmationRequest) {
+    return new Promise<SetupConfirmationAnswer>((resolve) => {
+      // A card already open is replaced: close the old one as dismissed.
+      settleSetupResolver(setupConfirmResolveRef, SETUP_DISMISSED);
+      setupConfirmResolveRef.current = resolve;
+      setSetupConfirmRequest(request);
+      notifyPlayerNeeded("question", request.characterSummary);
+    });
+  }
+
+  function resolveSetupConfirmation(answer: SetupConfirmationAnswer) {
+    settleSetupResolver(setupConfirmResolveRef, answer);
+    setSetupConfirmRequest(null);
+  }
+
+  // Who needs a character sheet in session zero. Party seats live in
+  // multiplayer.couchPlayers (the host writes them back), so the roster is the
+  // couch players either way; getSetupProgress reads one sheet for a solo story.
+  function setupRoster(): { id: string; name: string }[] {
+    return (storyData?.multiplayer?.couchPlayers ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
+  }
+
   // Physical dice mode: called by the GM executor when a formula roll can
   // be thrown physically. If we're hosting a networked session and the
   // turn in flight is attributable to exactly one connected guest (not the
@@ -3832,6 +3877,7 @@ function StoryPageContent() {
     resolveManualRoll(null);
     resolveDiceThrow(null);
     resolveAskQuestion(null);
+    resolveSetupConfirmation(SETUP_STOPPED);
     abandonRelayedDiceThrows();
     if (generationAbortRef.current) {
       generationAbortRef.current.abort();
@@ -4923,6 +4969,7 @@ function StoryPageContent() {
     profilePickerOpen ||
     !!manualRollRequest ||
     !!askQuestionRequest ||
+    !!setupConfirmRequest ||
     !!diceThrowRequest ||
     confirmDialog.isOpen ||
     syncConflict.isOpen;
@@ -5236,6 +5283,13 @@ function StoryPageContent() {
         couchPlayers={storyData?.multiplayer?.couchPlayers}
         onAnswer={resolveAskQuestion}
         onSkipAll={() => resolveAskQuestion(null)}
+      />
+
+      {/* Session zero: the setup card (confirm_setup) - generation is paused
+          until the player starts the story, asks for changes or closes it */}
+      <SetupConfirmModal
+        request={setupConfirmRequest}
+        onAnswer={resolveSetupConfirmation}
       />
 
       {/* Physical dice mode: the GM's roll can be thrown on a 3D dice tray -
