@@ -134,20 +134,22 @@ function getModelsFromPreset() {
   };
 }
 
-import { DEFAULT_PRESET } from "../misc/presets";
+import {
+  DEFAULT_PRESET,
+  hasPremadeCharacters,
+  shouldUseIntroOverride,
+} from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import SyncConflictModal from "../components/SyncConflictModal";
 import SyncIndicator from "../components/SyncIndicator";
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
-import { fillTemplate } from "../misc/characterSheetTemplate";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn } from "../misc/generation";
 import { MAX_UNDO_STACK_SIZE } from "../misc/localStoryManager";
 import { GMNPCReactionResult } from "../misc/gmExecutor";
 import { tickCooldowns } from "../misc/abilitySystem";
-import CharacterCreationForm from "./create-character/form";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
 import { useViewportHeight } from "../misc/useViewportHeight";
@@ -440,7 +442,6 @@ enum StoryState {
   MENU = "MENU",
   LOGS = "LOGS",
   CONTEXT = "CONTEXT",
-  CHARACTER_CREATION = "CHARACTER_CREATION",
 }
 
 function trimStoryData(data: StoryData): StoryData {
@@ -1105,7 +1106,7 @@ function StoryPageContent() {
   const [canRetry, setCanRetry] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [showPresetSelection, setShowPresetSelection] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
+  const startCustomPendingRef = useRef(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -1120,83 +1121,6 @@ function StoryPageContent() {
     message: "",
     onConfirm: () => {},
   });
-
-  const handleCharacterCreate = async (
-    characterData: Record<string, string>,
-  ) => {
-    if (!storyData || !selectedPreset) return;
-    logger.action("User created custom character", { characterData });
-
-    const updatedStoryData = {
-      ...storyData,
-      characterData,
-      selected_preset: selectedPreset.id,
-    };
-
-    // For custom preset, generate a character sheet from the template and filled data
-    if (
-      updatedStoryData.characterSheetTemplate?.template &&
-      Object.keys(characterData).length > 0
-    ) {
-      // Use the proper fillTemplate function that handles "FieldName (Category)" syntax
-      const filledSheet = fillTemplate(
-        updatedStoryData.characterSheetTemplate.template,
-        characterData,
-      );
-      updatedStoryData.characterSheet = filledSheet;
-
-      // Add character sheet to lore as "character_sheet" type for AI context
-      const characterSheetLore: StoryLore = {
-        title: "Player Character Sheet",
-        content: filledSheet,
-        relatedCharacters: [],
-        relatedLocations: [],
-        secrtet: false,
-        keys: [],
-        type: "character_sheet",
-        on: true,
-        on_triggers: [],
-        off_triggers: [],
-        var_on_triggers: [],
-        var_off_triggers: [],
-      };
-      updatedStoryData.lore = [
-        ...(updatedStoryData.lore || []),
-        characterSheetLore,
-      ];
-    }
-
-    // Determine starting choices
-    const startingChoices = updatedStoryData.starting_choices?.length
-      ? updatedStoryData.starting_choices.map((sc) => ({
-          text: sc.text,
-          intro_override: sc.intro_override,
-        }))
-      : [{ text: "Start Story" }];
-
-    // Add starting scene part
-    updatedStoryData.scene.parts.push({
-      content: updatedStoryData.intro || "The story begins.",
-      imageUrl: "",
-      user: false,
-      role: "assistant",
-      choices: startingChoices,
-    });
-
-    setStoryData(updatedStoryData);
-    setShowPresetSelection(false);
-    setCurrentState(StoryState.STORY);
-    setStarted(true);
-
-    // Set story text and choices from the first part
-    const lastPart =
-      updatedStoryData.scene.parts[updatedStoryData.scene.parts.length - 1];
-    setStoryText(lastPart.content);
-    setChoices({ choices: lastPart.choices || [] });
-
-    // Save the story
-    await performSave(updatedStoryData);
-  };
 
   // NPC Reaction notifications (social media style)
   const [pendingNPCReactions, setPendingNPCReactions] = useState<NPCReaction[]>(
@@ -1444,7 +1368,11 @@ function StoryPageContent() {
 
       //Initializestoryifnopartsyet-showpresetselection
       if (loadedStoryData.scene.parts.length === 0) {
-        setShowPresetSelection(true);
+        if (hasPremadeCharacters(loadedStoryData)) {
+          setShowPresetSelection(true);
+        } else {
+          startCustomPendingRef.current = true;
+        }
         setLoadingStory(false);
         return true; // early return signal
       }
@@ -1607,50 +1535,12 @@ function StoryPageContent() {
     if (!storyData) return;
     logger.action("User selected preset", { preset: preset.name });
 
-    // For custom preset with a character sheet template, redirect to character creation
     const isCustom = preset.id === "custom";
-    if (isCustom) {
-      // Check if storyData has characterSheetTemplate with fields
-      let templateWithFields = storyData.characterSheetTemplate;
-
-      // If not in storyData, try to fetch from the source adventure
-      if (!templateWithFields?.fields?.length && sourceAdventureId) {
-        try {
-          const { getLocalAdventure } =
-            await import("@/app/misc/localAdventureManager");
-          const localAdv = await getLocalAdventure(sourceAdventureId);
-          const adventure = localAdv?.adventureData;
-          if (adventure?.characterSheetTemplate?.fields?.length) {
-            templateWithFields = adventure.characterSheetTemplate;
-            // Also update storyData so we have it for later
-            setStoryData((prev) =>
-              prev
-                ? { ...prev, characterSheetTemplate: templateWithFields }
-                : prev,
-            );
-          }
-        } catch (error) {
-          console.error(
-            "Failed to fetch adventure for character template:",
-            error,
-          );
-        }
-      }
-
-      if (templateWithFields?.fields?.length) {
-        setSelectedPreset(preset);
-        setCurrentState(StoryState.CHARACTER_CREATION);
-        setShowPresetSelection(false);
-        return;
-      }
-    }
-
     const updatedStoryData = { ...storyData };
 
-    // For custom preset, use default values but don't apply any preset-specific overrides
-    // The user can customize via the menu after starting
-
-    // Apply preset to story data (skip for custom - use adventure defaults)
+    // Custom starts with no sheet: the GM builds it with the player in session
+    // zero, from the adventure's template when it has one. A pre-made
+    // character brings its own sheet.
     if (!isCustom) {
       // Add character sheet to lore if preset has one
       if (preset.characterSheet) {
@@ -1673,23 +1563,13 @@ function StoryPageContent() {
           characterSheetLore,
         ];
       }
-      if (preset.stats?.length)
-        updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
-      if (preset.resources?.length)
-        updatedStoryData.resources = JSON.parse(
-          JSON.stringify(preset.resources),
-        );
-      if (preset.inventory?.length)
-        updatedStoryData.inventory = JSON.parse(
-          JSON.stringify(preset.inventory),
-        );
-      if (preset.relationships?.length)
-        updatedStoryData.relationships = JSON.parse(
-          JSON.stringify(preset.relationships),
-        );
       if (preset.authorNotes)
         updatedStoryData.author_notes = preset.authorNotes;
     }
+
+    // Every new adventure starts in session zero: the observer stays
+    // suspended and start_game closes setup.
+    updatedStoryData.sessionZeroActive = true;
 
     // Determine starting choices - use custom ones if available, otherwise default
     // Choices are now plain text only - GM stage handles all dice mechanics
@@ -1735,22 +1615,24 @@ function StoryPageContent() {
     setInput({ StartStory: false });
     setStarted(true);
     setShowPresetSelection(false);
-    setSelectedPreset(preset);
 
-    // For custom preset, open the menu so user can customize their character
-    if (isCustom) {
-      setMenuOpen(true);
-      addNotification(
-        "Customize your character in the menu, then return to the story!",
-        "success",
-      );
-    } else {
+    if (!isCustom) {
       addNotification(
         `Character preset "${preset.name}" applied! ?`,
         "success",
       );
     }
   };
+
+  // An adventure with no pre-made character skips the picker and starts as
+  // Custom. setupUIFromStory only flags it: handlePresetSelect reads the
+  // storyData and storyDbId state, which are set by the time this effect runs.
+  useEffect(() => {
+    if (!startCustomPendingRef.current || !storyData || !storyDbId) return;
+    startCustomPendingRef.current = false;
+    void handlePresetSelect(DEFAULT_PRESET);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyData, storyDbId]);
 
   // Best-effort persist of the undo stack to IndexedDB so it survives a
   // reload - fire-and-forget like saveProgress's debounced writes below,
@@ -3584,8 +3466,9 @@ function StoryPageContent() {
     setPendingUserChoice(choice.text);
 
     // Check if this choice has intro_override (for starting choices)
-    // If so, skip AI generation and use the preset intro directly
-    if (choice.intro_override) {
+    // If so, skip AI generation and use the preset intro directly. Not during
+    // session zero: then the choice goes to the GM (see the flavor lines below).
+    if (choice.intro_override && shouldUseIntroOverride(storyData, choice)) {
       logger.action("Using intro_override instead of AI generation", {
         choice: choice.text,
       });
@@ -3791,6 +3674,14 @@ function StoryPageContent() {
           console.error("Error processing context roll:", error);
         }
       }
+    }
+
+    // A starting choice with an authored opening, picked during session zero:
+    // the GM gets it as the opening to narrate once setup is done.
+    if (choice.intro_override && !shouldUseIntroOverride(storyData, choice)) {
+      flavorLines.push(
+        `The adventure's opening for this choice, to narrate once setup is done: ${choice.intro_override}`,
+      );
     }
 
     let text = ">" + choice.text;
@@ -5345,37 +5236,6 @@ function StoryPageContent() {
                         </p>
                       </div>
                     </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {preset.id !== "custom" ? (
-                        <>
-                          {preset.stats && preset.stats.length > 0 && (
-                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">
-                              {preset.stats.length} Stats
-                            </span>
-                          )}
-                          {preset.resources && preset.resources.length > 0 && (
-                            <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded">
-                              {preset.resources.length} Resources
-                            </span>
-                          )}
-                          {preset.inventory && preset.inventory.length > 0 && (
-                            <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded">
-                              {preset.inventory.length} Items
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
-                            Default Stats
-                          </span>
-                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
-                            Starter Items
-                          </span>
-                        </>
-                      )}
-                    </div>
                   </button>
                 ))}
               </div>
@@ -5600,12 +5460,6 @@ function StoryPageContent() {
             router.push("/library");
           }}
         />
-        {currentState === StoryState.CHARACTER_CREATION && (
-          <CharacterCreationForm
-            storyData={storyData}
-            onCharacterCreate={handleCharacterCreate}
-          />
-        )}
         {currentState === StoryState.LORE && (
           <LorePage
             {...storyData}

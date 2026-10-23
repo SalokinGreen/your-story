@@ -1186,6 +1186,8 @@ export interface LiveBlockInput {
   pendingEventsSection: string;
   pendingMovesSection: string;
   freshStorySetupBlock: string;
+  // The adventure's character sheet template, for as long as session zero lasts.
+  sheetTemplateBlock?: string;
   sessionZeroStartGameReminder: string;
   setupOverdueBlock: string;
   observerNoteBlock: string;
@@ -1194,6 +1196,26 @@ export interface LiveBlockInput {
   knowledgeNoteBlock: string;
   pacingFeedbackLine: string;
   gmAdviceSection: string;
+}
+
+/**
+ * The adventure's character sheet template, shown to the GM for all of
+ * session zero (so a second player at the table gets it too) and gone once
+ * `start_game` ends setup. It rides in the live block because it appears and
+ * disappears with the story's state. Empty when there is no template.
+ */
+export function buildSheetTemplateBlock(
+  storyData: Pick<StoryData, "sessionZeroActive" | "characterSheetTemplate">,
+): string {
+  const template = storyData.characterSheetTemplate?.template;
+  if (!storyData.sessionZeroActive || !template) return "";
+  return `
+## CHARACTER SHEET TEMPLATE
+This adventure comes with a character sheet template. Build each player's sheet in this shape: fill in every field with the player in conversation. The \`| default\` values are examples, not choices made for the player. Write the finished sheet with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one note per player.
+\`\`\`
+${template}
+\`\`\`
+`;
 }
 
 export function buildLiveBlock(input: LiveBlockInput): string {
@@ -1217,6 +1239,7 @@ export function buildLiveBlock(input: LiveBlockInput): string {
   // prompt, which made it different every turn).
   const nudges =
     input.freshStorySetupBlock +
+    (input.sheetTemplateBlock ?? "") +
     input.sessionZeroStartGameReminder +
     input.setupOverdueBlock +
     input.observerNoteBlock +
@@ -1711,7 +1734,7 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
       ? `\n## 🆕 FRESH STORY - SETUP NEEDED
 This is a brand-new story with no established setting or character yet - the player skipped adventure creation to talk to you directly.
 - If the player's message doesn't give you enough to go on (genre, tone, character concept), ask up to 1-3 concise, friendly questions before creating anything. Do NOT narrate a full opening scene yet - just respond conversationally (use OOC round-brackets or plain text).
-- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one). Then call \`start_game\` with a title for the story and a short premise summary, and narrate the opening scene. The plan note must come BEFORE \`start_game\` - \`start_game\` is blocked until it exists.
+- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (the character sheet - from the CHARACTER SHEET TEMPLATE below when there is one, otherwise fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one). Then call \`start_game\` with a title for the story and a short premise summary, and narrate the opening scene. The plan note must come BEFORE \`start_game\` - \`start_game\` is blocked until it exists.
 - If ANY lore/mechanics/dm_instructions notes already exist on this story (e.g. from an adventure template), \`read_notes\` or \`search_notes\` them before writing the character sheet, mechanics, or plan notes - ground what you create in what's already established instead of inventing a setting from scratch. This is ENFORCED for the plan: \`create_note\` will refuse to create the "Campaign Plan" note until you've called \`read_notes\`/\`search_notes\` this turn, if any such notes exist.
 - Keep the interview short - one or two exchanges at most before diving in.
 `
@@ -2140,6 +2163,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     pendingEventsSection: gmStagePendingEventsSection,
     pendingMovesSection: gmStagePendingDirectorMovesSection,
     freshStorySetupBlock,
+    sheetTemplateBlock: buildSheetTemplateBlock(storyData),
     sessionZeroStartGameReminder,
     setupOverdueBlock,
     observerNoteBlock,

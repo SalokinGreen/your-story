@@ -298,4 +298,23 @@ staying up for all of session zero covers the gap this change opens.
 
 ## Decisions made during implementation
 
-(Filled in as slices land.)
+### 2026-10-23, slice 1
+
+- **Auto-start is a ref plus an effect, not a direct call.** The load effect
+  runs before `storyData` state exists, and `handlePresetSelect` reads state,
+  so `setupUIFromStory` sets `startCustomPendingRef` and an effect on
+  `[storyData, storyDbId]` calls `handlePresetSelect(DEFAULT_PRESET)` once
+  both are set. (A state flag would have added a `set-state-in-effect` lint
+  error.)
+- **Starting-choice text.** The override line is added to the player's turn
+  text through `flavorLines` in `handleChoice`, so it shows in the stored
+  player part like the oracle and table lines do.
+- **`shouldUseIntroOverride` takes `Pick<Choice, "text" | "intro_override">`**
+  and `page.tsx` also tests `choice.intro_override` itself, because the helper
+  is not a type guard.
+- **`DEFAULT_PRESET.description`** is now "Build your character with the GM."
+  (the picker card reads it); its other fields wait for slice 4.
+- `sourceAdventureId` state stays: the restart and New Game paths still read
+  it (slice 2 removes those). Only the dead template refetch went.
+- `selectedPreset` state went too (its only reader was the deleted form).
+
