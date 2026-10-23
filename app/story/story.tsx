@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_READING_FONT, DEFAULT_THEME_ID } from "./themeTokens";
 import {
   Choice,
   Choices,
@@ -180,11 +181,6 @@ interface FontSettings {
   lineHeight: number;
   paragraphSpacing: number;
   theme?: string;
-  themeColors?: {
-    background: string;
-    text: string;
-    accent: string;
-  };
 }
 
 // A single minimized, expandable thinking/tool row - click to see the full
@@ -916,16 +912,10 @@ export default function Story({
   // Font settings state
   const [fontSettings, setFontSettings] = useState({
     fontSize: 16,
-    fontFamily:
-      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: DEFAULT_READING_FONT,
     lineHeight: 1.6,
     paragraphSpacing: 0.5,
-    theme: "default",
-    themeColors: {
-      background: "rgb(23, 37, 84)",
-      text: "rgb(239, 246, 255)",
-      accent: "rgb(59, 130, 246)",
-    },
+    theme: DEFAULT_THEME_ID,
   });
 
   // Load font settings from localStorage and listen for changes
@@ -933,35 +923,17 @@ export default function Story({
     if (typeof window === "undefined") return;
 
     const loadFontSettings = () => {
-      // Get theme colors from CSS variables or use defaults
-      const computedStyle = getComputedStyle(document.documentElement);
-      const bgColor =
-        computedStyle.getPropertyValue("--story-bg-color").trim() ||
-        "rgb(23, 37, 84)";
-      const textColor =
-        computedStyle.getPropertyValue("--story-text-color").trim() ||
-        "rgb(239, 246, 255)";
-      const accentColor =
-        computedStyle.getPropertyValue("--story-accent-color").trim() ||
-        "rgb(59, 130, 246)";
-
       setFontSettings({
         fontSize: parseInt(localStorage.getItem("storyFontSize") || "16", 10),
         fontFamily:
-          localStorage.getItem("storyFontFamily") ||
-          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          localStorage.getItem("storyFontFamily") || DEFAULT_READING_FONT,
         lineHeight: parseFloat(
           localStorage.getItem("storyLineHeight") || "1.6",
         ),
         paragraphSpacing: parseFloat(
           localStorage.getItem("storyParagraphSpacing") || "0.5",
         ),
-        theme: localStorage.getItem("storyTheme") || "default",
-        themeColors: {
-          background: bgColor,
-          text: textColor,
-          accent: accentColor,
-        },
+        theme: localStorage.getItem("storyTheme") || DEFAULT_THEME_ID,
       });
     };
 
@@ -1329,10 +1301,7 @@ export default function Story({
     <div className="w-full flex-1 min-h-0 flex flex-col px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 backdrop-blur-xl"
-        style={{
-          backgroundColor: fontSettings.themeColors?.background,
-        }}
+        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 backdrop-blur-xl bg-ys-bg"
       >
         {/* Sync Status Indicator - top right corner */}
         {syncStatus && syncStatus !== "local-only" && (
@@ -1387,8 +1356,7 @@ export default function Story({
         {/* Chat Messages Area - Scrollable */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-0 sm:min-h-[300px]"
-          style={{ color: fontSettings.themeColors?.text }}
+          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-0 sm:min-h-[300px] text-ys-text"
         >
           {/* Previous exchanges (scrolled history) */}
           {previousExchanges.map((exchange, idx) => (
@@ -1803,7 +1771,6 @@ const prettify = (
         fontSize: `${fontSettings.fontSize}px`,
         fontFamily: fontSettings.fontFamily,
         lineHeight: fontSettings.lineHeight,
-        color: fontSettings.themeColors?.text,
       }
     : undefined;
 

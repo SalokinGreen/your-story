@@ -5,9 +5,23 @@
   --background: #ffffff;
   --foreground: #171717;
   --header-height: 57px; /* Fixed header height for CLS prevention */
+  /* Story screen colour tokens (Ink); a reading theme overrides them on <html>
+     (FontSettingsTab). */
+  --ys-bg: #121212;
+  --ys-surface: #1c1c1c;
+  --ys-text: #ececec;
+  --ys-muted: #9a9a9a;
+  --ys-border: #2a2a2a;
+  --ys-accent: #e8dcc4;
 }
 
 @theme inline {
+  --color-ys-bg: var(--ys-bg);
+  --color-ys-surface: var(--ys-surface);
+  --color-ys-text: var(--ys-text);
+  --color-ys-muted: var(--ys-muted);
+  --color-ys-border: var(--ys-border);
+  --color-ys-accent: var(--ys-accent);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
