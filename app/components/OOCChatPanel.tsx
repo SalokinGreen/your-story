@@ -7,11 +7,9 @@ import type { OOCChatMessage } from "@/app/misc/multiplayer/session";
 interface OOCChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpen: () => void;
   messages: OOCChatMessage[];
   myLocalPlayerId: string;
   onSend: (text: string) => void;
-  unreadCount: number;
 }
 
 // Out-of-character chat between online co-op players. Deliberately separate
@@ -22,11 +20,9 @@ interface OOCChatPanelProps {
 export default function OOCChatPanel({
   isOpen,
   onClose,
-  onOpen,
   messages,
   myLocalPlayerId,
   onSend,
-  unreadCount,
 }: OOCChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -44,22 +40,8 @@ export default function OOCChatPanel({
     setInput("");
   };
 
-  if (!isOpen) {
-    return (
-      <button
-        className="fixed top-1/2 -translate-y-1/2 right-0 z-40 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white p-2 rounded-l-lg shadow-md shadow-purple-950/40 transition-all pointer-events-auto"
-        onClick={onOpen}
-        title="Open OOC Chat"
-      >
-        <DynamicIcon name="MessageCircle" className="w-4 h-4" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1.5 -left-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
-      </button>
-    );
-  }
+  // Closed: nothing renders. The panel opens from the story menu's Status row.
+  if (!isOpen) return null;
 
   return (
     <>

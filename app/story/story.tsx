@@ -14,10 +14,7 @@ import TTSControls, { TTSRelayHandle } from "../components/TTSControls";
 import StoryImage from "../components/StoryImage";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
-import SyncIndicator from "../components/SyncIndicator";
-import NetStatusBadge from "../components/NetStatusBadge";
 import type {
-  GuestJoinedInfo,
   NetSessionInfo,
   TurnStatus,
 } from "../misc/multiplayer/session";
@@ -26,9 +23,6 @@ import PlayerBubbles from "../components/PlayerBubbles";
 import PartyTableStrip from "../components/PartyTableStrip";
 import type { PartyTable } from "../misc/party/partyRuntime";
 import CombatDisplay from "../components/CombatDisplay";
-import { ChapterNav } from "../components/ChapterNav";
-import { ObjectivesStrip } from "../components/ObjectivesStrip";
-import type { SyncStatus } from "../misc/localStoryManager";
 import {
   type TimelineBlock,
   buildSavedTimeline,
@@ -99,7 +93,6 @@ interface StoryProps {
   remoteActivity?: Record<string, "recording" | "processing" | "idle">;
   onLocalActivity?: (state: "recording" | "processing" | "idle") => void;
   netSession?: NetSessionInfo | null;
-  netPeers?: GuestJoinedInfo[];
   // Party-voice floor (talking stick), networked play only. When set, voice
   // bubbles obey the host-authoritative floor instead of couch-local state.
   floorHolderId?: string | null;
@@ -121,13 +114,13 @@ interface StoryProps {
   canUndo?: boolean;
   onStop?: () => void;
   onEdit?: (rawText: string, partIndex: number) => void;
-  viewingPartIndex?: number | null;
   onNavigateLeft?: () => void;
   onNavigateRight?: () => void;
-  onNavigateToIndex?: (index: number) => void;
+  // True while the story menu, the OOC panel or a play modal is open: the
+  // window shortcuts below then do nothing, so Enter/Space/Ctrl+Z/Ctrl+R
+  // do not act on the story behind them.
+  shortcutsSuspended?: boolean;
   onResetToCurrentPart?: () => void;
-  syncStatus?: SyncStatus;
-  onOpenJournal?: () => void;
   // Opens the Notes or NPC page pre-selected on the given entry, e.g. when
   // the player clicks a highlighted name/note title in the story prose.
   onOpenNote?: (kind: "lore" | "npc", id: string) => void;
@@ -796,13 +789,10 @@ export default function Story({
   canUndo,
   onStop,
   onEdit,
-  viewingPartIndex,
   onNavigateLeft,
   onNavigateRight,
-  onNavigateToIndex,
+  shortcutsSuspended,
   onResetToCurrentPart,
-  syncStatus,
-  onOpenJournal,
   onOpenNote,
   pendingUserChoice,
   liveGMEntries,
@@ -812,7 +802,6 @@ export default function Story({
   remoteActivity,
   onLocalActivity,
   netSession,
-  netPeers,
   floorHolderId,
   floorLockedOutIds,
   onFloorTake,
@@ -962,6 +951,7 @@ export default function Story({
 
   // Keyboard shortcuts
   React.useEffect(() => {
+    if (shortcutsSuspended) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs/textareas
       if (
@@ -1043,6 +1033,7 @@ export default function Story({
     editMode,
     onNavigateLeft,
     onNavigateRight,
+    shortcutsSuspended,
   ]);
 
   // Get selected choice from input state
@@ -1303,47 +1294,6 @@ export default function Story({
       <div
         className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 backdrop-blur-xl bg-ys-bg"
       >
-        {/* Sync Status Indicator - top right corner */}
-        {syncStatus && syncStatus !== "local-only" && (
-          <div className="absolute top-3 right-3 z-10">
-            <SyncIndicator status={syncStatus} />
-          </div>
-        )}
-
-        {/* Networked multiplayer connection status - top left corner */}
-        {netSession && (
-          <div className="absolute top-3 left-3 z-10">
-            <NetStatusBadge netSession={netSession} peers={netPeers ?? []} />
-          </div>
-        )}
-
-        {/* Header with story name, chapter nav, and scroll indicator */}
-        <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-white/[0.03] border-b border-white/10">
-          <div className="flex items-center gap-2 min-w-0">
-            <DynamicIcon name="BookOpen" className="w-4 h-4 text-blue-300 shrink-0" />
-            <span className="text-sm font-medium text-blue-200 truncate max-w-[200px]">
-              {storyData.story_name || "Untitled Story"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {exchanges.length > visibleExchangeCount && (
-              <span className="text-xs text-blue-400/60 hidden sm:inline">
-                ↑ Scroll for history ({exchanges.length} turns)
-              </span>
-            )}
-            {onNavigateToIndex && (
-              <ChapterNav
-                parts={storyData.scene.parts}
-                currentIndex={viewingPartIndex ?? null}
-                onJump={onNavigateToIndex}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Objectives Strip - glanceable active quests/threads */}
-        <ObjectivesStrip storyData={storyData} onOpenJournal={onOpenJournal} />
-
         {/* Combat Display - shows active combat state */}
         {storyData.combatState?.active && (
           <CombatDisplay
