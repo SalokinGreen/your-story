@@ -189,6 +189,46 @@ describe("buildPlayerView: the redaction boundary", () => {
     });
   }
 
+  it("carries a question's intro to the phone and nothing else new", () => {
+    const withQuestion: PartyHostState = {
+      ...s,
+      requests: [
+        {
+          requestId: "q1",
+          playerId: "mara",
+          kind: "question",
+          request: {
+            questions: [
+              {
+                question: "Where is it set?",
+                intro: "INTRO_OK a sentence about the setting.",
+                options: [{ label: "Paris", description: "Gaslight" }, { label: "Vienna" }],
+              },
+              { question: "Plain?", options: [{ label: "A" }, { label: "B" }] },
+            ],
+          },
+        },
+      ],
+    };
+    const view = buildPlayerView(withQuestion, story(), "mara", 0);
+    expect(Object.keys(view).sort()).toEqual(ALLOWED_KEYS);
+    expect(view.requests).toEqual([
+      {
+        requestId: "q1",
+        kind: "question",
+        questions: [
+          {
+            question: "Where is it set?",
+            intro: "INTRO_OK a sentence about the setting.",
+            options: [{ label: "Paris", description: "Gaslight" }, { label: "Vienna" }],
+            allowCustom: true,
+          },
+          { question: "Plain?", options: [{ label: "A" }, { label: "B" }], allowCustom: true },
+        ],
+      },
+    ]);
+  });
+
   it("shows a player their own sheet, the narration and the choices", () => {
     const json = JSON.stringify(views.mara);
     expect(views.mara.sheet).toEqual({ title: "Character: Mara", content: MARA_SHEET });

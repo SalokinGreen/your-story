@@ -63,7 +63,7 @@ describe("setupStripState", () => {
 
   it("ticks Concept, Character and Campaign from the notes, and names them", () => {
     const s = story({ setup: { mode: "full", conceptDone: true }, lore: [sheet, plan] });
-    expect(ticks(s)).toEqual({ concept: true, character: true, campaign: true, start: false });
+    expect(ticks(s)).toMatchObject({ concept: true, character: true, campaign: true, start: false });
     const state = setupStripState(s);
     if (state.kind !== "checklist") throw new Error("checklist expected");
     expect(state.steps.find((x) => x.id === "character")?.noteTitle).toBe("Character: Hero");
@@ -85,6 +85,45 @@ describe("setupStripState", () => {
     });
     expect(ticks(edited).start).toBe(false);
     expect(setupStripState(edited)).toMatchObject({ awaitingApproval: true });
+  });
+
+  it("shows Setup n/total in full mode and ticks it when every step is covered", () => {
+    const empty = setupStripState(story({ setup: { mode: "full" } }));
+    if (empty.kind !== "checklist") throw new Error("checklist expected");
+    expect(empty.steps.map((x) => x.id)).toEqual(["concept", "setup", "character", "campaign", "start"]);
+    const item = empty.steps.find((x) => x.id === "setup")!;
+    expect(item.label).toMatch(/^Setup 0\/\d+$/);
+    expect(item.done).toBe(false);
+    const total = Number(item.label.split("/")[1]);
+
+    const half = setupStripState(
+      story({ setup: { mode: "full", covered: { table: ["setting"], players: {} } } }),
+    );
+    if (half.kind !== "checklist") throw new Error("checklist expected");
+    expect(half.steps.find((x) => x.id === "setup")).toMatchObject({
+      label: `Setup 1/${total}`,
+      done: false,
+    });
+  });
+
+  it("ticks Setup once the progress is complete", () => {
+    const probe = setupStripState(story({ setup: { mode: "full" } }));
+    if (probe.kind !== "checklist") throw new Error("checklist expected");
+    // Cover everything by listing each step for the table and the solo player.
+    const ids = ["setting", "tone", "campaign", "name_look", "history", "drives"];
+    const full = setupStripState(
+      story({ setup: { mode: "full", covered: { table: ids, players: { solo: ids } } } }),
+    );
+    if (full.kind !== "checklist") throw new Error("checklist expected");
+    const item = full.steps.find((x) => x.id === "setup")!;
+    expect(item.label).toBe("Setup 6/6");
+    expect(item.done).toBe(true);
+  });
+
+  it("keeps the four-item checklist in quick mode", () => {
+    const state = setupStripState(story({ setup: { mode: "quick" } }));
+    if (state.kind !== "checklist") throw new Error("checklist expected");
+    expect(state.steps.map((x) => x.id)).toEqual(["concept", "character", "campaign", "start"]);
   });
 
   it("has a player line for each style", () => {

@@ -5,7 +5,7 @@
 import { getSetupNotes, getSetupProgress } from "./campaignPlan";
 import type { StoryData } from "./structs";
 
-export type SetupStripStepId = "concept" | "character" | "campaign" | "start";
+export type SetupStripStepId = "concept" | "setup" | "character" | "campaign" | "start";
 
 export interface SetupStripStep {
   id: SetupStripStepId;
@@ -40,11 +40,25 @@ export function setupStripState(
 
   const progress = getSetupProgress(story, players);
   const { sheets, plan } = getSetupNotes(story);
+  // Full mode counts the creation steps (design 3.6): "Setup n/total", ticked
+  // when every required step is covered. Quick mode keeps the four items.
+  const { covered, total } = progress.creation;
+  const setupItem: SetupStripStep[] =
+    story.setup.mode === "full" && total > 0
+      ? [
+          {
+            id: "setup",
+            label: `Setup ${covered}/${total}`,
+            done: covered >= total,
+          },
+        ]
+      : [];
   return {
     kind: "checklist",
     awaitingApproval: progress.character && progress.campaign && !progress.approved,
     steps: [
       { id: "concept", label: "Concept", done: progress.concept },
+      ...setupItem,
       {
         id: "character",
         label: "Character",

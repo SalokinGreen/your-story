@@ -120,6 +120,8 @@ export type PartyRequestView =
       kind: "question";
       questions: {
         question: string;
+        // Session zero: a sentence or two shown above the options.
+        intro?: string;
         options: { label: string; description?: string }[];
         allowCustom: boolean;
         // Present (true) only on a multi-select question.
