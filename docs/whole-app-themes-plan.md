@@ -1,7 +1,7 @@
 # The reading themes reach the whole app — implementation plan
 
-Status: **approved (decision 141), revised after Codex's review, being
-built.** Design: [`whole-app-themes-design.md`](whole-app-themes-design.md).
+Status: **built (decision 141) on `claude/whole-app-themes`, 2026-10-23**,
+after Codex's review. Design: [`whole-app-themes-design.md`](whole-app-themes-design.md).
 Decisions 137–141. Branch `claude/whole-app-themes`, one PR, six slices.
 
 Counts come from the 2026-10-23 survey on `master` at 69dad7e. They are
@@ -533,7 +533,10 @@ opens `FullScreenView` (slice 1) and `PDFImporter` (**not converted: slice
 `LibraryPickerModal` (converted here, since both screens open it),
 `APIKeysModal` (slice 2) and `ClaudeSubscriptionPanel` (slice 2). No data
 module supplies colours; the folder colours are player data.
-`DynamicIcon`, `DraggableScroll` and `Skeleton` were already clean.
+`DynamicIcon` and `Skeleton` were already clean. (`DraggableScroll` was
+named clean here, but it still held blue and purple, on its edge arrows,
+its track and its thumb. The Library screenshot showed it, and the
+coordinating session converted it.)
 Converted and on the ratchet: 7 files in `app/library/`, 3 in `app/creator/`,
 and `LibraryPickerModal`, `NewFolderDialog`, `FolderActionSheet`,
 `ExportFolderModal`, `JoinGameModal`, `HostGameModal`. (`LibraryPickerModal`

@@ -10,6 +10,57 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-23 — Whole-app themes
+
+Built from [`whole-app-themes-plan.md`](whole-app-themes-plan.md) on
+`claude/whole-app-themes` (decisions 137–141). The suite and `tsc` cover the
+token arithmetic, the bootstrap script and the colour ratchet. The screenshots
+were taken in the browser preview, not in the native apps, and a real phone
+was not available. These checks cover what the shells and devices do. Pick
+the theme in Settings → Display unless a check says otherwise.
+
+- **Paper White on the desktop app.** Build the branch with `tauri build`,
+  launch the app, and pick Paper White. *Expected:* the page, its scrollbars
+  and its form controls are light (a select's dropdown, a number field's
+  spinner), and the story and the Library read as they do in the preview. The
+  Windows title bar is drawn by the OS and is not expected to change; write
+  down what it shows. *Failure looks like:* a dark native scrollbar or select
+  popup on the light page, or a dark strip where the page should be.
+- **Paper White on the Android app.** Install the APK from `build-apps.yml`,
+  pick Paper White, and go to Home and back. *Expected:* the status bar at
+  the top is light, matching the page (the `theme-color` meta follows the
+  theme). The native scrollbars on the Library and the Notes list follow the
+  theme. *Failure looks like:* a dark status bar over a light page, or a dark
+  scrollbar. The status bar is the one thing here that depends on the
+  WebView honouring `theme-color`; if it does not, record it and say so.
+- **No dark flash on launch.** Pick Paper White, close the app fully, then
+  start it again (on Android, with the network throttled to slow 3G if you
+  can). *Expected:* the first frame is the Paper White page; nothing dark
+  shows before it. *Failure looks like:* a dark frame, or the Ink page for a
+  moment before the light one, on the desktop app or the APK.
+- **iOS overlay scrollbars.** No iOS build was made for this branch (no Mac
+  here; `build-apps.yml` is a manual release build). When one exists, pick Paper White
+  and then Ink on a long Notes list and a long story, and scroll. *Expected:*
+  the overlay scrollbar shows while scrolling and is visible on both pages.
+  *Failure looks like:* the overlay bar is invisible on one theme, or the
+  same colour as the page.
+- **The party phone's theme picker, on a real phone over the LAN.** Open the
+  table's QR link on a phone on the same Wi-Fi. Join, then open the "Theme"
+  disclosure at the foot of the page, and pick Paper White. *Expected:* the
+  phone page turns light at once. Reload the page: it is still Paper White.
+  The table's screen is unchanged, and so is any other phone. Repeat with
+  Sepia on a second phone. *Failure looks like:* the page reverting to Ink
+  after a reload (the phone's storage is not kept, as in a private tab, so the
+  choice lasts one visit), the table's theme changing too, or the picker
+  missing from the join form, the lobby or the seat view.
+- **A sync from another device re-applies the theme without a reload.** On
+  device A, pick Paper White. On device B, which is signed in to sync and has
+  Ink, open Settings → Sync and run a sync (or let it run on its own). Leave
+  the Library or a story open on B while it runs. *Expected:* B's colours
+  change to Paper White once the sync completes, with no reload. *Failure
+  looks like:* B stays on Ink until it is reloaded, or the screen is half
+  converted (the page background changes but the cards do not).
+
 ## 2026-10-23 — Android: background turns and back (`claude/android-background`, decisions 132–136)
 
 Built from [`android-background-plan.md`](android-background-plan.md). Nothing

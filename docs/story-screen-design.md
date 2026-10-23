@@ -165,6 +165,16 @@ counts) is dropped. The rows carry the counts.
   pages, Settings and the Library are **out of scope** and keep their look
   for now.
 
+> **2026-10-23 update.** The tokens now cover the whole app, not only the
+> story screen. The set grew from six colours to twelve variables
+> (`--ys-surface-2`, `--ys-on-accent`, `--ys-danger`, `--ys-success`,
+> `--ys-warning`, plus the `--ys-gradient` page frame), the Notes, NPC, Goal, Settings,
+> Library and Designer pages, the PDF importer, the home page and the party
+> phone page all read them, and Paper White works on every screen. This
+> section's "out of scope" line no longer holds. The design is
+> [`whole-app-themes-design.md`](whole-app-themes-design.md) (decisions
+> 137–141).
+
 ## 6. Where every control goes
 
 | region today | control | after |

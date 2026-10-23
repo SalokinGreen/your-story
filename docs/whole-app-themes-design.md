@@ -1,8 +1,8 @@
 # The reading themes reach the whole app — design
 
-Status: **approved (decision 141), being built.** The implementation plan
-is [`whole-app-themes-plan.md`](whole-app-themes-plan.md). Decisions 137–140
-in [`decisions.md`](decisions.md).
+Status: **built (decision 141) on `claude/whole-app-themes`, 2026-10-23.**
+The implementation plan is [`whole-app-themes-plan.md`](whole-app-themes-plan.md).
+Decisions 137–141 in [`decisions.md`](decisions.md).
 
 ## 1. Why
 
@@ -106,7 +106,9 @@ surface.
 - `body` takes `background: var(--ys-bg)` and `color: var(--ys-text)`. The
   OS media query and `--background` / `--foreground` go.
 - `<html>` gets `color-scheme` from the theme. A `theme-color` meta follows
-  `--ys-bg`, so the phone's status bar matches.
+  `--ys-bg`, so the phone's status bar matches. `applyThemeVars` sets it
+  after load. The bootstrap does not add it, because adding a `<head>` child
+  from outside React risks a hydration mismatch.
 - `.prose a` is violet today. It becomes the accent, underlined.
 - **Scrollbars** are hard-coded purple on grey today, switched by the OS dark
   mode (the author noticed). They take the tokens: a border-coloured thumb,
@@ -159,8 +161,9 @@ no props: nothing to learn beyond the names.
 ### 3.4 The gradient
 
 `--ys-gradient` is `linear-gradient(160deg, bg, mix(bg, accent, 7%))`,
-computed in `themeTokens()`. It is used by the home page, the Library
-background and the site header, and nowhere else.
+computed in `themeTokens()`. It is used by the home page, the Library and
+the Designer backgrounds, the terms and privacy pages, and the site header.
+The story screen and the dialogs stay flat.
 
 ### 3.5 Holding the line
 

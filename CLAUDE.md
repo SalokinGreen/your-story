@@ -1049,8 +1049,7 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   `GMTurn`, the folded work line, `TurnActions`, `prettify`), `turnWork.ts`
   and `playerLine.ts` (the pure helpers behind them), `StoryHeader.tsx` and
   `StoryMenuSheet.tsx` (the one-row header and the ☰ sheet that `MenuPage`
-  renders in), `themeTokens.ts` (the six `--ys-*` colour tokens and the Ink
-  default), `menu.tsx` and `menu/` (the in-story editors), `lore.tsx`,
+  renders in), `menu.tsx` and `menu/` (the in-story editors), `lore.tsx`,
   `npcs.tsx`, `goals.tsx`, `ContextViewer.tsx` and
   `LogViewer.tsx` (the debug views), `NPCReactionToast.tsx`. The design is `docs/story-screen-design.md`
   (decisions 112–117).
@@ -1071,8 +1070,8 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 179 files and 2,595 tests (the count after the Android
-  background work, 2026-10-23), largely against `app/misc/`.
+- `tests/` — Vitest, 181 files and 2,790 tests (the count after the
+  whole-app themes, 2026-10-23), largely against `app/misc/`.
   Deterministic tests seed `Math.random`; follow that for new dice and oracle
   tests.
 - `docs/` — mixed freshness (see the top of this file). The `*.sql` files are
@@ -1081,14 +1080,29 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 
 ## Conventions
 
-- **The story screen's colours are the `ys-*` tokens** (`bg-ys-bg`,
-  `bg-ys-surface`, `text-ys-text`, `text-ys-muted`, `border-ys-border`,
-  `text-ys-accent`; `app/globals.css`, `app/story/themeTokens.ts`), set by
-  the reading theme, never `purple-*`/`blue-*` or a hex. Red, green and amber
-  stay where they mean danger, success or a warning. Prose sits in a
-  typography `prose` container whose own grey beats an inherited colour, so
-  `prettify` sets `color: var(--ys-text)` inline. The Notes, NPC, Goal,
-  Settings and Library pages have not moved to the tokens yet.
+- **Every screen's colours are the `ys-*` tokens**: `bg-ys-bg`,
+  `bg-ys-surface`, `bg-ys-surface-2`, `text-ys-text`, `text-ys-muted`,
+  `border-ys-border`, `text-ys-accent`, `bg-ys-accent` with
+  `text-ys-on-accent`, and the meaning tokens `ys-danger`, `ys-success` and
+  `ys-warning`. The `--ys-gradient` is for the home page, the Library, the
+  Designer, the terms and privacy pages and the site header; the story screen
+  stays flat. The tokens are set by the reading theme
+  (`app/story/themeTokens.ts`: `THEME_PRESETS`, `themeTokens()`,
+  `applyThemeVars()`; Ink is the default) and defined in
+  `app/globals.css`, where the shared component classes also live: `ys-card`,
+  `ys-input`, `ys-button` with `--primary`, `--ghost` or `--danger`, `ys-chip`,
+  `ys-modal-backdrop` and `ys-modal`. Never `purple-*`, `blue-*` or another
+  palette hue, `bg-white`/`text-white`, `dark:`, or a hex or `rgb(` in a
+  class. Red, green and amber appear only as the meaning tokens. Fixed
+  palettes stay literal: the player colours (`app/misc/multiplayer/palette.ts`),
+  the dice (`app/misc/diceColors.ts`), the folder colours and the QR code's
+  black and white. Every `.tsx` or `.ts` file under `app/` is either listed in
+  `tests/themeTokensOnly.test.ts` or exempted there with its reason, so a new
+  file must choose. The pre-paint bootstrap (`app/misc/themeBootstrap.ts`,
+  rendered by `app/components/InlineScript.tsx` in the root layout) mirrors
+  `themeTokens()`: change both. Prose sits in a typography `prose` container
+  whose own grey beats an inherited colour, so `prettify` sets
+  `color: var(--ys-text)` inline.
 - TypeScript strict mode. `any` is not allowed in new code — there are ~134
   existing uses, which are debt, not precedent. Path alias `@/*` → repo root
   (`import { StoryData } from "@/app/misc/structs"`).
