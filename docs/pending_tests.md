@@ -10,6 +10,39 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-23 — The story screen, simplified (`claude/story-screen`)
+
+Everything that renders was walked through in the browser preview at 375 px
+and 1280 px, in Ink and Paper White, on a hand-made save (no model calls); see
+`docs/devlog/2026-10-23-story-screen.md`. What a desktop browser cannot show:
+
+- **Android, the reading font.** Open any story. The prose should be in a
+  serif (Noto Serif). A sans-serif means the `Georgia, 'Noto Serif', serif`
+  stack fell through and something has to be bundled.
+- **Android, the keyboard.** Tap "What do you do?". The input bar should sit
+  just above the keyboard with the last line of the story visible above it,
+  and drop back when the keyboard closes. Failure looks like the bar hidden
+  behind the keyboard or a gap under it.
+- **Android, the mic in the bar (solo story).** Tap 🎙. The first time, the
+  phone should ask for the microphone once (the #223 permission path); then
+  the input turns into a recording bar with a moving waveform. Stop talking
+  for 3 s or tap ✓: the words should land in the input box, **not be sent**.
+  Tap ▶: the GM's turn should treat it as voice input (it may mention
+  transcription errors). Needs a Mistral key; one short STT call.
+- **Read aloud, the slim player.** On a solo story, tap the latest turn, then
+  the speaker icon. A slim player (play/pause, seek) should appear above the
+  input while it reads, **stay** when paused, resume from where it paused,
+  and go away when the reading ends. With auto-narrate on, a new turn should
+  start reading by itself as before. Needs a TTS key; costs a little.
+- **Couch co-op on the phone.** With two couch players: each bubble records
+  for its player and queues a line; Generate sends them; the turn shows one
+  line per speaker in their colour. Typing with ( ) on should send
+  `> Name: (text)`.
+- **iOS:** the first four, once a Mac build exists.
+- **Online play (two devices):** the ☰ dot lights for a guest's unread OOC
+  chat; the menu's Status row opens the chat and closes the sheet; a guest's
+  voice and floor control behave as before.
+
 ## 2026-10-22 — Default systems PR C: Blood & Bone's content (`claude/default-systems-c`)
 
 No display and no model key in this session. The suite checks the content's

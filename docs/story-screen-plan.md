@@ -1,6 +1,6 @@
 # The story screen, simplified — implementation plan
 
-2026-10-23. Status: **approved (decision 117), being built on `claude/story-screen`.** It builds
+2026-10-23. Status: **built on `claude/story-screen` (decision 117).** It builds
 [`story-screen-design.md`](story-screen-design.md) (decisions 112–116) and adds
 no product decisions of its own. The few calls it had to make are in §9.
 

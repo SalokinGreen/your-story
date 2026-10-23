@@ -1,6 +1,6 @@
 # The story screen, simplified — design
 
-2026-10-22. Status: **approved (decision 116)**; plan in [`story-screen-plan.md`](story-screen-plan.md). Decisions 112–117.
+2026-10-22. Status: **approved (decision 116) and built on `claude/story-screen`**; devlog `devlog/2026-10-23-story-screen.md`; plan in [`story-screen-plan.md`](story-screen-plan.md). Decisions 112–117.
 The implementation plan (files, slices, tests) is a separate document, written
 after this one is approved.
 
