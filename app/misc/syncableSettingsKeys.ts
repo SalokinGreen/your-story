@@ -10,7 +10,6 @@ export const SYNCABLE_SETTINGS_KEYS = [
   "customMaxContext",
   "customMaxOutput",
   "embeddingsEnabled",
-  "webResearchEnabled",
   "embeddingThreshold",
   "usePrefill",
   "storytellerMode",

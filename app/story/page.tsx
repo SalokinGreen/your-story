@@ -149,7 +149,6 @@ import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn } from "../misc/generation";
 import { MAX_UNDO_STACK_SIZE } from "../misc/localStoryManager";
 import { GMNPCReactionResult } from "../misc/gmExecutor";
-import { tickCooldowns } from "../misc/abilitySystem";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
 import { useViewportHeight } from "../misc/useViewportHeight";
@@ -175,14 +174,6 @@ function getSecureRandomInt(min: number, max: number): number {
   } while (randomNumber >= maxValue - (maxValue % range));
 
   return min + (randomNumber % range);
-}
-
-// Helper to track player actions between turns (shown to AI on next generation)
-function trackPlayerAction(storyData: StoryData, action: string) {
-  if (!storyData.pendingPlayerActions) {
-    storyData.pendingPlayerActions = [];
-  }
-  storyData.pendingPlayerActions.push(action);
 }
 
 // Helper to trigger notifications for goal-related tool responses
@@ -465,7 +456,6 @@ function StoryPageContent() {
     deepinfraKey,
     zaiKey,
     falKey,
-    braveSearchKey,
   } = apiKeys;
   // The story menu is a sheet over the page (StoryMenuSheet), not a page of
   // its own, so the story stays mounted underneath it.
@@ -2329,10 +2319,6 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("embeddingsEnabled") === "true"
           : false;
-      const webResearchEnabled =
-        typeof window !== "undefined"
-          ? localStorage.getItem("webResearchEnabled") === "true"
-          : false;
       const embeddingThreshold =
         typeof window !== "undefined"
           ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -2403,8 +2389,6 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
-          webResearchEnabled,
-          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -2720,17 +2704,6 @@ function StoryPageContent() {
               );
             }
 
-            // Tick ability cooldowns at end of turn
-            if (storyData.abilities && storyData.abilities.length > 0) {
-              const offCooldown = tickCooldowns(storyData.abilities);
-              if (offCooldown.length > 0) {
-                addNotification(
-                  `Abilities ready: ${offCooldown.join(", ")}`,
-                  "success",
-                );
-              }
-            }
-
             // Copy gmConversation from result.scenePart to the last scene part
             // This preserves the full GM conversation history for future context
             const lastIdx = storyData.scene.parts.length - 1;
@@ -2949,10 +2922,6 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
         : false;
-    const webResearchEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("webResearchEnabled") === "true"
-        : false;
     const embeddingThreshold =
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -3019,8 +2988,6 @@ function StoryPageContent() {
           scenePartId: partialPart.id,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
-          webResearchEnabled,
-          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -3298,17 +3265,6 @@ function StoryPageContent() {
                 `Chapter ${currentChapter} Complete!`,
                 "success",
               );
-            }
-
-            // Tick ability cooldowns at end of turn
-            if (storyData.abilities && storyData.abilities.length > 0) {
-              const offCooldown = tickCooldowns(storyData.abilities);
-              if (offCooldown.length > 0) {
-                addNotification(
-                  `Abilities ready: ${offCooldown.join(", ")}`,
-                  "success",
-                );
-              }
             }
 
             const lastIdx = storyData.scene.parts.length - 1;
@@ -4075,10 +4031,6 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
         : false;
-    const webResearchEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("webResearchEnabled") === "true"
-        : false;
     const embeddingThreshold =
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -4165,8 +4117,6 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
-          webResearchEnabled,
-          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -4768,10 +4718,6 @@ function StoryPageContent() {
     );
   }
 
-  //Checkforgameoverstate
-  const isGameOver =
-    storyData?.scene.parts.some((part) => part.gameOver) || false;
-
   if (!storyData) {
     return (
       <div
@@ -4791,377 +4737,6 @@ function StoryPageContent() {
             >
               Browse Adventures
             </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  //GameOverScreen
-  if (isGameOver && storyData) {
-    const completedGoals =
-      storyData.goals?.filter((g) => g.fulfilled).length || 0;
-    const totalGoals = storyData.goals?.length || 0;
-
-    return (
-      <div
-        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4"
-        style={fullHeightStyle}
-      >
-        <div className="w-full px-2 sm:max-w-3xl mx-auto">
-          {/* Game Over Header */}
-          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-6 mb-4 text-center">
-            <div className="flex items-center justify-center gap-3 text-red-400 mb-3">
-              <DynamicIcon name="Skull" className="w-8 h-8" />
-              <h1 className="text-3xl font-bold">Game Over</h1>
-              <DynamicIcon name="Skull" className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-semibold text-white mb-1">
-              {storyData.story_name}
-            </h2>
-            <p className="text-sm text-blue-200/60">
-              {storyData.player_name}&apos;s journey has concluded
-            </p>
-          </div>
-
-          {/* Stats Summary */}
-          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 mb-4">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <DynamicIcon name="BarChart2" className="w-5 h-5 text-blue-400" />
-              Final Statistics
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-green-500/10 rounded-lg border border-green-400/20">
-                <div className="flex items-center gap-2 mb-1">
-                  <DynamicIcon
-                    name="Target"
-                    className="w-5 h-5 text-green-400"
-                  />
-                  <span className="text-sm font-medium text-white">Goals</span>
-                </div>
-                <div className="text-2xl font-bold text-green-400">
-                  {completedGoals}/{totalGoals}
-                </div>
-                <div className="text-xs text-blue-200/40">
-                  {totalGoals > 0
-                    ? Math.round((completedGoals / totalGoals) * 100)
-                    : 0}
-                  % Complete
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Goals Completed */}
-          {completedGoals > 0 && (
-            <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 mb-4">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <DynamicIcon name="Target" className="w-5 h-5 text-green-400" />
-                Goals Completed
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {storyData.goals
-                  .filter((g) => g.fulfilled)
-                  .map((goal, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-green-500/10 rounded-lg border border-green-400/20"
-                    >
-                      <div className="flex items-start gap-2">
-                        <DynamicIcon
-                          name="Check"
-                          className="w-5 h-5 text-green-400 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <div className="font-medium text-white text-sm">
-                            {goal.title}
-                          </div>
-                          <div className="text-xs text-blue-200/40 line-clamp-1">
-                            {goal.shortDescription}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4">
-            <h3 className="text-lg font-semibold text-white mb-4 text-center">
-              What&apos;s Next?
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => {
-                  setConfirmDialog({
-                    isOpen: true,
-                    title: "Replay Story",
-                    message:
-                      "Start this adventure from the beginning? All progress will be lost.",
-                    icon: "RotateCcw",
-                    confirmText: "Replay",
-                    confirmButtonClass: "bg-blue-600 hover:bg-blue-700",
-                    onConfirm: async () => {
-                      setConfirmDialog({ ...confirmDialog, isOpen: false });
-                      //Replaysamestory-resettobeginning
-                      if (!storyDbId) return;
-                      try {
-                        // Try to fetch fresh adventure data if we have a source adventure
-                        let freshTemplate: Partial<StoryData> | null = null;
-                        if (sourceAdventureId) {
-                          try {
-                            const { getLocalAdventure } =
-                              await import("@/app/misc/localAdventureManager");
-                            const localAdv =
-                              await getLocalAdventure(sourceAdventureId);
-                            freshTemplate =
-                              (localAdv?.adventureData as Partial<Adventure>)
-                                ?.storyTemplate || null;
-                          } catch (e) {
-                            console.warn(
-                              "Could not fetch fresh adventure data, using current story values",
-                            );
-                          }
-                        }
-
-                        //Resetstorytoinitialstatebutkeepadventuretemplate
-                        const resetStoryData: StoryData = {
-                          ...storyData,
-                          // Reset dynamic fields from fresh adventure template or current story
-                          stats: freshTemplate?.stats || storyData.stats,
-                          resources:
-                            freshTemplate?.resources || storyData.resources,
-                          inventory:
-                            freshTemplate?.inventory || storyData.inventory,
-                          abilities:
-                            freshTemplate?.abilities || storyData.abilities,
-                          relationships:
-                            freshTemplate?.relationships ||
-                            storyData.relationships,
-                          variables:
-                            freshTemplate?.variables || storyData.variables,
-                          skillTrees:
-                            freshTemplate?.skillTrees || storyData.skillTrees,
-                          agmtState:
-                            freshTemplate?.agmtState || storyData.agmtState,
-                          customTables:
-                            freshTemplate?.customTables ||
-                            storyData.customTables,
-                          restState: freshTemplate?.restState || {
-                            quickRestsUsed: 0,
-                            shortRestsUsed: 0,
-                          },
-                          unlockedNodes:
-                            freshTemplate?.unlockedNodes ||
-                            storyData.unlockedNodes,
-                          // Always reset these
-                          scene: { parts: [] },
-                          memory: [],
-                          currentChapter: 0,
-                          chapters: [],
-                          goals:
-                            (freshTemplate?.goals || storyData.goals)?.map(
-                              (g) => ({
-                                ...g,
-                                fulfilled: false,
-                                active: false,
-                              }),
-                            ) || [],
-                          lore: (freshTemplate?.lore || storyData.lore).map(
-                            (l) => ({
-                              ...l,
-                              on:
-                                l.on_triggers && l.on_triggers.length > 0
-                                  ? false
-                                  : true,
-                            }),
-                          ),
-                          newGamePlusMode: false,
-                        };
-
-                        // Save reset story locally
-                        const { saveLocalStory } =
-                          await import("@/app/misc/localStoryManager");
-                        await saveLocalStory(storyDbId, resetStoryData);
-
-                        addNotification(
-                          "Story reset! Starting fresh...",
-                          "success",
-                        );
-                        router.push(`/story?storyId=${storyDbId}`);
-                        window.location.reload();
-                      } catch (error) {
-                        console.error("Error replaying story:", error);
-                        addNotification("Failed to replay story", "failure");
-                      }
-                    },
-                  });
-                }}
-                className="p-3 bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium rounded-lg shadow-md shadow-blue-950/40 transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="RotateCcw" className="w-5 h-5" />
-                <div className="text-left text-sm">
-                  <div>Replay</div>
-                  <div className="text-xs opacity-70">Fresh start</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => {
-                  setConfirmDialog({
-                    isOpen: true,
-                    title: "New Game Plus",
-                    message:
-                      "Start a New Game Plus run? You&apos;ll keep all stats, resources, and items!",
-                    icon: "Star",
-                    confirmText: "Start NG+",
-                    confirmButtonClass:
-                      "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
-                    onConfirm: async () => {
-                      setConfirmDialog({ ...confirmDialog, isOpen: false });
-                      //New Game Plus - keep progress and increase difficulty
-                      if (!storyDbId) return;
-                      try {
-                        const ngPlusCount =
-                          (storyData.newGamePlusCount || 0) + 1;
-
-                        // Try to fetch fresh adventure data for story-specific fields (lore, goals)
-                        let freshTemplate: Partial<StoryData> | null = null;
-                        if (sourceAdventureId) {
-                          try {
-                            const { getLocalAdventure } =
-                              await import("@/app/misc/localAdventureManager");
-                            const localAdv =
-                              await getLocalAdventure(sourceAdventureId);
-                            freshTemplate =
-                              (localAdv?.adventureData as Partial<Adventure>)
-                                ?.storyTemplate || null;
-                          } catch (e) {
-                            console.warn(
-                              "Could not fetch fresh adventure data, using current story values",
-                            );
-                          }
-                        }
-
-                        //Resetstorybutkeepstats,resources,andinventory
-                        const ngPlusStoryData: StoryData = {
-                          ...storyData,
-                          scene: { parts: [] },
-                          memory: [],
-                          currentChapter: 0,
-                          chapters: [],
-                          //Keepstats,resources,inventory,abilities!
-                          stats: storyData.stats, //Keepstats
-                          resources: storyData.resources, //Keepresources
-                          inventory: storyData.inventory, //Keepinventory
-                          abilities: storyData.abilities, //Keepabilities
-                          // Reset story-specific fields from fresh adventure
-                          relationships:
-                            freshTemplate?.relationships ||
-                            storyData.relationships, // Reset relationships
-                          variables:
-                            freshTemplate?.variables || storyData.variables,
-                          agmtState:
-                            freshTemplate?.agmtState || storyData.agmtState,
-                          customTables:
-                            freshTemplate?.customTables ||
-                            storyData.customTables,
-                          restState: { quickRestsUsed: 0, shortRestsUsed: 0 },
-                          // Keep skill tree progress!
-                          skillTrees: storyData.skillTrees,
-                          unlockedNodes: storyData.unlockedNodes,
-                          // Reset goals from fresh adventure or current story
-                          goals:
-                            (freshTemplate?.goals || storyData.goals)?.map(
-                              (g) => ({
-                                ...g,
-                                fulfilled: false,
-                                active: false,
-                              }),
-                            ) || [],
-                          // Reset lore from fresh adventure or current story
-                          lore: (freshTemplate?.lore || storyData.lore).map(
-                            (l) => ({
-                              ...l,
-                              on:
-                                l.on_triggers && l.on_triggers.length > 0
-                                  ? false
-                                  : true,
-                            }),
-                          ),
-                          newGamePlusCount: ngPlusCount,
-                          newGamePlusMode: true,
-                        };
-
-                        // Save NG+ story locally
-                        const { saveLocalStory } =
-                          await import("@/app/misc/localStoryManager");
-                        await saveLocalStory(storyDbId, ngPlusStoryData);
-
-                        addNotification(
-                          `New Game Plus ${ngPlusCount} activated!`,
-                          "success",
-                        );
-                        router.push(`/story?storyId=${storyDbId}`);
-                        window.location.reload();
-                      } catch (error) {
-                        console.error("Error starting NG+:", error);
-                        addNotification(
-                          "Failed to start New Game Plus",
-                          "failure",
-                        );
-                      }
-                    },
-                  });
-                }}
-                className="p-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg shadow-md shadow-purple-950/40 transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="Star" className="w-5 h-5" />
-                <div className="text-left text-sm">
-                  <div>New Game+</div>
-                  <div className="text-xs opacity-70">Keep progress</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => router.push("/library")}
-                className="p-3 bg-white/5 hover:bg-white/10 text-white font-medium rounded-lg border border-white/10 transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="Library" className="w-5 h-5" />
-                <div className="text-left text-sm">
-                  <div>Library</div>
-                  <div className="text-xs opacity-70">Your stories</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => router.push("/creator")}
-                className="p-3 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="Map" className="w-5 h-5" />
-                <div className="text-left text-sm">
-                  <div>Explore</div>
-                  <div className="text-xs opacity-70">New adventures</div>
-                </div>
-              </button>
-            </div>
-
-            {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
-              <div className="mt-4 p-3 bg-amber-500/10 rounded-lg border border-amber-400/20 text-center">
-                <div className="font-medium text-sm text-amber-300 flex items-center justify-center gap-2">
-                  <DynamicIcon name="Star" className="w-4 h-4" />
-                  New Game Plus: Run #{storyData.newGamePlusCount}
-                </div>
-                <div className="text-xs text-blue-200/40 mt-0.5">
-                  Completed {storyData.newGamePlusCount}{" "}
-                  {storyData.newGamePlusCount === 1
-                    ? "playthrough"
-                    : "playthroughs"}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

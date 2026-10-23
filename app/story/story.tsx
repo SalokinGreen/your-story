@@ -14,7 +14,6 @@ import TTSControls, {
   type TTSControlHandle,
   type TTSRelayHandle,
 } from "../components/TTSControls";
-import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import type {
   NetSessionInfo,
@@ -580,16 +579,11 @@ export default function Story({
   storyId,
   storyText,
   choices,
-  input,
   loading,
   loadingStage,
   storyTextReady = true,
-  handleChoice,
-  handleSelect,
   onCustomInput,
   onActionConfirm,
-  onCommentSubmit,
-  onRerollChoices,
   onRetry,
   canRetry,
   onUndo,
@@ -629,7 +623,6 @@ export default function Story({
   onIllustrate,
   onRegenerateImage,
 }: StoryProps) {
-  const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   // The part being edited (any GM turn, not only the last), or null.
   const [editingPart, setEditingPart] = React.useState<number | null>(null);
   // The part whose actions row is open (tap a turn, or its "Turn actions"
@@ -710,7 +703,7 @@ export default function Story({
   );
 
   // Action mode state - persisted to localStorage
-  const [actionMode, setActionMode] = React.useState(() => {
+  const [actionMode] = React.useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("actionMode") === "true";
   });
@@ -798,17 +791,9 @@ export default function Story({
         e.target instanceof Element &&
         !!e.target.closest('button, a, [role="button"]');
 
-      // Escape to close modal
-      if (e.key === "Escape" && showChoicesModal) {
-        e.preventDefault();
-        setShowChoicesModal(false);
-        return;
-      }
-
-      // Enter/Space to jump into the composer (when modal closed)
+      // Enter/Space to jump into the composer
       if (
         (e.key === "Enter" || e.key === " ") &&
-        !showChoicesModal &&
         !onControl &&
         editingPart === null
       ) {
@@ -861,7 +846,6 @@ export default function Story({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
-    showChoicesModal,
     loading,
     loadingStage,
     canUndo,
@@ -873,9 +857,6 @@ export default function Story({
     onNavigateRight,
     shortcutsSuspended,
   ]);
-
-  // Get selected choice from input state
-  const selectedChoice = choices?.choices.find((c) => input[c.text]) || null;
 
   // Build chat messages from scene parts - pairs of user input + GM response
   const chatMessages: Array<{
@@ -1056,14 +1037,6 @@ export default function Story({
 
   // State for combat display expansion
   const [showCombat, setShowCombat] = React.useState(true);
-
-  // Handle choice selection from modal
-  const handleSelectChoice = (choice: Choice) => {
-    const index = choices.choices.findIndex((c) => c.text === choice.text);
-    if (index !== -1) {
-      handleSelect(index);
-    }
-  };
 
   // Whether we should keep pinning the view to the bottom as new content
   // streams in. True by default (and forced true whenever the player submits
@@ -1421,26 +1394,6 @@ export default function Story({
           onFloorRelease={onFloorRelease}
         />
       )}
-
-      {/* Choices Modal */}
-      <ChoicesModal
-        isOpen={showChoicesModal}
-        onClose={() => setShowChoicesModal(false)}
-        choices={choices}
-        storyData={storyData}
-        selectedChoice={selectedChoice}
-        onSelectChoice={handleSelectChoice}
-        onConfirm={handleChoice}
-        onCustomInput={onCustomInput}
-        onActionConfirm={onActionConfirm}
-        onCommentSubmit={onCommentSubmit}
-        onRerollChoices={onRerollChoices}
-        loading={loading}
-        // When there are no preset choices (e.g. a fresh Freeform Story),
-        // open straight into the freeform text box instead of an empty list.
-        actionMode={choices?.choices?.length ? actionMode : true}
-        onActionModeChange={setActionMode}
-      />
     </div>
   );
 }

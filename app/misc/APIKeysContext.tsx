@@ -26,7 +26,6 @@ export interface APIKeys {
   // fal.ai, for pictures made in play (decision 58): kept on the device like
   // the others, sent only to fal, never synced and not part of pickProviderKeys.
   falKey: string;
-  braveSearchKey: string;
   cartesiaKey: string;
   elevenlabsKey: string;
 }
@@ -61,7 +60,6 @@ const defaultKeys: APIKeys = {
   deepinfraKey: "",
   zaiKey: "",
   falKey: "",
-  braveSearchKey: "",
   cartesiaKey: "",
   elevenlabsKey: "",
 };
@@ -77,7 +75,6 @@ const LOCAL_KEYS = {
   deepinfraKey: "deepinfraKey",
   zaiKey: "zaiKey",
   falKey: "falKey",
-  braveSearchKey: "braveSearchKey",
   cartesiaKey: "cartesiaKey",
   elevenlabsKey: "elevenlabsKey",
   oauthCodeVerifier: "openrouter_code_verifier",
@@ -99,7 +96,6 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
       deepinfraKey: localStorage.getItem(LOCAL_KEYS.deepinfraKey) || "",
       zaiKey: localStorage.getItem(LOCAL_KEYS.zaiKey) || "",
       falKey: localStorage.getItem(LOCAL_KEYS.falKey) || "",
-      braveSearchKey: localStorage.getItem(LOCAL_KEYS.braveSearchKey) || "",
       cartesiaKey: localStorage.getItem(LOCAL_KEYS.cartesiaKey) || "",
       elevenlabsKey: localStorage.getItem(LOCAL_KEYS.elevenlabsKey) || "",
     };

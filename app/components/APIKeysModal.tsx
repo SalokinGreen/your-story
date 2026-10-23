@@ -71,7 +71,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
   const [showHiddenMessages, setShowHiddenMessages] = useState(false);
   const [customVoices, setCustomVoices] = useState<string[]>([]);
   const [defaultUserNotes, setDefaultUserNotes] = useState("");
-  const [webResearchEnabled, setWebResearchEnabled] = useState(false);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -89,9 +88,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
         localStorage.getItem("showHiddenMessages") === "true",
       );
       setDefaultUserNotes(localStorage.getItem("defaultUserNotes") || "");
-      setWebResearchEnabled(
-        localStorage.getItem("webResearchEnabled") === "true",
-      );
       try {
         const voices = localStorage.getItem("ttsCustomVoices");
         if (voices) setCustomVoices(JSON.parse(voices));
@@ -658,45 +654,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     </p>
                   </div>
                 </div>
-
-                {/* Brave Search - only used by the GM's optional web_research delegate_task */}
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-orange-400 to-amber-600 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">BS</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
-                        Brave Search
-                      </span>
-                      {hasKey("braveSearchKey") && (
-                        <DynamicIcon
-                          name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
-                        />
-                      )}
-                      <a
-                        href="https://api.search.brave.com/app/keys"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
-                      >
-                        Get key →
-                      </a>
-                    </div>
-                    <input
-                      type={showKeys ? "text" : "password"}
-                      value={keys.braveSearchKey}
-                      onChange={(e) => setKey("braveSearchKey", e.target.value)}
-                      placeholder="BSA..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
-                    />
-                    <p className="text-xs text-blue-300/50 mt-1">
-                      Only used if the GM delegates a web research task - enable that in
-                      the Game tab.
-                    </p>
-                  </div>
-                </div>
               </div>
 
               {/* Show/Hide Keys & Privacy Info */}
@@ -1032,44 +989,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   <p className="text-xs text-blue-300/50 mt-1">
                     {defaultUserNotes.length} characters
                   </p>
-                </div>
-
-                {/* Divider */}
-                <hr className="border-white/10" />
-
-                {/* Web Research Toggle */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-blue-100">
-                      Enable Web Research
-                    </p>
-                    <p className="text-xs text-blue-300/60 max-w-sm">
-                      Lets the GM delegate real-world research questions to a web
-                      search (via your Brave Search key in API Keys). Off by
-                      default - each search uses your own key.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
-                    <input
-                      type="checkbox"
-                      checked={webResearchEnabled}
-                      onChange={(e) => {
-                        setWebResearchEnabled(e.target.checked);
-                        localStorage.setItem(
-                          "webResearchEnabled",
-                          e.target.checked.toString(),
-                        );
-                        addNotification(
-                          e.target.checked
-                            ? "Web research enabled"
-                            : "Web research disabled",
-                          "success",
-                        );
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
-                  </label>
                 </div>
               </div>
             </>

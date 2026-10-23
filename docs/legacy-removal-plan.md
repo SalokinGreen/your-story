@@ -318,3 +318,29 @@ staying up for all of session zero covers the gap this change opens.
   it (slice 2 removes those). Only the dead template refetch went.
 - `selectedPreset` state went too (its only reader was the deleted form).
 
+
+### 2026-10-23, slice 2
+
+- **The game-over screen took the Replay and New Game+ flows with it**, and
+  with them page.tsx's own restart copy of the removed fields. The story
+  menu's Restart (menu.tsx) is now the only restart path; it keeps
+  `agmtState`, `customTables` (migration input) and `restState` (slice 3 removes
+  it with `take_rest`) and drops the copies of stats, resources, inventory,
+  abilities, relationships, variables, skill trees, unlocked nodes and
+  `newGamePlusMode`.
+- **Also deleted in menu.tsx:** `editingResources` (dead like the other two).
+- **`processLoreTriggers` stays** (keyword triggers); the variable-specific
+  `checkVarTriggers` is slice 3's. LoreEditor's read-only "Vars turning
+  ON/OFF" badges went with the checkboxes, and its `variables` prop with them.
+- **Brave key and Web Research:** removed from the keys modal, `APIKeysContext`
+  and the synced-settings list (`webResearchEnabled`); `page.tsx` no longer reads
+  either or passes them to generation. The optional `webResearchEnabled` and
+  `braveSearchKey` fields on the generation options and the sub-agent context
+  stay for slice 3 (`delegate_task`). `tests/sideModelCall.test.ts` still passes
+  a `braveSearchKey` in a fixture; harmless, left.
+- **story.tsx:** with the ChoicesModal mount gone, its feeders (`handleChoice`,
+  `onCommentSubmit`, `onRerollChoices`, `input`, `handleSelect` destructures,
+  `selectedChoice`, `handleSelectChoice`, `setActionMode`) were unused and
+  removed so the file's lint count does not rise. The props stay on `StoryProps`
+  (page.tsx still passes them); trimming them is not worth a page.tsx churn.
+- No test changed: the suite stays at 180 files / 2,740 tests.
