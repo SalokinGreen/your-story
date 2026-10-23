@@ -1771,6 +1771,9 @@ const prettify = (
         fontSize: `${fontSettings.fontSize}px`,
         fontFamily: fontSettings.fontFamily,
         lineHeight: fontSettings.lineHeight,
+        // Set inline, not inherited: the typography plugin's `prose` class
+        // gives paragraphs its own grey, which would win over the feed's.
+        color: "var(--ys-text)",
       }
     : undefined;
 
