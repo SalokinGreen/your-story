@@ -106,7 +106,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # The action's default package list still names 'tools', which the
+      # SDK manager no longer has, so the step fails before any build.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: npm ci
       - run: NEXT_PUBLIC_STANDALONE=true npm run build
       - run: npx cap sync android
