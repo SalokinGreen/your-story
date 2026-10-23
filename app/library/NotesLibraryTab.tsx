@@ -492,7 +492,7 @@ export default function NotesLibraryTab({
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const toExport =
       selectedNotes.size > 0
         ? notes.filter((n) => selectedNotes.has(n.id))
@@ -501,9 +501,17 @@ export default function NotesLibraryTab({
       addNotification("No notes to export", "warning");
       return;
     }
-    downloadLibraryNotes(toExport);
+    let location: string | undefined;
+    try {
+      ({ location } = await downloadLibraryNotes(toExport));
+    } catch {
+      addNotification("Failed to export notes", "failure");
+      return;
+    }
     addNotification(
-      `Exported ${toExport.length} note${toExport.length === 1 ? "" : "s"}`,
+      location
+        ? `Saved to ${location}`
+        : `Exported ${toExport.length} note${toExport.length === 1 ? "" : "s"}`,
       "success",
     );
   };

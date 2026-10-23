@@ -57,7 +57,7 @@ export default function ExportFolderModal({
   const folderNotes = notes.filter((n) => n.folderId === folder.id);
   const folderTables = tables.filter((t) => t.folderId === folder.id);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const selection: Parameters<typeof downloadFolderLibrary>[1] = {};
     if (includeStories && folderStories.length > 0) selection.stories = folderStories;
     if (includeAdventures && folderAdventures.length > 0)
@@ -75,8 +75,17 @@ export default function ExportFolderModal({
       return;
     }
 
-    downloadFolderLibrary(folder, selection);
-    addNotification(`Exported folder "${folder.name}"`, "success");
+    let location: string | undefined;
+    try {
+      ({ location } = await downloadFolderLibrary(folder, selection));
+    } catch {
+      addNotification("Failed to export folder", "failure");
+      return;
+    }
+    addNotification(
+      location ? `Saved to ${location}` : `Exported folder "${folder.name}"`,
+      "success",
+    );
     onClose();
   };
 

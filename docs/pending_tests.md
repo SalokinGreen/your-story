@@ -10,6 +10,28 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+
+## 2026-10-23 — Downloads on the phone, and the AI Context height (claude/ai-context-phone)
+
+- **AI Context -> the download (JSON) and TXT buttons, on the Android APK.**
+  Expected: the file is saved straight into `Downloads/Your Story/` (open the
+  Files app, Downloads) with a "Saved to Downloads/Your Story/context-gm-....json"
+  message, and no share sheet opens. Pressing it twice gives two files, not an
+  overwrite. On Android 7-9 a one-time storage permission prompt appears first;
+  denying it shows an error message. Failure looks like the share sheet (an
+  old build), an error toast, or a "Could not save the AI context" line in the
+  Debug Logs. On iOS the share sheet is kept (no Downloads folder there).
+- **The same for Debug Logs -> Export, the Story menu -> Export, and the
+  Library's folder and notes exports.** Each saves to `Downloads/Your Story/`
+  and shows "Saved to ...". The web and desktop apps behave as before.
+- **AI Context and Debug Logs fill the screen on the phone.** The panel
+  reaches the bottom with only a small gap, scrolls inside itself, and its
+  up/down buttons work; rotating the phone refits it. Failure looks like an
+  empty band below the panel (the old fixed height), or the whole page
+  scrolling.
+- **Desktop app: Export still saves a file** (the anchor path is unchanged
+  there).
+
 ## 2026-10-23 — Whole-app themes
 
 Built from [`whole-app-themes-plan.md`](whole-app-themes-plan.md) on

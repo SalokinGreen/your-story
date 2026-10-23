@@ -3,8 +3,14 @@
 import { useState, useEffect, useRef } from "react";
 import { logger, LogEntry } from "../misc/logger";
 import { DynamicIcon } from "../components/DynamicIcon";
+import { saveFile } from "../misc/saveFile";
+import { useNotification } from "../misc/NotificationContext";
+import { useFitToViewport } from "../misc/useFitToViewport";
 
 export default function LogViewer() {
+  const { ref: panelRef, height: panelHeight } =
+    useFitToViewport<HTMLDivElement>();
+  const { addNotification } = useNotification();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -49,14 +55,17 @@ export default function LogViewer() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] bg-ys-surface border border-ys-border rounded-lg shadow-lg overflow-hidden">
+    <div
+      ref={panelRef}
+      style={panelHeight ? { height: panelHeight } : undefined}
+      className="flex flex-col h-[calc(100dvh-6.5rem)] bg-ys-surface border border-ys-border rounded-lg shadow-lg overflow-hidden">
       <div className="p-4 border-b border-ys-border flex justify-between items-center bg-ys-surface-2">
         <h3 className="font-bold text-lg text-ys-text">
           Session Log
         </h3>
         <div className="flex gap-2">
           <button
-            onClick={() => {
+            onClick={async () => {
               const text = logs
                 .map(
                   (l) =>
@@ -67,12 +76,19 @@ export default function LogViewer() {
                     }`
                 )
                 .join("\n");
-              const blob = new Blob([text], { type: "text/plain" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `story-log-${Date.now()}.txt`;
-              a.click();
+              try {
+                const { location } = await saveFile(
+                  `story-log-${Date.now()}.txt`,
+                  text,
+                  "text/plain",
+                );
+                if (location) addNotification(`Saved to ${location}`, "success");
+              } catch (error) {
+                logger.error("Could not save the session log", {
+                  error: String(error),
+                });
+                addNotification("Could not save the session log", "failure");
+              }
             }}
             className="px-3 py-1 text-sm bg-ys-accent/15 text-ys-accent rounded hover:bg-ys-accent/25 flex items-center gap-1"
           >
