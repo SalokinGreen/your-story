@@ -6,6 +6,7 @@ import { APIKeysProvider } from "./misc/APIKeysContext";
 import NotificationContainer from "./components/NotificationContainer";
 import SiteHeader from "./components/SiteHeader";
 import FontInitializer from "./components/FontInitializer";
+import NativeBackButton from "./components/NativeBackButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,6 +54,7 @@ export default function RootLayout({
           </APIKeysProvider>
           <NotificationContainer />
           <FontInitializer />
+          <NativeBackButton />
         </NotificationProvider>
       </body>
     </html>

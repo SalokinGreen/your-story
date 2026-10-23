@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { DynamicIcon } from "../components/DynamicIcon";
+import { useRouteBack } from "../misc/useBackHandler";
 
 const ISSUES_URL = "https://github.com/SalokinGreen/your-story/issues";
 
@@ -80,6 +81,7 @@ function Summary({ children }: { children: React.ReactNode }) {
 
 export default function TermsOfService() {
   const router = useRouter();
+  useRouteBack(() => router.back());
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">

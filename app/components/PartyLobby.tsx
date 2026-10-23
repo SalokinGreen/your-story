@@ -6,6 +6,7 @@ import { DynamicIcon } from "./DynamicIcon";
 import { useNotification } from "../misc/NotificationContext";
 import type { PartyHostApi } from "../story/usePartyHost";
 import type { PartyError } from "../misc/party/partyBridge";
+import { useBackHandler } from "../misc/useBackHandler";
 
 // What to do about each way the server can fail to start. The codes are the
 // ones party_server.rs reports.
@@ -217,6 +218,7 @@ export function PartyLobbyModal({
   party: PartyHostApi;
   onClose: () => void;
 }) {
+  useBackHandler(true, onClose);
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"

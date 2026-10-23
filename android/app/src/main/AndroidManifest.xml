@@ -24,6 +24,14 @@
 
         </activity>
 
+        <!-- Keeps a turn alive after the player leaves the app (decision 132).
+             stopWithTask: swiping the app away ends the notification too. -->
+        <service
+            android:name=".TurnKeepAliveService"
+            android:exported="false"
+            android:stopWithTask="true"
+            android:foregroundServiceType="dataSync" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -43,4 +51,9 @@
          denies the request without ever showing a prompt. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Turns that survive leaving the app: a dataSync foreground service, and
+         the "your turn is ready" notification (Android 13+ asks at runtime). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

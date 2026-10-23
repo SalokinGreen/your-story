@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import { useViewportHeight } from "../misc/useViewportHeight";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface FullScreenViewProps {
   title: string;
@@ -42,6 +43,9 @@ export default function FullScreenView({
   children,
 }: FullScreenViewProps) {
   const viewportHeight = useViewportHeight();
+  // Android back steps back inside the view when it has a back, else closes it
+  // (decision 133). Registered here once for every full-screen menu.
+  useBackHandler(true, onBack ?? onClose);
 
   // This view covers the viewport, but the page underneath is still
   // scrollable: on mobile that shows up as the whole screen sliding around

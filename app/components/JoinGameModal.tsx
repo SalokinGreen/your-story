@@ -7,6 +7,7 @@ import { useNotification } from "@/app/misc/NotificationContext";
 import { MP_BACKEND_OPTIONS, type MPBackend } from "@/app/misc/multiplayer/types";
 import { isValidRoomCode, ROOM_CODE_LENGTH } from "@/app/misc/multiplayer/transports";
 import { PALETTE } from "@/app/story/menu/CouchPlayersEditor";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface JoinGameModalProps {
   isOpen: boolean;
@@ -48,6 +49,8 @@ export default function JoinGameModal({
   useEffect(() => {
     if (initialBackend) setBackend(initialBackend);
   }, [initialBackend]);
+
+  useBackHandler(isOpen, onClose);
 
   if (!isOpen) return null;
 

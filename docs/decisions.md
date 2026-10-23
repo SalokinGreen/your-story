@@ -197,6 +197,18 @@ tier slots (0–3) and the narration voice. The design is
 | 123 | After Codex's review (2026-10-23): "Default runs everyday turns and combat/rules on GLM 5.3. Today combat and rules think at 'high' and everyday turns at 'low'. How should the Default slot's single effort work?" | **"Combat never below 'high' (Recommended)."** The Default effort applies to every Default turn, but a combat or rules turn (tier 2) never thinks below `high`; the picker's help says so. A narrowing of decision 120. |
 | 124 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"approved"** — built as planned on `claude/model-picker`. |
 
+### Interview — Android: turns that survive leaving the app, and the back gesture (2026-10-23)
+
+The author: "I want to be able to leave the app while it generates and it finishing generating instead of breaking. And when I use the back gesture I want it to work in the app instead of closing the app." The design is [`android-background-design.md`](android-background-design.md), the plan [`android-background-plan.md`](android-background-plan.md).
+
+| # | question | decision |
+|---|---|---|
+| 132 | "To keep a turn alive while you're out of the app, Android requires a visible notification for as long as it runs. What should it do?" | **"'Writing…' + 'ready' ping (Recommended)."** An ongoing "Your Story is writing your turn…" notification while a turn generates, replaced by "Your turn is ready" (tap to open) when it finishes, only if the player is not in the app. Rejected: only "Writing…"; ask once first with an opt-out. |
+| 133 | "What should the back gesture do at the top of each screen?" | **"Story → Library → leave (Recommended)."** Back closes whatever is open (dialog, picture, menu, sub-page); on the story itself it goes to the Library; on the Library home it puts the app in the background, like Home, and never kills it. Rejected: story → leave; a second back to confirm leaving. |
+| 134 | "On the phone the GM's reply currently arrives all at once at the end instead of word by word, and Stop doesn't cancel the request on the phone. Fix those in this project?" | **"Yes, in this project (Recommended)."** |
+| 135 | "If Android kills the app mid-turn anyway (low memory, swiped away), what should happen when you come back?" | **"Say so, offer Retry (Recommended)."** The player's line is kept and the story shows that the last turn was interrupted, with Retry. Rejected: retry automatically; as today. |
+| 136 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"Approved"** — built as planned on `claude/android-background`. |
+
 ### Interview — removing the arcade leftovers (2026-10-23)
 
 After the model picker merged (#228), the author asked: "The next project will be to remove all legacy features from the game especially UI. All the deprecated stuff like most of the features from when this was an arcade instead of proper AI gm. Like the attributes, inventory, etc. I noticed with our new default system adventure it's still the deprecated menu." The design is [`legacy-removal-design.md`](legacy-removal-design.md), the plan [`legacy-removal-plan.md`](legacy-removal-plan.md).

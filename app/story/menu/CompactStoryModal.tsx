@@ -14,6 +14,7 @@ import {
   CompactStoryResult,
 } from "../../misc/storyCompaction";
 import { CompactionApiOptions } from "../../misc/compaction";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -44,6 +45,14 @@ export default function CompactStoryModal({
   );
   const [busy, setBusy] = useState(false);
   const [focus, setFocus] = useState("");
+
+  // Android back: out of the spin-off form first, then close; never while
+  // working (decision 133).
+  useBackHandler(true, () => {
+    if (busy) return;
+    if (mode !== "menu") setMode("menu");
+    else onClose();
+  });
 
   const currentSize = estimateStoryDataSize(storyData);
   const partCount = storyData.scene.parts.length;

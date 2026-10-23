@@ -35,6 +35,7 @@ import {
   scopeKey,
   scopeMatches,
 } from "./libraryScope";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 const NOTE_TYPE_OPTIONS: { value: LoreType; label: string }[] = [
   { value: "lore", label: "📜 Lore" },
@@ -115,10 +116,12 @@ export default function NotesLibraryTab({
 
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
   const [movingNote, setMovingNote] = useState<string | null>(null);
+  useBackHandler(movingNote !== null, () => setMovingNote(null));
 
   // OCR/PDF import: ask which folder to save results into before the
   // PDFImporter modal (and its OCR pipeline) opens.
   const [showOcrFolderPrompt, setShowOcrFolderPrompt] = useState(false);
+  useBackHandler(showOcrFolderPrompt, () => setShowOcrFolderPrompt(false));
   const [ocrTargetFolder, setOcrTargetFolder] = useState<string | undefined>(
     undefined,
   );

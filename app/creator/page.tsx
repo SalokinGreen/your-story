@@ -37,6 +37,8 @@ import { draftToAdventure } from "@/app/misc/designer_executor";
 import AdventureInspector from "./AdventureInspector";
 import DesignerChat from "./DesignerChat";
 import { useDesignerSession } from "./useDesignerSession";
+import { useRouteBack } from "@/app/misc/useBackHandler";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 type MobilePane = "chat" | "adventure";
 
@@ -44,6 +46,8 @@ const DEFAULT_MAX_OUTPUT = 8000;
 
 function CreatorPage() {
   const router = useRouter();
+  // Android back leaves the Designer for the Library (decision 133).
+  useRouteBack(() => router.push("/library"));
   const searchParams = useSearchParams();
   const { keys: apiKeys } = useAPIKeys();
   // The Claude subscription models need no key, only the desktop app's
@@ -55,6 +59,7 @@ function CreatorPage() {
 
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
   const [showSettings, setShowSettings] = useState(false);
+  useBackHandler(showSettings, () => setShowSettings(false));
   const [showImport, setShowImport] = useState(false);
   const [showAPIKeys, setShowAPIKeys] = useState(false);
 

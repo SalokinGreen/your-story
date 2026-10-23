@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { IconPicker } from "@/app/components/IconPicker";
 import { LocalFolder } from "@/app/misc/localFolderManager";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface FolderActionSheetProps {
   folder: LocalFolder;
@@ -27,6 +28,7 @@ export default function FolderActionSheet({
   onExport,
   onDelete,
 }: FolderActionSheetProps) {
+  useBackHandler(true, onClose);
   const [name, setName] = useState(folder.name);
   const [icon, setIcon] = useState(folder.icon);
   const [color, setColor] = useState(folder.color);

@@ -47,6 +47,7 @@ import {
   LAYER_SETTINGS_CHANGED_EVENT,
 } from "../misc/layerSettings";
 import { type ResolvedTier } from "../misc/reasoningTiers";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 interface StoryProps {
   storyData: StoryData;
@@ -95,6 +96,11 @@ interface StoryProps {
   onCommentSubmit?: (comment: string) => void;
   onRerollChoices?: () => void;
   onRetry?: () => void;
+  // Set when the last turn was killed mid-way (interruptedTurn.ts); the page
+  // owns the record, the banner only offers Retry and Dismiss.
+  interruptedTurn?: { mode: "new" | "retry"; text: string };
+  onRetryInterrupted?: () => void;
+  onDismissInterrupted?: () => void;
   canRetry?: boolean;
   onUndo?: () => void;
   canUndo?: boolean;
@@ -585,6 +591,9 @@ export default function Story({
   onCustomInput,
   onActionConfirm,
   onRetry,
+  interruptedTurn,
+  onRetryInterrupted,
+  onDismissInterrupted,
   canRetry,
   onUndo,
   canUndo,
@@ -640,6 +649,11 @@ export default function Story({
     if (turnRunning) setActionsFor(null);
   }
   const [editedText, setEditedText] = React.useState("");
+  // Android back cancels an open edit like its Cancel button (decision 133).
+  useBackHandler(editingPart !== null, () => {
+    setEditingPart(null);
+    setEditedText("");
+  });
   const [isHovering, setIsHovering] = React.useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -1357,6 +1371,32 @@ export default function Story({
             onRemove={onPartyRemove}
             onAnswerHere={onPartyAnswerHere}
           />
+        )}
+
+        {/* The last turn was killed mid-way (the OS closed the app): the story
+            was cut back to before it, and Retry sends it again. */}
+        {interruptedTurn && !loading && (
+          <div className="mx-auto w-full max-w-3xl px-3 pb-2" role="status">
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-ys-border bg-ys-surface p-3">
+              <p className="mr-auto text-sm text-ys-text">
+                The last turn was interrupted.
+              </p>
+              <button
+                type="button"
+                onClick={onRetryInterrupted}
+                className="rounded-lg border border-ys-accent px-3 py-1 text-sm text-ys-accent"
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={onDismissInterrupted}
+                className="rounded-lg border border-ys-border px-3 py-1 text-sm text-ys-muted"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Composer: suggested choices, player switcher, and chat input */}

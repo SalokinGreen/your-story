@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 interface StoryMenuSheetProps {
   open: boolean;
@@ -92,6 +93,10 @@ export function StoryMenuSheet({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open]);
+
+  // Android back closes the sheet; anything it opened sits above this entry
+  // (decision 133).
+  useBackHandler(open, onClose);
 
   if (!open) return null;
 

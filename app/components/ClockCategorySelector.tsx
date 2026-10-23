@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
+import { useBackHandler } from "../misc/useBackHandler";
 
 export interface CategoryItem {
   id: string;
@@ -23,6 +24,7 @@ export function ClockCategorySelector({
   completedIndices = [],
 }: ClockCategorySelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  useBackHandler(isOpen, () => setIsOpen(false));
   const [localIndex, setLocalIndex] = useState(currentIndex);
   const [isDragging, setIsDragging] = useState(false);
   const [hasDragged, setHasDragged] = useState(false); // Track if actual drag occurred

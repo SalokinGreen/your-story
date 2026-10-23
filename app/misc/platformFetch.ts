@@ -13,6 +13,8 @@
  * takes a different route to the same result - capacitor.config.ts sets
  * plugins.CapacitorHttp.enabled, which overrides window.fetch itself on
  * native, so the plain `fetch` fallback is already CORS-free there too.
+ * That native fetch buffers the answer and ignores an AbortSignal, so chat
+ * requests on Android go through getAbortableProviderFetch() below instead.
  */
 
 import { isTauri } from "@tauri-apps/api/core";
@@ -24,6 +26,74 @@ export function getProviderFetch(): typeof fetch {
     return tauriFetch as unknown as typeof fetch;
   }
   return fetch;
+}
+
+/**
+ * Hosts whose CORS answer lets the Android WebView call them itself. The
+ * patched window.fetch (CapacitorHttp) ignores an AbortSignal and buffers the
+ * whole answer, so Stop cannot cancel it and a stream arrives in one piece.
+ * The WebView's own fetch (`window.CapacitorWebFetch`, which Capacitor keeps
+ * when it patches window.fetch) does both properly, but only works where the
+ * provider answers a preflight for the app's origin. Checked 2026-10-23 as
+ * `https://localhost` (Capacitor's default Android origin):
+ *   openrouter.ai      204, allows *, Authorization, HTTP-Referer, X-Title
+ *   api.mistral.ai     200, allows *, Authorization, Content-Type
+ *   api.deepinfra.com  200, allows * and the same four headers
+ *   api.deepseek.com   200, reflects https://localhost
+ *   generativelanguage.googleapis.com  403, left out
+ *   api.z.ai           200 but no Access-Control-Allow-* headers, left out
+ * providerCall.ts sends only Content-Type and Authorization, plus HTTP-Referer
+ * and X-Title to OpenRouter; a new request header needs a new preflight check.
+ */
+const CORS_HOSTS = [
+  "openrouter.ai",
+  "api.mistral.ai",
+  "api.deepinfra.com",
+  "api.deepseek.com",
+];
+
+const downHosts = new Set<string>();
+
+/**
+ * A listed host whose WebView request failed with a network error (a
+ * TypeError) is taken off the list for the session: its CORS answer has
+ * probably changed, and later requests go through native HTTP.
+ */
+export function markHostDown(host: string): void {
+  downHosts.add(host);
+}
+
+/** For tests: forget every host marked down. */
+export function resetDownHostsForTests(): void {
+  downHosts.clear();
+}
+
+/** The host of a URL, or "" when it does not parse. */
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The fetch for a chat request to `url`. Tauri and every host off the list
+ * get getProviderFetch(). On Android, a listed host gets the WebView's own
+ * fetch, which streams and honours an AbortSignal (design 3.3). iOS keeps
+ * today's transport: its origin and CORS were not tested.
+ */
+export function getAbortableProviderFetch(url: string): typeof fetch {
+  if (isTauri()) return getProviderFetch();
+  if (typeof window !== "undefined" && Capacitor.getPlatform() === "android") {
+    const host = hostOf(url);
+    const webFetch = (window as unknown as { CapacitorWebFetch?: typeof fetch })
+      .CapacitorWebFetch;
+    if (CORS_HOSTS.includes(host) && !downHosts.has(host) && webFetch) {
+      return webFetch.bind(window) as typeof fetch;
+    }
+  }
+  return getProviderFetch();
 }
 
 /**

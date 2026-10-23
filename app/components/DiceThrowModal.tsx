@@ -19,6 +19,7 @@ import {
   type TraySize,
 } from "../misc/diceThrow";
 import { DynamicIcon } from "./DynamicIcon";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface DiceThrowModalProps {
   // The pending physical dice request, or null when nothing is being asked
@@ -187,6 +188,9 @@ export default function DiceThrowModal({
   const [phase, setPhase] = useState<Phase>("loading");
   // Settled faces per requested group, matching DiceThrowRequest.groups.
   const [settledFaces, setSettledFaces] = useState<number[][] | null>(null);
+
+  // Android back is the Skip button: a null answer (decision 133).
+  useBackHandler(!!request, () => onResolve(null));
 
   // One colour per pool, stable for as long as this request is on screen.
   const groups = request?.groups;

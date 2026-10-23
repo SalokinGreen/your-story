@@ -2127,6 +2127,7 @@ async function generateStoryTurnOnce(
                 deepinfraKey: options.deepinfraKey,
                 zaiKey: options.zaiKey,
                 customModel: getCustomModelIfUUID(classifierModel),
+                abortSignal: options.abortSignal,
               },
             );
             recordAICall({
@@ -3785,27 +3786,33 @@ export async function generateSimple(
     deepinfraKey?: string;
     zaiKey?: string;
     customModel?: CustomModel;
+    /** Cancels the call (the turn's Stop). */
+    abortSignal?: AbortSignal;
   },
 ): Promise<{
   content: string;
   toolCalls: ToolCall[];
   meta: GenerationMeta;
 }> {
-  const response = await providerFetch("/api/generate", {
-    messages,
-    tools: options.tools,
-    model: options.model,
-    reasoningEffort: options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
-    maxTokens: options.maxTokens || 4000,
-    temperature: options.temperature || 0.7,
-    openRouterKey: options.openRouterKey,
-    deepseekKey: options.deepseekKey,
-    googleKey: options.googleKey,
-    mistralKey: options.mistralKey,
-    deepinfraKey: options.deepinfraKey,
-    zaiKey: options.zaiKey,
-    customModel: options.customModel,
-  });
+  const response = await providerFetch(
+    "/api/generate",
+    {
+      messages,
+      tools: options.tools,
+      model: options.model,
+      reasoningEffort: options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+      maxTokens: options.maxTokens || 4000,
+      temperature: options.temperature || 0.7,
+      openRouterKey: options.openRouterKey,
+      deepseekKey: options.deepseekKey,
+      googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
+      zaiKey: options.zaiKey,
+      customModel: options.customModel,
+    },
+    options.abortSignal,
+  );
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
