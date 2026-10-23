@@ -1,6 +1,6 @@
 # Campaign setup that actually sets up — design
 
-Status: **draft, waiting for the author's approval.** The implementation plan
+Status: **approved (decision 147), being built.** The implementation plan
 is [`session-zero-plan.md`](session-zero-plan.md). Decisions 142–146 in
 [`decisions.md`](decisions.md).
 

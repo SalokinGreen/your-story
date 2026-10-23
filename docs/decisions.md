@@ -208,6 +208,7 @@ The author, after a Blood & Bone freeform start went wrong (a GM context export 
 | 144 | "What should the campaign intro (the first real scene after setup) give you?" | **"A briefing, then the scene (Recommended)."** A short who-you-are / where / what's-at-stake prologue in the story's voice, then the opening scene with a clear first choice. Rejected: cinematic prologue only; straight into the scene. |
 | 145 | "Should you see setup progress while it happens?" | **"Yes, a small checklist (Recommended)."** A slim strip above the composer (Concept · Character · Campaign · Start) that ticks as each is done, with the sheet and plan one tap away. Rejected: conversational only. |
 | 146 | The author's direct request, not a multiple-choice question: "Right now we only have the GM asking questions you can choose in between, but Claude Code also has multiple choice questions." | **`ask_question` gains multi-select.** A question can be marked to allow several answers; the player ticks any number of options (plus free text where allowed), and the GM receives every pick. Single-choice stays the default. Part of the session-zero design. |
+| 147 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"Approved"** — built as planned on `claude/session-zero`. |
 
 ### Interview — the reading themes reach the whole app (2026-10-23)
 

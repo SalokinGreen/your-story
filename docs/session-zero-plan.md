@@ -1,7 +1,7 @@
 # Campaign setup that actually sets up — implementation plan
 
-Status: **draft, revised after Codex's review, waiting for the author's
-approval.** Design: [`session-zero-design.md`](session-zero-design.md).
+Status: **approved (decision 147), revised after Codex's review, being
+built.** Design: [`session-zero-design.md`](session-zero-design.md).
 Decisions 142–146. Branch `claude/session-zero`, one PR, six slices. Line
 numbers are from `master` at the merge of #233 (2026-10-23).
 
