@@ -256,6 +256,37 @@ export function currentSetupHashes(story: StoryData): {
   return { sheetHash: hashNotes(sheets), planHash: hashNotes(plan ? [plan] : []) };
 }
 
+/** Most titles `setup.referenceTitles` keeps. */
+export const SETUP_REFERENCE_MAX_TITLES = 20;
+
+/**
+ * Moves notes the GM just read to the front of `setup.referenceTitles`
+ * (newest first, one entry per title, bounded). Mutates `story`; does
+ * nothing outside session zero.
+ */
+export function recordSetupReference(
+  story: StoryData,
+  titles: ReadonlyArray<string>,
+): void {
+  if (story.sessionZeroActive !== true || titles.length === 0) return;
+  const key = (t: string) => t.toLowerCase().replace(/\.md$/i, "").trim();
+  const incoming = new Set(titles.map(key));
+  const kept = (story.setup?.referenceTitles ?? []).filter(
+    (t) => !incoming.has(key(t)),
+  );
+  const fresh: string[] = [];
+  const seen = new Set<string>();
+  for (const t of titles) {
+    if (seen.has(key(t))) continue;
+    seen.add(key(t));
+    fresh.push(t);
+  }
+  story.setup = {
+    ...story.setup,
+    referenceTitles: [...fresh, ...kept].slice(0, SETUP_REFERENCE_MAX_TITLES),
+  };
+}
+
 export type SetupStep =
   | "concept"
   | "character"

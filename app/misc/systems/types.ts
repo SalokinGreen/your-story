@@ -35,6 +35,9 @@ export interface BuiltinSystem {
   packs: BuiltinPack[];
   starters: BuiltinAdventure[];
   sheetTemplate?: string; // {{Field | description | default}} markdown
+  // Built-in note id of the system's character-creation rules. Session zero
+  // carries that note in full while it runs (buildSessionZeroBlock).
+  creationNoteId?: string;
   meterSets: MeterSet[];
   endOfSessionReminder?: string; // returned by end_session
 }

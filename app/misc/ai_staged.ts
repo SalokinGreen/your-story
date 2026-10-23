@@ -21,8 +21,10 @@ import {
 import { formatOracleRecencyLine } from "@/app/misc/mythic";
 import { formatTintLine } from "@/app/misc/primaMateria";
 import {
+  getSetupProgress,
   getSetupReminder,
   SETUP_REMINDER_URGENT_TURNS,
+  type SetupProgress,
 } from "@/app/misc/campaignPlan";
 import { cleanString } from "@/app/misc/textUtils";
 import { currentThreshold, filledBoxes } from "@/app/misc/metersAndTracks";
@@ -1158,6 +1160,10 @@ export interface LiveBlockInput {
   freshStorySetupBlock: string;
   // The adventure's character sheet template, for as long as session zero lasts.
   sheetTemplateBlock?: string;
+  // The one session-zero section (buildSessionZeroBlock). While session zero
+  // lasts it stands in for the four setup blocks around it, which the caller
+  // then passes empty.
+  sessionZeroBlock?: string;
   sessionZeroStartGameReminder: string;
   setupOverdueBlock: string;
   observerNoteBlock: string;
@@ -1188,6 +1194,201 @@ ${template}
 `;
 }
 
+// ---- the session-zero block (docs/session-zero-design.md 3.3-3.4) ----------
+
+/** Most tokens of read notes the setup reference carries in full. */
+export const SETUP_REFERENCE_CAP_TOKENS = 6000;
+/** From this many answered setup questions on, the GM is nudged to propose. */
+export const SETUP_QUESTION_NUDGE_AT = 6;
+
+// Note types the prompt already carries in full every turn.
+const SETUP_REFERENCE_SKIP_TYPES: ReadonlySet<string> = new Set([
+  "dm_instructions",
+  "gm_notes",
+  "character_sheet",
+  "gm_plan",
+]);
+
+function referenceTitleKey(t: string): string {
+  return t.toLowerCase().replace(/\.md$/i, "").trim();
+}
+
+function setupChecklist(p: SetupProgress): string {
+  const rows: Array<[string, boolean]> = [
+    ["Concept (the player's style and idea)", p.concept],
+    ["Character (a sheet for every player)", p.character],
+    ["Campaign (the Campaign Plan note)", p.campaign],
+    ["Approval (the player pressed Start on the setup card)", p.approved],
+    ["Start (start_game)", p.started],
+  ];
+  let arrowPlaced = false;
+  return rows
+    .map(([label, done]) => {
+      if (done) return `✓ ${label}`;
+      if (!arrowPlaced) {
+        arrowPlaced = true;
+        return `→ ${label}`;
+      }
+      return `· ${label}`;
+    })
+    .join("\n");
+}
+
+function setupNextStep(
+  progress: SetupProgress,
+  mode: "quick" | "full",
+): string {
+  switch (progress.next) {
+    case "concept":
+      return mode === "full"
+        ? `NEXT: the concept. Ask the player the first creation step with \`ask_question\` (2-4 options plus a custom answer; allow several answers where that fits (multi_select)). One question per step.`
+        : `NEXT: the concept. Ask 2-4 short questions with \`ask_question\` (genre or setting, tone, the kind of character) - choices the player can tap, with a custom answer allowed; allow several answers where that fits (multi_select). Then move on to the character.`;
+    case "character": {
+      const who =
+        progress.missingSheetFor.length > 0
+          ? ` Still missing a sheet: ${progress.missingSheetFor.join(", ")}.`
+          : "";
+      return mode === "full"
+        ? `NEXT: the character, one creation step at a time. Ask each step with \`ask_question\` first; only when the last step is answered, write the sheet from the template with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one per player.${who}`
+        : `NEXT: the character. Propose a complete one from the answers so far and write it from the template with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one per player.${who}`;
+    }
+    case "campaign":
+      return `NEXT: the campaign. \`read_notes\` the existing lore, mechanics and setting notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (see the CAMPAIGN PLAN section for the rules).`;
+    case "confirm":
+      return `NEXT: ask the player's OK. Call \`confirm_setup({ character_summary, campaign_hook })\` with a short summary of the character (name, kind, the hook of their background) and one or two sentences on the campaign. The player sees a card with Start the story / Change something. If they ask for changes, edit the sheet or the plan, then call \`confirm_setup\` again.`;
+    case "start_game":
+      return `NEXT: the player approved. Call \`start_game\` now with a title for the story and a short premise summary. After it succeeds, give the campaign intro: a short briefing (who they are, where they are, what is at stake and why they are here), then the opening scene, ending on a clear first choice.`;
+    default:
+      return "";
+  }
+}
+
+function setupModeLines(mode: "quick" | "full"): string {
+  if (mode === "full") {
+    return `MODE: step by step.
+- Walk the system's creation rules (below) with the player in order, one \`ask_question\` per creation step, before writing anything.
+- Each question offers 2-4 options and a custom answer; never fill in a choice the player did not make.
+- Write the sheet only after the last step is answered, then the plan from what you learned.
+- Keep each reply short: the question, no story.`;
+  }
+  return `MODE: quick setup.
+- Ask only 2-4 short questions with \`ask_question\`, then PROPOSE: make the choices the player left open yourself.
+- Write the sheet and the plan without asking about every field. The player can change anything on the setup card.
+- Use the creation rules (below, when present) as grounding for what is legal, not as a script to walk through.
+- Keep each reply short: the question or the proposal, no story.`;
+}
+
+function findEnabledNoteByTitle(
+  lore: StoryLore[],
+  title: string,
+): StoryLore | undefined {
+  const key = referenceTitleKey(title);
+  return lore.find(
+    (n) => n.enabled !== false && referenceTitleKey(n.title) === key,
+  );
+}
+
+function renderReferenceNote(n: StoryLore): string {
+  const hidden =
+    n.visibility === "hidden" ||
+    n.visibility === "to_be_revealed" ||
+    n.visibility === "check_per_turn";
+  return hidden
+    ? `### ${n.title} [[HIDDEN_LORE:${n.title}]]\n(HIDDEN FROM PLAYER - do not narrate this content or reveal its existence.)\n${n.content}[[/HIDDEN_LORE]]`
+    : `### ${n.title}\n${n.content}`;
+}
+
+/**
+ * The setup reference: the notes the GM read during session zero, newest
+ * first, one per title, in full until `capTokens`, then listed by title. The
+ * creation note and the notes the prompt already carries in full are left out,
+ * as are disabled and deleted ones.
+ */
+export function buildSetupReference(
+  story: Pick<StoryData, "lore" | "setup">,
+  skipNoteId?: string,
+  capTokens: number = SETUP_REFERENCE_CAP_TOKENS,
+): string {
+  const lore = story.lore ?? [];
+  const seen = new Set<string>();
+  const notes: StoryLore[] = [];
+  for (const title of story.setup?.referenceTitles ?? []) {
+    const key = referenceTitleKey(title);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const n = findEnabledNoteByTitle(lore, title);
+    if (!n) continue;
+    if (skipNoteId && n.libraryNoteId === skipNoteId) continue;
+    if (SETUP_REFERENCE_SKIP_TYPES.has(n.type ?? "lore")) continue;
+    notes.push(n);
+  }
+  if (notes.length === 0) return "";
+
+  let used = 0;
+  let overflow = false;
+  const full: string[] = [];
+  const byTitle: string[] = [];
+  for (const n of notes) {
+    const rendered = renderReferenceNote(n);
+    const cost = estimateTokens(rendered);
+    if (!overflow && used + cost <= capTokens) {
+      full.push(rendered);
+      used += cost;
+    } else {
+      overflow = true;
+      byTitle.push(`- ${n.title}: read_notes it again if you need it`);
+    }
+  }
+  let out = `## SETUP REFERENCE (notes you read during setup, newest first)\n`;
+  if (full.length > 0) out += full.join("\n\n") + "\n";
+  if (byTitle.length > 0) {
+    out += `\nToo long to carry here:\n${byTitle.join("\n")}\n`;
+  }
+  return out;
+}
+
+/**
+ * The one session-zero section of the live block: where setup stands, what to
+ * do next, the rule that nothing is narrated yet, the mode, the sheet
+ * template, the system's creation rules and the notes read so far. Per-turn
+ * by nature, so it rides in the live block and leaves with `start_game`.
+ */
+export function buildSessionZeroBlock(story: StoryData): string {
+  const progress = getSetupProgress(story);
+  const mode = story.setup?.mode ?? "quick";
+  const resolved = resolveSystem(story);
+  const lore = story.lore ?? [];
+
+  let out = `\n## 🎭 SESSION ZERO - SETTING UP THE STORY\n${setupChecklist(progress)}\n\n${setupNextStep(progress, mode)}\n\n`;
+  out += `RULE: until \`start_game\` succeeds you never narrate the story. Every turn you either ask the player (\`ask_question\`), do a setup step (write the sheet or the plan) or call \`confirm_setup\`. A short out-of-character line is fine. Do not describe scenes, play out events or roll for the story yet.\n\n`;
+  out += setupModeLines(mode) + "\n";
+
+  const template =
+    story.characterSheetTemplate?.template || resolved.system?.sheetTemplate;
+  if (template) {
+    out += `\n## CHARACTER SHEET TEMPLATE\nBuild each player's sheet in this shape: fill in every field with the player in conversation. The \`| default\` values are examples, not choices made for the player. Write the finished sheet with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one note per player.\n\`\`\`\n${template}\n\`\`\`\n`;
+  }
+
+  const creationId = resolved.system?.creationNoteId;
+  if (creationId) {
+    const creation = lore.find(
+      (n) => n.enabled !== false && n.libraryNoteId === creationId,
+    );
+    if (creation) {
+      out += `\n## CREATION RULES (carried in full while you set up; no need to read_notes this)\n${renderReferenceNote(creation)}\n`;
+    }
+  }
+
+  const reference = buildSetupReference(story, creationId);
+  if (reference) out += "\n" + reference;
+
+  const asked = story.setup?.questionsAsked ?? 0;
+  if (asked >= SETUP_QUESTION_NUDGE_AT) {
+    out += `\nYou have asked ${asked} setup questions. Enough: stop asking, make the remaining choices yourself and propose the character and the campaign now.\n`;
+  }
+  return out;
+}
+
 export function buildLiveBlock(input: LiveBlockInput): string {
   let out = `${STATE_RULE}\n📋 LIVE GAME STATE (this turn)\n${STATE_RULE}\n`;
   if (input.loreSection) out += "\n" + input.loreSection + "\n";
@@ -1208,6 +1409,7 @@ export function buildLiveBlock(input: LiveBlockInput): string {
   // Per-turn nudges, kept verbatim (they used to sit inside the system
   // prompt, which made it different every turn).
   const nudges =
+    (input.sessionZeroBlock ?? "") +
     input.freshStorySetupBlock +
     (input.sheetTemplateBlock ?? "") +
     input.sessionZeroStartGameReminder +
@@ -2121,6 +2323,10 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     summary: storyData.scene.summary,
   });
 
+  // During session zero one block replaces the four setup blocks (they keep
+  // firing outside it, for a started story that lacks a sheet or a plan).
+  const inSessionZero = storyData.sessionZeroActive === true;
+
   const liveBlock = buildLiveBlock({
     loreSection,
     npcList,
@@ -2133,10 +2339,13 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     challengeSection,
     pendingEventsSection: gmStagePendingEventsSection,
     pendingMovesSection: gmStagePendingDirectorMovesSection,
-    freshStorySetupBlock,
-    sheetTemplateBlock: buildSheetTemplateBlock(storyData),
-    sessionZeroStartGameReminder,
-    setupOverdueBlock,
+    sessionZeroBlock: inSessionZero ? buildSessionZeroBlock(storyData) : "",
+    freshStorySetupBlock: inSessionZero ? "" : freshStorySetupBlock,
+    sheetTemplateBlock: inSessionZero ? "" : buildSheetTemplateBlock(storyData),
+    sessionZeroStartGameReminder: inSessionZero
+      ? ""
+      : sessionZeroStartGameReminder,
+    setupOverdueBlock: inSessionZero ? "" : setupOverdueBlock,
     observerNoteBlock,
     storyProgressNoteBlock,
     repetitionNoteBlock,

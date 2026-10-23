@@ -389,3 +389,51 @@ the code and taken in:
   signal is `turn_status` (collecting/generating), which would need a
   protocol change; a guest sees the turn generating as for any paused tool.
   Add it with slice 4/5 if wanted.
+
+### 2026-10-23, slice 3
+
+- **`buildSessionZeroBlock(story)`** lives in `ai_staged.ts` with
+  `buildSetupReference`, `SETUP_REFERENCE_CAP_TOKENS` (6,000) and
+  `SETUP_QUESTION_NUDGE_AT` (6). It reaches the request through a new
+  `LiveBlockInput.sessionZeroBlock`; while `sessionZeroActive`,
+  `buildGMStagePrompt` passes the four older blocks empty (they are still
+  built and still fire outside session zero). The checklist has five rows
+  (Concept, Character, Campaign, Approval, Start); the player-facing strip
+  stays four.
+- **Cap rule:** notes are carried whole in newest-first order until the next
+  one would pass the cap; that note and every older one are then listed by
+  title ("read_notes it again if you need it"), so a small old note is not
+  carried ahead of a large newer one. The count is the rendered note
+  (heading included); the section's own headings add a few hundred tokens
+  on top.
+- **Reference skips** disabled or missing notes, the creation note, and the
+  types the prompt already carries in full (`dm_instructions`,
+  `character_sheet`, `gm_plan`). Hidden-visibility notes keep the
+  `[[HIDDEN_LORE]]` wrapper `read_notes` uses.
+- **Creation note in quick mode: carried too**, for grounding (it says what a
+  legal character is); the quick-mode lines say "grounding, not a script".
+  It is not a duplicate of the reference (skipped there).
+- **`read_notes`:** `recordSetupReference(story, titles)` in
+  `campaignPlan.ts` runs on the executor's working copy, only while
+  `sessionZeroActive` and only for titles actually found; the list is capped
+  at `SETUP_REFERENCE_MAX_TITLES` (20). A call's titles go in call order at
+  the front.
+- **Template precedence:** the story's own `characterSheetTemplate.template`,
+  else the resolved system's `sheetTemplate`; shown for all of session zero,
+  as before.
+- **`BuiltinSystem.creationNoteId`** is set to
+  `builtin:blood-and-bone:character-creation` (checked against `creation.ts`).
+- **Tests changed because the old blocks no longer fire in session zero:**
+  `campaignPlan.setupReminder.test.ts` (the soft/urgent cases now use a
+  started story with no plan; a new case asserts the session-zero block
+  replaces them) and `sheetTemplateBlock.test.ts` (the FRESH STORY line is
+  checked outside session zero; one new case for the single template
+  section). New file `tests/sessionZeroBlock.test.ts` (36 tests).
+- **Measured, a full Blood & Bone setup request** (system prompt, the 5
+  pinned-or-listed rules notes, tools, 3 setup turns of history, a sheet, the
+  block with the sheet template, the creation rules in full and the six
+  other rules notes as the reference): **29,439 tokens** (messages 18,425,
+  tools 11,014, of which the system tools are about 1,200; the block alone
+  7,871) against the 36,000 default GM-stage input budget. The reply is
+  reserved separately. Round-by-round growth within a turn is the tool
+  results, as for any turn.

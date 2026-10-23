@@ -153,6 +153,7 @@ import {
   currentSetupHashes,
   getSetupNotes,
   getSetupProgress,
+  recordSetupReference,
 } from "./campaignPlan";
 
 // ============================================
@@ -1131,6 +1132,11 @@ export async function executeGMTools(
           // docs/gm-plan-notes-design.md): mark that notes were read this
           // turn so the Campaign Plan spine note can be created.
           modified.notesReadThisTurn = true;
+          // Session zero keeps what the GM read in view (the setup reference
+          // in the live block), since history stubs the result.
+          if (result.success && result.result.type === "read_notes") {
+            recordSetupReference(modified, result.result.titles);
+          }
           break;
         case "search_memory":
           result = await executeSearchMemory(
