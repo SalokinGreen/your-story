@@ -21,7 +21,13 @@ import type {
   TurnStatus,
 } from "../misc/multiplayer/session";
 import TurnLobbyOverlay from "../components/TurnLobbyOverlay";
-import PlayerBubbles from "../components/PlayerBubbles";
+import PlayerBubbles, { RecordingOverlay } from "../components/PlayerBubbles";
+import {
+  isSttEnabled,
+  useVoiceRecorder,
+} from "../components/useVoiceRecorder";
+import { appendTranscript, stillVoice } from "./composerDraft";
+import { wrapOutOfCharacter } from "./playerLine";
 import PartyTableStrip from "../components/PartyTableStrip";
 import type { PartyTable } from "../misc/party/partyRuntime";
 import CombatDisplay from "../components/CombatDisplay";
@@ -42,13 +48,6 @@ import {
   LAYER_SETTINGS_CHANGED_EVENT,
 } from "../misc/layerSettings";
 import { type ResolvedTier } from "../misc/reasoningTiers";
-
-// Solo play has no CouchPlayer of its own (see structs.ts) - this stands in
-// for PlayerBubbles' `players` prop so voice input still gets a bubble
-// outside of couch co-op/multiplayer.
-const SOLO_VOICE_PLAYER: CouchPlayer[] = [
-  { id: "solo", name: "You", color: "#8b5cf6" },
-];
 
 interface StoryProps {
   storyData: StoryData;
@@ -160,15 +159,22 @@ interface StoryComposerProps {
   loading: boolean;
   loadingStage?: "gm" | "story" | "choices" | null;
   couchPlayers: CouchPlayer[];
+  // Party mode's table is open: phones are the input, and there is no mic here.
+  partyTableOpen?: boolean;
   onCustomInput?: StoryProps["onCustomInput"];
   onActionConfirm?: StoryProps["onActionConfirm"];
   onStop?: () => void;
   onFocusChange?: () => void;
 }
 
-// The chat input row - suggested-choice chips, couch co-op player switcher,
-// textarea, send/stop button - split out of Story so a keystroke only
-// re-renders this small subtree instead of the entire chat history above it.
+// Solo play has no CouchPlayer of its own (see structs.ts); the composer's mic
+// records as this stand-in, in the accent colour.
+const SOLO_RECORDER = { id: "solo", name: "You", color: "var(--ys-accent)" };
+
+// The chat input - suggested-choice chips, couch co-op player switcher, and one
+// bar holding the textarea, the out-of-character toggle, the mic (solo play)
+// and send/stop - split out of Story so a keystroke only re-renders this small
+// subtree instead of the entire chat history above it.
 const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
   function StoryComposer(
     {
@@ -176,6 +182,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       loading,
       loadingStage,
       couchPlayers,
+      partyTableOpen = false,
       onCustomInput,
       onActionConfirm,
       onStop,
@@ -185,6 +192,12 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
   ) {
     const [composerText, setComposerText] = React.useState("");
     const [composerBusy, setComposerBusy] = React.useState(false);
+    // Talk to the GM out of character: the next send is wrapped in ( ), then
+    // the toggle switches itself off.
+    const [ooc, setOoc] = React.useState(false);
+    // The draft holds text from the mic, so it goes out as voice input (the GM
+    // is told it may contain transcription errors). Typing from scratch doesn't.
+    const [draftIsVoice, setDraftIsVoice] = React.useState(false);
     const composerRef = useRef<HTMLTextAreaElement>(null);
     React.useImperativeHandle(
       forwardedRef,
@@ -207,14 +220,47 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       el.style.height = Math.min(el.scrollHeight, 140) + "px";
     };
 
+    // A transcript lands in the draft to be read, edited and sent with the
+    // arrow; it is never sent by itself.
+    const handleTranscript = React.useCallback(
+      (_owner: typeof SOLO_RECORDER, text: string) => {
+        setComposerText((prev) => appendTranscript(prev, text));
+        setDraftIsVoice(true);
+      },
+      [],
+    );
+    const recorder = useVoiceRecorder<typeof SOLO_RECORDER>({
+      onTranscript: handleTranscript,
+    });
+    const recording = recorder.activeOwnerId !== null;
+    const transcribing = recorder.processingIds.size > 0;
+
+    // The draft can grow from the mic as well as from typing. The textarea is
+    // not mounted while recording, so the height is measured when it returns.
+    React.useEffect(() => {
+      const el = composerRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 140) + "px";
+    }, [composerText, recording]);
+
+    // The mic is for solo play: couch co-op and online play keep the per-player
+    // bubbles, and party mode's players speak from their phones.
+    const showMic =
+      couchPlayers.length === 0 && !partyTableOpen && isSttEnabled();
+
     // Shared freeform submit path: submit the action as a plain Choice - the
     // GM stage determines mechanics (skill checks, items, tables) during
     // generation, so no client-side analysis step happens here.
-    const submitFreeformAction = (text: string) => {
+    const submitFreeformAction = (text: string, isVoice: boolean) => {
       const trimmed = text.trim();
       if (!trimmed) return;
 
-      if (onActionConfirm) {
+      // Only onCustomInput carries the voice kind, so a voice draft takes it
+      // even where typed text goes through onActionConfirm.
+      if (isVoice && onCustomInput) {
+        onCustomInput(trimmed, undefined, undefined, "voice");
+      } else if (onActionConfirm) {
         onActionConfirm({ text: trimmed });
       } else if (onCustomInput) {
         onCustomInput(trimmed);
@@ -222,10 +268,14 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
     };
 
     const handleComposerSubmit = async () => {
-      const text = composerText.trim();
-      if (!text || loading || loadingStage || composerBusy) return;
+      const typed = composerText.trim();
+      if (!typed || loading || loadingStage || composerBusy || recording) return;
 
+      const text = ooc ? wrapOutOfCharacter(typed) : typed;
+      const isVoice = draftIsVoice;
       setComposerText("");
+      setOoc(false);
+      setDraftIsVoice(false);
       if (composerRef.current) composerRef.current.style.height = "auto";
 
       setComposerBusy(true);
@@ -243,7 +293,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
           return;
         }
 
-        await submitFreeformAction(text);
+        await submitFreeformAction(text, isVoice);
       } finally {
         setComposerBusy(false);
       }
@@ -251,6 +301,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
 
     // Tapping a suggested-choice chip submits that choice directly (mechanics
     // like skill checks and intro overrides ride along on the Choice object).
+    // Never wrapped as out-of-character.
     const handleChipSelect = (choice: Choice) => {
       if (loading || loadingStage || composerBusy) return;
       if (onActionConfirm) {
@@ -265,6 +316,8 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       onFocusChange?.();
       window.setTimeout(() => onFocusChange?.(), 300);
     };
+
+    const generating = loading || !!loadingStage;
 
     return (
       <div
@@ -281,7 +334,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
                   key={`chip-${i}-${choice.text}`}
                   onClick={() => handleChipSelect(choice)}
                   disabled={composerBusy}
-                  className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-400/20 hover:border-purple-400/40 text-purple-100/90 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
+                  className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full border border-ys-border text-ys-text hover:bg-ys-text/10 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
                   title={choice.text}
                 >
                   {choice.text}
@@ -292,7 +345,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
 
         {/* Couch co-op: switch who's speaking */}
         {couchPlayers.length > 1 && (
-          <div className="flex items-center gap-1 p-1 bg-black/25 border border-white/10 rounded-full overflow-x-auto scrollbar-hide w-fit max-w-full">
+          <div className="flex items-center gap-1 p-1 bg-ys-surface border border-ys-border rounded-full overflow-x-auto scrollbar-hide w-fit max-w-full">
             {couchPlayers.map((player) => {
               const isActive = activeSpeaker?.id === player.id;
               return (
@@ -302,7 +355,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation ${
                     isActive
                       ? "text-white shadow-md"
-                      : "text-blue-200/60 hover:text-white"
+                      : "text-ys-muted hover:text-ys-text"
                   }`}
                   style={
                     isActive
@@ -330,78 +383,125 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
           </div>
         )}
 
-        {/* Input row - full width; voice input is the always-on bubble
-            (see PlayerBubbles below) instead of a mic button here. */}
-        <div className="flex items-end gap-2">
-          <div className="relative flex-1">
-            <textarea
-              ref={composerRef}
-              value={composerText}
-              onChange={(e) => {
-                setComposerText(e.target.value);
-                autoGrowComposer();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleComposerSubmit();
-                }
-              }}
-              onFocus={handleFocusChange}
-              onBlur={handleFocusChange}
-              rows={1}
-              placeholder={
-                loading || loadingStage
-                  ? loadingStage === "gm"
-                    ? "GM is thinking..."
-                    : loadingStage === "choices"
-                      ? "Preparing choices..."
-                      : "Writing the story..."
-                  : couchPlayers.length > 1 && activeSpeaker
-                    ? `What does ${activeSpeaker.name} do?`
-                    : "What do you do?"
-              }
-              className="w-full resize-none pl-4 pr-12 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/40 text-base leading-snug transition-colors"
-              style={
-                couchPlayers.length > 1 && activeSpeaker
-                  ? { borderColor: `${activeSpeaker.color}66` }
-                  : undefined
-              }
+        {/* One bar: [ textarea | ( ) | mic | send ]. While recording, the
+            recording bar takes the textarea's place. */}
+        <div
+          className={`flex items-end gap-1 rounded-3xl bg-ys-surface border border-ys-border pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-ys-muted ${
+            ooc ? "ring-1 ring-ys-accent" : ""
+          }`}
+          style={
+            couchPlayers.length > 1 && activeSpeaker
+              ? { borderColor: `${activeSpeaker.color}66` }
+              : undefined
+          }
+        >
+          {recording ? (
+            <RecordingOverlay
+              placement="inline"
+              player={SOLO_RECORDER}
+              analyserRef={recorder.analyserRef}
+              onCancel={recorder.cancelRecording}
+              onConfirm={recorder.stopRecording}
             />
+          ) : (
+            <>
+              <textarea
+                ref={composerRef}
+                value={composerText}
+                onChange={(e) => {
+                  setComposerText(e.target.value);
+                  setDraftIsVoice((v) => stillVoice(v, e.target.value));
+                  autoGrowComposer();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleComposerSubmit();
+                  }
+                }}
+                onFocus={handleFocusChange}
+                onBlur={handleFocusChange}
+                rows={1}
+                placeholder={
+                  generating
+                    ? loadingStage === "gm"
+                      ? "GM is thinking..."
+                      : loadingStage === "choices"
+                        ? "Preparing choices..."
+                        : "Writing the story..."
+                    : ooc
+                      ? "Talk to the GM, out of character…"
+                      : couchPlayers.length > 1 && activeSpeaker
+                        ? `What does ${activeSpeaker.name} do?`
+                        : "What do you do?"
+                }
+                className="flex-1 min-w-0 resize-none bg-transparent py-1.5 text-ys-text placeholder:text-ys-muted focus:outline-none text-base leading-snug"
+              />
 
-            {/* Send / Stop button, embedded like other chat UIs */}
-            {loading || loadingStage ? (
               <button
-                onClick={onStop}
-                className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full bg-red-500/15 hover:bg-red-500/30 border border-red-400/40 flex items-center justify-center transition-colors touch-manipulation"
-                title="Stop generating"
+                type="button"
+                onClick={() => setOoc((v) => !v)}
+                aria-pressed={ooc}
+                title="Talk to the GM out of character"
+                className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-colors touch-manipulation ${
+                  ooc
+                    ? "bg-ys-accent/20 text-ys-accent"
+                    : "text-ys-muted hover:text-ys-text"
+                }`}
               >
-                <span className="relative flex items-center justify-center">
-                  <span className="absolute w-7 h-7 border-2 border-red-400/30 border-t-red-300 rounded-full animate-spin" />
-                  <DynamicIcon
-                    name="Square"
-                    className="w-3 h-3 text-red-300 fill-current"
-                  />
-                </span>
+                ( )
               </button>
-            ) : (
-              <button
-                onClick={handleComposerSubmit}
-                disabled={!composerText.trim() || composerBusy}
-                className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full flex items-center justify-center transition-all bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 disabled:opacity-40 shadow-md shadow-purple-950/40 touch-manipulation"
-                title="Send"
-              >
-                {composerBusy ? (
-                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <DynamicIcon
-                    name="ArrowUp"
-                    className="w-4 h-4 text-white"
-                  />
-                )}
-              </button>
-            )}
-          </div>
+
+              {showMic && (
+                <button
+                  type="button"
+                  onClick={() => recorder.beginRecording(SOLO_RECORDER)}
+                  disabled={generating || transcribing}
+                  title="Speak your action"
+                  aria-label="Speak your action"
+                  className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-ys-muted hover:text-ys-text transition-colors touch-manipulation disabled:opacity-40"
+                >
+                  {transcribing ? (
+                    <div className="w-4 h-4 border-2 border-ys-muted/40 border-t-ys-muted rounded-full animate-spin" />
+                  ) : (
+                    <DynamicIcon name="Mic" className="w-5 h-5" />
+                  )}
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Send / Stop: the same white circle */}
+          {generating ? (
+            <button
+              onClick={onStop}
+              className="shrink-0 w-9 h-9 rounded-full bg-ys-text text-ys-bg flex items-center justify-center transition-all active:scale-95 touch-manipulation"
+              title="Stop generating"
+              aria-label="Stop generating"
+            >
+              <span className="relative flex items-center justify-center">
+                <span className="absolute w-7 h-7 border-2 border-ys-bg/30 border-t-ys-bg rounded-full animate-spin" />
+                <DynamicIcon
+                  name="Square"
+                  className="w-3 h-3 fill-current"
+                />
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={handleComposerSubmit}
+              disabled={!composerText.trim() || composerBusy || recording}
+              className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all bg-ys-text text-ys-bg active:scale-95 disabled:opacity-40 touch-manipulation"
+              title="Send"
+              aria-label="Send"
+            >
+              {composerBusy ? (
+                <div className="w-4 h-4 border-2 border-ys-bg/40 border-t-ys-bg rounded-full animate-spin" />
+              ) : (
+                <DynamicIcon name="Play" className="w-4 h-4 fill-current" />
+              )}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -666,12 +766,16 @@ export default function Story({
   const couchPlayers =
     (storyData.multiplayer?.enabled && storyData.multiplayer.couchPlayers) ||
     [];
-  // Whether the floating voice bubbles are on screen. They hang over the
+  // Whether the floating voice bubbles are on screen (couch co-op and online
+  // play only; solo play has the composer's mic). They hang over the
   // bottom of the feed, so the feed gets room to scroll its last lines (and
   // a just-opened turn-actions row) clear of them. They step aside while a
   // turn is being edited, where they would sit on the text box.
   const showVoiceBubbles =
-    !!onCustomInput && !partyTable && editingPart === null;
+    couchPlayers.length > 0 &&
+    !!onCustomInput &&
+    !partyTable &&
+    editingPart === null;
 
   // Kept at this level (rather than inside StoryComposer) so the "Enter/Space
   // jumps into the composer" keyboard shortcut below can reach it.
@@ -1290,6 +1394,7 @@ export default function Story({
             loading={loading}
             loadingStage={loadingStage}
             couchPlayers={couchPlayers}
+            partyTableOpen={!!partyTable}
             onCustomInput={onCustomInput}
             onActionConfirm={onActionConfirm}
             onStop={onStop}
@@ -1298,13 +1403,11 @@ export default function Story({
         )}
       </div>
 
-      {/* Voice input bubble(s): tap to speak a turn - the default voice
-          input UI now, replacing the old composer mic button. Couch
-          co-op/multiplayer get one bubble per player; solo play gets a
-          single default bubble instead. */}
+      {/* Voice input bubbles: couch co-op and online play get one per player.
+          Solo play speaks through the mic in the composer's bar instead. */}
       {showVoiceBubbles && onCustomInput && (
         <PlayerBubbles
-          players={couchPlayers.length > 0 ? couchPlayers : SOLO_VOICE_PLAYER}
+          players={couchPlayers}
           onSubmit={(text, speakerIds) =>
             onCustomInput(text, undefined, speakerIds, "voice")
           }

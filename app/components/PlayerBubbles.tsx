@@ -4,8 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CouchPlayer } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
 import { useNotification } from "../misc/NotificationContext";
-import { useAPIKeys } from "../misc/APIKeysContext";
-import { sttFetch } from "../misc/sttFetch";
+import { useVoiceRecorder } from "./useVoiceRecorder";
 import { buildTurnText } from "../misc/party/turnText";
 import {
   createFloor,
@@ -28,7 +27,6 @@ interface Position {
 }
 
 const BUBBLE_SIZE = 64; // px
-const SILENCE_TIMEOUT_MS = 3000;
 const DRAG_THRESHOLD = 8; // px of movement before a press counts as a drag, not a tap
 
 function positionStorageKey(playerId: string) {
@@ -76,12 +74,6 @@ function clampPct(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
 }
 
-interface RecordingSession {
-  stopped: boolean;
-  // Set by cancelRecording() - tells mediaRecorder.onstop to discard the
-  // take instead of transcribing it.
-  discard: boolean;
-}
 
 const WAVEFORM_BAR_COUNT = 24;
 
@@ -131,7 +123,7 @@ function LiveWaveform({
           ref={(el) => {
             barsRef.current[i] = el;
           }}
-          className="w-[3px] rounded-full bg-white/70 shrink-0"
+          className="w-[3px] rounded-full bg-ys-muted shrink-0"
           style={{ height: "14%" }}
         />
       ))}
@@ -139,31 +131,41 @@ function LiveWaveform({
   );
 }
 
-function RecordingOverlay({
+// "floating" is the couch bubbles' bar, fixed over the page; "inline" fills a
+// row of its parent (the composer's, where it takes the input's place), so it
+// stays inside the keyboard-aware layout.
+export function RecordingOverlay({
   player,
   analyserRef,
   onCancel,
   onConfirm,
+  placement = "floating",
 }: {
-  player: CouchPlayer;
+  player: Pick<CouchPlayer, "name" | "color">;
   analyserRef: React.RefObject<AnalyserNode | null>;
   onCancel: () => void;
   onConfirm: () => void;
+  placement?: "floating" | "inline";
 }) {
+  const floating = placement === "floating";
   return (
     <div
-      className="fixed z-50 left-1/2 -translate-x-1/2 bottom-6 w-[min(26rem,calc(100vw-2rem))] flex items-center gap-2 rounded-full bg-[#0d1829]/95 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50 pl-2 pr-2 py-2"
-      style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+      className={
+        floating
+          ? "fixed z-50 left-1/2 -translate-x-1/2 bottom-6 w-[min(26rem,calc(100vw-2rem))] flex items-center gap-2 rounded-full bg-ys-surface/95 backdrop-blur-xl border border-ys-border shadow-2xl shadow-black/50 pl-2 pr-2 py-2"
+          : "flex-1 min-w-0 flex items-center gap-2"
+      }
+      style={floating ? { marginBottom: "env(safe-area-inset-bottom)" } : undefined}
       role="dialog"
       aria-label={`Recording for ${player.name}`}
     >
       <button
         type="button"
         onClick={onCancel}
-        className="shrink-0 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center transition-all touch-manipulation"
+        className="shrink-0 w-9 h-9 rounded-full bg-ys-text/10 hover:bg-ys-text/20 active:scale-95 flex items-center justify-center transition-all touch-manipulation"
         title="Cancel recording"
       >
-        <DynamicIcon name="X" className="w-4 h-4 text-white/80" />
+        <DynamicIcon name="X" className="w-4 h-4 text-ys-muted" />
       </button>
 
       <span className="relative flex h-2.5 w-2.5 shrink-0">
@@ -182,10 +184,10 @@ function RecordingOverlay({
       <button
         type="button"
         onClick={onConfirm}
-        className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 touch-manipulation bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-md shadow-purple-950/40"
+        className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 touch-manipulation bg-ys-text text-ys-bg"
         title="Stop & transcribe"
       >
-        <DynamicIcon name="Check" className="w-4 h-4 text-white" />
+        <DynamicIcon name="Check" className="w-4 h-4" />
       </button>
     </div>
   );
@@ -230,25 +232,40 @@ export default function PlayerBubbles({
   onFloorRelease,
 }: PlayerBubblesProps) {
   const { addNotification } = useNotification();
-  const { keys } = useAPIKeys();
 
-  const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
-  const [processingPlayerIds, setProcessingPlayerIds] = useState<Set<string>>(
-    new Set(),
-  );
   const [pendingLines, setPendingLines] = useState<PendingLine[]>([]);
-
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const sessionRef = useRef<RecordingSession | null>(null);
 
   // Networked play drives the floor from the host (props); couch play keeps a
   // local floor here so the talking-stick + anti-steal-back rules still apply
   // when everyone shares one device.
   const isNetworked = !!myPlayerId;
+
+  // A finished take becomes a queued line; Generate sends the queue.
+  const handleTranscript = useCallback((player: CouchPlayer, text: string) => {
+    const line: PendingLine = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      playerId: player.id,
+      name: player.name,
+      color: player.color,
+      text,
+    };
+    setPendingLines((prev) => [...prev, line]);
+  }, []);
+
+  const {
+    activeOwnerId: activePlayerId,
+    processingIds: processingPlayerIds,
+    analyserRef,
+    beginRecording,
+    stopRecording,
+    cancelRecording,
+  } = useVoiceRecorder<CouchPlayer>({
+    onTranscript: handleTranscript,
+    onLocalActivity,
+    isNetworked,
+    onFloorTake,
+    onFloorRelease,
+  });
   const couchFloorRef = useRef(createFloor());
   const [couchLockedOut, setCouchLockedOut] = useState<string[]>([]);
   const couchFloorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -281,47 +298,6 @@ export default function PlayerBubbles({
     };
   }, []);
 
-  const teardownAudio = useCallback(() => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
-    }
-    analyserRef.current = null;
-  }, []);
-
-  useEffect(() => teardownAudio, [teardownAudio]);
-
-  const transcribe = useCallback(
-    async (blob: Blob): Promise<string> => {
-      const sttEnabled =
-        typeof window === "undefined" ||
-        localStorage.getItem("sttEnabled") !== "false";
-      if (!sttEnabled) {
-        throw new Error("Speech-to-text is disabled in Settings");
-      }
-      const formData = new FormData();
-      formData.append("audio", blob, "recording.webm");
-      formData.append("mistralKey", keys.mistralKey);
-
-      const response = await sttFetch(formData);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to transcribe audio");
-      }
-      const data = await response.json();
-      return data.transcript || "";
-    },
-    [keys.mistralKey],
-  );
 
   const submitLines = useCallback(
     (lines: PendingLine[]) => {
@@ -332,215 +308,6 @@ export default function PlayerBubbles({
     [onSubmit],
   );
 
-  const handleRecordingStopped = useCallback(
-    async (player: CouchPlayer, mimeType: string, chunks: Blob[]) => {
-      setActivePlayerId((cur) => (cur === player.id ? null : cur));
-
-      if (chunks.length === 0) {
-        onLocalActivity?.("idle");
-        return;
-      }
-      const blob = new Blob(chunks, { type: mimeType });
-      if (blob.size < 1000) {
-        onLocalActivity?.("idle");
-        return;
-      }
-
-      setProcessingPlayerIds((prev) => new Set(prev).add(player.id));
-      onLocalActivity?.("processing");
-      try {
-        const transcript = await transcribe(blob);
-        const trimmed = transcript.trim();
-
-        if (trimmed) {
-          const line: PendingLine = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            playerId: player.id,
-            name: player.name,
-            color: player.color,
-            text: trimmed,
-          };
-          setPendingLines((prev) => [...prev, line]);
-        }
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Couldn't transcribe that — try again";
-        addNotification(message, "failure");
-      } finally {
-        setProcessingPlayerIds((prev) => {
-          const next = new Set(prev);
-          next.delete(player.id);
-          return next;
-        });
-        onLocalActivity?.("idle");
-      }
-    },
-    [transcribe, addNotification, onLocalActivity],
-  );
-
-  const stopRecording = useCallback(() => {
-    const session = sessionRef.current;
-    if (!session) return;
-    session.stopped = true;
-    sessionRef.current = null;
-
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      mediaRecorderRef.current.stop();
-    }
-    teardownAudio();
-    // Networked: yield the party-voice floor so the next speaker can take it.
-    if (isNetworked) onFloorRelease?.();
-  }, [teardownAudio, isNetworked, onFloorRelease]);
-
-  // Like stopRecording, but marks the take to be discarded once the
-  // MediaRecorder actually stops (see onstop in beginRecording) instead of
-  // sending it off for transcription - the "X" on the recording overlay.
-  const cancelRecording = useCallback(() => {
-    const session = sessionRef.current;
-    if (!session) return;
-    session.stopped = true;
-    session.discard = true;
-    sessionRef.current = null;
-
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      mediaRecorderRef.current.stop();
-    }
-    teardownAudio();
-    if (isNetworked) onFloorRelease?.();
-  }, [teardownAudio, isNetworked, onFloorRelease]);
-
-  const watchSilence = useCallback((session: RecordingSession) => {
-    const analyser = analyserRef.current;
-    if (!analyser) return;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    let lastSoundTime = Date.now();
-
-    const tick = () => {
-      if (session.stopped || !analyserRef.current) return;
-      analyser.getByteFrequencyData(dataArray);
-      const average =
-        dataArray.reduce((sum, v) => sum + v, 0) / bufferLength;
-
-      if (average > 10) {
-        lastSoundTime = Date.now();
-      } else if (Date.now() - lastSoundTime > SILENCE_TIMEOUT_MS) {
-        // Silence: pause and queue what was said, but don't generate yet.
-        stopRecording();
-        return;
-      }
-      animationFrameRef.current = requestAnimationFrame(tick);
-    };
-    tick();
-  }, [stopRecording]);
-
-  const beginRecording = useCallback(
-    async (player: CouchPlayer) => {
-      const sttEnabled =
-        typeof window === "undefined" ||
-        localStorage.getItem("sttEnabled") !== "false";
-      if (!sttEnabled) {
-        addNotification(
-          "Voice input is disabled — enable it in Settings",
-          "warning",
-        );
-        return;
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
-        streamRef.current = stream;
-
-        const audioContext = new AudioContext();
-        audioContextRef.current = audioContext;
-        const source = audioContext.createMediaStreamSource(stream);
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        analyserRef.current = analyser;
-
-        const mimeType = MediaRecorder.isTypeSupported(
-          "audio/webm;codecs=opus",
-        )
-          ? "audio/webm;codecs=opus"
-          : MediaRecorder.isTypeSupported("audio/webm")
-            ? "audio/webm"
-            : "audio/mp4";
-
-        const chunks: Blob[] = [];
-        const mediaRecorder = new MediaRecorder(stream, { mimeType });
-        mediaRecorderRef.current = mediaRecorder;
-
-        const session: RecordingSession = { stopped: false, discard: false };
-        sessionRef.current = session;
-
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunks.push(e.data);
-        };
-        mediaRecorder.onstop = () => {
-          if (session.discard) {
-            setActivePlayerId((cur) => (cur === player.id ? null : cur));
-            onLocalActivity?.("idle");
-            return;
-          }
-          handleRecordingStopped(player, mimeType, chunks);
-        };
-        mediaRecorder.onerror = () => {
-          addNotification("Recording error", "failure");
-          session.stopped = true;
-          sessionRef.current = null;
-          teardownAudio();
-          setActivePlayerId((cur) => (cur === player.id ? null : cur));
-          onLocalActivity?.("idle");
-        };
-
-        mediaRecorder.start(100);
-        setActivePlayerId(player.id);
-        onLocalActivity?.("recording");
-        // Networked: claim the party-voice floor (host arbitrates and may
-        // interrupt someone else). Couch play grabs the floor in handleBubbleTap
-        // before we ever get here.
-        if (isNetworked) onFloorTake?.();
-        watchSilence(session);
-      } catch (error) {
-        let message =
-          error instanceof Error ? error.message : "Failed to start recording";
-        if (error instanceof DOMException && error.name === "NotAllowedError") {
-          message = "Microphone access denied";
-        } else if (
-          error instanceof DOMException &&
-          error.name === "NotFoundError"
-        ) {
-          message = "No microphone found";
-        }
-        addNotification(message, "failure");
-        teardownAudio();
-      }
-    },
-    [
-      addNotification,
-      handleRecordingStopped,
-      teardownAudio,
-      watchSilence,
-      onLocalActivity,
-      isNetworked,
-      onFloorTake,
-    ],
-  );
 
   const handleBubbleTap = useCallback(
     async (player: CouchPlayer) => {

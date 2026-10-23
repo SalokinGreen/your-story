@@ -649,3 +649,38 @@ None was dropped.
 - **Hit areas**: the "Turn actions" button is a 24 px target with the icon,
   dim (40%) until hover or focus, not the 40 px of the row's buttons; it sits
   beside a text line that is itself small.
+
+### 2026-10-23, slice 5
+
+- **`useVoiceRecorder<P extends { id: string }>()` lives in
+  `app/components/useVoiceRecorder.ts`**, with `isSttEnabled()` (the
+  `sttEnabled` key, default on). It is a move of `PlayerBubbles`' recorder
+  (teardown, `transcribe`, `handleRecordingStopped`, stop, cancel,
+  `watchSilence`, `beginRecording`) with `activePlayerId` and
+  `processingPlayerIds` renamed `activeOwnerId` and `processingIds`. What a
+  transcript becomes is the caller's: the bubbles' `onTranscript` builds the
+  same `PendingLine` as before; the composer's appends to the draft. The one
+  structural difference: `PendingLine` is built in a callback the hook calls
+  after `await transcribe`, where it used to be built inline in the same
+  place. Same order of `onLocalActivity`, floor take and release, and toasts.
+- **`RecordingOverlay` takes `player: Pick<CouchPlayer, "name" | "color">`**
+  (the composer has no `CouchPlayer`; its stand-in is `SOLO_RECORDER`, in
+  `var(--ys-accent)`). Its colours and `LiveWaveform`'s bars already take the
+  tokens, because the inline bar sits in the token-coloured composer.
+- **`app/story/composerDraft.ts`** (`appendTranscript`, `stillVoice`) is the
+  pure part of "transcript goes into the draft", tested in
+  `tests/composerDraft.test.ts`. Clearing the draft to nothing drops the voice
+  mark.
+- **`inputKind`:** `onActionConfirm` (typed text) has no voice kind and
+  `handleActionConfirm` never reaches `handleCustomInput`, so a voice draft
+  goes through `onCustomInput(text, undefined, undefined, "voice")`: the
+  route the bubble used. `speakerIds` is `undefined`, not `["solo"]` as the old
+  solo bubble sent (nothing reads a solo id: the spotlight ledger ignores
+  stories with one player). Typed text keeps `onActionConfirm`.
+- **The mic reads `sttEnabled` during render** (`isSttEnabled()`), like
+  `isTTSEnabled()` elsewhere; the composer re-renders on every keystroke and
+  the story page is client-only.
+- **OOC and a voice draft** combine: the transcript is wrapped, and the voice
+  note is still added.
+- **Icons:** `Mic`, `Play`, `Square`, `Check`, `X` are in lucide's `icons`
+  map. The OOC toggle is the text `( )`.
