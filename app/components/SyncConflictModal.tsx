@@ -51,24 +51,24 @@ export default function SyncConflictModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-linear-to-b from-blue-950 via-blue-950 to-indigo-950 rounded-2xl shadow-2xl border border-amber-500/50 max-w-lg w-full mx-4 overflow-hidden">
+      <div className="relative bg-ys-surface rounded-2xl shadow-2xl border border-amber-500/50 max-w-lg w-full mx-4 overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 p-5 border-b border-amber-500/30 bg-amber-500/10">
           <div className="p-2 bg-amber-500/20 rounded-lg">
             <DynamicIcon
               name="AlertTriangle"
-              className="w-6 h-6 text-amber-400"
+              className="w-6 h-6 text-amber-500"
             />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Sync Conflict</h2>
-            <p className="text-sm text-amber-200/80">{storyName}</p>
+            <h2 className="text-lg font-bold text-ys-text">Sync Conflict</h2>
+            <p className="text-sm text-ys-muted">{storyName}</p>
           </div>
         </div>
 
         {/* Content */}
         <div className="p-5 space-y-4">
-          <p className="text-gray-300 text-sm">
+          <p className="text-ys-text text-sm">
             This story has been modified both locally and on the server. Which
             version would you like to keep?
           </p>
@@ -81,24 +81,24 @@ export default function SyncConflictModal({
               className={`p-4 rounded-xl border-2 transition-all text-left ${
                 localIsNewer
                   ? "border-green-500/50 bg-green-500/10 hover:border-green-400"
-                  : "border-purple-500/30 bg-purple-500/5 hover:border-purple-400"
+                  : "border-ys-border bg-ys-text/5 hover:border-ys-muted"
               }`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <DynamicIcon
                   name="Smartphone"
-                  className="w-4 h-4 text-blue-400"
+                  className="w-4 h-4 text-ys-muted"
                 />
-                <span className="font-semibold text-white text-sm">
+                <span className="font-semibold text-ys-text text-sm">
                   This Device
                 </span>
                 {localIsNewer && (
-                  <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">
+                  <span className="text-xs bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded">
                     Newer
                   </span>
                 )}
               </div>
-              <div className="text-xs text-gray-400 space-y-1">
+              <div className="text-xs text-ys-muted space-y-1">
                 <div className="flex items-center gap-1">
                   <DynamicIcon name="Clock" className="w-3 h-3" />
                   {formatDate(localUpdatedAt)}
@@ -116,19 +116,19 @@ export default function SyncConflictModal({
               className={`p-4 rounded-xl border-2 transition-all text-left ${
                 !localIsNewer
                   ? "border-green-500/50 bg-green-500/10 hover:border-green-400"
-                  : "border-purple-500/30 bg-purple-500/5 hover:border-purple-400"
+                  : "border-ys-border bg-ys-text/5 hover:border-ys-muted"
               }`}
             >
               <div className="flex items-center gap-2 mb-2">
-                <DynamicIcon name="Cloud" className="w-4 h-4 text-purple-400" />
-                <span className="font-semibold text-white text-sm">Cloud</span>
+                <DynamicIcon name="Cloud" className="w-4 h-4 text-ys-muted" />
+                <span className="font-semibold text-ys-text text-sm">Cloud</span>
                 {!localIsNewer && (
-                  <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">
+                  <span className="text-xs bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded">
                     Newer
                   </span>
                 )}
               </div>
-              <div className="text-xs text-gray-400 space-y-1">
+              <div className="text-xs text-ys-muted space-y-1">
                 <div className="flex items-center gap-1">
                   <DynamicIcon name="Clock" className="w-3 h-3" />
                   {formatDate(serverUpdatedAt)}
@@ -141,16 +141,16 @@ export default function SyncConflictModal({
             </button>
           </div>
 
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-ys-muted text-center">
             The other version will be permanently overwritten.
           </p>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-purple-900/50 bg-blue-900/20">
+        <div className="p-4 border-t border-ys-border bg-ys-text/5">
           <button
             onClick={onClose}
-            className="w-full py-2 text-sm text-gray-400 hover:text-white transition-colors"
+            className="w-full py-2 text-sm text-ys-muted hover:text-ys-text transition-colors"
           >
             Decide Later
           </button>

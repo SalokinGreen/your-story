@@ -46,30 +46,30 @@ export default function OOCChatPanel({
   return (
     <>
       <button
-        className="fixed top-1/2 -translate-y-1/2 z-40 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white p-1.5 rounded-l-lg shadow-md shadow-purple-950/40 transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
+        className="fixed top-1/2 -translate-y-1/2 z-40 bg-ys-text text-ys-bg hover:opacity-90 p-1.5 rounded-l-lg shadow-md shadow-black/30 transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
         onClick={onClose}
         title="Close OOC Chat"
       >
         <DynamicIcon name="ChevronRight" className="w-4 h-4" />
       </button>
-      <div className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-[#0d1829]/95 backdrop-blur-2xl shadow-2xl shadow-black/50 border-l border-white/10 animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-2xl">
+      <div className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-ys-surface shadow-2xl shadow-black/50 border-l border-ys-border animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-4 py-3 backdrop-blur-sm">
+        <div className="flex items-center justify-between border-b border-ys-border px-4 py-3">
           <div className="flex items-center gap-2 min-w-0">
             <DynamicIcon
               name="MessageCircle"
-              className="w-4 h-4 text-blue-400 shrink-0"
+              className="w-4 h-4 text-ys-muted shrink-0"
             />
-            <span className="text-sm font-semibold text-blue-100 truncate">
+            <span className="text-sm font-semibold text-ys-text truncate">
               OOC Chat
             </span>
-            <span className="text-[10px] text-blue-300/50">
+            <span className="text-[10px] text-ys-muted">
               (players only, GM can&apos;t see this)
             </span>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-blue-300/60 hover:bg-white/10 hover:text-white transition-colors"
+            className="rounded-lg p-1.5 text-ys-muted hover:bg-ys-text/10 hover:text-ys-text transition-colors"
             title="Close"
           >
             <DynamicIcon name="X" className="w-4 h-4" />
@@ -82,9 +82,9 @@ export default function OOCChatPanel({
             <div className="flex flex-col items-center justify-center h-full text-center p-4">
               <DynamicIcon
                 name="MessageCircle"
-                className="w-8 h-8 text-blue-400/50 mb-2"
+                className="w-8 h-8 text-ys-muted mb-2"
               />
-              <p className="text-xs text-blue-300/60">
+              <p className="text-xs text-ys-muted">
                 Chat with your fellow players - the GM never sees this
               </p>
             </div>
@@ -99,8 +99,8 @@ export default function OOCChatPanel({
                   <div
                     className={`max-w-[85%] rounded-xl px-3 py-2 ${
                       isMe
-                        ? "rounded-tr-sm bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
-                        : "rounded-tl-sm bg-white/5 text-blue-100 border border-white/10"
+                        ? "rounded-tr-sm bg-ys-text text-ys-bg"
+                        : "rounded-tl-sm bg-ys-text/5 text-ys-text border border-ys-border"
                     }`}
                   >
                     {!isMe && (
@@ -123,7 +123,7 @@ export default function OOCChatPanel({
         </div>
 
         {/* Input */}
-        <div className="border-t border-white/10 bg-white/[0.02] p-3">
+        <div className="border-t border-ys-border p-3">
           <div className="flex gap-2">
             <textarea
               value={input}
@@ -136,12 +136,12 @@ export default function OOCChatPanel({
               }}
               placeholder="Message the other players..."
               rows={2}
-              className="flex-1 resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-blue-300/40 focus:border-purple-400/50 focus:ring-1 focus:ring-purple-500 outline-none"
+              className="flex-1 resize-none rounded-lg border border-ys-border bg-ys-text/5 px-3 py-2 text-xs text-ys-text placeholder:text-ys-muted focus:border-ys-muted focus:ring-1 focus:ring-ys-accent outline-none"
             />
             <button
               onClick={handleSend}
               disabled={!input.trim()}
-              className="self-end px-3 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:bg-white/5 disabled:bg-none disabled:cursor-not-allowed text-white rounded-lg shadow-md shadow-purple-950/40 transition-all"
+              className="self-end px-3 py-2 bg-ys-text text-ys-bg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-all"
             >
               <DynamicIcon name="Send" className="w-4 h-4" />
             </button>

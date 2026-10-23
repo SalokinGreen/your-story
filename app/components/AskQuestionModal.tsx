@@ -99,19 +99,21 @@ export default function AskQuestionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-blue-950 border border-purple-500/40 rounded-2xl w-full max-w-sm shadow-2xl shadow-purple-950/50 overflow-hidden">
+      <div className="bg-ys-surface border border-ys-border rounded-2xl w-full max-w-sm shadow-2xl shadow-black/50 overflow-hidden">
         {/* Header */}
-        <div className="px-5 pt-5 pb-4 bg-linear-to-br from-purple-900/40 to-blue-900/20 text-center">
-          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-linear-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-950/50">
-            <DynamicIcon name="HelpCircle" className="w-6 h-6 text-white" />
+        <div className="px-5 pt-5 pb-4 bg-ys-text/5 text-center">
+          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-ys-text text-ys-bg flex items-center justify-center shadow-lg shadow-black/30">
+            <DynamicIcon name="HelpCircle" className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-white">{question.question}</h3>
+          <h3 className="text-lg font-bold text-ys-text">{question.question}</h3>
           {question.target_player_name && (
             <span
-              className="inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full text-xs font-semibold text-white"
-              style={{
-                backgroundColor: matchedPlayer?.color || "#7c3aed",
-              }}
+              className={`inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                matchedPlayer ? "text-white" : "bg-ys-text text-ys-bg"
+              }`}
+              style={
+                matchedPlayer ? { backgroundColor: matchedPlayer.color } : undefined
+              }
             >
               <DynamicIcon name="User" className="w-3 h-3" />
               For {question.target_player_name}
@@ -126,13 +128,13 @@ export default function AskQuestionModal({
               <button
                 key={idx}
                 onClick={() => selectOption(opt.label)}
-                className="w-full text-left px-4 py-3 rounded-xl bg-blue-900/30 border border-blue-700/40 hover:border-purple-500/60 hover:bg-blue-900/50 active:scale-[0.99] transition-all"
+                className="w-full text-left px-4 py-3 rounded-xl bg-ys-text/5 border border-ys-border hover:border-ys-muted hover:bg-ys-text/10 active:scale-[0.99] transition-all"
               >
-                <div className="font-semibold text-white text-sm">
+                <div className="font-semibold text-ys-text text-sm">
                   {opt.label}
                 </div>
                 {opt.description && (
-                  <div className="text-xs text-blue-200/60 mt-0.5">
+                  <div className="text-xs text-ys-muted mt-0.5">
                     {opt.description}
                   </div>
                 )}
@@ -157,7 +159,7 @@ export default function AskQuestionModal({
                       }
                     }}
                     placeholder="Type your own answer..."
-                    className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/40 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 bg-ys-text/5 border border-ys-border rounded-xl text-ys-text text-sm focus:outline-none focus:ring-2 focus:ring-ys-accent"
                   />
                   <STTButton
                     onTranscript={(text) => setCustomText(text)}
@@ -167,7 +169,7 @@ export default function AskQuestionModal({
                 <button
                   onClick={submitCustom}
                   disabled={!customText.trim()}
-                  className="w-full py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] disabled:opacity-40 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-xl bg-ys-text text-ys-bg hover:opacity-90 active:scale-[0.99] disabled:opacity-40 font-semibold text-sm transition-all flex items-center justify-center gap-2"
                 >
                   <DynamicIcon name="Check" className="w-4 h-4" />
                   Confirm
@@ -176,7 +178,7 @@ export default function AskQuestionModal({
             ) : (
               <button
                 onClick={() => setShowCustomInput(true)}
-                className="w-full py-2.5 text-sm text-blue-300/70 hover:text-blue-200 border border-dashed border-blue-700/40 rounded-xl transition-colors"
+                className="w-full py-2.5 text-sm text-ys-muted hover:text-ys-text border border-dashed border-ys-border rounded-xl transition-colors"
               >
                 Type something else...
               </button>
@@ -184,7 +186,7 @@ export default function AskQuestionModal({
 
           <button
             onClick={skipQuestion}
-            className="w-full py-2 text-xs text-blue-300/50 hover:text-blue-200 transition-colors"
+            className="w-full py-2 text-xs text-ys-muted hover:text-ys-text transition-colors"
           >
             Skip
           </button>
@@ -196,8 +198,8 @@ export default function AskQuestionModal({
                   key={idx}
                   className={`h-1.5 rounded-full transition-all ${
                     idx === questionIndex
-                      ? "w-5 bg-purple-500"
-                      : "w-1.5 bg-blue-700/50"
+                      ? "w-5 bg-ys-accent"
+                      : "w-1.5 bg-ys-border"
                   }`}
                 />
               ))}

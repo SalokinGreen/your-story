@@ -34,7 +34,7 @@ export default function TurnLobbyOverlay({
   const nameFor = (id: string) =>
     couchPlayers.find((p) => p.id === id)?.name || "Player";
   const colorFor = (id: string) =>
-    couchPlayers.find((p) => p.id === id)?.color || "#6366f1";
+    couchPlayers.find((p) => p.id === id)?.color || "var(--ys-muted)";
 
   const iResponded = submitted.has(myPlayerId) || passed.has(myPlayerId);
   const waitingCount = status.expectedPlayerIds.filter(
@@ -42,10 +42,10 @@ export default function TurnLobbyOverlay({
   ).length;
 
   return (
-    <div className="w-full rounded-2xl bg-[#0d1829]/95 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50 p-4 mb-2">
+    <div className="w-full rounded-2xl bg-ys-surface border border-ys-border shadow-2xl shadow-black/50 p-4 mb-2">
       <div className="flex items-center gap-2 mb-3">
-        <DynamicIcon name="Users" className="w-4 h-4 text-purple-300" />
-        <span className="text-sm font-semibold text-white">
+        <DynamicIcon name="Users" className="w-4 h-4 text-ys-muted" />
+        <span className="text-sm font-semibold text-ys-text">
           {waitingCount > 0
             ? `Waiting on ${waitingCount} ${waitingCount === 1 ? "player" : "players"}…`
             : "Everyone's in"}
@@ -64,8 +64,8 @@ export default function TurnLobbyOverlay({
               key={id}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
                 state === "waiting"
-                  ? "bg-white/5 border-white/10 text-blue-200/60"
-                  : "bg-white/10 border-white/15 text-white"
+                  ? "bg-ys-text/5 border-ys-border text-ys-muted"
+                  : "bg-ys-text/10 border-ys-border text-ys-text"
               }`}
               title={
                 state === "submitted"
@@ -87,10 +87,10 @@ export default function TurnLobbyOverlay({
               {nameFor(id)}
               {id === myPlayerId && " (you)"}
               {state === "submitted" && (
-                <DynamicIcon name="Check" className="w-3 h-3 text-green-400" />
+                <DynamicIcon name="Check" className="w-3 h-3 text-green-500" />
               )}
               {state === "passed" && (
-                <DynamicIcon name="Minus" className="w-3 h-3 text-blue-300/60" />
+                <DynamicIcon name="Minus" className="w-3 h-3 text-ys-muted" />
               )}
             </span>
           );
@@ -102,7 +102,7 @@ export default function TurnLobbyOverlay({
           <button
             type="button"
             onClick={onPass}
-            className="flex-1 px-3 py-2 text-sm font-semibold rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 transition-colors"
+            className="flex-1 px-3 py-2 text-sm font-semibold rounded-xl bg-ys-text/5 hover:bg-ys-text/10 border border-ys-border text-ys-text transition-colors"
           >
             Pass this turn
           </button>
@@ -111,7 +111,7 @@ export default function TurnLobbyOverlay({
           <button
             type="button"
             onClick={onStartNow}
-            className="flex-1 px-3 py-2 text-sm font-semibold rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40 transition-all flex items-center justify-center gap-1.5"
+            className="flex-1 px-3 py-2 text-sm font-semibold rounded-xl bg-ys-text text-ys-bg hover:opacity-90 shadow-md shadow-black/20 transition-all flex items-center justify-center gap-1.5"
           >
             <DynamicIcon name="Play" className="w-4 h-4" />
             Start now

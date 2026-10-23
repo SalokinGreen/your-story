@@ -684,3 +684,32 @@ None was dropped.
   note is still added.
 - **Icons:** `Mic`, `Play`, `Square`, `Check`, `X` are in lucide's `icons`
   map. The OOC toggle is the text `( )`.
+
+### 2026-10-23, slice 6
+
+- **Primary buttons are `bg-ys-text text-ys-bg`** (the composer's send) on both
+  themes; the old purple-to-indigo gradients, blue fills and their coloured
+  shadows are gone. Tinted fills with `text-ys-text` stand in for pale coloured
+  text, which a light theme can't read.
+- **Semantic colours stay, one step stronger:** red for danger and stop, green
+  for "newer" and success, amber for the sync warning and the party banner's
+  tint, and `CombatDisplay`'s stat and combatant colours (red, blue, orange,
+  purple, green, yellow). Their text moved from the 300/400 shades to 500/600,
+  which read on both Ink and Paper White.
+- **`ConfirmDialog`'s default button is the theme's primary** and no longer a
+  default class string. A caller's own `confirmButtonClass` (red, orange, blue,
+  gray) is a coloured fill, so it gets `text-white` added by the dialog.
+- **A "for Name" chip in the ask and roll modals** takes the player's colour
+  with white text when the name matches a player; with no match it is
+  `bg-ys-text text-ys-bg`, replacing the hard-coded `#7c3aed`.
+- **`DiceThrowModal`'s scrim is `bg-ys-bg/85`**, not `bg-black/80`, so its text
+  follows the theme. The dice keep their own colours; whether they stay legible
+  on a light scrim is a screenshot check.
+- **`PartyLobby`:** the QR stays black on white; the interface `<option>`s take
+  the surface colours. **`TurnLobbyOverlay`'s** fallback player colour is
+  `var(--ys-muted)`.
+- **`TTSControls`'s bar variant** uses the same token classes as the slim one
+  (only layout still differs). **`PlayerBubbles`:** the discs stay player-coloured
+  with white icons; the Generate bubble, the queue panel and the recording bar
+  take tokens.
+- **`NPCReactionToast` lost its `dark:` classes**; the tokens carry the theme.

@@ -39,10 +39,10 @@ export default function PartyTableStrip({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 pb-2" aria-label="Party table">
-      <div className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md p-3 space-y-2">
+      <div className="rounded-xl border border-ys-border bg-ys-surface p-3 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           {table.players.length === 0 && (
-            <p className="text-xs text-blue-200/60">
+            <p className="text-xs text-ys-muted">
               Nobody has joined yet. Tap Join to show the QR code.
             </p>
           )}
@@ -54,7 +54,7 @@ export default function PartyTableStrip({
               <div
                 key={p.id}
                 className={`flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border text-sm ${
-                  holder ? "bg-white/15 border-white/40" : "bg-white/5 border-white/10"
+                  holder ? "bg-ys-text/15 border-ys-muted" : "bg-ys-text/5 border-ys-border"
                 } ${p.connected ? "" : "opacity-50"}`}
                 style={holder ? { boxShadow: `0 0 0 2px ${p.color}` } : undefined}
               >
@@ -63,18 +63,18 @@ export default function PartyTableStrip({
                   style={{ backgroundColor: p.color }}
                   aria-hidden="true"
                 />
-                <span className="text-white">{p.name}</span>
+                <span className="text-ys-text">{p.name}</span>
                 {holder && (
-                  <span className="flex items-center gap-1 text-xs text-amber-200">
+                  <span className="flex items-center gap-1 text-xs text-ys-text">
                     <DynamicIcon name="Mic" className="w-3 h-3" /> spotlight
                   </span>
                 )}
                 {locked && (
-                  <span className="text-xs text-blue-200/70" title="Can't take the spotlight back yet">
+                  <span className="text-xs text-ys-muted" title="Can't take the spotlight back yet">
                     {Math.ceil(lockedMs / 1000)} s
                   </span>
                 )}
-                {!p.connected && <span className="text-xs text-blue-200/60">offline</span>}
+                {!p.connected && <span className="text-xs text-ys-muted">offline</span>}
                 {removing === p.id ? (
                   <button
                     type="button"
@@ -84,7 +84,7 @@ export default function PartyTableStrip({
                     }}
                     onBlur={() => setRemoving(null)}
                     autoFocus
-                    className="px-2 py-0.5 text-xs rounded-full bg-red-500/30 text-red-100 hover:bg-red-500/50"
+                    className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30"
                   >
                     Remove?
                   </button>
@@ -93,7 +93,7 @@ export default function PartyTableStrip({
                     type="button"
                     onClick={() => setRemoving(p.id)}
                     disabled={generating}
-                    className="p-1 text-blue-200/40 hover:text-white rounded-full disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="p-1 text-ys-muted hover:text-ys-text rounded-full disabled:opacity-30 disabled:cursor-not-allowed"
                     title={
                       generating
                         ? "Wait for the GM to finish this turn"
@@ -110,11 +110,11 @@ export default function PartyTableStrip({
           <button
             type="button"
             onClick={onJoin}
-            className="flex items-center gap-1 px-3 py-1 text-sm rounded-full border border-white/10 bg-white/5 text-blue-100 hover:bg-white/10"
+            className="flex items-center gap-1 px-3 py-1 text-sm rounded-full border border-ys-border bg-ys-text/5 text-ys-text hover:bg-ys-text/10"
           >
             <DynamicIcon name="QrCode" className="w-3.5 h-3.5" /> Join
           </button>
-          <span className="ml-auto text-xs text-blue-200/50">
+          <span className="ml-auto text-xs text-ys-muted">
             {connected} of {table.players.length} on phones
           </span>
         </div>
@@ -126,7 +126,7 @@ export default function PartyTableStrip({
                 <span className="font-semibold shrink-0" style={{ color: line.color }}>
                   {line.name}
                 </span>
-                <span className="text-blue-100/90 break-words min-w-0">{line.text}</span>
+                <span className="text-ys-text break-words min-w-0">{line.text}</span>
               </li>
             ))}
           </ul>
@@ -135,7 +135,7 @@ export default function PartyTableStrip({
         {table.pending.map((req) => (
           <div
             key={req.requestId}
-            className="flex items-center justify-between gap-2 text-xs text-amber-100/90 bg-amber-500/10 border border-amber-400/20 rounded-lg px-3 py-1.5"
+            className="flex items-center justify-between gap-2 text-xs text-ys-text bg-amber-500/10 border border-amber-400/20 rounded-lg px-3 py-1.5"
           >
             <span>
               Waiting for {req.playerName}&apos;s {req.kind === "roll" ? "roll" : "answer"} on their phone
@@ -143,7 +143,7 @@ export default function PartyTableStrip({
             <button
               type="button"
               onClick={() => onAnswerHere(req.requestId)}
-              className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white"
+              className="px-2 py-0.5 rounded-md bg-ys-text/10 hover:bg-ys-text/20 text-ys-text"
             >
               Answer here
             </button>
@@ -151,7 +151,7 @@ export default function PartyTableStrip({
         ))}
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-blue-200/60">
+          <p className="text-xs text-ys-muted">
             {generating
               ? "The GM is working…"
               : table.queue.length === 0
@@ -162,7 +162,7 @@ export default function PartyTableStrip({
             type="button"
             onClick={onGo}
             disabled={generating || table.queue.length === 0}
-            className="px-5 py-1.5 text-sm font-semibold rounded-lg bg-blue-500/80 hover:bg-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-1.5 text-sm font-semibold rounded-lg bg-ys-text text-ys-bg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Go
           </button>

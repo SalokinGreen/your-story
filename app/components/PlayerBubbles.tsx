@@ -630,19 +630,19 @@ function GenerateBubble({
       title="Generate from queued turns"
     >
       <span
-        className="relative rounded-full flex items-center justify-center shadow-lg animate-[pulse_2s_ease-in-out_infinite] transition-transform active:scale-95 bg-linear-to-br from-purple-600 to-indigo-600"
+        className="relative rounded-full flex items-center justify-center shadow-lg animate-[pulse_2s_ease-in-out_infinite] transition-transform active:scale-95 bg-ys-text text-ys-bg"
         style={{
           width: BUBBLE_SIZE,
           height: BUBBLE_SIZE,
           opacity: disabled ? 0.4 : 1,
         }}
       >
-        <DynamicIcon name="Sparkles" className="w-6 h-6 text-white" />
-        <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-white text-purple-700 text-[11px] font-bold flex items-center justify-center shadow">
+        <DynamicIcon name="Sparkles" className="w-6 h-6" />
+        <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-ys-accent text-ys-bg text-[11px] font-bold flex items-center justify-center shadow">
           {count}
         </span>
       </span>
-      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold text-white bg-purple-900/70 shadow-sm whitespace-nowrap">
+      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold text-ys-bg bg-ys-text/80 shadow-sm whitespace-nowrap">
         Generate
       </span>
     </button>
@@ -658,27 +658,27 @@ function PendingLinesPanel({
 }) {
   return (
     <div
-      className="fixed z-40 left-1/2 -translate-x-1/2 bottom-24 w-[min(22rem,calc(100vw-2rem))] max-h-40 overflow-y-auto rounded-xl bg-[#0d1829]/90 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50 p-2 space-y-1"
+      className="fixed z-40 left-1/2 -translate-x-1/2 bottom-24 w-[min(22rem,calc(100vw-2rem))] max-h-40 overflow-y-auto rounded-xl bg-ys-surface border border-ys-border shadow-2xl shadow-black/50 p-2 space-y-1"
       role="log"
       aria-label="Queued player turns"
     >
       {lines.map((line) => (
         <div
           key={line.id}
-          className="flex items-start gap-2 text-xs bg-white/5 rounded-lg px-2 py-1.5"
+          className="flex items-start gap-2 text-xs bg-ys-text/5 rounded-lg px-2 py-1.5"
         >
           <span
             className="w-2 h-2 rounded-full mt-1 shrink-0"
             style={{ backgroundColor: line.color }}
           />
           <div className="min-w-0 flex-1">
-            <span className="font-semibold text-white/90">{line.name}:</span>{" "}
-            <span className="text-white/70">{line.text}</span>
+            <span className="font-semibold text-ys-text">{line.name}:</span>{" "}
+            <span className="text-ys-muted">{line.text}</span>
           </div>
           <button
             type="button"
             onClick={() => onRemove(line.id)}
-            className="shrink-0 text-white/40 hover:text-white/80 transition-colors"
+            className="shrink-0 text-ys-muted hover:text-ys-text transition-colors"
             title="Remove this line"
           >
             <DynamicIcon name="X" className="w-3.5 h-3.5" />

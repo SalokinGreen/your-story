@@ -42,28 +42,28 @@ export function explainPartyError(error: PartyError): { title: string; steps: st
 
 function CantConnectHelp() {
   return (
-    <details className="text-xs text-blue-200/60">
-      <summary className="cursor-pointer text-blue-200/80 hover:text-white">
+    <details className="text-xs text-ys-muted">
+      <summary className="cursor-pointer text-ys-muted hover:text-ys-text">
         A phone can&apos;t connect?
       </summary>
       <ul className="mt-2 space-y-2 list-disc pl-4">
         <li>
-          <span className="text-blue-100">Same Wi-Fi.</span> The phone must be on the same network as
+          <span className="text-ys-text">Same Wi-Fi.</span> The phone must be on the same network as
           this PC. A guest network usually blocks phones from reaching other devices (client
           isolation).
         </li>
         <li>
-          <span className="text-blue-100">Windows marks the network Public.</span> Open Settings,
+          <span className="text-ys-text">Windows marks the network Public.</span> Open Settings,
           Network &amp; internet, your connection&apos;s properties, and set the network profile to
           Private.
         </li>
         <li>
-          <span className="text-blue-100">The firewall prompt was dismissed.</span> Open Windows
+          <span className="text-ys-text">The firewall prompt was dismissed.</span> Open Windows
           Security, Firewall &amp; network protection, Allow an app through firewall, and tick
           Private for Your Story.
         </li>
         <li>
-          <span className="text-blue-100">The wrong network.</span> If this PC has a VPN or other
+          <span className="text-ys-text">The wrong network.</span> If this PC has a VPN or other
           adapters, pick the home network&apos;s address above.
         </li>
       </ul>
@@ -88,7 +88,7 @@ export default function PartyLobby({
 
   if (!party.available) {
     return (
-      <div className="p-4 bg-white/[0.03] rounded-xl border border-white/10 text-sm text-blue-200/70">
+      <div className="p-4 bg-ys-text/5 rounded-xl border border-ys-border text-sm text-ys-muted">
         Party mode runs in the Your Story desktop app: the desktop is the table, and phones join it
         over your home Wi-Fi.
       </div>
@@ -113,11 +113,11 @@ export default function PartyLobby({
             />
           </div>
           <div className="space-y-3 min-w-0 w-full">
-            <p className="text-sm text-blue-100">
+            <p className="text-sm text-ys-text">
               Scan this with a phone on the same Wi-Fi to join the table.
             </p>
-            <div className="flex items-center gap-2 p-2 bg-white/[0.03] rounded-lg border border-white/10">
-              <p className="text-xs font-mono text-white break-all select-all grow">{info.url}</p>
+            <div className="flex items-center gap-2 p-2 bg-ys-text/5 rounded-lg border border-ys-border">
+              <p className="text-xs font-mono text-ys-text break-all select-all grow">{info.url}</p>
               <button
                 type="button"
                 onClick={() => {
@@ -126,14 +126,14 @@ export default function PartyLobby({
                     () => addNotification("Couldn't copy the link", "failure"),
                   );
                 }}
-                className="p-2 text-blue-200/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
+                className="p-2 text-ys-muted hover:text-ys-text hover:bg-ys-text/10 rounded-lg transition-colors shrink-0"
                 title="Copy the link"
               >
                 <DynamicIcon name="Copy" className="w-4 h-4" />
               </button>
             </div>
             {!joinOnly && info.interfaces.length > 1 && (
-              <label className="block text-xs text-blue-200/60">
+              <label className="block text-xs text-ys-muted">
                 Network
                 <select
                   value={picked ?? info.ip}
@@ -141,10 +141,10 @@ export default function PartyLobby({
                     setPicked(e.target.value);
                     void party.start(e.target.value);
                   }}
-                  className="mt-1 block w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white"
+                  className="mt-1 block w-full bg-ys-text/5 border border-ys-border rounded-lg px-2 py-1.5 text-sm text-ys-text"
                 >
                   {info.interfaces.map((i) => (
-                    <option key={i.ip} value={i.ip} className="text-black">
+                    <option key={i.ip} value={i.ip} className="bg-ys-surface text-ys-text">
                       {i.ip} · {i.name}
                       {i.isDefault ? " (default)" : ""}
                     </option>
@@ -162,7 +162,7 @@ export default function PartyLobby({
               setPicked(undefined);
               void party.stop();
             }}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-white/5 hover:bg-red-500/20 text-blue-100 border border-white/10"
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-ys-text/5 hover:bg-red-500/20 text-ys-text border border-ys-border"
           >
             Close the table
           </button>
@@ -173,14 +173,14 @@ export default function PartyLobby({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2 text-sm text-blue-200/70">
+      <div className="space-y-2 text-sm text-ys-muted">
         <p>
           Everyone plays from their own phone. This desktop shows the story; each phone shows that
           player&apos;s character and controls.
         </p>
         <p>
           Starting opens a small server on your home network for as long as the table is open.{" "}
-          <span className="text-blue-100">
+          <span className="text-ys-text">
             The first time, Windows will ask whether to let Your Story through its firewall. Allow it
             on Private networks only.
           </span>
@@ -188,20 +188,20 @@ export default function PartyLobby({
       </div>
       {explained && (
         <div className="p-3 rounded-lg border border-red-400/30 bg-red-500/10 space-y-1">
-          <p className="text-sm font-semibold text-red-200">{explained.title}</p>
-          <ul className="text-xs text-red-100/80 space-y-1 list-disc pl-4">
+          <p className="text-sm font-semibold text-red-500">{explained.title}</p>
+          <ul className="text-xs text-ys-text space-y-1 list-disc pl-4">
             {explained.steps.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ul>
         </div>
       )}
-      {blocked && <p className="text-xs text-amber-200/80">{blocked}</p>}
+      {blocked && <p className="text-xs text-ys-muted">{blocked}</p>}
       <button
         type="button"
         disabled={party.status === "starting" || !!blocked}
         onClick={() => void party.start(picked)}
-        className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-blue-500/80 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-ys-text text-ys-bg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {party.status === "starting" ? "Opening the table…" : "Open the table"}
       </button>
@@ -225,15 +225,15 @@ export function PartyLobbyModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 rounded-2xl bg-slate-900 border border-white/10 space-y-4"
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 rounded-2xl bg-ys-surface border border-ys-border space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Join the table</h2>
+          <h2 className="text-lg font-semibold text-ys-text">Join the table</h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-blue-200/70 hover:text-white hover:bg-white/10 rounded-lg"
+            className="p-2 text-ys-muted hover:text-ys-text hover:bg-ys-text/10 rounded-lg"
             aria-label="Close"
           >
             <DynamicIcon name="X" className="w-4 h-4" />

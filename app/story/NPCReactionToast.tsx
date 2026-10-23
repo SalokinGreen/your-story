@@ -47,9 +47,9 @@ export default function NPCReactionToast({
       className={`
         pointer-events-auto cursor-pointer
         flex items-center gap-3 
-        bg-gray-900/95 dark:bg-gray-800/95
+        bg-ys-surface
         backdrop-blur-sm
-        border border-gray-700 dark:border-gray-600
+        border border-ys-border
         rounded-xl shadow-2xl
         px-4 py-3
         min-w-[280px] max-w-[360px]
@@ -59,7 +59,7 @@ export default function NPCReactionToast({
             ? "opacity-0 translate-x-4 scale-95"
             : "opacity-100 translate-x-0 scale-100"
         }
-        hover:bg-gray-800/95 dark:hover:bg-gray-700/95
+        hover:bg-ys-text/10
       `}
       onClick={handleDismiss}
       style={{
@@ -71,24 +71,24 @@ export default function NPCReactionToast({
         <StoredPortrait
           imageId={reaction.npcPortraitImageId}
           alt={reaction.npcName}
-          className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/50"
+          className="w-12 h-12 rounded-full object-cover ring-2 ring-ys-border"
         >
           {reaction.npcImage ? (
             <img
               src={reaction.npcImage}
               alt={reaction.npcName}
-              className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/50"
+              className="w-12 h-12 rounded-full object-cover ring-2 ring-ys-border"
             />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center ring-2 ring-indigo-500/50">
-              <span className="text-white text-lg font-bold">
+            <div className="w-12 h-12 rounded-full bg-ys-text/15 flex items-center justify-center ring-2 ring-ys-border">
+              <span className="text-ys-text text-lg font-bold">
                 {reaction.npcName.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
         </StoredPortrait>
         {/* Online-style indicator dot */}
-        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900 dark:border-gray-800 flex items-center justify-center">
+        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-ys-surface flex items-center justify-center">
           {reaction.emoji && (
             <span className="text-[10px]">{reaction.emoji}</span>
           )}
@@ -98,25 +98,25 @@ export default function NPCReactionToast({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-white truncate">
+          <span className="font-semibold text-ys-text truncate">
             {reaction.npcName}
           </span>
-          <span className="text-gray-300 truncate">{reaction.reaction}</span>
+          <span className="text-ys-text truncate">{reaction.reaction}</span>
           {reaction.emoji && !reaction.npcImage && (
             <span className="text-lg shrink-0">{reaction.emoji}</span>
           )}
         </div>
         {reaction.context && (
-          <p className="text-sm text-gray-400 truncate mt-0.5">
+          <p className="text-sm text-ys-muted truncate mt-0.5">
             {reaction.context}
           </p>
         )}
       </div>
 
       {/* Progress bar at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-700/50 rounded-b-xl overflow-hidden">
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-ys-border rounded-b-xl overflow-hidden">
         <div
-          className="h-full bg-linear-to-r from-indigo-500 to-purple-500 transition-all duration-50 ease-linear"
+          className="h-full bg-ys-accent transition-all duration-50 ease-linear"
           style={{ width: `${progress}%` }}
         />
       </div>

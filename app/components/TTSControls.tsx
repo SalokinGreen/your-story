@@ -1365,8 +1365,8 @@ export default function TTSControls({
           disabled={buttonDisabled}
           className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
             buttonDisabled
-              ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
-              : "bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40"
+              ? "bg-ys-text/5 text-ys-muted/50 cursor-not-allowed"
+              : "bg-ys-text text-ys-bg hover:opacity-90 shadow-md shadow-black/20"
           }`}
           title="Read aloud"
         >
@@ -1384,7 +1384,7 @@ export default function TTSControls({
       className={
         slim
           ? "flex items-center gap-1.5 bg-ys-surface border border-ys-border rounded-full pl-1 pr-3 py-1 mx-3 mb-1 min-w-0"
-          : "flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full pl-1 pr-3 py-1 flex-1 min-w-0 max-w-[20rem] ml-2"
+          : "flex items-center gap-1.5 bg-ys-text/5 border border-ys-border rounded-full pl-1 pr-3 py-1 flex-1 min-w-0 max-w-[20rem] ml-2"
       }
     >
       <button
@@ -1392,12 +1392,8 @@ export default function TTSControls({
         disabled={!canSkipBack}
         className={`${slim ? "hidden sm:flex" : "flex"} w-7 h-7 shrink-0 rounded-full items-center justify-center transition-colors ${
           canSkipBack
-            ? slim
-              ? "text-ys-muted hover:bg-ys-border hover:text-ys-text"
-              : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-            : slim
-              ? "text-ys-muted/30 cursor-not-allowed"
-              : "text-blue-300/25 cursor-not-allowed"
+            ? "text-ys-muted hover:bg-ys-border hover:text-ys-text"
+            : "text-ys-muted/30 cursor-not-allowed"
         }`}
         title="Previous sentence"
       >
@@ -1413,8 +1409,8 @@ export default function TTSControls({
               ? "bg-ys-border text-ys-muted/40 cursor-not-allowed"
               : "bg-ys-accent text-ys-bg hover:opacity-90"
             : buttonDisabled
-              ? "bg-white/5 text-blue-300/40 cursor-not-allowed shadow-md"
-              : "bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40"
+              ? "bg-ys-text/5 text-ys-muted/50 cursor-not-allowed shadow-md"
+              : "bg-ys-text text-ys-bg hover:opacity-90 shadow-md shadow-black/20"
         }`}
         title={centerTitle}
       >
@@ -1432,12 +1428,8 @@ export default function TTSControls({
         disabled={!canSkipForward}
         className={`${slim ? "hidden sm:flex" : "flex"} w-7 h-7 shrink-0 rounded-full items-center justify-center transition-colors ${
           canSkipForward
-            ? slim
-              ? "text-ys-muted hover:bg-ys-border hover:text-ys-text"
-              : "text-blue-100/80 hover:bg-white/10 hover:text-white"
-            : slim
-              ? "text-ys-muted/30 cursor-not-allowed"
-              : "text-blue-300/25 cursor-not-allowed"
+            ? "text-ys-muted hover:bg-ys-border hover:text-ys-text"
+            : "text-ys-muted/30 cursor-not-allowed"
         }`}
         title="Next sentence"
       >
@@ -1466,16 +1458,16 @@ export default function TTSControls({
         }`}
       >
         <div
-          className={`w-full h-1.5 rounded-full overflow-hidden ${slim ? "bg-ys-border" : "bg-white/10"}`}
+          className={`w-full h-1.5 rounded-full overflow-hidden bg-ys-border`}
         >
           <div
-            className={`h-full ${slim ? "bg-ys-accent" : "bg-purple-400/80"} ${isDragging ? "" : "transition-[width] duration-75"}`}
+            className={`h-full bg-ys-accent ${isDragging ? "" : "transition-[width] duration-75"}`}
             style={{ width: `${seekPct}%` }}
           />
         </div>
         {seekable && (
           <div
-            className={`absolute w-3 h-3 rounded-full bg-white shadow-md ${slim ? "ring-2 ring-ys-accent" : "shadow-purple-950/40 ring-2 ring-purple-500/70"} -translate-x-1/2 transition-transform ${
+            className={`absolute w-3 h-3 rounded-full bg-white shadow-md ring-2 ring-ys-accent -translate-x-1/2 transition-transform ${
               isDragging ? "scale-125" : "scale-0 group-hover:scale-100 group-focus:scale-100"
             }`}
             style={{ left: `${seekPct}%` }}
@@ -1484,7 +1476,7 @@ export default function TTSControls({
       </div>
 
       <span
-        className={`shrink-0 text-[10px] leading-none tabular-nums min-w-[4.5rem] text-right ${slim ? "text-ys-muted" : "text-blue-100/60"}`}
+        className={`shrink-0 text-[10px] leading-none tabular-nums min-w-[4.5rem] text-right text-ys-muted`}
       >
         {formatTime(displayTime)} / {formatTime(totalDuration)}
       </span>

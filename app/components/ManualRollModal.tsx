@@ -80,19 +80,21 @@ export default function ManualRollModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-blue-950 border border-purple-500/40 rounded-2xl w-full max-w-sm shadow-2xl shadow-purple-950/50 overflow-hidden">
+      <div className="bg-ys-surface border border-ys-border rounded-2xl w-full max-w-sm shadow-2xl shadow-black/50 overflow-hidden">
         {/* Header */}
-        <div className="px-5 pt-5 pb-4 bg-linear-to-br from-purple-900/40 to-blue-900/20 text-center">
-          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-linear-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-950/50">
-            <DynamicIcon name="Dices" className="w-6 h-6 text-white" />
+        <div className="px-5 pt-5 pb-4 bg-ys-text/5 text-center">
+          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-ys-text text-ys-bg flex items-center justify-center shadow-lg shadow-black/30">
+            <DynamicIcon name="Dices" className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-white">{request.title}</h3>
+          <h3 className="text-lg font-bold text-ys-text">{request.title}</h3>
           {request.playerName && (
             <span
-              className="inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full text-xs font-semibold text-white"
-              style={{
-                backgroundColor: matchedPlayer?.color || "#7c3aed",
-              }}
+              className={`inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                matchedPlayer ? "text-white" : "bg-ys-text text-ys-bg"
+              }`}
+              style={
+                matchedPlayer ? { backgroundColor: matchedPlayer.color } : undefined
+              }
             >
               <DynamicIcon name="User" className="w-3 h-3" />
               {request.playerName} rolls
@@ -101,14 +103,14 @@ export default function ManualRollModal({
         </div>
 
         <div className="p-5 space-y-4">
-          <p className="text-sm text-blue-200/70 text-center">
+          <p className="text-sm text-ys-muted text-center">
             {request.description}
           </p>
 
           {/* What to roll */}
           {request.formula && (
             <div className="flex items-center justify-center gap-2 text-sm">
-              <span className="px-3 py-1.5 rounded-lg bg-purple-900/40 border border-purple-600/40 text-purple-100 font-mono font-semibold">
+              <span className="px-3 py-1.5 rounded-lg bg-ys-text/10 border border-ys-border text-ys-text font-mono font-semibold">
                 🎲 {request.formula}
               </span>
             </div>
@@ -116,7 +118,7 @@ export default function ManualRollModal({
 
           {/* Result input */}
           <div>
-            <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2 text-center">
+            <label className="block text-xs font-semibold text-ys-muted uppercase tracking-wider mb-2 text-center">
               What did you roll?
             </label>
             <div className="flex items-stretch gap-2">
@@ -132,11 +134,11 @@ export default function ManualRollModal({
                   }
                 }}
                 placeholder='17, or "4 and 6", or "natural 20!"'
-                className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/40 rounded-xl text-white text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full px-4 py-3 bg-ys-text/5 border border-ys-border rounded-xl text-ys-text text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-ys-accent"
               />
               <STTButton onTranscript={handleVoiceTranscript} className="shrink-0" />
             </div>
-            <p className="mt-2 text-center text-xs text-blue-300/60 h-4">
+            <p className="mt-2 text-center text-xs text-ys-muted h-4">
               Every die, in your own words - the GM reads it as you write it
             </p>
           </div>
@@ -144,14 +146,14 @@ export default function ManualRollModal({
           <button
             onClick={submit}
             disabled={!canSubmit}
-            className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] disabled:opacity-40 text-white font-semibold transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-xl bg-ys-text text-ys-bg hover:opacity-90 active:scale-[0.99] disabled:opacity-40 font-semibold transition-all flex items-center justify-center gap-2"
           >
             <DynamicIcon name="Check" className="w-4 h-4" />
             Confirm Roll
           </button>
           <button
             onClick={onSkip}
-            className="w-full py-2 text-xs text-blue-300/50 hover:text-blue-200 transition-colors"
+            className="w-full py-2 text-xs text-ys-muted hover:text-ys-text transition-colors"
           >
             Skip - let the GM roll for me
           </button>
