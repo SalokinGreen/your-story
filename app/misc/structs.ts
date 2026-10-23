@@ -759,6 +759,24 @@ export interface PlanState {
   spineLength?: SpineLength; // Which preset `beats` came from
 }
 
+// Session-zero setup state (docs/session-zero-design.md 3.1). The steps are
+// derived from live state by getSetupProgress (campaignPlan.ts); only what
+// cannot be derived is stored here. Absent on old saves and outside session
+// zero. Never part of a party phone's view.
+export interface SetupState {
+  mode?: "quick" | "full"; // chosen by the player
+  conceptDone?: boolean; // a setup question was answered
+  // The player pressed "Start the story" on the setup card. The hashes are of
+  // exactly what the card showed (hashNotes), so any later edit to the sheet
+  // or the plan cancels the approval.
+  approval?: {
+    sheetHash: string;
+    planHash: string;
+  };
+  referenceTitles?: string[]; // notes read during setup, newest first
+  questionsAsked?: number; // setup questions answered this session zero
+}
+
 export interface StoryData {
   story_name: string;
   premise: string;
@@ -768,6 +786,8 @@ export interface StoryData {
   // the normal classifier, since campaign-shaping decisions belong there.
   // Old saves: undefined behaves as false (no session zero to run).
   sessionZeroActive?: boolean;
+  // Session-zero setup state (see SetupState).
+  setup?: SetupState;
   player_name: string;
   player_summary: string;
   // Custom display settings for chat-like story view (multiplayer-ready)

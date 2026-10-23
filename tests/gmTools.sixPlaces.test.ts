@@ -126,6 +126,27 @@ describe("the GM's tool surface", () => {
   });
 });
 
+// Session zero cannot finish without these (docs/session-zero-design.md): the
+// questions, the player's OK and the start. Each must be offered, reach Gemini
+// and have a label - the checks above only prove the Google and label entries
+// point INTO the whitelist, not that a required tool is in all three.
+const REQUIRED_TOOLS = ["ask_question", "confirm_setup", "start_game"];
+
+describe("the tools session zero cannot do without", () => {
+  it.each(REQUIRED_TOOLS)("%s is in the whitelist, the schema, the Google list and the labels", (name) => {
+    expect(whitelist.has(name), "whitelist").toBe(true);
+    expect(GM_TOOL_MAP.has(name), "schema").toBe(true);
+    expect(gmExecutorSource, "executor").toContain(`case "${name}":`);
+    expect(GOOGLE_ESSENTIAL_TOOLS.has(name), "google").toBe(true);
+    expect(name in TOOL_LABELS, "label").toBe(true);
+  });
+
+  it("offers confirm_setup on every story, in or out of session zero (one stable list)", () => {
+    expect(offered(story({ sessionZeroActive: true } as Partial<StoryData>))).toContain("confirm_setup");
+    expect(offered(story({ sessionZeroActive: false } as Partial<StoryData>))).toContain("confirm_setup");
+  });
+});
+
 describe("the removed tools", () => {
   it("are in no schema, whitelist, Google filter or label", () => {
     for (const name of REMOVED_TOOLS) {

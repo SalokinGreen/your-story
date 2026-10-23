@@ -220,6 +220,8 @@ export const GOOGLE_ESSENTIAL_TOOLS = new Set([
   // increment_scene is the scene counter (status report 6.14: without these
   // Gemini could not end session zero or run a challenge).
   "start_game",
+  "confirm_setup",
+  "ask_question",
   "start_challenge",
   "record_challenge_result",
   "cancel_challenge",

@@ -2047,6 +2047,10 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     // sessionZeroActive. The START OF PLAY / fresh-story-setup prompt blocks
     // instruct the GM to call this, so it MUST be offered here - without it the
     // model is told to call a tool it doesn't have.
+    // confirm_setup is the player's OK that start_game requires; like
+    // start_game it is always offered (a story-level setting would flip
+    // mid-story and break the cached tool list).
+    "confirm_setup",
     "start_game",
     // Reasoning-tier self-escalation
     "set_reasoning_tier",

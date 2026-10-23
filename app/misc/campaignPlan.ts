@@ -191,3 +191,151 @@ export function getSetupReminder(state: StoryData): SetupReminder | null {
     missingStart,
   };
 }
+
+// ============================================
+// SESSION-ZERO SETUP PROGRESS (docs/session-zero-design.md 3.1)
+// ============================================
+
+/**
+ * Whether this story has a character_sheet note with anything in it - the
+ * same "has setup happened yet?" test buildGMStagePrompt uses to decide
+ * between its FRESH STORY setup block and normal play. (Lives here, and is
+ * re-exported by observer.ts, so setup progress and the observer share one
+ * definition without an import cycle.)
+ */
+export function hasCharacterSheetNote(storyData: StoryData): boolean {
+  return populatedSheets(storyData).length > 0;
+}
+
+function populatedSheets(story: StoryData): StoryLore[] {
+  return (story.lore || []).filter(
+    (l) =>
+      l.enabled !== false &&
+      l.type === "character_sheet" &&
+      Boolean(l.content?.trim()),
+  );
+}
+
+/**
+ * A stable string hash of notes' titles and contents (FNV-1a over UTF-16
+ * code units, hex). No crypto API, so it runs everywhere the engine does.
+ * Order-independent: notes are sorted by title first.
+ */
+export function hashNotes(
+  notes: ReadonlyArray<{ title: string; content?: string }>,
+): string {
+  const parts = [...notes]
+    .map((n) => `${n.title}\u0000${n.content ?? ""}`)
+    .sort();
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193 ^ 0x5bd1e995;
+  const text = parts.join("\u0001");
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x85ebca6b) >>> 0;
+    h2 = (h2 ^ (h2 >>> 13)) >>> 0;
+  }
+  return `${h1.toString(16).padStart(8, "0")}${h2.toString(16).padStart(8, "0")}-${text.length}`;
+}
+
+/** The player-sheet notes and the plan note a setup approval is bound to. */
+export function getSetupNotes(story: StoryData): {
+  sheets: StoryLore[];
+  plan: StoryLore | undefined;
+} {
+  return { sheets: populatedSheets(story), plan: findSpinePlanNote(story) };
+}
+
+/** The hashes of the current sheet(s) and plan, as `setup.approval` stores them. */
+export function currentSetupHashes(story: StoryData): {
+  sheetHash: string;
+  planHash: string;
+} {
+  const { sheets, plan } = getSetupNotes(story);
+  return { sheetHash: hashNotes(sheets), planHash: hashNotes(plan ? [plan] : []) };
+}
+
+export type SetupStep =
+  | "concept"
+  | "character"
+  | "campaign"
+  | "confirm"
+  | "start_game";
+
+export interface SetupProgress {
+  concept: boolean;
+  character: boolean;
+  campaign: boolean;
+  approved: boolean;
+  started: boolean;
+  /** The first step not yet done, or null once the story has started. */
+  next: SetupStep | null;
+  /** Players still without a sheet (names), when more than one is required. */
+  missingSheetFor: string[];
+}
+
+function normaliseTitle(t: string): string {
+  return t.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Where session zero stands, derived from live state. `players` names who
+ * needs a character sheet; when omitted, couch co-op's `couchPlayers` (two or
+ * more) are used, else solo play needs one sheet. A sheet belongs to a player
+ * by `ownerCouchPlayerId` or a "Character: <name>" title.
+ */
+export function getSetupProgress(
+  story: StoryData,
+  players?: ReadonlyArray<{ id: string; name: string }>,
+): SetupProgress {
+  const sheets = populatedSheets(story);
+  const required =
+    players && players.length > 0
+      ? players
+      : (story.multiplayer?.couchPlayers?.length ?? 0) > 1
+        ? (story.multiplayer?.couchPlayers ?? [])
+        : [];
+
+  let character: boolean;
+  const missingSheetFor: string[] = [];
+  if (required.length > 1) {
+    for (const p of required) {
+      const title = normaliseTitle(`Character: ${p.name}`);
+      const has = sheets.some(
+        (s) =>
+          s.ownerCouchPlayerId === p.id ||
+          (!s.ownerCouchPlayerId && normaliseTitle(s.title) === title),
+      );
+      if (!has) missingSheetFor.push(p.name);
+    }
+    character = missingSheetFor.length === 0;
+  } else {
+    character = sheets.length > 0;
+  }
+
+  const plan = findSpinePlanNote(story);
+  const campaign = !!plan;
+  const setup = story.setup;
+  const concept = !!setup?.mode && (!!setup.conceptDone || sheets.length > 0);
+
+  const approval = setup?.approval;
+  let approved = false;
+  if (approval && character && campaign) {
+    const now = currentSetupHashes(story);
+    approved =
+      approval.sheetHash === now.sheetHash && approval.planHash === now.planHash;
+  }
+
+  const started = story.sessionZeroActive !== true;
+  let next: SetupStep | null = null;
+  if (!started) {
+    if (!concept) next = "concept";
+    else if (!character) next = "character";
+    else if (!campaign) next = "campaign";
+    else if (!approved) next = "confirm";
+    else next = "start_game";
+  }
+
+  return { concept, character, campaign, approved, started, next, missingSheetFor };
+}

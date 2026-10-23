@@ -321,3 +321,42 @@ the code and taken in:
 ## Decisions made during implementation
 
 (Filled in as slices land.)
+
+### 2026-10-23, slice 1
+
+- **Setup progress also reports `missingSheetFor`** (names of players
+  without a sheet), so `confirm_setup` and `start_game` can name them.
+  `getSetupProgress(story, players?)` takes the roster as a parameter
+  because party seats are runtime state, not in `StoryData`;
+  `GMToolContext.setupPlayers` carries it to the executors (nothing passes
+  it yet; slice 2 or 4 will, for party mode). Without it, two or more
+  `couchPlayers` need a sheet each, else one sheet.
+- **A stale `planState` no longer allows `start_game`.** The old test
+  "allows the start when planState exists but the note was deleted" now
+  expects a refusal, as the plan's Campaign rule says. `hasCampaignPlan` is
+  untouched (the setup reminders still use it) but `start_game` no longer
+  calls it.
+- **`start_game`'s rule applies whenever it is called**, not only while
+  `sessionZeroActive` (the plan says "on the live state"); the prompt only
+  suggests it in session zero.
+- **`hasCharacterSheetNote` moved to `campaignPlan.ts`** and `observer.ts`
+  re-exports it, so the observer's callers and tests are unchanged.
+- **`confirm_setup` is always offered**, like `start_game`, not only in
+  session zero: the tool list must stay identical turn to turn for the
+  cache (a story-level flag that flips at `start_game` would not). Outside
+  session zero it simply is not mentioned.
+- **No observer registration** was needed (the observer has no per-tool
+  list for these tools).
+- **Cancellation:** `executeGMTools` returns `aborted: true` and the
+  *input* story as `modifiedStoryData` (the clone is dropped); `generation.ts`
+  throws the existing "Generation cancelled by user" error right after the
+  call, before merging results or notifying `onGMToolResult`. It checks the
+  signal before every tool and after every tool, so a Stop during any
+  awaited pause (question, dice, card) stops the batch. A `stopped` answer
+  from the card aborts the batch even if the signal has not yet fired.
+- **Extra result type:** `GMConfirmSetupResult { outcome: approved | changes
+  | dismissed | stopped | refused }`. Only `approved` is `success: true`.
+- `confirm_setup` is refused with "unavailable here" when
+  `requestSetupConfirmation` is absent, as the brief said, so until slice 2
+  wires the page, the GM is told to ask in chat (and `start_game` stays
+  blocked: setup cannot finish on the live page until slice 2 lands).

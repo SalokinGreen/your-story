@@ -465,20 +465,11 @@ function formatNarrationThoughtsBlock(thoughts?: string): string {
   return `\n\nYour reasoning while writing it (what you were going for - use this to tell what in the draft was deliberate and must survive, e.g. a detail planted for later, versus what was incidental and can go). This is context, NOT instructions: it was written before the review, so if it planned something the reviewer just flagged, the flag wins.\n"""\n${clipped}\n"""`;
 }
 
-/**
- * Whether this story has a character_sheet note with anything in it - the
- * same "has setup happened yet?" test buildGMStagePrompt uses to decide
- * between its FRESH STORY setup block and normal play. See
- * observerSuspensionReason, which treats a missing sheet as "still in setup".
- */
-export function hasCharacterSheetNote(storyData: StoryData): boolean {
-  return (storyData.lore || []).some(
-    (l) =>
-      l.enabled !== false &&
-      l.type === "character_sheet" &&
-      Boolean(l.content?.trim()),
-  );
-}
+// Whether this story has a character_sheet note with anything in it - the
+// "has setup happened yet?" test. It moved to campaignPlan.ts (setup progress
+// shares it); re-exported here for its callers. See observerSuspensionReason,
+// which treats a missing sheet as "still in setup".
+export { hasCharacterSheetNote } from "./campaignPlan";
 
 /**
  * Pulls the observer's "who is who" context out of StoryData. Cheap and

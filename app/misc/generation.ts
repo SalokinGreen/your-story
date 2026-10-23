@@ -2821,8 +2821,19 @@ async function generateStoryTurnOnce(
                 requestDiceThrow: callbacks.onRequestDiceThrow,
                 requestPlayerAnswer: callbacks.onAskQuestion,
               },
-              { imageJobs: options.imageToolContext },
+              {
+                imageJobs: options.imageToolContext,
+                abortSignal: options.abortSignal,
+              },
             );
+
+            // Stopped during the batch (the signal fired, or Stop on the
+            // setup card): the executor committed nothing, and neither do we.
+            // Throw the same error the round-start check does, so the turn
+            // unwinds through the existing cancellation path.
+            if (gmExecution.aborted) {
+              throw new Error("Generation cancelled by user");
+            }
 
             // Accumulate results across rounds
             gmResults.push(...gmExecution.results);
