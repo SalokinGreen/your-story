@@ -1,6 +1,6 @@
 # Removing the arcade leftovers — design
 
-Status: **approved (decision 131), being built.** The implementation plan is
+Status: **built (decision 131) on claude/legacy-removal, 2026-10-23.** The implementation plan is
 [`legacy-removal-plan.md`](legacy-removal-plan.md). Decisions 125–130 in
 [`decisions.md`](decisions.md).
 

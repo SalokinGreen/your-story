@@ -10,6 +10,43 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-23 — Legacy removal (`claude/legacy-removal`, decisions 125–131)
+
+Built from [`legacy-removal-plan.md`](legacy-removal-plan.md). Nothing here
+was played and no model was called. The suite and `tsc` cover the engine and
+the stored shapes; these checks cover the play.
+
+- **Session zero on The Hollow Hour, a real model (the author's go: it spends
+  on the key).** On the default ladder, with an OpenRouter key: Library →
+  *The Hollow Hour* → Play → *Start Without Notes*. *Expected:* the story
+  opens on the intro with no picker and no form. Before `start_game` the GM
+  fills every field the Blood & Bone template lists, in conversation, and
+  writes one `character_sheet` note (titled "Character: <name>" only when more
+  than one person is playing). The AI Context's live message carries the
+  CHARACTER SHEET TEMPLATE block until `start_game`, and not after it.
+  *Failure looks like:* a sheet that keeps the template's `| default` example
+  values, `start_game` called with no sheet note, the template block missing
+  from the live message during session zero, or the GM asking for the plan
+  before the sheet exists.
+- **A starting choice with an authored opening, in session zero.** Make a
+  Designer adventure with a starting choice that has an opening written for it
+  (`intro_override`), start it, and pick that choice before `start_game`.
+  *Expected:* the choice goes to the GM as the player's action, with the line
+  "The adventure's opening for this choice, to narrate once setup is done"
+  in the turn, the GM runs setup, and the authored opening is narrated after
+  `start_game`. *Failure looks like:* the authored prose inserted at once
+  with no GM turn (the old shortcut), the opening never narrated, or the
+  choice's text arriving empty. The shortcut after `start_game` is not in this
+  check: a starting choice is only on offer at the start.
+- **Online play with an older guest.** Host on this build; join from a build
+  from before 2026-10-23 (the last desktop build before this change). The guest
+  opens the Story Editor. *Expected:* the editor opens and its sections render,
+  and play carries on. *Failure looks like:* the guest's screen going blank or
+  showing an error boundary when the Story Editor opens, with a message about
+  `resources`, `relationships` or reading `map` or `spread` of undefined. The
+  host's broadcast shim (`withLegacyGuestShim`, decision 126) is meant to
+  prevent that.
+
 ## 2026-10-23 — The model picker, simplified (`claude/model-picker`)
 
 Settings was walked through in the browser preview (the Models card, Mixed
@@ -82,11 +119,13 @@ decision 76 reserves for the author.
   collapsible) and *The Hollow Hour* with Play and "Open a copy in the
   Designer". *Failure:* no section (the registry did not load), or a pack
   showing a handful of notes instead of ~31 and 7.
-- **Start the starter.** Play *The Hollow Hour*, skip the picker. *Expected:*
-  the character creation form shows the Blood & Bone sheet (Kind, Archetype,
-  Path, five stats, Stress triggers, Connections, background); after you make
-  a character the Lore page's panel shows Heat 3/6 ("A pattern" under it) and
-  three vows in the Cohort group at 0 of 10 boxes. The note list shows the
+- **Start the starter.** Play *The Hollow Hour*. *Expected (edited
+  2026-10-23: the form it named is gone, decision 129):* no picker and no
+  form; the story opens on the intro in session zero, and the GM builds the
+  character from the Blood & Bone sheet in conversation (Kind, Archetype, Path,
+  five stats, Stress triggers, Connections, background). After `start_game`
+  the Lore page's panel shows Heat 3/6 ("A pattern" under it) and three vows
+  in the Cohort group at 0 of 10 boxes. The note list shows the
   Blood & Bone notes, *The Hollow Hour — Running it* and *The truth about
   Runa* (hidden). *Failure:* no panel (the story has no `meters`), or two
   copies of every note (the pack was attached on top of the starter's).
@@ -94,8 +133,10 @@ decision 76 reserves for the author.
   "The Hollow Hour (copy)" in Adventures, opening in the Designer with all
   notes, three NPCs, Heat and the vows; the Inspector's Rules switch reads
   "Automatic (on: Blood & Bone)". Save and play the copy: Heat and the vows
-  are still there. (The copy loses the starter's session-zero flag; the GM
-  still reads *Running it*, which says what to do without a Campaign Plan.)
+  are still there. (Edited 2026-10-23, read from the code and not yet played:
+  every new story now starts in session zero, a copy's included, since the
+  story start sets the flag for every adventure. The GM still reads *Running
+  it*, which says what to do without a Campaign Plan.)
 - **The picker.** From the Designer's or the in-game lore editor's import:
   *Expected:* chips "Built-in: Blood & Bone — Rules" and "… — Europe by
   Night"; importing the rules into a draft with no sheet template sets the

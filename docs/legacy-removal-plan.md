@@ -1,6 +1,6 @@
 # Removing the arcade leftovers — implementation plan
 
-Status: **approved (decision 131), being built.** Design:
+Status: **built (decision 131) on claude/legacy-removal, 2026-10-23.** Design:
 [`legacy-removal-design.md`](legacy-removal-design.md). Decisions 125–130.
 Branch `claude/legacy-removal`, one PR, five slices in order. Line numbers are
 from `master` at 3f66c9a (2026-10-23) and will drift as slices land.
