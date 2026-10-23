@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import type { OOCChatMessage } from "@/app/misc/multiplayer/session";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface OOCChatPanelProps {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export default function OOCChatPanel({
   };
 
   // Closed: nothing renders. The panel opens from the story menu's Status row.
+  useBackHandler(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (

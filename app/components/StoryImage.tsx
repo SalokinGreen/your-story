@@ -7,6 +7,7 @@
 // 59) and follows the job queue (imageJobs.ts), so a card shows pending, done,
 // declined, failed or missing, and every one of them is a visible state.
 
+import { useBackHandler } from "@/app/misc/useBackHandler";
 import React, {
   useCallback,
   useEffect,
@@ -161,6 +162,9 @@ export default function StoryImage({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  // Android back closes the full-screen picture (decision 133).
+  useBackHandler(open, () => setOpen(false));
 
   // The picture itself runs edge to edge with no frame (its caller bleeds it
   // out of the page's gutters); the cards for a picture that is not there are

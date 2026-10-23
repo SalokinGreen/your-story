@@ -404,3 +404,75 @@ checked against the code, and all are taken in:
   `prompt_cache_key` and `cache_control` are body fields. All four listed
   hosts' preflights allow these. Nothing bypasses `postChatRequest`.
 - Not verified: any real device or CORS preflight (needs the Android app).
+
+### 2026-10-23, slice 4 (the back gesture)
+
+- **Plugin.** `@capacitor/app@^8.1.2`; `cap sync android` added it to
+  `capacitor.plugins.json` and touched only `capacitor.build.gradle` and
+  `capacitor.settings.gradle` (one and three lines).
+- **`popBackHandler` calls the top entry and leaves it there**; the surface
+  removes its own entry when it closes. A second back before the surface has
+  unmounted calls the close function again, which is harmless (it sets a flag
+  to false). No double-call guard was added.
+- **`clearRouteBack(fn)`** was added: a page's cleanup clears the route back
+  only if it is still its own, so a new page that set its back before the old
+  page unmounted keeps it.
+- **The hooks update their ref in an effect**, not during render (the lint
+  rule `react-hooks/refs`). The callback a back press calls is therefore the
+  one from the last committed render.
+- **`NativeBackButton`** imports `@capacitor/app` dynamically and only on
+  Android, so the web and desktop bundles never run it.
+- **Tests.** The repo has no DOM test setup (no testing-library, no jsdom),
+  so `tests/useBackHandler.test.tsx` replaces `react`'s `useRef`/`useEffect`
+  with a small per-component harness (refs persist, an effect re-runs on
+  changed deps with cleanup first, unmount runs cleanups). It tests the hook's
+  own logic, not React's.
+- **Back semantics chosen where the plan left them open:**
+  `FullScreenView` registers `onBack ?? onClose`, so GuidedStoryStart's steps
+  go back a step before closing; `CompactStoryModal` goes spin-off form to its
+  menu, then closes, and does nothing while busy; `AskQuestionModal` uses
+  `onSkipAll` (the page's `resolveAskQuestion(null)`), `ManualRollModal`
+  `onSkip`, `DiceThrowModal` `onResolve(null)`; `RecordingOverlay` cancels the
+  recording; the edit box under a turn cancels like its Cancel button.
+- **Ordering.** A child opened later registers above its parent. One case is
+  not covered by construction: two surfaces mounted in the same commit
+  register children first, so the parent would sit on top. None exists today
+  (PDFImporter's two `FullScreenView`s are exclusive).
+
+**Inventory of dismissible surfaces** (found by grepping `app/` for `Escape`,
+`fixed`, `isOpen`/`onClose`/`open` props, `role="dialog"`, `createPortal`):
+
+| surface | registered by |
+|---|---|
+| `FullScreenView` (Story Editor in `menu.tsx`, `lore.tsx` and `npcs.tsx` editors, Add Character, notes editor in `NotesLibraryTab`, `PDFImporter` x2, `LibraryPickerModal`, `GuidedStoryStart`, `APIKeysModal` and so Settings, wherever mounted) | inside `FullScreenView`, once |
+| `ConfirmDialog` (story page, menu, three library tabs) | inside `ConfirmDialog` |
+| `StoryImage` full-screen picture | inside `StoryImage` (its Escape handler's function) |
+| `StoryMenuSheet` | inside it |
+| Save Copy (inline in `menu.tsx`) | `useBackHandler(showSaveCopyModal, ...)` |
+| `CompactStoryModal` (Compact Story / Summarise / spin-off) | inside it |
+| `ProfilePickerModal`, `OOCChatPanel`, `SyncConflictModal` | inside each (`onCancel` / `onClose`) |
+| `PartyLobbyModal` | inside it |
+| `NewFolderDialog`, `JoinGameModal`, `HostGameModal` | inside each |
+| `ExportFolderModal`, `FolderActionSheet` | inside each (mounted only when open) |
+| Library "Move to Folder" (adventures, notes, stories) and the notes tab's "Import from PDF" folder prompt | `useBackHandler` beside their state |
+| `ManualRollModal`, `DiceThrowModal`, `AskQuestionModal` | inside each (null answer) |
+| `ClockCategorySelector` wheel | inside it (its Escape function) |
+| `RecordingOverlay` (couch voice) | inside it (`onCancel`) |
+| inline edit box under a turn (`story.tsx`) | `useBackHandler(editingPart !== null, ...)` |
+| NPC filter dropdown (`npcs.tsx`) | `useBackHandler(isFilterDropdownOpen, ...)` |
+| Designer settings strip (`creator/page.tsx`) | `useBackHandler(showSettings, ...)` |
+
+Route backs: story page (`currentState !== STORY` goes to STORY, else
+`/library`), Library (a sub-view goes `goHome()`, home sets none), Designer
+(`/library`), `/privacy` and `/terms` (`router.back()`); `/` sets none.
+
+Not registered, on purpose: transient toasts and the notification container
+(not dismissible surfaces), `PendingLinesPanel` (a status list with no close),
+`SiteHeader`'s `APIKeysModal` (it is the same component, so it registers
+itself), the dice spike dev page, and in-page sub-views that the page's route
+back already handles (the story's Lore/NPCs/Goals pages). The NPC detail pane
+inside the NPCs page (`selectedNPC`) is not a surface and sends back to the
+story, not to the list.
+- Not verified: any device (the preview cannot fire a native back). The
+  console check from the slice (`popBackHandler()` against an open sheet, a
+  dialog in it, and the full-screen picture) was not run here.

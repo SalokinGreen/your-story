@@ -5,6 +5,7 @@ import type { ManualRollRequest } from "../misc/gmExecutor";
 import type { CouchPlayer } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
 import STTButton from "./STTButton";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface ManualRollModalProps {
   // The pending roll request, or null when nothing is being asked
@@ -51,6 +52,9 @@ export default function ManualRollModal({
       return () => clearTimeout(timer);
     }
   }, [request]);
+
+  // Android back is the Skip button (decision 133).
+  useBackHandler(!!request, onSkip);
 
   if (!request) return null;
 

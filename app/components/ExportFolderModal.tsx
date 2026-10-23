@@ -9,6 +9,7 @@ import { LocalAdventure } from "@/app/misc/localAdventureManager";
 import { listLibraryNotes, LibraryNote } from "@/app/misc/localNotesLibraryManager";
 import { listLibraryTables, LibraryTable } from "@/app/misc/localTablesLibraryManager";
 import { downloadFolderLibrary } from "@/app/misc/folderLibraryExport";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface ExportFolderModalProps {
   folder: LocalFolder;
@@ -23,6 +24,7 @@ export default function ExportFolderModal({
   adventures,
   onClose,
 }: ExportFolderModalProps) {
+  useBackHandler(true, onClose);
   const { addNotification } = useNotification();
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState<LibraryNote[]>([]);

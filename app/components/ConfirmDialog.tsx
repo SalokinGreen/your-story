@@ -1,5 +1,6 @@
 "use client";
 
+import { useBackHandler } from "../misc/useBackHandler";
 import { useEffect, useCallback } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 
@@ -46,6 +47,9 @@ export default function ConfirmDialog({
       return () => window.removeEventListener("keydown", handleKeyDown);
     }
   }, [isOpen, handleKeyDown]);
+
+  // Android back cancels (decision 133).
+  useBackHandler(isOpen, onCancel);
 
   if (!isOpen) return null;
 

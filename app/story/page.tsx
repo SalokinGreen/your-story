@@ -157,6 +157,7 @@ import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
 import { useViewportHeight } from "../misc/useViewportHeight";
 import { SYNC_COMPLETED_EVENT, SyncResult } from "../misc/syncManager";
+import { useRouteBack } from "@/app/misc/useBackHandler";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -1208,6 +1209,14 @@ function StoryPageContent() {
   useEffect(() => {
     if (showOOCChat) setOOCLastSeenCount(oocMessages.length);
   }, [showOOCChat, oocMessages.length]);
+
+  // Android back, when no dialog or sheet is open: off the story page (Lore,
+  // NPCs, Goals...) goes to the story, on it leaves to the Library
+  // (decision 133).
+  useRouteBack(() => {
+    if (currentState !== StoryState.STORY) setCurrentState(StoryState.STORY);
+    else router.push("/library");
+  });
   const oocUnread = useMemo(
     () =>
       showOOCChat ? 0 : Math.max(0, oocMessages.length - oocLastSeenCount),

@@ -47,6 +47,7 @@ import {
   LAYER_SETTINGS_CHANGED_EVENT,
 } from "../misc/layerSettings";
 import { type ResolvedTier } from "../misc/reasoningTiers";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 interface StoryProps {
   storyData: StoryData;
@@ -648,6 +649,11 @@ export default function Story({
     if (turnRunning) setActionsFor(null);
   }
   const [editedText, setEditedText] = React.useState("");
+  // Android back cancels an open edit like its Cancel button (decision 133).
+  useBackHandler(editingPart !== null, () => {
+    setEditingPart(null);
+    setEditedText("");
+  });
   const [isHovering, setIsHovering] = React.useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 

@@ -43,6 +43,7 @@ import { pickProviderKeys } from "../misc/sideModelCall";
 import { resolveSideCallModel } from "../misc/layerSettings";
 import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import type { MPBackend } from "../misc/multiplayer/types";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 interface MenuProps extends StoryData {
   storyDbId: string | null;
@@ -505,6 +506,8 @@ export default function MenuPage({
     onModalOpenChange?.(modalOpen);
   }, [modalOpen, onModalOpenChange]);
   useEffect(() => () => onModalOpenChange?.(false), [onModalOpenChange]);
+  // Android back dismisses Save Copy like its Cancel button (decision 133).
+  useBackHandler(showSaveCopyModal, () => setShowSaveCopyModal(false));
 
   const goTo = (target: MenuNavTarget) => {
     onNavigate(target);

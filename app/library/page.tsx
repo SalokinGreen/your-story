@@ -46,6 +46,7 @@ import NewFolderDialog from "@/app/components/NewFolderDialog";
 import { readFolderLibraryFile } from "@/app/misc/folderLibraryExport";
 import { SYNC_COMPLETED_EVENT } from "@/app/misc/syncManager";
 import type { StoryLore } from "@/app/misc/structs";
+import { useRouteBack } from "@/app/misc/useBackHandler";
 
 /**
  * Which slice of the library is on screen. Folders are the front door - the
@@ -373,6 +374,9 @@ export default function LibraryPage() {
   })();
 
   const goHome = () => setView({ kind: "home" });
+  // Android back: a sub-view returns to Library home; on the home it falls
+  // through to backgrounding the app (decision 133).
+  useRouteBack(view.kind === "home" ? null : goHome);
   const goBack = () =>
     view.kind === "home" ? router.push("/") : goHome();
 

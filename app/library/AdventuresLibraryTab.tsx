@@ -15,6 +15,7 @@ import {
 import { LocalFolder, createLocalFolder } from "@/app/misc/localFolderManager";
 import { getRelativeTime } from "@/app/misc/relativeTime";
 import { ALL_SCOPE, LibraryScope, scopeMatches } from "./libraryScope";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 type AdventureSortBy = "updated" | "title";
 
@@ -43,6 +44,7 @@ export default function AdventuresLibraryTab({
   const [chipFolder, setChipFolder] = useState<LibraryScope>(scope);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [movingAdventure, setMovingAdventure] = useState<string | null>(null);
+  useBackHandler(movingAdventure !== null, () => setMovingAdventure(null));
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
 
   const [confirmDialog, setConfirmDialog] = useState<{

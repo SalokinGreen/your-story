@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { IconPicker } from "@/app/components/IconPicker";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface NewFolderDialogProps {
   isOpen: boolean;
@@ -20,6 +21,8 @@ export default function NewFolderDialog({
   const [name, setName] = useState("");
   const [icon, setIcon] = useState(DEFAULT_ICON);
   const [color, setColor] = useState(DEFAULT_COLOR);
+
+  useBackHandler(isOpen, onClose);
 
   if (!isOpen) return null;
 

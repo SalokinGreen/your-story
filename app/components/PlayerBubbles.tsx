@@ -12,6 +12,7 @@ import {
   pruneLockouts,
   FLOOR_STEAL_COOLDOWN_MS,
 } from "../misc/multiplayer/floorControl";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface PendingLine {
   id: string;
@@ -147,6 +148,8 @@ export function RecordingOverlay({
   onConfirm: () => void;
   placement?: "floating" | "inline";
 }) {
+  // Android back cancels the recording (decision 133).
+  useBackHandler(true, onCancel);
   const floating = placement === "floating";
   return (
     <div

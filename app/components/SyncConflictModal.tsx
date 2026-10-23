@@ -2,6 +2,7 @@
 
 import React from "react";
 import { DynamicIcon } from "./DynamicIcon";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface SyncConflictModalProps {
   isOpen: boolean;
@@ -26,6 +27,8 @@ export default function SyncConflictModal({
   onKeepLocal,
   onKeepServer,
 }: SyncConflictModalProps) {
+  useBackHandler(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const formatDate = (date: Date | string) => {

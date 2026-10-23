@@ -1,5 +1,6 @@
 "use client";
 
+import { useBackHandler } from "../misc/useBackHandler";
 import { useState } from "react";
 import { CouchPlayer, PlayerArchetype } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
@@ -49,6 +50,8 @@ export default function ProfilePickerModal({
   const [archetype, setArchetype] = useState<PlayerArchetype | "">("");
   const [personalityTags, setPersonalityTags] = useState<string[]>([]);
   const [wishTags, setWishTags] = useState<string[]>([]);
+
+  useBackHandler(isOpen, onCancel);
 
   if (!isOpen) return null;
 

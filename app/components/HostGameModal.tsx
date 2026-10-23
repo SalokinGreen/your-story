@@ -6,6 +6,7 @@ import { DynamicIcon } from "./DynamicIcon";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { MP_BACKEND_OPTIONS, type MPBackend } from "@/app/misc/multiplayer/types";
 import { PALETTE } from "@/app/story/menu/CouchPlayersEditor";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface HostGameModalProps {
   isOpen: boolean;
@@ -33,6 +34,8 @@ export default function HostGameModal({
   const [name, setName] = useState(defaultName || "Player");
   const [color, setColor] = useState(PALETTE[0]);
   const [backend, setBackend] = useState<MPBackend>("torrent");
+
+  useBackHandler(isOpen, onClose);
 
   if (!isOpen) return null;
 

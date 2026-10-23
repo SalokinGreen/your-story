@@ -8,6 +8,7 @@ import FullScreenView from "../components/FullScreenView";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { preprocessMarkdown } from "../misc/markdownUtils";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 interface NPCsPageProps extends StoryData {
   onUpdateNPCs?: (updatedNPCs: NPC[]) => void;
@@ -106,6 +107,7 @@ export default function NPCsPage(props: NPCsPageProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  useBackHandler(isFilterDropdownOpen, () => setIsFilterDropdownOpen(false));
   const [isEditing, setIsEditing] = useState(false);
   const [editNotes, setEditNotes] = useState("");
   const [editAliases, setEditAliases] = useState("");

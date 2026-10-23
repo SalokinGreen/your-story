@@ -19,6 +19,7 @@ import {
 } from "@/app/misc/localFolderManager";
 import { getRelativeTime } from "@/app/misc/relativeTime";
 import { ALL_SCOPE, LibraryScope, scopeMatches } from "./libraryScope";
+import { useBackHandler } from "@/app/misc/useBackHandler";
 
 type StorySortBy = "updated" | "created" | "name" | "chapter";
 
@@ -58,6 +59,7 @@ export default function StoriesLibraryTab({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showMassMoveDropdown, setShowMassMoveDropdown] = useState(false);
   const [movingStory, setMovingStory] = useState<string | null>(null);
+  useBackHandler(movingStory !== null, () => setMovingStory(null));
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
 
   const [confirmDialog, setConfirmDialog] = useState<{

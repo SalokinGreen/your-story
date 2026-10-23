@@ -9,6 +9,7 @@ import type {
 import type { CouchPlayer } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
 import STTButton from "./STTButton";
+import { useBackHandler } from "../misc/useBackHandler";
 
 interface AskQuestionModalProps {
   // The pending question batch, or null when nothing is being asked
@@ -55,6 +56,9 @@ export default function AskQuestionModal({
       return () => clearTimeout(timer);
     }
   }, [request, showCustomInput, questionIndex]);
+
+  // Android back skips the whole batch, as the GM's null answer (decision 133).
+  useBackHandler(!!request && request.questions.length > 0, onSkipAll);
 
   if (!request || request.questions.length === 0) return null;
 
