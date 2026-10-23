@@ -992,6 +992,17 @@ export default function TTSControls({
     setIsMuted(false);
   }, [setCurrentChunkIndex]);
 
+  // Stop reading aloud for good: Play switches auto-narration on for every
+  // later turn, and pausing only pauses this one, so without this there was
+  // no way back short of Settings. Play turns it on again.
+  const handleTurnOff = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ttsAutoGenerate", "false");
+    }
+    pendingAutoGenerateRef.current = false;
+    stopAndResetPlayback();
+  }, [stopAndResetPlayback]);
+
   // Single toggle button behavior:
   // - idle, nothing cached -> activate: turn on auto-narrate (so future
   //   streamed turns start reading themselves too) and generate + stream +
@@ -1434,6 +1445,15 @@ export default function TTSControls({
         title="Next sentence"
       >
         <DynamicIcon name="SkipForward" className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={handleTurnOff}
+        className="flex w-7 h-7 shrink-0 rounded-full items-center justify-center text-ys-muted hover:bg-ys-border hover:text-ys-text transition-colors"
+        title="Stop reading aloud"
+        aria-label="Stop reading aloud"
+      >
+        <DynamicIcon name="X" className="w-4 h-4" />
       </button>
 
       {/* Scrubbable timeline across the whole narration (all per-sentence
