@@ -23,6 +23,7 @@ interface TurnKeepAlivePlugin {
     title: string;
     body: string;
   }): Promise<void>;
+  notifyAttention(options: { title: string; body: string }): Promise<void>;
   requestNotificationPermission(): Promise<void>;
 }
 
@@ -116,4 +117,24 @@ export function endTurnKeepAlive(
       }),
     );
   }
+}
+
+/** What the GM is waiting on when a turn pauses for the player. */
+export type PlayerPause = "question" | "roll";
+
+/**
+ * Call when a turn pauses on the player (ask_question, a manual roll, a dice
+ * throw). The native side posts it only while the app is in the background,
+ * since otherwise the prompt is already on screen.
+ */
+export function notifyPlayerNeeded(kind: PlayerPause, detail?: string): void {
+  if (!isAndroid()) return;
+  const title =
+    kind === "question"
+      ? "The GM has a question for you"
+      : "The GM needs a roll from you";
+  const body = detail?.trim() ? detail.trim().slice(0, 240) : "Your Story";
+  fire("notifyAttention", () =>
+    TurnKeepAlive.notifyAttention({ title, body }),
+  );
 }

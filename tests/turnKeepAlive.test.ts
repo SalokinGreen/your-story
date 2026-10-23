@@ -5,6 +5,7 @@ const native = vi.hoisted(() => ({
   begin: vi.fn(),
   end: vi.fn(),
   notifyReady: vi.fn(),
+  notifyAttention: vi.fn(),
   requestNotificationPermission: vi.fn(),
 }));
 
@@ -14,6 +15,7 @@ vi.mock("@capacitor/core", () => ({
     begin: native.begin,
     end: native.end,
     notifyReady: native.notifyReady,
+    notifyAttention: native.notifyAttention,
     requestNotificationPermission: native.requestNotificationPermission,
   }),
 }));
@@ -26,6 +28,7 @@ import {
   beginTurnKeepAlive,
   endTurnKeepAlive,
   newTurnId,
+  notifyPlayerNeeded,
 } from "@/app/misc/turnKeepAlive";
 
 function memoryStorage() {
@@ -43,6 +46,7 @@ beforeEach(() => {
     native.begin,
     native.end,
     native.notifyReady,
+    native.notifyAttention,
     native.requestNotificationPermission,
     logged.warn,
   ]) {
@@ -130,5 +134,37 @@ describe("turnKeepAlive", () => {
 
   it("makes distinct turn ids", () => {
     expect(newTurnId()).not.toBe(newTurnId());
+  });
+});
+
+describe("notifyPlayerNeeded", () => {
+  it("asks native to post a question ping with the question as its body", () => {
+    notifyPlayerNeeded("question", "  Do you open the door?  ");
+    expect(native.notifyAttention).toHaveBeenCalledWith({
+      title: "The GM has a question for you",
+      body: "Do you open the door?",
+    });
+  });
+
+  it("names a roll, and falls back to the app name with no detail", () => {
+    notifyPlayerNeeded("roll");
+    expect(native.notifyAttention).toHaveBeenCalledWith({
+      title: "The GM needs a roll from you",
+      body: "Your Story",
+    });
+  });
+
+  it.each(["web", "ios"])("is a no-op on %s", (platform) => {
+    native.platform = platform;
+    notifyPlayerNeeded("question", "Q");
+    expect(native.notifyAttention).not.toHaveBeenCalled();
+  });
+
+  it("never throws when native rejects", async () => {
+    native.notifyAttention.mockRejectedValue(new Error("boom"));
+    expect(() => notifyPlayerNeeded("roll", "Stealth")).not.toThrow();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(logged.warn).toHaveBeenCalled();
   });
 });

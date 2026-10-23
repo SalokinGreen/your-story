@@ -112,6 +112,7 @@ import {
   beginTurnKeepAlive,
   endTurnKeepAlive,
   newTurnId,
+  notifyPlayerNeeded,
   type TurnKeepAliveOutcome,
 } from "../misc/turnKeepAlive";
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
@@ -3688,6 +3689,7 @@ function StoryPageContent() {
         return;
       }
       setManualRollRequest(request);
+      notifyPlayerNeeded("roll", request.title);
     });
   }
 
@@ -3715,6 +3717,7 @@ function StoryPageContent() {
         return;
       }
       setAskQuestionRequest(request);
+      notifyPlayerNeeded("question", request.questions[0]?.question);
     });
   }
 
@@ -3763,6 +3766,7 @@ function StoryPageContent() {
 
       diceThrowResolveRef.current = resolve;
       setDiceThrowRequest(request);
+      notifyPlayerNeeded("roll", request.reason);
     });
   }
 

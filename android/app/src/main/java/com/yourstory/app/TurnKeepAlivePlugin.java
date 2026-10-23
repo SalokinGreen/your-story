@@ -102,6 +102,40 @@ public class TurnKeepAlivePlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * Posts "the GM is waiting for you" (a question, a manual roll, a dice
+     * throw) while the player is away: the turn is paused on their answer, so
+     * neither "writing" nor "ready" tells them anything. Only in the
+     * background, only with the permission; cleared when the app comes back.
+     */
+    @PluginMethod
+    public void notifyAttention(PluginCall call) {
+        String title = call.getString("title", "The GM is waiting for you");
+        String body = call.getString("body", "");
+        if (inForeground || !canNotify()) {
+            call.resolve();
+            return;
+        }
+        Context context = getContext();
+        TurnKeepAliveService.ensureChannels(context);
+        Notification notification = new NotificationCompat.Builder(context, TurnKeepAliveService.CHANNEL_READY)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setContentIntent(TurnKeepAliveService.openAppIntent(context))
+            .build();
+        try {
+            NotificationManagerCompat.from(context).notify(TurnKeepAliveService.NOTIFICATION_ID_ATTENTION, notification);
+        } catch (SecurityException e) {
+            // Permission revoked between the check and the post: nothing to do.
+        }
+        call.resolve();
+    }
+
     /** Asks for POST_NOTIFICATIONS on Android 13+; resolves at once below that. */
     @PluginMethod
     public void requestNotificationPermission(PluginCall call) {
@@ -130,8 +164,9 @@ public class TurnKeepAlivePlugin extends Plugin {
     @Override
     protected void handleOnResume() {
         inForeground = true;
-        // A "ready" ping is stale once the player is back.
+        // A "ready" or "waiting for you" ping is stale once the player is back.
         NotificationManagerCompat.from(getContext()).cancel(TurnKeepAliveService.NOTIFICATION_ID_READY);
+        NotificationManagerCompat.from(getContext()).cancel(TurnKeepAliveService.NOTIFICATION_ID_ATTENTION);
     }
 
     @Override

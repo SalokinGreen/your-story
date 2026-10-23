@@ -33,6 +33,7 @@ public class TurnKeepAliveService extends Service {
     static final String CHANNEL_READY = "ready";
     static final int NOTIFICATION_ID_TURN = 1;
     static final int NOTIFICATION_ID_READY = 2;
+    static final int NOTIFICATION_ID_ATTENTION = 3;
     private static final String EXTRA_TURN_ID = "turnId";
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
