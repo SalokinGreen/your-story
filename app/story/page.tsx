@@ -102,6 +102,12 @@ import {
   freezeBlocks,
 } from "../misc/turnTimeline";
 import { logger } from "../misc/logger";
+import {
+  beginTurnKeepAlive,
+  endTurnKeepAlive,
+  newTurnId,
+  type TurnKeepAliveOutcome,
+} from "../misc/turnKeepAlive";
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { getSubscriptionFallbacks } from "../misc/reasoningTiers";
@@ -571,16 +577,43 @@ function StoryPageContent() {
   }, []);
   // The last finished turn's cost-ledger id, to cancel its pictures on Retry/Undo.
   const lastTurnCostIdRef = useRef<string | null>(null);
+  // The final save of the turn in flight, set by the turn's onComplete so the
+  // wrapper below can await it before ending the Android keep-alive service.
+  const turnSaveRef = useRef<Promise<boolean> | null>(null);
   async function generateTrackedTurn(
     ...args: Parameters<typeof generateStoryTurn>
   ) {
     turnLiveRef.current = args[0];
+    // Android: keep the process alive while the player is away (decision 132).
+    // Ended only after the final save has settled, so "ready" means saved.
+    const turnId = newTurnId();
+    const turnSignal = args[2]?.abortSignal;
+    const wasStopped = () =>
+      turnSignal?.aborted === true ||
+      generationAbortRef.current?.signal.aborted === true;
+    let outcome: TurnKeepAliveOutcome = "failed";
+    turnSaveRef.current = null;
+    beginTurnKeepAlive(turnId);
     try {
       const result = await generateStoryTurn(...args);
       lastTurnCostIdRef.current = result.meta?.costTurnId ?? null;
+      let saved = false;
+      try {
+        saved = (await turnSaveRef.current) === true;
+      } catch {
+        saved = false;
+      }
+      if (wasStopped()) outcome = "stopped";
+      else if (result.success && result.content.trim() && saved)
+        outcome = "ready";
       return result;
+    } catch (error) {
+      outcome = wasStopped() ? "stopped" : "failed";
+      throw error;
     } finally {
       turnLiveRef.current = null;
+      turnSaveRef.current = null;
+      endTurnKeepAlive(turnId, outcome, args[0].story_name);
     }
   }
   const [illustrating, setIllustrating] = useState(false);
@@ -1623,8 +1656,11 @@ function StoryPageContent() {
   }
 
   //Savestoryprogresstodatabase(debounced)
-  async function saveProgress(updatedStoryData: StoryData, immediate = false) {
-    if (!storyDbId) return;
+  async function saveProgress(
+    updatedStoryData: StoryData,
+    immediate = false,
+  ): Promise<boolean> {
+    if (!storyDbId) return false;
 
     //Clearexistingtimeout
     if (saveTimeoutRef.current) {
@@ -1640,11 +1676,14 @@ function StoryPageContent() {
     saveTimeoutRef.current = setTimeout(() => {
       performSave(updatedStoryData);
     }, 3000); //3seconddebounce
+    return false; // nothing is written yet
   }
 
   //Actualsavelogicisolated
-  async function performSave(updatedStoryData: StoryData) {
-    if (!storyDbId) return;
+  // Resolves true once the story is written, false when it was not (the error
+  // is already reported); the turn wrapper uses it to decide "ready".
+  async function performSave(updatedStoryData: StoryData): Promise<boolean> {
+    if (!storyDbId) return false;
 
     try {
       logger.info("Saving story progress...");
@@ -1664,12 +1703,14 @@ function StoryPageContent() {
 
       await saveLocalStory(storyDbId, trimmedData);
       console.log("Local story saved successfully");
+      return true;
     } catch (error) {
       console.error("Error saving progress:", error);
       addNotification(
         "Failed to save story progress. Please try again.",
         "failure",
       );
+      return false;
     }
   }
 
@@ -2787,7 +2828,7 @@ function StoryPageContent() {
               lastPartForSave.choices?.length || 0,
               "choices",
             );
-            saveProgress(storyData, true);
+            turnSaveRef.current = saveProgress(storyData, true);
 
             logger.ai_response("Generation complete (custom input)", {
               totalTokenCost: result.meta.totalTokenCost,
@@ -3292,7 +3333,7 @@ function StoryPageContent() {
 
             setStoryData({ ...storyData });
 
-            saveProgress(storyData, true);
+            turnSaveRef.current = saveProgress(storyData, true);
 
             if (opts.successNotification) {
               addNotification(opts.successNotification, "success");
@@ -4256,8 +4297,9 @@ function StoryPageContent() {
 
             setStoryData({ ...storyData });
 
-            // Save progress
-            saveProgress(storyData);
+            // Save progress. Immediate (it was debounced) so the turn wrapper
+            // can await it before ending the Android keep-alive.
+            turnSaveRef.current = saveProgress(storyData, true);
 
             addNotification("Response regenerated", "success");
 
@@ -4942,9 +4984,9 @@ function StoryPageContent() {
             {...storyData}
             storyDbId={storyDbId}
             sourceAdventureId={sourceAdventureId}
-            onSaveProgress={(updatedStoryData) =>
-              saveProgress(updatedStoryData || storyData)
-            }
+            onSaveProgress={async (updatedStoryData) => {
+              await saveProgress(updatedStoryData || storyData);
+            }}
             onUpdateStoryData={updateStoryData}
             onNavigate={(target: MenuNavTarget) =>
               setCurrentState(StoryState[target])

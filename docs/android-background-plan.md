@@ -311,3 +311,42 @@ checked against the code, and all are taken in:
 ## Decisions made during implementation
 
 (Filled in as slices land.)
+
+### 2026-10-23, slice 1 (the keep-alive service)
+
+- **`end` is fired before `notifyReady`**, not after as the slice text says.
+  The native side posts "ready" only for the id it last ended, so the order
+  has to be end then ready; Capacitor runs a plugin's calls in order.
+- **How the wrapper awaits the save.** `saveProgress` and `performSave` now
+  return `Promise<boolean>` (true once written; false when it failed, there
+  was no story id, or the write was only debounced). `performSave` already
+  swallowed its errors into a toast, so a rejected save never happens; the
+  boolean is how "saved" is known. The three `onComplete` handlers (custom
+  input, `runTurnGeneration`, legacy Retry) store the immediate save in
+  `turnSaveRef`, and `generateTrackedTurn` awaits it before
+  `endTurnKeepAlive`. `MenuPage`'s `onSaveProgress` (typed `Promise<void>`)
+  is wrapped to keep its type.
+- **Legacy Retry now saves immediately** (`saveProgress(storyData, true)`)
+  instead of after the 3 s debounce, so there is a promise to await. The
+  only visible effect is the write landing sooner.
+- **Stop detection** reads the `abortSignal` passed in the turn's options as
+  well as `generationAbortRef.current?.signal.aborted`, since `handleStop`
+  may replace the ref.
+- **"ready"** needs `result.success`, non-empty `result.content`, a save that
+  resolved true, and no abort. Any throw is "failed" unless aborted.
+- **Turn id** comes from `newTurnId()` in `turnKeepAlive.ts`:
+  `crypto.randomUUID()` with a time-and-random fallback (the codebase has no
+  shared fallback helper). The ready notification's body is
+  `story_name`, or "Your Story" when blank.
+- **Icon.** Only `@mipmap/ic_launcher` exists, so both notifications use it
+  as the small icon. Android masks small icons to a silhouette, so it may
+  show as a plain square; a proper monochrome `ic_stat_*` drawable is a
+  follow-up.
+- **Native threading.** `begin` is an intent, so it reaches
+  `onStartCommand` after anything posted straight to the main looper. `end`
+  therefore records the ended id on the main looper and `onStartCommand`
+  always calls `startForeground` first (the OS kills the app otherwise), then
+  `stopSelf()` if `shouldStart(pendingId, endedId)` says the turn already
+  ended. `shouldStart` is the pure rule.
+- Not checked here: nothing in `android/` compiled (no SDK); CI is the first
+  compile.
