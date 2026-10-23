@@ -1,7 +1,7 @@
 # The model picker, simplified — implementation plan
 
-2026-10-23. Status: **plan, revised after Codex's review, awaiting the
-author's go.** It builds [`model-picker-design.md`](model-picker-design.md)
+2026-10-23. Status: **approved (decision 124), being built on
+`claude/model-picker`.** It builds [`model-picker-design.md`](model-picker-design.md)
 (decisions 118–123) and adds no product decisions of its own. The calls it
 had to make are in §8, and the review is in §9.
 

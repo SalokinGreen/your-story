@@ -195,6 +195,7 @@ tier slots (0–3) and the narration voice. The design is
 | 121 | "The side agents … each have their own model picker today. What happens to them?" | **"Fold under an 'Advanced settings' section (Recommended)."** They keep working as now; their pickers move into a collapsed section. |
 | 122 | "Which models should the two slots start on for a player who never changes them?" | **"Default GLM 5.3, Advanced Sonnet (Recommended)."** Everyday turns move up from Haiku to GLM 5.3; combat, rules and the prose stay on GLM 5.3; boss fights stay on Sonnet. |
 | 123 | After Codex's review (2026-10-23): "Default runs everyday turns and combat/rules on GLM 5.3. Today combat and rules think at 'high' and everyday turns at 'low'. How should the Default slot's single effort work?" | **"Combat never below 'high' (Recommended)."** The Default effort applies to every Default turn, but a combat or rules turn (tier 2) never thinks below `high`; the picker's help says so. A narrowing of decision 120. |
+| 124 | The design and the implementation plan, revised after Codex's review (2026-10-23) | **"approved"** — built as planned on `claude/model-picker`. |
 
 ### Interview — the story screen (2026-10-22)
 
