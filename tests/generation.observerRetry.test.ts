@@ -91,8 +91,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Runs one turn whose first attempt the Observer sends back for more care; returns the tiers the GM resolved. */
-async function tiersAcrossTheRetry(saved: Record<string, string>): Promise<number[]> {
+/** Runs one turn whose first attempt the Observer sends back for more care. */
+async function runFlaggedTurn(
+  saved: Record<string, string>,
+): Promise<{ tiers: number[]; resets: number; content: string }> {
   const s = storage(saved);
   vi.stubGlobal("localStorage", s);
   vi.stubGlobal("sessionStorage", storage({}));
@@ -141,9 +143,15 @@ async function tiersAcrossTheRetry(saved: Record<string, string>): Promise<numbe
     onReasoningTierResolved: (resolved: ResolvedTier) => tiers.push(resolved.tier),
     onObserverReset: () => resets.push(1),
   });
-  expect(resets).toHaveLength(1);
-  expect(result.content).toBe(RETRY_NARRATION);
-  return tiers;
+  return { tiers, resets: resets.length, content: result.content };
+}
+
+/** The tiers the GM resolved across a turn the Observer reset once. */
+async function tiersAcrossTheRetry(saved: Record<string, string>): Promise<number[]> {
+  const run = await runFlaggedTurn(saved);
+  expect(run.resets).toBe(1);
+  expect(run.content).toBe(RETRY_NARRATION);
+  return run.tiers;
 }
 
 describe("the Observer's escalation retry", () => {
@@ -161,5 +169,15 @@ describe("the Observer's escalation retry", () => {
     expect(tiers[0]).toBe(1);
     // Tier 2 is the identical call; the retry goes past it to tier 3.
     expect(tiers[tiers.length - 1]).toBe(3);
+  });
+
+  it("keeps the turn when no heavier call exists: every tier the same model and effort", async () => {
+    const same = { modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" };
+    const run = await runFlaggedTurn({
+      reasoningTierOverrides: JSON.stringify([same, same, same, same]),
+    });
+    // No rollback, no reroll on the same call: the first attempt stands.
+    expect(run.resets).toBe(0);
+    expect(run.content).toBe(FIRST_NARRATION);
   });
 });

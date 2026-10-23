@@ -20,6 +20,7 @@ import {
   getEffectiveTiers,
   getSlotOverride,
   nextDistinctTier,
+  observerRetryTier,
   setSlotOverride,
   slotForTier,
 } from "@/app/misc/reasoningTiers";
@@ -314,5 +315,33 @@ describe("the turn-cost estimate prices the classifier as generation.ts runs it"
       modelKey: "Grok 4.5",
       reasoningEffort: "low",
     });
+  });
+});
+
+describe("observerRetryTier", () => {
+  const state = (currentTier: number, tier3CallsInScene = 0) => ({
+    currentTier,
+    tier3CallsInScene,
+    lastSceneKey: "freeform:0",
+  });
+
+  it("on the shipped ladder, from tier 1 asks for tier 2", () => {
+    expect(observerRetryTier(1, state(1), getEffectiveTiers())).toBe(2);
+  });
+
+  it("is null when every tier above is the same call", () => {
+    const same = { modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" };
+    localStorage.setItem(KEY, JSON.stringify([same, same, same, same]));
+    expect(observerRetryTier(1, state(1), getEffectiveTiers())).toBeNull();
+  });
+
+  it("is null when the scene cap clamps the request back to the call already made", () => {
+    // A combat turn ran on tier 2; tier 3 is spent for the scene, so the
+    // request is clamped to tier 2, which is the same call.
+    expect(observerRetryTier(2, state(2, 3), getEffectiveTiers())).toBeNull();
+  });
+
+  it("still asks for Advanced while the scene has top-tier calls left", () => {
+    expect(observerRetryTier(2, state(2, 0), getEffectiveTiers())).toBe(3);
   });
 });

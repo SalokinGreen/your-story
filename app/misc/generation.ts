@@ -145,6 +145,7 @@ import {
   isSceneGatedForRoll,
   hasSatisfiedRollGate,
   nextDistinctTier,
+  observerRetryTier,
   describeTier,
   getTierState,
   getEffectiveTiers,
@@ -1517,6 +1518,23 @@ export async function generateStoryTurn(
           }
         }
 
+        // A tier_escalation_missed reset only helps when the retry runs on a
+        // heavier call. When the ladder has none to offer (everything above
+        // is the same model and effort, or the scene cap clamps the request
+        // back to the same call), resetting would just reroll the turn on the
+        // call it already made, so the turn is kept and the flag surfaced.
+        const escalationRetryTier =
+          majorFlag.type === "tier_escalation_missed" && preTurnSnapshot
+            ? observerRetryTier(
+                tierUsedThisTurn ?? SCENE_BASELINE_TIER,
+                getTierState(preTurnSnapshot),
+                getEffectiveTiers(),
+              )
+            : null;
+        const escalationRerunsSameCall =
+          majorFlag.type === "tier_escalation_missed" &&
+          escalationRetryTier === null;
+
         if (rewrittenNarration) {
           logger.action(
             "Observer rewrite succeeded, keeping tool calls/rolls and replacing narration",
@@ -1589,6 +1607,14 @@ export async function generateStoryTurn(
             correctedObserverFlags: [majorFlag],
             observerRewriteOriginal: rewriteOriginal,
           };
+        } else if (escalationRerunsSameCall) {
+          logger.action(
+            "Observer asked for a heavier tier, but none is a different call - keeping the turn",
+            {
+              tierUsed: tierUsedThisTurn,
+              detail: majorFlag.detail,
+            },
+          );
         } else if (preTurnSnapshot) {
           // Full state rollback, restored in place (delete-all-keys +
           // Object.assign) so every closure over storyData (the caller, other
@@ -1602,14 +1628,9 @@ export async function generateStoryTurn(
           if (majorFlag.type === "tier_escalation_missed") {
             // The nearest tier that is a different call, not tier + 1: with
             // Default filling tiers 0 and 1 alike, + 1 would rerun the same
-            // model at the same effort (design §3). Nothing different above
-            // means the top tier, as before.
-            const requestedTier =
-              nextDistinctTier(
-                tierUsedThisTurn ?? SCENE_BASELINE_TIER,
-                "up",
-                getEffectiveTiers(),
-              ) ?? TOP_TIER;
+            // model at the same effort (design §3). escalationRerunsSameCall
+            // above already kept the turn when there is no such tier.
+            const requestedTier = escalationRetryTier ?? TOP_TIER;
             const escalation = applyTierEscalation(
               storyData,
               requestedTier,

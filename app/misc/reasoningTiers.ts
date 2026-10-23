@@ -807,6 +807,39 @@ export function resolveTierEscalation(
 }
 
 /**
+ * The tier the Observer's tier_escalation_missed retry should request, or null
+ * when the retry would only rerun the call the turn already made. The retry
+ * rolls the turn back, spends its one reset and can reroll dice, so it is only
+ * worth it when the call actually gets heavier. Two ways it would not: nothing
+ * above `tierUsed` is a different call (Default set to the same model and effort
+ * as Advanced, say), or the scene cap clamps the request back down to a tier
+ * that is the same call (resolveTierEscalation). Engine review, design §3.
+ */
+export function observerRetryTier(
+  tierUsed: number,
+  tierState: ReasoningTierState,
+  tiers: readonly {
+    modelKey: AnyModelKey;
+    reasoningEffort: ReasoningEffort;
+  }[],
+): number | null {
+  const requested = nextDistinctTier(tierUsed, "up", tiers);
+  if (requested === null) return null;
+  const { grantedTier } = resolveTierEscalation(
+    { tier: requested, reason: "" },
+    tierState.currentTier,
+    tierState,
+  );
+  const used = tiers[tierUsed];
+  const granted = tiers[grantedTier];
+  if (!used || !granted) return null;
+  const sameCall =
+    granted.modelKey === used.modelKey &&
+    granted.reasoningEffort === used.reasoningEffort;
+  return sameCall ? null : requested;
+}
+
+/**
  * Runs a tier-escalation request through the same decay/cap policy as
  * `set_reasoning_tier` and persists the result onto `storyData.reasoningTierState`
  * (mutating `modified`, same convention as every other GM tool executor).
