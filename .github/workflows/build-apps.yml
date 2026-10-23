@@ -114,6 +114,19 @@ jobs:
       - run: npm ci
       - run: NEXT_PUBLIC_STANDALONE=true npm run build
       - run: npx cap sync android
+      # Sign every debug APK with the same key, so a new build installs over
+      # the last one. Without it each runner makes a fresh debug key and the
+      # phone refuses the update ("App not installed"). The keystore is a
+      # repository secret, never a file in this public repo; Gradle's debug
+      # signing reads ~/.android/debug.keystore (alias androiddebugkey,
+      # password android). Unset on a fork: the runner's own key is used.
+      - name: Install the shared debug signing key
+        env:
+          ANDROID_DEBUG_KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+        if: env.ANDROID_DEBUG_KEYSTORE != ''
+        run: |
+          mkdir -p ~/.android
+          echo "$ANDROID_DEBUG_KEYSTORE" | base64 -d > ~/.android/debug.keystore
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
