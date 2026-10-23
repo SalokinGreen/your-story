@@ -84,7 +84,7 @@ export default function PartyTableStrip({
                     }}
                     onBlur={() => setRemoving(null)}
                     autoFocus
-                    className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30"
+                    className="px-2 py-0.5 text-xs rounded-full bg-ys-danger/20 text-ys-danger hover:bg-ys-danger/30"
                   >
                     Remove?
                   </button>
@@ -135,7 +135,7 @@ export default function PartyTableStrip({
         {table.pending.map((req) => (
           <div
             key={req.requestId}
-            className="flex items-center justify-between gap-2 text-xs text-ys-text bg-amber-500/10 border border-amber-400/20 rounded-lg px-3 py-1.5"
+            className="flex items-center justify-between gap-2 text-xs text-ys-text bg-ys-warning/10 border border-ys-warning/20 rounded-lg px-3 py-1.5"
           >
             <span>
               Waiting for {req.playerName}&apos;s {req.kind === "roll" ? "roll" : "answer"} on their phone

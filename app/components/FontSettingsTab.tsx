@@ -6,8 +6,9 @@ import {
   DEFAULT_READING_FONT,
   DEFAULT_THEME_ID,
   INK,
-  themeTokens,
-  type ThemePreset,
+  THEME_PRESETS,
+  applyThemeVars,
+  findThemePreset,
 } from "../story/themeTokens";
 
 interface CustomFont {
@@ -138,68 +139,6 @@ const DEFAULT_FONTS = [
   { name: "Cursive", value: "'Segoe Script', 'Brush Script MT', cursive" },
 ];
 
-// Theme presets for story background and text colors
-export const THEME_PRESETS: ThemePreset[] = [
-  INK,
-  {
-    id: "default",
-    name: "Ocean Blue",
-    background: "rgb(23, 37, 84)", // blue-950
-    text: "rgb(239, 246, 255)", // blue-50
-    accent: "rgb(59, 130, 246)", // blue-500
-  },
-  {
-    id: "sepia",
-    name: "Sepia",
-    background: "rgb(68, 52, 35)",
-    text: "rgb(245, 235, 220)",
-    accent: "rgb(194, 154, 108)",
-  },
-  {
-    id: "dark",
-    name: "Pure Dark",
-    background: "rgb(17, 17, 17)",
-    text: "rgb(229, 229, 229)",
-    accent: "rgb(168, 162, 158)",
-  },
-  {
-    id: "paper",
-    name: "Paper White",
-    background: "rgb(250, 250, 248)",
-    text: "rgb(41, 37, 36)",
-    accent: "rgb(87, 83, 78)",
-    muted: "rgb(100, 96, 92)", // derived mix is 4.3:1; this is about 6:1
-  },
-  {
-    id: "forest",
-    name: "Forest",
-    background: "rgb(20, 30, 22)",
-    text: "rgb(220, 237, 222)",
-    accent: "rgb(74, 124, 89)",
-  },
-  {
-    id: "sunset",
-    name: "Sunset",
-    background: "rgb(45, 25, 30)",
-    text: "rgb(255, 235, 230)",
-    accent: "rgb(220, 120, 95)",
-  },
-  {
-    id: "nord",
-    name: "Nord",
-    background: "rgb(46, 52, 64)",
-    text: "rgb(236, 239, 244)",
-    accent: "rgb(136, 192, 208)",
-  },
-  {
-    id: "solarized",
-    name: "Solarized Dark",
-    background: "rgb(0, 43, 54)",
-    text: "rgb(253, 246, 227)",
-    accent: "rgb(38, 139, 210)",
-  },
-];
-
 // Font size presets
 const FONT_SIZE_PRESETS = [
   { name: "Small", value: 14 },
@@ -208,22 +147,6 @@ const FONT_SIZE_PRESETS = [
   { name: "Extra Large", value: 20 },
   { name: "Huge", value: 24 },
 ];
-
-// Set the six colour tokens (--ys-*) the story screen reads, plus the three
-// older --story-* colours, which a synced older device may still read.
-function applyThemeVars(themeData: ThemePreset) {
-  const root = document.documentElement.style;
-  const tokens = themeTokens(themeData);
-  root.setProperty("--ys-bg", tokens.bg);
-  root.setProperty("--ys-surface", tokens.surface);
-  root.setProperty("--ys-text", tokens.text);
-  root.setProperty("--ys-muted", tokens.muted);
-  root.setProperty("--ys-border", tokens.border);
-  root.setProperty("--ys-accent", tokens.accent);
-  root.setProperty("--story-bg-color", themeData.background);
-  root.setProperty("--story-text-color", themeData.text);
-  root.setProperty("--story-accent-color", themeData.accent);
-}
 
 export default function FontSettingsTab({
   addNotification,
@@ -235,6 +158,10 @@ export default function FontSettingsTab({
   const [theme, setTheme] = useState(DEFAULT_THEME_ID);
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  // False until the load effect below has read the saved settings. The apply
+  // effect waits for it: until then `theme` is the initial Ink, and applying
+  // it would overwrite the saved theme the bootstrap script already painted.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get current theme colors
@@ -258,6 +185,7 @@ export default function FontSettingsTab({
       if (savedParagraphSpacing)
         setParagraphSpacing(parseFloat(savedParagraphSpacing));
       if (savedTheme) setTheme(savedTheme);
+      setSettingsLoaded(true);
 
       // Load custom fonts from IndexedDB
       getAllFonts()
@@ -320,6 +248,7 @@ export default function FontSettingsTab({
 
   // Apply settings whenever they change
   useEffect(() => {
+    if (!settingsLoaded) return;
     applyFontSettings(
       fontSize,
       fontFamily,
@@ -333,6 +262,7 @@ export default function FontSettingsTab({
     lineHeight,
     paragraphSpacing,
     theme,
+    settingsLoaded,
     applyFontSettings,
   ]);
 
@@ -470,7 +400,7 @@ export default function FontSettingsTab({
     <div className="space-y-6">
       {/* Theme Selection */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+        <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
           <DynamicIcon name="Palette" className="w-4 h-4" />
           Color Theme
         </label>
@@ -482,13 +412,13 @@ export default function FontSettingsTab({
               onClick={() => handleThemeChange(themeOption.id)}
               className={`relative p-1 rounded-lg transition-all ${
                 theme === themeOption.id
-                  ? "ring-2 ring-purple-500 ring-offset-2 ring-offset-[#0d1829]"
-                  : "hover:ring-1 hover:ring-white/20"
+                  ? "ring-2 ring-ys-accent ring-offset-2 ring-offset-ys-bg"
+                  : "hover:ring-1 hover:ring-ys-border"
               }`}
               title={themeOption.name}
             >
               <div
-                className="w-full aspect-square rounded-md flex items-center justify-center"
+                className="w-full aspect-square rounded-md flex items-center justify-center border border-ys-border"
                 style={{ backgroundColor: themeOption.background }}
               >
                 <span
@@ -498,7 +428,7 @@ export default function FontSettingsTab({
                   Aa
                 </span>
               </div>
-              <span className="text-[10px] text-blue-300/50 block text-center mt-1 truncate">
+              <span className="text-[10px] text-ys-muted block text-center mt-1 truncate">
                 {themeOption.name}
               </span>
             </button>
@@ -509,11 +439,11 @@ export default function FontSettingsTab({
       {/* Font Size */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+          <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
             <DynamicIcon name="Type" className="w-4 h-4" />
             Font Size
           </label>
-          <span className="text-sm text-purple-300 font-medium">
+          <span className="text-sm text-ys-accent font-medium">
             {fontSize}px
           </span>
         </div>
@@ -525,8 +455,8 @@ export default function FontSettingsTab({
               onClick={() => handleFontSizeChange(preset.value)}
               className={`flex-1 py-2 px-2 text-xs font-medium rounded-lg transition-colors ${
                 fontSize === preset.value
-                  ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
-                  : "bg-white/5 text-blue-200/70 hover:bg-white/10"
+                  ? "bg-ys-accent text-ys-on-accent border border-transparent"
+                  : "bg-ys-surface-2 text-ys-muted hover:border-ys-muted border border-transparent"
               }`}
             >
               {preset.name}
@@ -540,18 +470,18 @@ export default function FontSettingsTab({
           max="32"
           value={fontSize}
           onChange={(e) => handleFontSizeChange(parseInt(e.target.value, 10))}
-          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+          className="w-full h-2 bg-ys-surface-2 rounded-lg appearance-none cursor-pointer accent-ys-accent"
         />
       </div>
 
       {/* Line Height */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+          <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
             <DynamicIcon name="AlignJustify" className="w-4 h-4" />
             Line Spacing
           </label>
-          <span className="text-sm text-purple-300 font-medium">
+          <span className="text-sm text-ys-accent font-medium">
             {lineHeight.toFixed(1)}
           </span>
         </div>
@@ -563,9 +493,9 @@ export default function FontSettingsTab({
           step="0.1"
           value={lineHeight}
           onChange={(e) => handleLineHeightChange(parseFloat(e.target.value))}
-          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+          className="w-full h-2 bg-ys-surface-2 rounded-lg appearance-none cursor-pointer accent-ys-accent"
         />
-        <div className="flex justify-between text-xs text-blue-300/50">
+        <div className="flex justify-between text-xs text-ys-muted">
           <span>Compact</span>
           <span>Normal</span>
           <span>Spacious</span>
@@ -575,11 +505,11 @@ export default function FontSettingsTab({
       {/* Paragraph Spacing */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+          <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
             <DynamicIcon name="SeparatorHorizontal" className="w-4 h-4" />
             Paragraph Spacing
           </label>
-          <span className="text-sm text-purple-300 font-medium">
+          <span className="text-sm text-ys-accent font-medium">
             {paragraphSpacing.toFixed(1)}em
           </span>
         </div>
@@ -593,9 +523,9 @@ export default function FontSettingsTab({
           onChange={(e) =>
             handleParagraphSpacingChange(parseFloat(e.target.value))
           }
-          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+          className="w-full h-2 bg-ys-surface-2 rounded-lg appearance-none cursor-pointer accent-ys-accent"
         />
-        <div className="flex justify-between text-xs text-blue-300/50">
+        <div className="flex justify-between text-xs text-ys-muted">
           <span>None</span>
           <span>Normal</span>
           <span>Wide</span>
@@ -604,7 +534,7 @@ export default function FontSettingsTab({
 
       {/* Font Family */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+        <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
           <DynamicIcon name="TextCursorInput" className="w-4 h-4" />
           Font Family
         </label>
@@ -612,7 +542,7 @@ export default function FontSettingsTab({
         <select
           value={fontFamily}
           onChange={(e) => handleFontFamilyChange(e.target.value)}
-          className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-3 py-2.5 ys-input text-sm"
         >
           <optgroup label="Built-in Fonts">
             {DEFAULT_FONTS.map((font) => (
@@ -635,10 +565,10 @@ export default function FontSettingsTab({
 
       {/* Font Preview */}
       <div
-        className="p-4 rounded-lg border border-white/10"
+        className="p-4 rounded-lg border border-ys-border"
         style={{ backgroundColor: currentTheme.background }}
       >
-        <p className="text-xs text-blue-300/50 mb-2">Preview</p>
+        <p className="text-xs text-ys-muted mb-2">Preview</p>
         <div
           style={{
             fontFamily: fontFamily,
@@ -662,13 +592,13 @@ export default function FontSettingsTab({
       </div>
 
       {/* Custom Font Upload */}
-      <div className="space-y-3 pt-4 border-t border-white/10">
+      <div className="space-y-3 pt-4 border-t border-ys-border">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+          <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
             <DynamicIcon name="Upload" className="w-4 h-4" />
             Custom Fonts
           </label>
-          <span className="text-xs text-blue-300/50">
+          <span className="text-xs text-ys-muted">
             .woff2, .woff, .ttf, .otf
           </span>
         </div>
@@ -684,7 +614,7 @@ export default function FontSettingsTab({
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="w-full py-3 px-4 border-2 border-dashed border-white/15 rounded-lg text-sm text-blue-300/60 hover:border-purple-400 hover:text-purple-300 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-3 px-4 border-2 border-dashed border-ys-border rounded-lg text-sm text-ys-muted hover:border-ys-accent hover:text-ys-accent transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isUploading ? (
             <>
@@ -705,26 +635,26 @@ export default function FontSettingsTab({
             {customFonts.map((font) => (
               <div
                 key={font.id}
-                className="flex items-center justify-between p-2 bg-white/5 rounded-lg"
+                className="flex items-center justify-between p-2 bg-ys-surface-2 rounded-lg"
               >
                 <div className="flex items-center gap-2">
                   <DynamicIcon
                     name="FileText"
-                    className="w-4 h-4 text-blue-300/50"
+                    className="w-4 h-4 text-ys-muted"
                   />
                   <span
-                    className="text-sm text-blue-200/80"
+                    className="text-sm text-ys-muted"
                     style={{ fontFamily: `"${font.name}"` }}
                   >
                     {font.name}
                   </span>
-                  <span className="text-xs text-blue-300/40 uppercase">
+                  <span className="text-xs text-ys-muted uppercase">
                     .{font.format}
                   </span>
                 </div>
                 <button
                   onClick={() => handleDeleteFont(font)}
-                  className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  className="p-1.5 text-ys-danger hover:bg-ys-danger/15 rounded-lg transition-colors"
                   title="Remove font"
                 >
                   <DynamicIcon name="Trash2" className="w-4 h-4" />
@@ -734,7 +664,7 @@ export default function FontSettingsTab({
           </div>
         )}
 
-        <p className="text-xs text-blue-300/50">
+        <p className="text-xs text-ys-muted">
           Fonts are stored locally on your device. Max file size: 5MB.
         </p>
       </div>
@@ -801,9 +731,22 @@ export function useFontSettings() {
   return settings;
 }
 
+/** Paint the saved theme (Ink when none is saved). Synchronous, so the colours never wait on IndexedDB. */
+export function applySavedTheme() {
+  if (typeof window === "undefined") return;
+  try {
+    applyThemeVars(findThemePreset(localStorage.getItem("storyTheme")));
+  } catch (error) {
+    console.error("Failed to apply the saved theme:", error);
+  }
+}
+
 // Initialize fonts on app load
 export async function initializeFonts() {
   if (typeof window === "undefined") return;
+
+  // Colours first and at once: they do not need the font database.
+  applySavedTheme();
 
   try {
     const fonts = await getAllFonts();
@@ -814,9 +757,6 @@ export async function initializeFonts() {
     const fontFamily = localStorage.getItem("storyFontFamily");
     const lineHeight = localStorage.getItem("storyLineHeight");
     const paragraphSpacing = localStorage.getItem("storyParagraphSpacing");
-    const themeId = localStorage.getItem("storyTheme") || DEFAULT_THEME_ID;
-    const themeData =
-      THEME_PRESETS.find((t) => t.id === themeId) || THEME_PRESETS[0];
 
     if (fontSize) {
       document.documentElement.style.setProperty(
@@ -840,7 +780,6 @@ export async function initializeFonts() {
         `${paragraphSpacing}em`
       );
     }
-    applyThemeVars(themeData);
   } catch (error) {
     console.error("Failed to initialize fonts:", error);
   }

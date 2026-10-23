@@ -55,21 +55,21 @@ export default function HostGameModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center ys-modal-backdrop p-4"
       onClick={onClose}
     >
       <div
-        className="bg-blue-950 border border-blue-700/50 rounded-2xl w-full max-w-sm shadow-2xl"
+        className="ys-modal w-full max-w-sm shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-blue-800/40">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <DynamicIcon name="Wifi" className="w-4 h-4 text-purple-300" />
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ys-border">
+          <h3 className="text-base font-bold text-ys-text flex items-center gap-2">
+            <DynamicIcon name="Wifi" className="w-4 h-4 text-ys-accent" />
             Host This Story Online
           </h3>
           <button
             onClick={onClose}
-            className="p-1.5 text-blue-300/60 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors"
+            className="p-1.5 text-ys-muted hover:text-ys-text hover:bg-ys-surface-2 rounded-lg transition-colors"
             title="Close"
           >
             <DynamicIcon name="X" className="w-4 h-4" />
@@ -77,7 +77,7 @@ export default function HostGameModal({
         </div>
 
         <div className="p-5 space-y-4">
-          <p className="text-xs text-blue-200/60">
+          <p className="text-xs text-ys-muted">
             Peer-to-peer over the internet - no server, no account. You&apos;ll
             get a room code to share once it&apos;s created.
           </p>
@@ -87,7 +87,7 @@ export default function HostGameModal({
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              className="w-11 h-11 shrink-0 rounded-lg cursor-pointer bg-transparent border border-blue-700/40"
+              className="w-11 h-11 shrink-0 rounded-lg cursor-pointer bg-transparent border border-ys-border"
               title="Your bubble color"
             />
             <input
@@ -102,18 +102,18 @@ export default function HostGameModal({
               }}
               placeholder="Your name"
               maxLength={24}
-              className="flex-1 min-w-0 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="flex-1 min-w-0 px-4 py-3 bg-ys-surface-2 border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider">
+            <label className="block text-xs font-semibold text-ys-muted uppercase tracking-wider">
               Connection
             </label>
             <select
               value={backend}
               onChange={(e) => setBackend(e.target.value as MPBackend)}
-              className="w-full px-4 py-2.5 bg-blue-900/20 border border-blue-700/40 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-2.5 bg-ys-surface-2 border border-ys-border rounded-xl text-ys-text text-sm focus:outline-none focus:ring-2 focus:ring-ys-accent"
             >
               {MP_BACKEND_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -121,7 +121,7 @@ export default function HostGameModal({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-blue-200/50">
+            <p className="text-xs text-ys-muted">
               If players can&apos;t connect, you can switch this later from
               Menu &gt; Online Play.
             </p>
@@ -129,7 +129,7 @@ export default function HostGameModal({
 
           <button
             onClick={handleHost}
-            className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-xl active:scale-[0.99] font-semibold shadow-lg transition-all flex items-center justify-center gap-2 bg-ys-accent text-ys-on-accent hover:opacity-90"
           >
             <DynamicIcon name="Play" className="w-4 h-4" />
             Create Room

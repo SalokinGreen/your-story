@@ -112,9 +112,9 @@ export default function ClaudeSubscriptionPanel() {
   const signedIn = isClaudeCliUsable(status);
 
   return (
-    <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
+    <div className="p-4 ys-card rounded-lg space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+        <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="Sparkles" className="w-4 h-4" />
           Claude subscription
         </h4>
@@ -122,7 +122,7 @@ export default function ClaudeSubscriptionPanel() {
           <button
             onClick={refresh}
             disabled={refreshing}
-            className="text-xs text-purple-300 hover:text-purple-200 disabled:opacity-50"
+            className="text-xs text-ys-accent hover:underline disabled:opacity-50"
           >
             {refreshing ? "Checking…" : "Refresh"}
           </button>
@@ -134,7 +134,7 @@ export default function ClaudeSubscriptionPanel() {
           <div className="flex items-center gap-3 text-xs">
             <span
               className={`flex items-center gap-1.5 ${
-                signedIn ? "text-emerald-300" : "text-amber-300"
+                signedIn ? "text-ys-success" : "text-ys-warning"
               }`}
             >
               <DynamicIcon
@@ -144,28 +144,28 @@ export default function ClaudeSubscriptionPanel() {
               {describeClaudeCliStatus(status)}
             </span>
             {status?.version && (
-              <span className="text-blue-300/50">CLI {status.version}</span>
+              <span className="text-ys-muted">CLI {status.version}</span>
             )}
           </div>
-          <p className="text-xs text-blue-300/60">
+          <p className="text-xs text-ys-muted">
             Play on your own Claude plan: pick a &ldquo;(subscription)&rdquo;
             model for Default or Advanced. For those turns this app
             runs Anthropic&rsquo;s <code>claude</code> CLI on this computer. It
             never sees or stores your sign-in.
           </p>
           {status && !status.installed && (
-            <p className="text-xs text-blue-200/80">
+            <p className="text-xs text-ys-muted">
               Install Anthropic&rsquo;s <code>claude</code> CLI (Claude Code)
               first, then sign in as below.
             </p>
           )}
           {status && !signedIn && (
-            <p className="text-xs text-blue-200/80">
+            <p className="text-xs text-ys-muted">
               To sign in, open a terminal, run <code>claude</code>, then{" "}
               <code>/login</code>. Then press Refresh.
             </p>
           )}
-          <p className="text-[11px] text-blue-300/40">
+          <p className="text-[11px] text-ys-muted">
             The side agents stay on their own models unless you point one at a
             subscription model under AI → Advanced settings. A turn that reaches your
             plan&rsquo;s usage limit stops with a message; it is never moved to
@@ -173,13 +173,13 @@ export default function ClaudeSubscriptionPanel() {
           </p>
           {online && (
             <div className="space-y-1">
-              <p className="text-xs text-amber-300">
+              <p className="text-xs text-ys-warning">
                 An online game is active, so subscription models are not used:
                 other players&rsquo; input would run on your plan. Solo play and
                 couch co-op on this computer are not affected.
               </p>
               {fallbacks.length > 0 && (
-                <ul className="text-xs text-blue-300/70 list-disc pl-4 space-y-0.5">
+                <ul className="text-xs text-ys-muted list-disc pl-4 space-y-0.5">
                   {fallbacks.map((f) => (
                     <li key={f.slot}>
                       {f.slot} uses {f.fallbackModelKey} instead of {f.modelKey}{" "}
@@ -193,11 +193,11 @@ export default function ClaudeSubscriptionPanel() {
         </>
       ) : (
         <div className="space-y-1.5">
-          <p className="text-xs text-amber-300">
+          <p className="text-xs text-ys-warning">
             Claude subscription models run only in the desktop app. On this
             device:
           </p>
-          <ul className="text-xs text-blue-300/70 list-disc pl-4 space-y-0.5">
+          <ul className="text-xs text-ys-muted list-disc pl-4 space-y-0.5">
             {fallbacks.map((f) => (
               <li key={f.slot}>
                 {f.slot} uses {f.fallbackModelKey} instead of {f.modelKey}.

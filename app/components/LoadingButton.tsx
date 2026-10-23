@@ -29,17 +29,17 @@ export function LoadingButton({
   ...props
 }: LoadingButtonProps) {
   const baseStyles =
-    "inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed";
+    "inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ys-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ys-bg disabled:cursor-not-allowed";
 
   const variantStyles = {
     primary:
-      "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-md hover:shadow-lg disabled:from-gray-400 disabled:to-gray-500 disabled:shadow-none",
+      "bg-ys-accent hover:opacity-90 text-ys-on-accent shadow-md hover:shadow-lg disabled:opacity-50 disabled:shadow-none",
     secondary:
-      "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-400",
+      "bg-ys-surface-2 hover:bg-ys-border text-ys-text disabled:opacity-50",
     danger:
-      "bg-red-600 hover:bg-red-500 text-white shadow-md disabled:bg-gray-400",
+      "bg-ys-danger/15 hover:bg-ys-danger/25 border border-ys-danger/40 text-ys-danger shadow-md disabled:opacity-50",
     ghost:
-      "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 disabled:bg-transparent disabled:text-gray-400",
+      "bg-transparent hover:bg-ys-surface-2 text-ys-muted hover:text-ys-text disabled:bg-transparent disabled:opacity-50",
   };
 
   const sizeStyles = {

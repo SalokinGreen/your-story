@@ -48,6 +48,7 @@ import {
 } from "../misc/layerSettings";
 import { type ResolvedTier } from "../misc/reasoningTiers";
 import { useBackHandler } from "@/app/misc/useBackHandler";
+import { PLAYER_TEXT_COLOR } from "../misc/multiplayer/palette";
 
 interface StoryProps {
   storyData: StoryData;
@@ -359,19 +360,22 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
                   onClick={() => setActiveSpeakerId(player.id)}
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation ${
                     isActive
-                      ? "text-white shadow-md"
+                      ? "shadow-md"
                       : "text-ys-muted hover:text-ys-text"
                   }`}
                   style={
                     isActive
-                      ? { backgroundColor: player.color }
+                      ? {
+                          backgroundColor: player.color,
+                          color: PLAYER_TEXT_COLOR,
+                        }
                       : undefined
                   }
                   title={`Play as ${player.name}`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${
-                      isActive ? "bg-white/90" : ""
+                      isActive ? "bg-current" : ""
                     }`}
                     style={
                       isActive
@@ -1147,7 +1151,7 @@ export default function Story({
     <div className="w-full flex-1 min-h-0 flex flex-col px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 bg-ys-bg"
+        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-ys-border sm:shadow-2xl sm: overflow-hidden relative flex flex-col flex-1 min-h-0 bg-ys-bg"
       >
         {/* Combat Display - shows active combat state */}
         {storyData.combatState?.active && (
@@ -1310,7 +1314,7 @@ export default function Story({
                       }
                     }}
                     disabled={!editedText.trim()}
-                    className="px-3 py-1.5 text-sm font-medium bg-ys-accent text-ys-bg hover:opacity-90 disabled:opacity-40 rounded-lg transition-opacity flex items-center gap-1.5"
+                    className="px-3 py-1.5 text-sm font-medium bg-ys-accent text-ys-on-accent hover:opacity-90 disabled:opacity-40 rounded-lg transition-opacity flex items-center gap-1.5"
                   >
                     <DynamicIcon name="Save" className="w-4 h-4" />
                     Save

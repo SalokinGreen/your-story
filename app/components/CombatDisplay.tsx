@@ -22,7 +22,7 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
     lowercaseName.includes("health") ||
     lowercaseName.includes("life")
   ) {
-    return "text-red-500";
+    return "text-ys-danger";
   }
 
   // Defense-related stats
@@ -32,7 +32,7 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
     lowercaseName.includes("defense") ||
     lowercaseName.includes("ac")
   ) {
-    return "text-blue-500";
+    return "text-ys-accent";
   }
 
   // Attack-related stats
@@ -41,7 +41,7 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
     lowercaseName.includes("damage") ||
     lowercaseName.includes("strength")
   ) {
-    return "text-orange-500";
+    return "text-ys-warning";
   }
 
   // Magic-related stats
@@ -50,7 +50,7 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
     lowercaseName.includes("magic") ||
     lowercaseName.includes("spell")
   ) {
-    return "text-purple-500";
+    return "text-ys-accent";
   }
 
   // Default color
@@ -81,13 +81,13 @@ function getCombatantIcon(type: Combatant["type"]): string {
 function getCombatantTypeColor(type: Combatant["type"]): string {
   switch (type) {
     case "player":
-      return "text-green-600 bg-green-500/10 border-green-400/20";
+      return "text-ys-success bg-ys-success/10 border-ys-success/20";
     case "ally":
-      return "text-blue-500 bg-blue-500/10 border-blue-400/20";
+      return "text-ys-accent bg-ys-accent/10 border-ys-accent/20";
     case "enemy":
-      return "text-red-500 bg-red-500/10 border-red-400/20";
+      return "text-ys-danger bg-ys-danger/10 border-ys-danger/20";
     case "neutral":
-      return "text-yellow-600 bg-yellow-500/10 border-yellow-400/20";
+      return "text-ys-warning bg-ys-warning/10 border-ys-warning/20";
     default:
       return "text-ys-muted bg-ys-text/5 border-ys-border";
   }
@@ -98,10 +98,10 @@ function getCombatantTypeColor(type: Combatant["type"]): string {
  */
 function ConditionBadge({ condition }: { condition: CombatCondition }) {
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md bg-amber-500/10 text-amber-600 border border-amber-400/20">
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md bg-ys-warning/10 text-ys-warning border border-ys-warning/20">
       <span>{condition.name}</span>
       {condition.duration !== undefined && (
-        <span className="text-amber-400/60">({condition.duration})</span>
+        <span className="text-ys-warning/60">({condition.duration})</span>
       )}
     </span>
   );
@@ -123,12 +123,12 @@ function CombatantRow({
   return (
     <div
       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all ${typeColor} ${
-        isCurrentTurn ? "ring-2 ring-yellow-400/50 scale-[1.02]" : ""
+        isCurrentTurn ? "ring-2 ring-ys-warning/50 scale-[1.02]" : ""
       } ${!combatant.isActive ? "opacity-40" : ""}`}
     >
       {/* Turn indicator */}
       {isCurrentTurn && (
-        <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+        <div className="w-1.5 h-1.5 rounded-full bg-ys-warning animate-pulse" />
       )}
 
       {/* Combatant icon */}
@@ -208,29 +208,29 @@ export default function CombatDisplay({
   });
 
   return (
-    <div className="border-b border-red-400/20 bg-red-500/[0.06] backdrop-blur-md">
+    <div className="border-b border-ys-danger/20 bg-ys-danger/[0.06] backdrop-blur-md">
       {/* Combat Header - always visible */}
       <button
         onClick={onToggleExpand}
-        className="w-full flex items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 bg-red-500/10 hover:bg-red-500/15 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 bg-ys-danger/10 hover:bg-ys-danger/15 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <DynamicIcon name="Swords" className="w-4 h-4 text-red-500" />
-          <span className="text-sm font-bold text-red-500">
+          <DynamicIcon name="Swords" className="w-4 h-4 text-ys-danger" />
+          <span className="text-sm font-bold text-ys-danger">
             ⚔️ COMBAT: {combatState.name || "Battle"}
           </span>
-          <span className="text-xs text-red-500/60 ml-2">
+          <span className="text-xs text-ys-danger/60 ml-2">
             Round {combatState.round}
             {currentCombatant && ` • ${currentCombatant.name}'s Turn`}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-red-500/80">
+          <span className="text-xs text-ys-danger/80">
             {activeCombatants.length} combatants
           </span>
           <DynamicIcon
             name={expanded ? "ChevronUp" : "ChevronDown"}
-            className="w-4 h-4 text-red-500"
+            className="w-4 h-4 text-ys-danger"
           />
         </div>
       </button>
@@ -254,7 +254,7 @@ export default function CombatDisplay({
                   key={id}
                   className={`px-2 py-0.5 text-xs rounded ${typeColor} ${
                     isCurrentTurn
-                      ? "ring-2 ring-yellow-400/50 font-bold"
+                      ? "ring-2 ring-ys-warning/50 font-bold"
                       : "opacity-70"
                   } ${!combatant.isActive ? "line-through opacity-30" : ""}`}
                   title={`${combatant.name} (Init: ${combatant.initiativeRoll})`}
@@ -277,7 +277,7 @@ export default function CombatDisplay({
 
             {/* Inactive combatants (collapsed) */}
             {inactiveCombatants.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-red-400/20">
+              <div className="mt-2 pt-2 border-t border-ys-danger/20">
                 <span className="text-xs text-ys-muted mb-1 block">
                   Out of combat ({inactiveCombatants.length}):
                 </span>
@@ -296,7 +296,7 @@ export default function CombatDisplay({
 
           {/* Combat Log (collapsible) */}
           {combatState.log && combatState.log.length > 0 && (
-            <div className="border-t border-red-400/20 pt-2">
+            <div className="border-t border-ys-danger/20 pt-2">
               <button
                 onClick={() => setShowLog(!showLog)}
                 className="flex items-center gap-1 text-xs text-ys-muted hover:text-ys-text transition-colors"

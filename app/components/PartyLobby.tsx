@@ -7,6 +7,7 @@ import { useNotification } from "../misc/NotificationContext";
 import type { PartyHostApi } from "../story/usePartyHost";
 import type { PartyError } from "../misc/party/partyBridge";
 import { useBackHandler } from "../misc/useBackHandler";
+import { QR_BACKGROUND, QR_FOREGROUND } from "../misc/multiplayer/palette";
 
 // What to do about each way the server can fail to start. The codes are the
 // ones party_server.rs reports.
@@ -103,13 +104,16 @@ export default function PartyLobby({
     return (
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
-          <div className="bg-white p-3 rounded-xl shrink-0">
+          <div
+            className="p-3 rounded-xl shrink-0"
+            style={{ backgroundColor: QR_BACKGROUND }}
+          >
             <QRCodeSVG
               value={info.url}
               size={200}
               level="M"
-              bgColor="#ffffff"
-              fgColor="#000000"
+              bgColor={QR_BACKGROUND}
+              fgColor={QR_FOREGROUND}
               title="Scan to join the table"
             />
           </div>
@@ -163,7 +167,7 @@ export default function PartyLobby({
               setPicked(undefined);
               void party.stop();
             }}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-ys-text/5 hover:bg-red-500/20 text-ys-text border border-ys-border"
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-ys-text/5 hover:bg-ys-danger/20 text-ys-text border border-ys-border"
           >
             Close the table
           </button>
@@ -188,8 +192,8 @@ export default function PartyLobby({
         </p>
       </div>
       {explained && (
-        <div className="p-3 rounded-lg border border-red-400/30 bg-red-500/10 space-y-1">
-          <p className="text-sm font-semibold text-red-500">{explained.title}</p>
+        <div className="p-3 rounded-lg border border-ys-danger/30 bg-ys-danger/10 space-y-1">
+          <p className="text-sm font-semibold text-ys-danger">{explained.title}</p>
           <ul className="text-xs text-ys-text space-y-1 list-disc pl-4">
             {explained.steps.map((step) => (
               <li key={step}>{step}</li>
@@ -221,7 +225,7 @@ export function PartyLobbyModal({
   useBackHandler(true, onClose);
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center ys-modal-backdrop p-4"
       role="dialog"
       aria-label="Join the table"
       onClick={onClose}

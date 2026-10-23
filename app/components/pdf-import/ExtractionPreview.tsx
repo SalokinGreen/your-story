@@ -73,37 +73,37 @@ export default function ExtractionPreview({
     visible.lore.length + visible.mechanicNotes.length + visible.tableNotes.length;
 
   const filters: { id: Filter; label: string; count: number; active: string }[] = [
-    { id: "all", label: "All", count: total, active: "bg-white/15 text-white" },
+    { id: "all", label: "All", count: total, active: "bg-ys-surface-2 text-ys-text" },
     {
       id: "lore",
       label: "Lore",
       count: lore.length,
-      active: "bg-blue-500/20 text-blue-100 ring-1 ring-blue-400/30",
+      active: "bg-ys-accent/20 text-ys-text ring-1 ring-ys-accent/30",
     },
     {
       id: "mechanics",
       label: "Mechanics",
       count: mechanicNotes.length,
-      active: "bg-amber-500/20 text-amber-100 ring-1 ring-amber-400/30",
+      active: "bg-ys-warning/20 text-ys-warning ring-1 ring-ys-warning/30",
     },
     {
       id: "tables",
       label: "Tables",
       count: tableNotes.length,
-      active: "bg-purple-500/20 text-purple-100 ring-1 ring-purple-400/30",
+      active: "bg-ys-accent/20 text-ys-accent ring-1 ring-ys-accent/30",
     },
   ];
 
   if (total === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 p-6 text-center">
+      <div className="rounded-xl border border-dashed border-ys-border p-6 text-center">
         {streaming ? (
-          <div className="flex items-center justify-center gap-2 text-sm text-blue-300/60">
+          <div className="flex items-center justify-center gap-2 text-sm text-ys-muted">
             <DynamicIcon name="LoaderCircle" className="w-4 h-4 animate-spin" />
             Waiting for the first note…
           </div>
         ) : (
-          <p className="text-sm text-blue-300/50 italic">{emptyMessage}</p>
+          <p className="text-sm text-ys-muted italic">{emptyMessage}</p>
         )}
       </div>
     );
@@ -120,7 +120,7 @@ export default function ExtractionPreview({
             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
               filter === entry.id
                 ? entry.active
-                : "bg-white/5 text-blue-300/70 hover:bg-white/10 hover:text-white"
+                : "bg-ys-surface text-ys-muted hover:bg-ys-surface-2 hover:text-ys-text"
             }`}
           >
             {entry.label}
@@ -128,8 +128,8 @@ export default function ExtractionPreview({
           </button>
         ))}
         {streaming && (
-          <span className="ml-auto flex items-center gap-1.5 text-[11px] text-purple-200/80">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+          <span className="ml-auto flex items-center gap-1.5 text-[11px] text-ys-accent/80">
+            <span className="w-1.5 h-1.5 rounded-full bg-ys-accent animate-pulse" />
             Writing…
           </span>
         )}
@@ -137,14 +137,14 @@ export default function ExtractionPreview({
 
       {total > SEARCH_THRESHOLD && (
         <div className="relative">
-          <span className="text-blue-300/40 absolute left-2.5 top-1/2 -translate-y-1/2">
+          <span className="text-ys-muted absolute left-2.5 top-1/2 -translate-y-1/2">
             <DynamicIcon name="Search" className="w-3.5 h-3.5" />
           </span>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search these notes…"
-            className="w-full pl-8 pr-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-blue-300/40 focus:outline-none focus:border-purple-400/40"
+            className="w-full pl-8 pr-3 py-1.5 bg-ys-surface border border-ys-border rounded-lg text-xs text-ys-text placeholder-ys-muted focus:outline-none focus:border-ys-accent/40"
           />
         </div>
       )}
@@ -153,7 +153,7 @@ export default function ExtractionPreview({
         className={`space-y-2 ${scrollClass ?? ""}`}
       >
         {visibleCount === 0 && (
-          <p className="text-xs text-blue-300/50 italic py-2">
+          <p className="text-xs text-ys-muted italic py-2">
             Nothing matches “{query.trim()}”.
           </p>
         )}

@@ -4,6 +4,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { useBackHandler } from "../misc/useBackHandler";
 
+// Glows around the wheel: the accent, faded.
+const GLOW_10 = "color-mix(in srgb, var(--ys-accent) 10%, transparent)";
+const GLOW_15 = "color-mix(in srgb, var(--ys-accent) 15%, transparent)";
+
 export interface CategoryItem {
   id: string;
   label: string;
@@ -377,8 +381,8 @@ export function ClockCategorySelector({
         onClick={() => setIsOpen(true)}
         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${
           isCompleted
-            ? "bg-green-500/10 border-2 border-green-400/30 text-green-300"
-            : "bg-linear-to-r from-purple-600 to-blue-600 border-2 border-purple-400/30 text-white shadow-md shadow-purple-950/40"
+            ? "bg-ys-success/10 border-2 border-ys-success/30 text-ys-success"
+            : "border-2 border-ys-accent/30 shadow-md bg-ys-accent text-ys-on-accent"
         } hover:scale-105 shadow-lg`}
       >
         <DynamicIcon name={current.icon} className="w-5 h-5" />
@@ -394,7 +398,7 @@ export function ClockCategorySelector({
         <>
           {/* Backdrop with blur */}
           <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-ys-bg backdrop-blur-sm z-40"
             onClick={() => setIsOpen(false)}
           />
 
@@ -409,10 +413,10 @@ export function ClockCategorySelector({
           >
             {/* Header with title */}
             <div className="absolute -top-20 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-              <div className="text-purple-300 text-sm font-medium tracking-wider uppercase opacity-80">
+              <div className="text-ys-accent text-sm font-medium tracking-wider uppercase opacity-80">
                 Select Category
               </div>
-              <div className="text-blue-300/60 text-xs mt-1">
+              <div className="text-ys-accent/60 text-xs mt-1">
                 Scroll or drag • Click to select
               </div>
             </div>
@@ -428,18 +432,18 @@ export function ClockCategorySelector({
             >
               {/* Decorative ring */}
               <div
-                className="absolute rounded-full border-4 border-purple-500/20 pointer-events-none"
+                className="absolute rounded-full border-4 border-ys-accent/20 pointer-events-none"
                 style={{
                   top: "20px",
                   left: "0",
                   right: "0",
                   bottom: "20px",
                   boxShadow:
-                    "inset 0 0 60px rgba(139, 92, 246, 0.1), 0 0 40px rgba(139, 92, 246, 0.1)",
+                    `inset 0 0 60px ${GLOW_10}, 0 0 40px ${GLOW_10}`,
                 }}
               />
               <div
-                className="absolute rounded-full border-2 border-purple-400/10 pointer-events-none"
+                className="absolute rounded-full border-2 border-ys-accent/10 pointer-events-none"
                 style={{
                   top: "36px",
                   left: "16px",
@@ -456,17 +460,17 @@ export function ClockCategorySelector({
                   transform: "translateY(-50%)",
                   height: "56px",
                   background:
-                    "linear-gradient(to bottom, transparent, rgba(139, 92, 246, 0.15) 40%, rgba(139, 92, 246, 0.15) 60%, transparent)",
+                    `linear-gradient(to bottom, transparent, ${GLOW_15} 40%, ${GLOW_15} 60%, transparent)`,
                 }}
               />
 
               {/* Selection indicator lines */}
               <div
-                className="absolute left-8 right-8 h-0.5 bg-purple-400/40 pointer-events-none z-10"
+                className="absolute left-8 right-8 h-0.5 bg-ys-accent/40 pointer-events-none z-10"
                 style={{ top: "calc(50% - 28px)" }}
               />
               <div
-                className="absolute left-8 right-8 h-0.5 bg-purple-400/40 pointer-events-none z-10"
+                className="absolute left-8 right-8 h-0.5 bg-ys-accent/40 pointer-events-none z-10"
                 style={{ top: "calc(50% + 27px)" }}
               />
 
@@ -492,22 +496,22 @@ export function ClockCategorySelector({
 
                     // Determine colors based on state
                     const bgColor = isCenter
-                      ? "rgba(147, 51, 234, 0.9)" // purple-600/90
+                      ? "var(--ys-accent)"
                       : isItemCompleted
-                      ? "rgba(20, 83, 45, 0.6)" // green-900/60
-                      : "rgba(23, 37, 84, 0.8)"; // blue-950/80
+                      ? "color-mix(in srgb, var(--ys-success) 15%, var(--ys-surface))"
+                      : "var(--ys-surface)";
 
                     const textColor = isCenter
-                      ? "#ffffff"
+                      ? "var(--ys-on-accent)"
                       : isItemCompleted
-                      ? "rgb(134, 239, 172)" // green-300
-                      : "rgb(191, 219, 254)"; // blue-200
+                      ? "var(--ys-success)"
+                      : "var(--ys-text)";
 
                     const iconBgColor = isCenter
-                      ? "rgba(168, 85, 247, 0.5)" // purple-500/50
+                      ? "color-mix(in srgb, var(--ys-on-accent) 20%, transparent)"
                       : isItemCompleted
-                      ? "rgba(34, 197, 94, 0.3)" // green-500/30
-                      : "rgba(30, 64, 175, 0.5)"; // blue-800/50
+                      ? "color-mix(in srgb, var(--ys-success) 25%, transparent)"
+                      : "var(--ys-surface-2)";
 
                     return (
                       <button
@@ -536,7 +540,7 @@ export function ClockCategorySelector({
                           color: textColor,
                           fontWeight: isCenter ? "700" : "400",
                           boxShadow: isCenter
-                            ? "0 10px 15px -3px rgba(168, 85, 247, 0.3)"
+                            ? "0 10px 15px -3px color-mix(in srgb, var(--ys-accent) 30%, transparent)"
                             : "none",
                           border: "none",
                           cursor: "pointer",
@@ -577,7 +581,7 @@ export function ClockCategorySelector({
                           style={{
                             fontSize: "12px",
                             flexShrink: 0,
-                            color: isCenter ? "rgb(233, 213, 255)" : undefined,
+                            color: isCenter ? "var(--ys-on-accent)" : undefined,
                             opacity: isCenter ? 1 : 0.5,
                           }}
                         >
@@ -596,7 +600,7 @@ export function ClockCategorySelector({
                   setLocalIndex((prev) => Math.max(0, prev - 1));
                 }}
                 disabled={localIndex === 0}
-                className="absolute top-4 left-1/2 -translate-x-1/2 z-30 p-2 text-purple-400 hover:text-purple-300 disabled:opacity-20 disabled:cursor-not-allowed transition-all hover:scale-110 bg-white/5 rounded-full"
+                className="absolute top-4 left-1/2 -translate-x-1/2 z-30 p-2 text-ys-accent hover:text-ys-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all hover:scale-110 bg-ys-surface rounded-full"
               >
                 <DynamicIcon name="ChevronUp" className="w-6 h-6" />
               </button>
@@ -608,7 +612,7 @@ export function ClockCategorySelector({
                   );
                 }}
                 disabled={localIndex === categories.length - 1}
-                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 p-2 text-purple-400 hover:text-purple-300 disabled:opacity-20 disabled:cursor-not-allowed transition-all hover:scale-110 bg-white/5 rounded-full"
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 p-2 text-ys-accent hover:text-ys-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all hover:scale-110 bg-ys-surface rounded-full"
               >
                 <DynamicIcon name="ChevronDown" className="w-6 h-6" />
               </button>
@@ -616,16 +620,16 @@ export function ClockCategorySelector({
 
             {/* Footer hint */}
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-              <div className="text-blue-400/50 text-xs flex items-center gap-2">
-                <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
+              <div className="text-ys-accent/50 text-xs flex items-center gap-2">
+                <kbd className="px-1.5 py-0.5 bg-ys-surface-2 rounded text-[10px]">
                   ↑↓
                 </kbd>
                 <span>navigate</span>
-                <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
+                <kbd className="px-1.5 py-0.5 bg-ys-surface-2 rounded text-[10px]">
                   Enter
                 </kbd>
                 <span>select</span>
-                <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
+                <kbd className="px-1.5 py-0.5 bg-ys-surface-2 rounded text-[10px]">
                   Esc
                 </kbd>
                 <span>close</span>

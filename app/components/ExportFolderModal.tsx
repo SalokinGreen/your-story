@@ -123,8 +123,8 @@ export default function ExportFolderModal({
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 p-6 max-w-md w-full">
+    <div className="fixed inset-0 ys-modal-backdrop flex items-center justify-center z-50 p-4">
+      <div className="ys-modal shadow-2xl p-6 max-w-md w-full">
         <div className="flex items-center gap-2 mb-4">
           <DynamicIcon
             name={folder.icon}
@@ -135,10 +135,10 @@ export default function ExportFolderModal({
         </div>
 
         {loading ? (
-          <p className="text-blue-200/60 text-sm py-4">Loading folder contents...</p>
+          <p className="text-ys-muted text-sm py-4">Loading folder contents...</p>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm text-blue-200/70 mb-2">
+            <p className="text-sm text-ys-muted mb-2">
               Choose what to include in the export file.
             </p>
             {rows.map((row) => (
@@ -146,8 +146,8 @@ export default function ExportFolderModal({
                 key={row.key}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
                   row.count === 0
-                    ? "opacity-40 cursor-not-allowed border-white/10"
-                    : "cursor-pointer border-white/10 hover:bg-white/5"
+                    ? "opacity-40 cursor-not-allowed border-ys-border"
+                    : "cursor-pointer border-ys-border hover:bg-ys-surface-2"
                 }`}
               >
                 <input
@@ -155,11 +155,11 @@ export default function ExportFolderModal({
                   checked={row.checked && row.count > 0}
                   disabled={row.count === 0}
                   onChange={(e) => row.setChecked(e.target.checked)}
-                  className="w-4 h-4 accent-purple-600"
+                  className="w-4 h-4 accent-ys-accent"
                 />
                 <DynamicIcon name={row.icon} className="w-4 h-4" />
                 <span className="flex-1">{row.label}</span>
-                <span className="text-sm text-blue-200/50">{row.count}</span>
+                <span className="text-sm text-ys-muted">{row.count}</span>
               </label>
             ))}
           </div>
@@ -168,14 +168,14 @@ export default function ExportFolderModal({
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+            className="flex-1 px-4 py-2 bg-ys-surface-2 hover:bg-ys-border border border-ys-border rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleExport}
             disabled={loading}
-            className="flex-1 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold rounded-lg shadow-md shadow-purple-950/40 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 font-semibold rounded-lg shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2 bg-ys-accent text-ys-on-accent hover:opacity-90"
           >
             <DynamicIcon name="Download" className="w-4 h-4" />
             Export

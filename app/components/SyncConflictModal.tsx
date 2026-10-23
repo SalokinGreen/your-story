@@ -49,18 +49,18 @@ export default function SyncConflictModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 ys-modal-backdrop"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="relative bg-ys-surface rounded-2xl shadow-2xl border border-amber-500/50 max-w-lg w-full mx-4 overflow-hidden">
+      <div className="relative bg-ys-surface rounded-2xl shadow-2xl border border-ys-warning/50 max-w-lg w-full mx-4 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 p-5 border-b border-amber-500/30 bg-amber-500/10">
-          <div className="p-2 bg-amber-500/20 rounded-lg">
+        <div className="flex items-center gap-3 p-5 border-b border-ys-warning/30 bg-ys-warning/10">
+          <div className="p-2 bg-ys-warning/20 rounded-lg">
             <DynamicIcon
               name="AlertTriangle"
-              className="w-6 h-6 text-amber-500"
+              className="w-6 h-6 text-ys-warning"
             />
           </div>
           <div>
@@ -83,7 +83,7 @@ export default function SyncConflictModal({
               onClick={onKeepLocal}
               className={`p-4 rounded-xl border-2 transition-all text-left ${
                 localIsNewer
-                  ? "border-green-500/50 bg-green-500/10 hover:border-green-400"
+                  ? "border-ys-success/50 bg-ys-success/10 hover:border-ys-success"
                   : "border-ys-border bg-ys-text/5 hover:border-ys-muted"
               }`}
             >
@@ -96,7 +96,7 @@ export default function SyncConflictModal({
                   This Device
                 </span>
                 {localIsNewer && (
-                  <span className="text-xs bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded">
+                  <span className="text-xs bg-ys-success/20 text-ys-success px-1.5 py-0.5 rounded">
                     Newer
                   </span>
                 )}
@@ -118,7 +118,7 @@ export default function SyncConflictModal({
               onClick={onKeepServer}
               className={`p-4 rounded-xl border-2 transition-all text-left ${
                 !localIsNewer
-                  ? "border-green-500/50 bg-green-500/10 hover:border-green-400"
+                  ? "border-ys-success/50 bg-ys-success/10 hover:border-ys-success"
                   : "border-ys-border bg-ys-text/5 hover:border-ys-muted"
               }`}
             >
@@ -126,7 +126,7 @@ export default function SyncConflictModal({
                 <DynamicIcon name="Cloud" className="w-4 h-4 text-ys-muted" />
                 <span className="font-semibold text-ys-text text-sm">Cloud</span>
                 {!localIsNewer && (
-                  <span className="text-xs bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded">
+                  <span className="text-xs bg-ys-success/20 text-ys-success px-1.5 py-0.5 rounded">
                     Newer
                   </span>
                 )}

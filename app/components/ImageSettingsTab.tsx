@@ -24,7 +24,7 @@ import {
 import { pickImageProvider } from "@/app/misc/imageProvider";
 
 const SELECT_CLASS =
-  "w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40";
+  "ys-input text-sm";
 
 const PROVIDER_LABELS: Record<ImageProviderChoice, string> = {
   auto: "Automatic (fal.ai, then DeepInfra, then OpenRouter)",
@@ -52,7 +52,7 @@ function ModelPicker({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-blue-200 mb-1">
+      <label className="block text-sm font-medium text-ys-muted mb-1">
         {label}
       </label>
       <select
@@ -61,12 +61,12 @@ function ModelPicker({
         className={SELECT_CLASS}
       >
         {Object.entries(catalog).map(([key, cfg]) => (
-          <option key={key} value={key} className="bg-gray-900">
+          <option key={key} value={key}>
             {cfg.name} ({priceLabel(cfg.pricePerImage)} per picture)
           </option>
         ))}
       </select>
-      {help && <p className="text-xs text-blue-200/50 mt-1">{help}</p>}
+      {help && <p className="text-xs text-ys-muted mt-1">{help}</p>}
     </div>
   );
 }
@@ -88,15 +88,15 @@ export default function ImageSettingsTab() {
 
   return (
     <div className="space-y-5">
-      <div className="p-4 bg-white/[0.03] rounded-xl border border-white/10">
-        <p className="text-sm text-blue-100/80">
+      <div className="p-4 ys-card rounded-xl">
+        <p className="text-sm text-ys-muted">
           The Game Master can paint a picture at a moment that matters, and the
           Illustrate this button paints any turn. Pictures stay on this device
           and are not synced.
         </p>
         <p
           className={`text-xs mt-2 flex items-center gap-1.5 ${
-            provider ? "text-green-300/80" : "text-amber-300/80"
+            provider ? "text-ys-success" : "text-ys-warning"
           }`}
         >
           <DynamicIcon
@@ -111,10 +111,10 @@ export default function ImageSettingsTab() {
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-blue-200">
+          <p className="text-sm font-semibold text-ys-muted">
             Let the Game Master paint pictures
           </p>
-          <p className="text-xs text-blue-200/60">
+          <p className="text-xs text-ys-muted">
             Off: the button still works, the GM is simply not offered the tool.
           </p>
         </div>
@@ -125,12 +125,12 @@ export default function ImageSettingsTab() {
             onChange={(e) => update({ gmImagesEnabled: e.target.checked })}
             className="sr-only peer"
           />
-          <div className="w-14 h-7 bg-white/10 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-white/20 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-500 peer-checked:to-pink-500"></div>
+          <div className="w-14 h-7 bg-ys-border peer-focus:ring-4 peer-focus:ring-ys-accent/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-ys-accent"></div>
         </label>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-blue-200 mb-1">
+        <label className="block text-sm font-medium text-ys-muted mb-1">
           Game Master pictures per scene: {settings.gmImagesPerScene}
         </label>
         <input
@@ -143,7 +143,7 @@ export default function ImageSettingsTab() {
           className="w-full"
           disabled={!settings.gmImagesEnabled}
         />
-        <p className="text-xs text-blue-200/50 mt-1">
+        <p className="text-xs text-ys-muted mt-1">
           The engine refuses any more in the same scene. Your own Illustrate
           this button does not count against it. 0 turns the GM&apos;s pictures
           off.
@@ -151,7 +151,7 @@ export default function ImageSettingsTab() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-blue-200 mb-1">
+        <label className="block text-sm font-medium text-ys-muted mb-1">
           Provider
         </label>
         <select
@@ -162,15 +162,15 @@ export default function ImageSettingsTab() {
           className={SELECT_CLASS}
         >
           {(Object.keys(PROVIDER_LABELS) as ImageProviderChoice[]).map((p) => (
-            <option key={p} value={p} className="bg-gray-900">
+            <option key={p} value={p}>
               {PROVIDER_LABELS[p]}
             </option>
           ))}
         </select>
       </div>
 
-      <div className="space-y-4 p-4 bg-white/[0.03] rounded-xl border border-white/10">
-        <h4 className="text-sm font-semibold text-purple-300">fal.ai models</h4>
+      <div className="space-y-4 p-4 ys-card rounded-xl">
+        <h4 className="text-sm font-semibold text-ys-accent">fal.ai models</h4>
         <ModelPicker
           label="Scenes and places"
           value={settings.sceneModel}
@@ -192,8 +192,8 @@ export default function ImageSettingsTab() {
         />
       </div>
 
-      <div className="space-y-4 p-4 bg-white/[0.03] rounded-xl border border-white/10">
-        <h4 className="text-sm font-semibold text-purple-300">
+      <div className="space-y-4 p-4 ys-card rounded-xl">
+        <h4 className="text-sm font-semibold text-ys-accent">
           DeepInfra and OpenRouter
         </h4>
         <ModelPicker
@@ -208,14 +208,14 @@ export default function ImageSettingsTab() {
           catalog={OPENROUTER_IMAGE_MODELS}
           onChange={(openrouterModel) => update({ openrouterModel })}
         />
-        <p className="text-xs text-amber-200/70">
+        <p className="text-xs text-ys-warning">
           Neither takes reference pictures, so a character&apos;s face can
           drift between scenes. fal.ai is recommended for pictures in play.
         </p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-blue-200 mb-1">
+        <label className="block text-sm font-medium text-ys-muted mb-1">
           Default art style
         </label>
         <input
@@ -224,7 +224,7 @@ export default function ImageSettingsTab() {
           onBlur={(e) => update({ defaultStyle: e.target.value })}
           className={SELECT_CLASS}
         />
-        <p className="text-xs text-blue-200/50 mt-1">
+        <p className="text-xs text-ys-muted mt-1">
           The line that ends every picture&apos;s prompt, so a story&apos;s
           pictures look like one book. A story can set its own in the Story
           Editor, under Pictures.

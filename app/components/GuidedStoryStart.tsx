@@ -18,18 +18,10 @@ import {
   deleteSavedPlayerProfile,
 } from "../misc/user_settings";
 import type { SavedPlayerProfile } from "../misc/user_settings";
+import { PLAYER_PALETTE } from "../misc/multiplayer/palette";
 
 // Same palette as CouchPlayersEditor so colors stay consistent across the app
-const PALETTE = [
-  "#22c55e", // green
-  "#ec4899", // pink
-  "#3b82f6", // blue
-  "#f59e0b", // amber
-  "#a855f7", // purple
-  "#ef4444", // red
-  "#14b8a6", // teal
-  "#eab308", // yellow
-];
+const PALETTE = PLAYER_PALETTE;
 
 const MAX_PLAYERS = 4;
 const MAX_PERSONALITY_TAGS = 4;
@@ -352,26 +344,26 @@ export default function GuidedStoryStart() {
   return (
     <div className="mb-10">
       {/* Hero card - the default "just play" entry point */}
-      <div className="max-w-xl mx-auto rounded-2xl bg-linear-to-br from-purple-900/40 via-blue-950/60 to-blue-900/40 border border-purple-500/30 shadow-xl shadow-purple-950/30 p-6 text-center">
+      <div className="max-w-xl mx-auto rounded-2xl border border-ys-accent/30 shadow-xl p-6 text-center bg-ys-surface">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <StaticIcon name="Sparkles" className="w-5 h-5 text-purple-300" />
-          <h2 className="text-xl font-bold text-white">Start a Story</h2>
+          <StaticIcon name="Sparkles" className="w-5 h-5 text-ys-accent" />
+          <h2 className="text-xl font-bold text-ys-text">Start a Story</h2>
         </div>
-        <p className="text-sm text-blue-200/60 mb-5 max-w-md mx-auto">
+        <p className="text-sm text-ys-muted mb-5 max-w-md mx-auto">
           No setup, no forms - your AI Game Master builds the world with you.
           Play solo or pass the phone around the couch.
         </p>
         <button
           onClick={openWizard}
           disabled={starting}
-          className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] text-white text-base font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2 mx-auto disabled:opacity-60"
+          className="w-full sm:w-auto px-8 py-3.5 rounded-xl active:scale-[0.98] text-base font-semibold shadow-lg transition-all flex items-center justify-center gap-2 mx-auto disabled:opacity-60 bg-ys-accent text-ys-on-accent hover:opacity-90"
         >
           <StaticIcon name="Play" className="w-5 h-5" />
           {starting ? "Starting..." : "Play Now"}
         </button>
         <button
           onClick={() => setShowJoinGameModal(true)}
-          className="mt-3 flex items-center justify-center gap-1.5 mx-auto text-sm text-blue-300/70 hover:text-white transition-colors"
+          className="mt-3 flex items-center justify-center gap-1.5 mx-auto text-sm text-ys-muted hover:text-ys-text transition-colors"
         >
           <DynamicIcon name="Wifi" className="w-3.5 h-3.5" />
           Have a room code? Join a Game
@@ -417,7 +409,7 @@ export default function GuidedStoryStart() {
             <div className="flex items-center justify-center gap-1.5 pt-3">
               <span
                 className={`h-1.5 rounded-full transition-all ${
-                  step === "count" ? "w-5 bg-purple-400" : "w-1.5 bg-white/15"
+                  step === "count" ? "w-5 bg-ys-accent" : "w-1.5 bg-ys-surface-2"
                 }`}
               />
               {players.length > 0
@@ -433,14 +425,14 @@ export default function GuidedStoryStart() {
                         backgroundColor:
                           step === "player" && i === playerIndex
                             ? p.color
-                            : "rgba(255,255,255,0.15)",
+                            : "var(--ys-border)",
                       }}
                     />
                   ))
-                : [<span key="p" className="w-1.5 h-1.5 rounded-full bg-white/15" />]}
+                : [<span key="p" className="w-1.5 h-1.5 rounded-full bg-ys-surface-2" />]}
               <span
                 className={`h-1.5 rounded-full transition-all ${
-                  step === "ready" ? "w-5 bg-purple-400" : "w-1.5 bg-white/15"
+                  step === "ready" ? "w-5 bg-ys-accent" : "w-1.5 bg-ys-surface-2"
                 }`}
               />
             </div>
@@ -449,7 +441,7 @@ export default function GuidedStoryStart() {
             <div className="p-5">
               {step === "count" && (
                 <div>
-                  <p className="text-sm text-blue-200/60 mb-4 text-center">
+                  <p className="text-sm text-ys-muted mb-4 text-center">
                     Everyone plays on this device - the GM gives each player
                     their own character and spotlight.
                   </p>
@@ -459,26 +451,26 @@ export default function GuidedStoryStart() {
                         <button
                           key={count}
                           onClick={() => chooseCount(count)}
-                          className="group p-4 rounded-xl bg-white/5 hover:bg-purple-500/10 border border-white/10 hover:border-purple-400/40 transition-all text-center"
+                          className="group p-4 rounded-xl bg-ys-surface hover:bg-ys-accent/10 border border-ys-border hover:border-ys-accent/40 transition-all text-center"
                         >
                           <div className="flex items-center justify-center gap-1 mb-2">
                             {Array.from({ length: count }, (_, i) => (
                               <span
                                 key={i}
-                                className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-[#0d1829] -ml-2 first:ml-0"
+                                className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-ys-surface -ml-2 first:ml-0"
                                 style={{ backgroundColor: PALETTE[i] }}
                               >
                                 <DynamicIcon
                                   name="User"
-                                  className="w-3.5 h-3.5 text-white"
+                                  className="w-3.5 h-3.5 text-ys-text"
                                 />
                               </span>
                             ))}
                           </div>
-                          <span className="block font-semibold text-white">
+                          <span className="block font-semibold text-ys-text">
                             {count === 1 ? "Solo" : `${count} Players`}
                           </span>
-                          <span className="block text-xs text-blue-300/50 mt-0.5">
+                          <span className="block text-xs text-ys-muted mt-0.5">
                             {count === 1
                               ? "Just you and the GM"
                               : "Couch co-op"}
@@ -491,14 +483,14 @@ export default function GuidedStoryStart() {
                   {/* Play Online: host a room others join over the internet -
                       you only set up your own profile; friends build theirs
                       when they join. */}
-                  <div className="mt-3 pt-3 border-t border-white/10">
+                  <div className="mt-3 pt-3 border-t border-ys-border">
                     <button
                       onClick={choosePlayOnline}
-                      className="w-full p-4 rounded-xl bg-linear-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/30 hover:to-indigo-600/30 border border-purple-400/30 hover:border-purple-400/50 transition-all flex items-center justify-center gap-2.5 text-center"
+                      className="w-full p-4 rounded-xl border border-ys-accent/30 hover:border-ys-accent/50 transition-all flex items-center justify-center gap-2.5 text-center bg-ys-surface hover:bg-ys-surface-2"
                     >
-                      <DynamicIcon name="Wifi" className="w-5 h-5 text-purple-300" />
-                      <span className="font-semibold text-white">Play Online</span>
-                      <span className="text-xs text-blue-300/60">
+                      <DynamicIcon name="Wifi" className="w-5 h-5 text-ys-accent" />
+                      <span className="font-semibold text-ys-text">Play Online</span>
+                      <span className="text-xs text-ys-muted">
                         Friends join over the internet
                       </span>
                     </button>
@@ -511,7 +503,7 @@ export default function GuidedStoryStart() {
                   {/* Saved profiles - resume a returning player instead of retyping them */}
                   {availableProfiles.length > 0 && (
                     <div>
-                      <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                      <label className="block text-xs font-semibold text-ys-text uppercase tracking-wider mb-2">
                         Continue as
                       </label>
                       <div className="flex flex-wrap gap-1.5">
@@ -523,8 +515,8 @@ export default function GuidedStoryStart() {
                                 onClick={() => pickProfile(p)}
                                 className={`flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                                   selected
-                                    ? "text-white border-transparent shadow-md"
-                                    : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40 hover:text-white"
+                                    ? "text-ys-text border-transparent shadow-md"
+                                    : "bg-ys-surface border-ys-border text-ys-text hover:border-ys-accent/40 hover:text-ys-text"
                                 }`}
                                 style={
                                   selected
@@ -533,7 +525,7 @@ export default function GuidedStoryStart() {
                                 }
                               >
                                 <span
-                                  className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-ys-text text-[10px] font-bold shrink-0"
                                   style={{ backgroundColor: p.color }}
                                 >
                                   {p.name.trim()[0]?.toUpperCase() || "?"}
@@ -546,7 +538,7 @@ export default function GuidedStoryStart() {
                                   forgetProfile(p.id);
                                 }}
                                 title={`Forget ${p.name}`}
-                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-950 border border-white/20 text-blue-300/60 hover:text-white hover:bg-red-500/80 opacity-70 hover:opacity-100 transition-opacity flex items-center justify-center"
+                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-ys-surface border border-ys-border text-ys-muted hover:text-ys-text hover:bg-ys-danger/80 opacity-70 hover:opacity-100 transition-opacity flex items-center justify-center"
                               >
                                 <DynamicIcon name="X" className="w-2.5 h-2.5" />
                               </button>
@@ -560,7 +552,7 @@ export default function GuidedStoryStart() {
                   {/* Name + color preview */}
                   <div className="flex items-center gap-3">
                     <span
-                      className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg transition-colors"
+                      className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-ys-text font-bold text-lg shadow-lg transition-colors"
                       style={{ backgroundColor: currentPlayer.color }}
                     >
                       {(currentPlayer.name.trim() ||
@@ -581,13 +573,13 @@ export default function GuidedStoryStart() {
                       }}
                       placeholder={`Player ${playerIndex + 1} name`}
                       maxLength={24}
-                      className="flex-1 min-w-0 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="flex-1 min-w-0 px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text text-base focus:outline-none focus:ring-2 focus:ring-ys-accent"
                     />
                   </div>
 
                   {/* Color picker */}
                   <div>
-                    <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-ys-text uppercase tracking-wider mb-2">
                       Pick a color
                     </label>
                     <div className="flex flex-wrap gap-2">
@@ -604,7 +596,7 @@ export default function GuidedStoryStart() {
                             disabled={taken}
                             className={`w-9 h-9 rounded-full transition-all ${
                               selected
-                                ? "ring-2 ring-white ring-offset-2 ring-offset-[#0d1829] scale-110"
+                                ? "ring-2 ring-ys-border ring-offset-2 ring-offset-ys-surface scale-110"
                                 : taken
                                   ? "opacity-25 cursor-not-allowed"
                                   : "hover:scale-110"
@@ -619,9 +611,9 @@ export default function GuidedStoryStart() {
 
                   {/* Personality tags */}
                   <div>
-                    <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-ys-text uppercase tracking-wider mb-2">
                       Personality{" "}
-                      <span className="text-blue-300/40 normal-case font-normal">
+                      <span className="text-ys-muted normal-case font-normal">
                         (pick up to {MAX_PERSONALITY_TAGS})
                       </span>
                     </label>
@@ -648,10 +640,10 @@ export default function GuidedStoryStart() {
                             }
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                               selected
-                                ? "text-white border-transparent shadow-md"
+                                ? "text-ys-text border-transparent shadow-md"
                                 : full
-                                  ? "bg-white/[0.03] border-white/10 text-blue-300/30 cursor-not-allowed"
-                                  : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40 hover:text-white"
+                                  ? "bg-ys-surface border-ys-border text-ys-muted cursor-not-allowed"
+                                  : "bg-ys-surface border-ys-border text-ys-text hover:border-ys-accent/40 hover:text-ys-text"
                             }`}
                             style={
                               selected
@@ -668,9 +660,9 @@ export default function GuidedStoryStart() {
 
                   {/* Player archetype (Robin Laws' player-type taxonomy) */}
                   <div>
-                    <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-ys-text uppercase tracking-wider mb-2">
                       What kind of player are you?{" "}
-                      <span className="text-blue-300/40 normal-case font-normal">
+                      <span className="text-ys-muted normal-case font-normal">
                         (optional)
                       </span>
                     </label>
@@ -689,8 +681,8 @@ export default function GuidedStoryStart() {
                             title={info.description}
                             className={`px-3 py-2 rounded-lg text-left text-xs font-medium border transition-all ${
                               selected
-                                ? "text-white border-transparent shadow-md"
-                                : "bg-blue-900/20 border-blue-700/40 text-blue-200/70 hover:border-purple-500/50 hover:text-white"
+                                ? "text-ys-text border-transparent shadow-md"
+                                : "bg-ys-surface border-ys-accent/40 text-ys-text hover:border-ys-accent/50 hover:text-ys-text"
                             }`}
                             style={
                               selected
@@ -712,7 +704,7 @@ export default function GuidedStoryStart() {
 
                   {/* Story wishes */}
                   <div>
-                    <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-ys-text uppercase tracking-wider mb-2">
                       What do you want from this story?
                     </label>
                     <div className="flex flex-wrap gap-1.5 mb-2">
@@ -732,8 +724,8 @@ export default function GuidedStoryStart() {
                             }
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                               selected
-                                ? "bg-linear-to-r from-purple-600 to-blue-600 border-transparent text-white shadow-md shadow-purple-950/40"
-                                : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40 hover:text-white"
+                                ? "border-transparent shadow-md bg-ys-accent text-ys-on-accent"
+                                : "bg-ys-surface border-ys-border text-ys-text hover:border-ys-accent/40 hover:text-ys-text"
                             }`}
                           >
                             {tag}
@@ -751,13 +743,13 @@ export default function GuidedStoryStart() {
                       }
                       placeholder="Anything else? (optional)"
                       maxLength={200}
-                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2.5 bg-ys-surface border border-ys-border rounded-xl text-ys-text text-sm placeholder-ys-accent/40 focus:outline-none focus:ring-2 focus:ring-ys-accent"
                     />
                   </div>
 
                   <button
                     onClick={nextFromPlayer}
-                    className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 bg-ys-accent text-ys-on-accent hover:opacity-90"
                   >
                     {playerIndex < players.length - 1 ? (
                       <>
@@ -785,20 +777,20 @@ export default function GuidedStoryStart() {
                           setPlayerIndex(i);
                           setStep("player");
                         }}
-                        className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-3 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border rounded-xl transition-colors text-left"
                         title="Edit this player"
                       >
                         <span
-                          className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white font-bold shadow"
+                          className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-ys-text font-bold shadow"
                           style={{ backgroundColor: p.color }}
                         >
                           {(p.name.trim() || `P${i + 1}`)[0].toUpperCase()}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-semibold text-white truncate">
+                          <span className="block text-sm font-semibold text-ys-text truncate">
                             {p.name.trim() || `Player ${i + 1}`}
                           </span>
-                          <span className="block text-xs text-blue-300/50 truncate">
+                          <span className="block text-xs text-ys-muted truncate">
                             {[
                               p.archetype ? ARCHETYPE_INFO[p.archetype].label : "",
                               p.personality.join(", "),
@@ -810,7 +802,7 @@ export default function GuidedStoryStart() {
                         </span>
                         <DynamicIcon
                           name="Pencil"
-                          className="w-3.5 h-3.5 text-blue-300/40 shrink-0"
+                          className="w-3.5 h-3.5 text-ys-muted shrink-0"
                         />
                       </button>
                     ))}
@@ -818,7 +810,7 @@ export default function GuidedStoryStart() {
 
                   {/* Dice mode: who rolls? */}
                   <div>
-                    <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-ys-text uppercase tracking-wider mb-2">
                       Who rolls the dice?
                     </label>
                     <div className="grid grid-cols-3 gap-2">
@@ -826,18 +818,18 @@ export default function GuidedStoryStart() {
                         onClick={() => setDiceMode("ai")}
                         className={`p-3 rounded-xl border text-left transition-all ${
                           diceMode === "ai"
-                            ? "bg-purple-500/15 border-purple-400/40 ring-1 ring-purple-400/30"
-                            : "bg-white/5 border-white/10 hover:border-purple-400/40"
+                            ? "bg-ys-accent/15 border-ys-accent/40 ring-1 ring-ys-accent/30"
+                            : "bg-ys-surface border-ys-border hover:border-ys-accent/40"
                         }`}
                       >
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-ys-text mb-0.5">
                           <StaticIcon
                             name="Sparkles"
-                            className="w-4 h-4 text-purple-300"
+                            className="w-4 h-4 text-ys-accent"
                           />
                           GM rolls
                         </span>
-                        <span className="block text-xs text-blue-300/50">
+                        <span className="block text-xs text-ys-muted">
                           The AI rolls digitally and narrates the results
                         </span>
                       </button>
@@ -845,18 +837,18 @@ export default function GuidedStoryStart() {
                         onClick={() => setDiceMode("physical")}
                         className={`p-3 rounded-xl border text-left transition-all ${
                           diceMode === "physical"
-                            ? "bg-purple-500/15 border-purple-400/40 ring-1 ring-purple-400/30"
-                            : "bg-white/5 border-white/10 hover:border-purple-400/40"
+                            ? "bg-ys-accent/15 border-ys-accent/40 ring-1 ring-ys-accent/30"
+                            : "bg-ys-surface border-ys-border hover:border-ys-accent/40"
                         }`}
                       >
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-ys-text mb-0.5">
                           <StaticIcon
                             name="Move3d"
-                            className="w-4 h-4 text-purple-300"
+                            className="w-4 h-4 text-ys-accent"
                           />
                           Throw 3D dice
                         </span>
-                        <span className="block text-xs text-blue-300/50">
+                        <span className="block text-xs text-ys-muted">
                           Drag to throw real physics dice on-screen
                         </span>
                       </button>
@@ -864,18 +856,18 @@ export default function GuidedStoryStart() {
                         onClick={() => setDiceMode("manual")}
                         className={`p-3 rounded-xl border text-left transition-all ${
                           diceMode === "manual"
-                            ? "bg-purple-500/15 border-purple-400/40 ring-1 ring-purple-400/30"
-                            : "bg-white/5 border-white/10 hover:border-purple-400/40"
+                            ? "bg-ys-accent/15 border-ys-accent/40 ring-1 ring-ys-accent/30"
+                            : "bg-ys-surface border-ys-border hover:border-ys-accent/40"
                         }`}
                       >
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-ys-text mb-0.5">
                           <StaticIcon
                             name="Dices"
-                            className="w-4 h-4 text-purple-300"
+                            className="w-4 h-4 text-ys-accent"
                           />
                           We roll
                         </span>
-                        <span className="block text-xs text-blue-300/50">
+                        <span className="block text-xs text-ys-muted">
                           Use real dice - the GM asks for your results
                         </span>
                       </button>
@@ -889,8 +881,8 @@ export default function GuidedStoryStart() {
                         onClick={() => setPickerMode("character")}
                         className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                           characterAttached
-                            ? "bg-purple-500/15 border-purple-400/40 text-purple-200"
-                            : "bg-white/5 hover:bg-white/10 border-white/10 text-blue-200/70"
+                            ? "bg-ys-accent/15 border-ys-accent/40 text-ys-accent"
+                            : "bg-ys-surface hover:bg-ys-surface-2 border-ys-border text-ys-text"
                         }`}
                       >
                         <DynamicIcon name="User" className="w-4 h-4" />
@@ -901,7 +893,7 @@ export default function GuidedStoryStart() {
                     )}
                     <button
                       onClick={() => setPickerMode("notes")}
-                      className="flex-1 px-3 py-2.5 rounded-xl border bg-white/5 hover:bg-white/10 border-white/10 text-blue-200/70 text-xs font-medium transition-all flex items-center justify-center gap-1.5"
+                      className="flex-1 px-3 py-2.5 rounded-xl border bg-ys-surface hover:bg-ys-surface-2 border-ys-border text-ys-text text-xs font-medium transition-all flex items-center justify-center gap-1.5"
                     >
                       <DynamicIcon name="Library" className="w-4 h-4" />
                       {noteCount > 0
@@ -914,7 +906,7 @@ export default function GuidedStoryStart() {
                     <button
                       onClick={() => beginStory(true)}
                       disabled={starting}
-                      className="w-full py-3.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white text-base font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                      className="w-full py-3.5 rounded-xl active:scale-[0.99] text-base font-semibold shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 bg-ys-accent text-ys-on-accent hover:opacity-90"
                     >
                       <DynamicIcon name="Wifi" className="w-5 h-5" />
                       {starting ? "Starting..." : "Host Online Game"}
@@ -924,7 +916,7 @@ export default function GuidedStoryStart() {
                       <button
                         onClick={() => beginStory()}
                         disabled={starting}
-                        className="w-full py-3.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white text-base font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                        className="w-full py-3.5 rounded-xl active:scale-[0.99] text-base font-semibold shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 bg-ys-accent text-ys-on-accent hover:opacity-90"
                       >
                         <StaticIcon name="Sparkles" className="w-5 h-5" />
                         {starting ? "Starting..." : "Begin Adventure"}
@@ -932,7 +924,7 @@ export default function GuidedStoryStart() {
                       <button
                         onClick={() => beginStory(true)}
                         disabled={starting}
-                        className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 active:scale-[0.99] text-blue-200 text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                        className="w-full py-2.5 rounded-xl bg-ys-surface hover:bg-ys-surface-2 border border-ys-border active:scale-[0.99] text-ys-text text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                         title="Start this story and immediately open it as an online room others can join"
                       >
                         <DynamicIcon name="Wifi" className="w-4 h-4" />
@@ -940,7 +932,7 @@ export default function GuidedStoryStart() {
                       </button>
                     </>
                   )}
-                  <p className="text-xs text-blue-300/40 text-center">
+                  <p className="text-xs text-ys-muted text-center">
                     {hostOnlineMode
                       ? "You'll get a room code to share. Friends pick their own characters when they join."
                       : "The GM will ask what kind of world you want - then build it around " +

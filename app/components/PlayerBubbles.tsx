@@ -13,6 +13,7 @@ import {
   FLOOR_STEAL_COOLDOWN_MS,
 } from "../misc/multiplayer/floorControl";
 import { useBackHandler } from "../misc/useBackHandler";
+import { PLAYER_TEXT_COLOR } from "../misc/multiplayer/palette";
 
 interface PendingLine {
   id: string;
@@ -155,7 +156,7 @@ export function RecordingOverlay({
     <div
       className={
         floating
-          ? "fixed z-50 left-1/2 -translate-x-1/2 bottom-6 w-[min(26rem,calc(100vw-2rem))] flex items-center gap-2 rounded-full bg-ys-surface/95 backdrop-blur-xl border border-ys-border shadow-2xl shadow-black/50 pl-2 pr-2 py-2"
+          ? "fixed z-50 left-1/2 -translate-x-1/2 bottom-6 w-[min(26rem,calc(100vw-2rem))] flex items-center gap-2 rounded-full bg-ys-surface/95 backdrop-blur-xl border border-ys-border shadow-2xl  pl-2 pr-2 py-2"
           : "flex-1 min-w-0 flex items-center gap-2"
       }
       style={floating ? { marginBottom: "env(safe-area-inset-bottom)" } : undefined}
@@ -582,8 +583,9 @@ function Bubble({
             width: BUBBLE_SIZE,
             height: BUBBLE_SIZE,
             backgroundColor: player.color,
+            color: PLAYER_TEXT_COLOR,
             boxShadow: isActive
-              ? `0 0 0 3px rgba(255,255,255,0.7), 0 0 18px ${player.color}`
+              ? `0 0 0 3px color-mix(in srgb, var(--ys-text) 70%, transparent), 0 0 18px ${player.color}`
               : `0 4px 12px rgba(0,0,0,0.4)`,
             opacity: disabled ? 0.4 : 1,
           }}
@@ -591,18 +593,21 @@ function Bubble({
           {isProcessing ? (
             <DynamicIcon
               name="Loader2"
-              className="w-6 h-6 text-white animate-spin"
+              className="w-6 h-6 animate-spin"
             />
           ) : lockedOut ? (
-            <DynamicIcon name="MicOff" className="w-6 h-6 text-white/80" />
+            <DynamicIcon name="MicOff" className="w-6 h-6" />
           ) : (
-            <DynamicIcon name="Mic" className="w-6 h-6 text-white" />
+            <DynamicIcon name="Mic" className="w-6 h-6" />
           )}
         </span>
       </span>
       <span
-        className="px-2 py-0.5 rounded-full text-[11px] font-semibold text-white shadow-sm whitespace-nowrap max-w-[6.5rem] truncate"
-        style={{ backgroundColor: `${player.color}cc` }}
+        className="px-2 py-0.5 rounded-full text-[11px] font-semibold shadow-sm whitespace-nowrap max-w-[6.5rem] truncate"
+        style={{
+          backgroundColor: `${player.color}cc`,
+          color: PLAYER_TEXT_COLOR,
+        }}
       >
         {player.name}
       </span>
@@ -641,7 +646,7 @@ function GenerateBubble({
         }}
       >
         <DynamicIcon name="Sparkles" className="w-6 h-6" />
-        <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-ys-accent text-ys-bg text-[11px] font-bold flex items-center justify-center shadow">
+        <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 rounded-full bg-ys-accent text-ys-on-accent text-[11px] font-bold flex items-center justify-center shadow">
           {count}
         </span>
       </span>
@@ -661,7 +666,7 @@ function PendingLinesPanel({
 }) {
   return (
     <div
-      className="fixed z-40 left-1/2 -translate-x-1/2 bottom-24 w-[min(22rem,calc(100vw-2rem))] max-h-40 overflow-y-auto rounded-xl bg-ys-surface border border-ys-border shadow-2xl shadow-black/50 p-2 space-y-1"
+      className="fixed z-40 left-1/2 -translate-x-1/2 bottom-24 w-[min(22rem,calc(100vw-2rem))] max-h-40 overflow-y-auto rounded-xl bg-ys-surface border border-ys-border shadow-2xl p-2 space-y-1"
       role="log"
       aria-label="Queued player turns"
     >

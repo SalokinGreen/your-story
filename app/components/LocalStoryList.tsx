@@ -47,14 +47,14 @@ export default function LocalStoryList() {
 
   if (loading) {
     return (
-      <div className="animate-pulse h-20 bg-gray-100 dark:bg-blue-950 rounded-lg"></div>
+      <div className="animate-pulse h-20 bg-ys-surface rounded-lg"></div>
     );
   }
 
   if (stories.length === 0) {
     return (
-      <div className="text-center py-8 bg-gray-50 dark:bg-blue-950/50 rounded-xl border border-gray-200 dark:border-gray-700">
-        <p className="text-gray-500 dark:text-gray-400">
+      <div className="text-center py-8 bg-ys-surface rounded-xl border border-ys-border">
+        <p className="text-ys-muted">
           No locally saved stories found.
         </p>
       </div>
@@ -63,7 +63,7 @@ export default function LocalStoryList() {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+      <h3 className="text-lg font-bold text-ys-text flex items-center gap-2">
         <DynamicIcon name="Folder" className="w-5 h-5" /> Local Stories
       </h3>
       <div className="grid gap-4">
@@ -71,24 +71,24 @@ export default function LocalStoryList() {
           <div
             key={story.id}
             onClick={() => router.push(`/story?storyId=${story.id}`)}
-            className="group relative bg-white dark:bg-blue-950 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-400 shadow-sm hover:shadow-md transition-all cursor-pointer"
+            className="group relative bg-ys-surface p-4 rounded-xl border border-ys-border hover:border-ys-accent shadow-sm hover:shadow-md transition-all cursor-pointer"
           >
             <div className="flex justify-between items-start">
               <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-gray-900 dark:text-white truncate pr-8">
+                <h4 className="font-bold text-ys-text truncate pr-8">
                   {story.title}
                 </h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-sm text-ys-muted mt-1">
                   {new Date(story.updatedAt).toLocaleDateString()} •{" "}
                   {new Date(story.updatedAt).toLocaleTimeString()}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">
+                <p className="text-sm text-ys-muted mt-2 line-clamp-2">
                   {story.preview}
                 </p>
               </div>
               <button
                 onClick={(e) => handleDelete(e, story.id)}
-                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                className="absolute top-4 right-4 p-2 text-ys-muted hover:text-ys-danger hover:bg-ys-danger/25 rounded-lg transition-colors"
                 title="Delete local story"
               >
                 <DynamicIcon name="Trash2" className="w-4 h-4" />

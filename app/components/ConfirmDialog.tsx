@@ -54,8 +54,8 @@ export default function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-ys-surface rounded-2xl shadow-2xl shadow-black/50 p-6 max-w-md w-full border border-ys-border animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 ys-modal-backdrop flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="ys-modal p-6 max-w-md w-full animate-in zoom-in-95 duration-200">
         {/* Icon & Title */}
         <div className="flex items-center gap-3 mb-4">
           <DynamicIcon
@@ -82,12 +82,12 @@ export default function ConfirmDialog({
           </button>
           <button
             onClick={onConfirm}
-            // A caller's own class (red for danger) is a coloured fill with white text;
-            // the default is the theme's primary button.
-            className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-colors ${
-              confirmButtonClass
-                ? `text-white ${confirmButtonClass}`
-                : "bg-ys-text text-ys-bg hover:opacity-90"
+            // A caller that passes a confirmButtonClass is asking for the
+            // destructive look (they used to pass red classes); the theme's
+            // danger button covers it, whatever the string says. The default is
+            // the theme's primary button.
+            className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-colors ys-button ${
+              confirmButtonClass ? "ys-button--danger" : "ys-button--primary"
             }`}
           >
             {confirmText}

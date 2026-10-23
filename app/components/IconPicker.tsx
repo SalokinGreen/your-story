@@ -171,7 +171,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
   return (
     <div className="relative" ref={wrapperRef}>
       {label && (
-        <label className="block text-sm font-medium text-blue-200/80 mb-1">
+        <label className="block text-sm font-medium text-ys-text/80 mb-1">
           {label}
         </label>
       )}
@@ -179,24 +179,24 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+        className="flex items-center gap-2 w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-ys-accent focus:border-ys-accent"
       >
-        <div className="w-6 h-6 flex items-center justify-center bg-white/5 rounded-lg">
+        <div className="w-6 h-6 flex items-center justify-center bg-ys-surface rounded-lg">
           <DynamicIcon
             name={value}
-            className="w-5 h-5 text-white"
+            className="w-5 h-5 text-ys-text"
           />
         </div>
-        <span className="flex-1 text-left text-white truncate">
+        <span className="flex-1 text-left text-ys-text truncate">
           {value ? toDisplayName(value) : "Select Icon"}
         </span>
-        <DynamicIcon name="ChevronDown" className="w-4 h-4 text-blue-300/50" />
+        <DynamicIcon name="ChevronDown" className="w-4 h-4 text-ys-muted" />
       </button>
 
       {isOpen && (
-        <div className="absolute z-30 mt-1 w-full min-w-[360px] bg-[#0d1829]/95 backdrop-blur-2xl rounded-xl shadow-2xl shadow-black/50 border border-white/10 max-h-[480px] flex flex-col">
+        <div className="absolute z-30 mt-1 w-full min-w-[360px] bg-ys-surface/95 backdrop-blur-2xl rounded-xl shadow-2xl border border-ys-border max-h-[480px] flex flex-col">
           {/* Search */}
-          <div className="p-2 border-b border-white/10 space-y-2">
+          <div className="p-2 border-b border-ys-border space-y-2">
             <input
               type="text"
               placeholder="Search 4000+ icons..."
@@ -207,7 +207,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                   setSelectedCategory("All");
                 }
               }}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-sm text-ys-text placeholder-ys-muted focus:outline-none focus:ring-2 focus:ring-ys-accent"
               autoFocus
             />
 
@@ -223,8 +223,8 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                 }}
                 className={`px-2 py-1 text-xs rounded-full whitespace-nowrap flex items-center gap-1 ${
                   selectedCategory === "Featured"
-                    ? "bg-purple-500/15 text-purple-300"
-                    : "bg-white/5 text-blue-300/60 hover:bg-white/10"
+                    ? "bg-ys-accent/15 text-ys-accent"
+                    : "bg-ys-surface text-ys-muted hover:bg-ys-surface-2"
                 }`}
               >
                 <span>⭐</span> Featured
@@ -236,8 +236,8 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                 }}
                 className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                   selectedCategory === "All"
-                    ? "bg-purple-500/15 text-purple-300"
-                    : "bg-white/5 text-blue-300/60 hover:bg-white/10"
+                    ? "bg-ys-accent/15 text-ys-accent"
+                    : "bg-ys-surface text-ys-muted hover:bg-ys-surface-2"
                 }`}
               >
                 All
@@ -251,8 +251,8 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                   }}
                   className={`px-2 py-1 text-xs rounded-full whitespace-nowrap flex items-center gap-1 ${
                     selectedCategory === cat
-                      ? "bg-purple-500/15 text-purple-300"
-                      : "bg-white/5 text-blue-300/60 hover:bg-white/10"
+                      ? "bg-ys-accent/15 text-ys-accent"
+                      : "bg-ys-surface text-ys-muted hover:bg-ys-surface-2"
                   }`}
                 >
                   {cat}
@@ -273,29 +273,29 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                   onChange(iconId);
                   setIsOpen(false);
                 }}
-                className={`flex flex-col items-center justify-center p-2 rounded hover:bg-purple-500/10 transition-colors ${
+                className={`flex flex-col items-center justify-center p-2 rounded hover:bg-ys-accent/10 transition-colors ${
                   value === iconId
-                    ? "bg-purple-500/15 ring-1 ring-purple-400/40"
+                    ? "bg-ys-accent/15 ring-1 ring-ys-accent/40"
                     : ""
                 }`}
                 title={toDisplayName(iconId)}
               >
                 <DynamicIcon
                   name={iconId}
-                  className="w-6 h-6 text-blue-200/80"
+                  className="w-6 h-6 text-ys-text/80"
                 />
               </button>
             ))}
             {paginatedIcons.length === 0 && (
-              <div className="col-span-6 text-center py-8 text-blue-300/50 text-sm">
+              <div className="col-span-6 text-center py-8 text-ys-muted text-sm">
                 No icons found
               </div>
             )}
           </div>
 
           {/* Footer with pagination and attribution */}
-          <div className="p-2 border-t border-white/10 flex items-center justify-between gap-2">
-            <span className="text-xs text-blue-300/50">
+          <div className="p-2 border-t border-ys-border flex items-center justify-between gap-2">
+            <span className="text-xs text-ys-muted">
               {allFilteredIcons.length} icons
               {search && ` for "${search}"`}
             </span>
@@ -305,17 +305,17 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                 <button
                   onClick={() => setPage(Math.max(0, page - 1))}
                   disabled={page === 0}
-                  className="p-1 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-1 rounded-lg hover:bg-ys-surface-2 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
                 </button>
-                <span className="text-xs text-blue-200/70 min-w-[60px] text-center">
+                <span className="text-xs text-ys-muted min-w-[60px] text-center">
                   {page + 1} / {totalPages}
                 </span>
                 <button
                   onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                   disabled={page >= totalPages - 1}
-                  className="p-1 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-1 rounded-lg hover:bg-ys-surface-2 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <DynamicIcon name="ChevronRight" className="w-4 h-4" />
                 </button>
@@ -326,7 +326,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
               href="https://game-icons.net"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-blue-300/50 hover:text-purple-400 transition-colors"
+              className="text-xs text-ys-muted hover:text-ys-accent transition-colors"
             >
               game-icons.net
             </a>

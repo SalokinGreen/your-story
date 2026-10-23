@@ -63,8 +63,22 @@ describe("noteMentions", () => {
         id: "The Sunken Temple",
         label: "The Sunken Temple",
         terms: ["The Sunken Temple"],
-        colorClass: "text-green-300",
+        colorClass: "text-ys-accent",
       });
+    });
+
+    it("puts the GM-side and secret note types in their own groups", () => {
+      const storyData = createMockStoryData({
+        lore: [
+          lore({ title: "Rules Note", type: "mechanics" }),
+          lore({ title: "Hidden Door", type: "secret" }),
+        ],
+      });
+      const byLabel = Object.fromEntries(
+        buildMentionCandidates(storyData).map((c) => [c.label, c.colorClass]),
+      );
+      expect(byLabel["Rules Note"]).toBe("text-ys-muted");
+      expect(byLabel["Hidden Door"]).toBe("text-ys-warning");
     });
 
     it("includes a lore note's aliases as extra terms", () => {
@@ -99,7 +113,7 @@ describe("noteMentions", () => {
         id: "npc_bob",
         label: "Bob",
         terms: ["Bob", "Bobby"],
-        colorClass: "text-pink-300",
+        colorClass: "text-ys-accent",
       });
     });
   });

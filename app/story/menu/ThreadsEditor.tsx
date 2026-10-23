@@ -63,28 +63,28 @@ export default function ThreadsEditor({
   };
 
   const statusColor: Record<StoryThread["status"], string> = {
-    active: "bg-blue-500/10 text-blue-300 border border-blue-400/20",
-    resolved: "bg-green-500/10 text-green-300 border border-green-400/20",
-    abandoned: "bg-white/5 text-blue-300/50 border border-white/10",
+    active: "bg-ys-accent/10 text-ys-accent border border-ys-accent/20",
+    resolved: "bg-ys-success/10 text-ys-success border border-ys-success/20",
+    abandoned: "bg-ys-surface text-ys-muted border border-ys-border",
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h4 className="text-lg font-bold text-white flex items-center gap-2">
-          <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
-            <DynamicIcon name="GitBranch" className="w-4 h-4 text-purple-300" />
+        <h4 className="text-lg font-bold text-ys-text flex items-center gap-2">
+          <span className="p-1.5 rounded-lg bg-ys-accent/10 ring-1 ring-ys-accent/20">
+            <DynamicIcon name="GitBranch" className="w-4 h-4 text-ys-accent" />
           </span>
           Story Threads
         </h4>
         <button
           onClick={addThread}
-          className="px-3 py-1.5 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white text-sm font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all"
+          className="px-3 py-1.5 bg-ys-success/15 text-ys-success text-sm font-medium rounded-lg transition-all border border-ys-success/40"
         >
           + Add Thread
         </button>
       </div>
-      <p className="text-xs text-blue-200/60 mb-4">
+      <p className="text-xs text-ys-muted mb-4">
         Plotlines the GM tracks and can open, update, or resolve on its own
         via tool calls during play. Add one here to seed a thread the GM
         should be aware of, or to correct one it created.
@@ -94,7 +94,7 @@ export default function ThreadsEditor({
           editingIndex === index ? (
             <div
               key={thread.id}
-              className="p-4 bg-white/[0.04] backdrop-blur-xl border border-purple-400/30 rounded-2xl shadow-[0_0_20px_rgba(168,85,247,0.1)]"
+              className="p-4 bg-ys-surface backdrop-blur-xl border border-ys-accent/30 rounded-2xl shadow-[0_0_20px_color-mix(in_srgb,var(--ys-accent)_10%,transparent)]"
             >
               <div className="space-y-3">
                 <input
@@ -104,7 +104,7 @@ export default function ThreadsEditor({
                     setEditThread({ ...editThread!, title: e.target.value })
                   }
                   placeholder="Thread Title"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                 />
                 <textarea
                   value={editThread?.description || ""}
@@ -115,7 +115,7 @@ export default function ThreadsEditor({
                     })
                   }
                   placeholder="Description"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   rows={3}
                 />
                 <div className="flex gap-3">
@@ -127,7 +127,7 @@ export default function ThreadsEditor({
                         status: e.target.value as StoryThread["status"],
                       })
                     }
-                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                    className="flex-1 px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   >
                     <option value="active">Active</option>
                     <option value="resolved">Resolved</option>
@@ -142,7 +142,7 @@ export default function ThreadsEditor({
                           .value as StoryThread["priority"],
                       })
                     }
-                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                    className="flex-1 px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   >
                     <option value="main">Main</option>
                     <option value="side">Side</option>
@@ -152,13 +152,13 @@ export default function ThreadsEditor({
                 <div className="flex gap-2">
                   <button
                     onClick={saveEdit}
-                    className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-lg shadow-md shadow-emerald-950/40 transition-all"
+                    className="px-4 py-2 bg-ys-success/15 text-ys-success rounded-lg transition-all border border-ys-success/40"
                   >
                     Save
                   </button>
                   <button
                     onClick={cancelEdit}
-                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
+                    className="px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text rounded-lg transition-all"
                   >
                     Cancel
                   </button>
@@ -168,13 +168,13 @@ export default function ThreadsEditor({
           ) : (
             <div
               key={thread.id}
-              className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-xl flex items-center gap-3 hover:bg-white/[0.05] transition-colors"
+              className="p-4 bg-ys-surface backdrop-blur-md border border-ys-border rounded-xl flex items-center gap-3 hover:bg-ys-surface-2 transition-colors"
             >
               <div className="flex-1">
-                <div className="flex items-center gap-2 font-medium text-white flex-wrap">
+                <div className="flex items-center gap-2 font-medium text-ys-text flex-wrap">
                   <DynamicIcon
                     name="GitBranch"
-                    className="w-5 h-5 text-purple-400"
+                    className="w-5 h-5 text-ys-accent"
                   />
                   {thread.title}
                   <span
@@ -183,26 +183,26 @@ export default function ThreadsEditor({
                     {thread.status[0].toUpperCase() + thread.status.slice(1)}
                   </span>
                   {thread.priority && (
-                    <span className="px-2 py-0.5 bg-purple-500/10 text-purple-300 border border-purple-400/20 rounded-full text-xs font-bold">
+                    <span className="px-2 py-0.5 bg-ys-accent/10 text-ys-accent border border-ys-accent/20 rounded-full text-xs font-bold">
                       {PRIORITY_LABEL[thread.priority]}
                     </span>
                   )}
                 </div>
-                <div className="text-sm text-blue-200/60">
+                <div className="text-sm text-ys-muted">
                   {thread.description}
                 </div>
               </div>
               <div className="flex gap-0.5">
                 <button
                   onClick={() => startEdit(index)}
-                  className="w-7 h-7 sm:w-8 sm:h-8 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg flex items-center justify-center transition-colors"
+                  className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-accent/10 hover:bg-ys-accent/20 text-ys-text border border-ys-accent/20 rounded-lg flex items-center justify-center transition-colors"
                   title="Edit"
                 >
                   <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
                 <button
                   onClick={() => removeThread(index)}
-                  className="w-7 h-7 sm:w-8 sm:h-8 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg flex items-center justify-center transition-colors"
+                  className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-danger/10 hover:bg-ys-danger/20 text-ys-danger border border-ys-danger/20 rounded-lg flex items-center justify-center transition-colors"
                   title="Remove"
                 >
                   <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -212,7 +212,7 @@ export default function ThreadsEditor({
           ),
         )}
         {localThreads.length === 0 && (
-          <p className="text-sm text-blue-200/60">
+          <p className="text-sm text-ys-muted">
             No threads yet - the GM will open some as the story develops.
           </p>
         )}

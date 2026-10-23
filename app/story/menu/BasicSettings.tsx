@@ -46,30 +46,30 @@ export default function BasicSettings({
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-2">
+        <label className="block text-sm font-semibold text-ys-text mb-2">
           Story Name
         </label>
         <input
           type="text"
           value={form.story_name}
           onChange={(e) => onChange({ ...form, story_name: e.target.value })}
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+          className="w-full px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-2">
+        <label className="block text-sm font-semibold text-ys-text mb-2">
           Player/Character Name
         </label>
         <input
           type="text"
           value={form.player_name}
           onChange={(e) => onChange({ ...form, player_name: e.target.value })}
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+          className="w-full px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-2">
+        <label className="block text-sm font-semibold text-ys-text mb-2">
           Character Description
         </label>
         <textarea
@@ -77,21 +77,21 @@ export default function BasicSettings({
           onChange={(e) =>
             onChange({ ...form, player_summary: e.target.value })
           }
-          className="w-full h-32 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none transition-colors"
+          className="w-full h-32 px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 resize-none transition-colors"
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-2">
+        <label className="block text-sm font-semibold text-ys-text mb-2">
           Story Premise
         </label>
         <textarea
           value={form.premise}
           onChange={(e) => onChange({ ...form, premise: e.target.value })}
-          className="w-full h-24 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none transition-colors"
+          className="w-full h-24 px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 resize-none transition-colors"
         />
       </div>
       <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-2">
+        <label className="block text-sm font-semibold text-ys-text mb-2">
           Max Chapters
         </label>
         <input
@@ -100,12 +100,12 @@ export default function BasicSettings({
           onChange={(e) =>
             onChange({ ...form, max_chapters: parseInt(e.target.value) || 0 })
           }
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+          className="w-full px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-2">
+        <label className="block text-sm font-semibold text-ys-text mb-2">
           Who Rolls the Dice?
         </label>
         <div className="grid grid-cols-3 gap-2">
@@ -114,15 +114,15 @@ export default function BasicSettings({
             onClick={() => onChange({ ...form, diceMode: "ai" })}
             className={`p-3 rounded-xl border text-left transition-all ${
               form.diceMode === "ai"
-                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
-                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
+                ? "bg-ys-accent/10 border-ys-accent/40 ring-1 ring-ys-accent/30 shadow-[0_0_16px_color-mix(in_srgb,var(--ys-accent)_15%,transparent)]"
+                : "bg-ys-surface border-ys-border hover:border-ys-accent/30 hover:bg-ys-surface-2"
             }`}
           >
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
-              <DynamicIcon name="Sparkles" className="w-4 h-4 text-purple-300" />
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-ys-text mb-0.5">
+              <DynamicIcon name="Sparkles" className="w-4 h-4 text-ys-accent" />
               GM rolls
             </span>
-            <span className="block text-xs text-blue-300/50">
+            <span className="block text-xs text-ys-muted">
               The AI rolls digitally and narrates the results
             </span>
           </button>
@@ -131,15 +131,15 @@ export default function BasicSettings({
             onClick={() => onChange({ ...form, diceMode: "physical" })}
             className={`p-3 rounded-xl border text-left transition-all ${
               form.diceMode === "physical"
-                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
-                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
+                ? "bg-ys-accent/10 border-ys-accent/40 ring-1 ring-ys-accent/30 shadow-[0_0_16px_color-mix(in_srgb,var(--ys-accent)_15%,transparent)]"
+                : "bg-ys-surface border-ys-border hover:border-ys-accent/30 hover:bg-ys-surface-2"
             }`}
           >
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
-              <DynamicIcon name="Move3d" className="w-4 h-4 text-purple-300" />
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-ys-text mb-0.5">
+              <DynamicIcon name="Move3d" className="w-4 h-4 text-ys-accent" />
               Throw 3D dice
             </span>
-            <span className="block text-xs text-blue-300/50">
+            <span className="block text-xs text-ys-muted">
               Drag to throw real physics dice on-screen
             </span>
           </button>
@@ -148,15 +148,15 @@ export default function BasicSettings({
             onClick={() => onChange({ ...form, diceMode: "manual" })}
             className={`p-3 rounded-xl border text-left transition-all ${
               form.diceMode === "manual"
-                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
-                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
+                ? "bg-ys-accent/10 border-ys-accent/40 ring-1 ring-ys-accent/30 shadow-[0_0_16px_color-mix(in_srgb,var(--ys-accent)_15%,transparent)]"
+                : "bg-ys-surface border-ys-border hover:border-ys-accent/30 hover:bg-ys-surface-2"
             }`}
           >
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
-              <DynamicIcon name="Dices" className="w-4 h-4 text-purple-300" />
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-ys-text mb-0.5">
+              <DynamicIcon name="Dices" className="w-4 h-4 text-ys-accent" />
               We roll
             </span>
-            <span className="block text-xs text-blue-300/50">
+            <span className="block text-xs text-ys-muted">
               Roll real dice - the GM pauses and asks for your results
             </span>
           </button>
@@ -164,9 +164,9 @@ export default function BasicSettings({
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-2">
+        <label className="block text-sm font-semibold text-ys-text mb-2">
           Your Player Type{" "}
-          <span className="text-xs font-normal text-blue-300/50">
+          <span className="text-xs font-normal text-ys-muted">
             (used for solo play - tells the GM how to engage you)
           </span>
         </label>
@@ -186,14 +186,14 @@ export default function BasicSettings({
                 title={info.description}
                 className={`p-2.5 rounded-lg border text-left transition-all ${
                   selected
-                    ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
-                    : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                    ? "bg-ys-accent/40 border-ys-accent/60 ring-1 ring-ys-accent/40"
+                    : "bg-ys-accent/20 border-ys-accent/40 hover:border-ys-accent/40"
                 }`}
               >
-                <span className="block text-sm font-semibold text-white">
+                <span className="block text-sm font-semibold text-ys-text">
                   {info.label}
                 </span>
-                <span className="block text-xs text-blue-300/50">
+                <span className="block text-xs text-ys-muted">
                   {info.description}
                 </span>
               </button>
@@ -203,7 +203,7 @@ export default function BasicSettings({
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-2">
+        <label className="block text-sm font-semibold text-ys-text mb-2">
           Suggested Choices
         </label>
         <div className="grid grid-cols-2 gap-2">
@@ -212,15 +212,15 @@ export default function BasicSettings({
             onClick={() => onChange({ ...form, autoGenerateChoices: false })}
             className={`p-3 rounded-xl border text-left transition-all ${
               !form.autoGenerateChoices
-                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
-                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
+                ? "bg-ys-accent/10 border-ys-accent/40 ring-1 ring-ys-accent/30 shadow-[0_0_16px_color-mix(in_srgb,var(--ys-accent)_15%,transparent)]"
+                : "bg-ys-surface border-ys-border hover:border-ys-accent/30 hover:bg-ys-surface-2"
             }`}
           >
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
-              <DynamicIcon name="PenLine" className="w-4 h-4 text-purple-300" />
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-ys-text mb-0.5">
+              <DynamicIcon name="PenLine" className="w-4 h-4 text-ys-accent" />
               Off
             </span>
-            <span className="block text-xs text-blue-300/50">
+            <span className="block text-xs text-ys-muted">
               Freeform text only - type or say what you do
             </span>
           </button>
@@ -229,15 +229,15 @@ export default function BasicSettings({
             onClick={() => onChange({ ...form, autoGenerateChoices: true })}
             className={`p-3 rounded-xl border text-left transition-all ${
               form.autoGenerateChoices
-                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
-                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
+                ? "bg-ys-accent/10 border-ys-accent/40 ring-1 ring-ys-accent/30 shadow-[0_0_16px_color-mix(in_srgb,var(--ys-accent)_15%,transparent)]"
+                : "bg-ys-surface border-ys-border hover:border-ys-accent/30 hover:bg-ys-surface-2"
             }`}
           >
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
-              <DynamicIcon name="List" className="w-4 h-4 text-purple-300" />
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-ys-text mb-0.5">
+              <DynamicIcon name="List" className="w-4 h-4 text-ys-accent" />
               On
             </span>
-            <span className="block text-xs text-blue-300/50">
+            <span className="block text-xs text-ys-muted">
               Also suggest a few tappable actions after each turn
             </span>
           </button>

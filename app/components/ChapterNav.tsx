@@ -75,7 +75,7 @@ export function ChapterNav({ parts, currentIndex, onJump }: ChapterNavProps) {
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-1 text-xs text-blue-300/70 hover:text-blue-200 transition-colors px-1.5 py-1 rounded hover:bg-blue-800/40"
+        className="flex items-center gap-1 text-xs text-ys-muted hover:text-ys-text transition-colors px-1.5 py-1 rounded hover:bg-ys-surface-2"
         title="Jump to chapter"
       >
         <DynamicIcon name="BookMarked" className="w-3.5 h-3.5" />

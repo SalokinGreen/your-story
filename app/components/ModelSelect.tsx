@@ -47,7 +47,7 @@ export default function ModelSelect({
       onChange={(e) => onChange(e.target.value)}
       className={
         className ||
-        "text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white"
+        "text-xs bg-ys-surface-2 border border-ys-border rounded-md px-2 py-1 text-ys-text"
       }
     >
       {Array.from(groups.entries()).map(([provider, models]) => (

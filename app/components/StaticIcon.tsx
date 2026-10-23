@@ -135,7 +135,7 @@ export const StaticIcon: React.FC<StaticIconProps> = ({ name, ...props }) => {
     // Fallback to a circle if icon not found
     return (
       <span
-        className="inline-block rounded-full bg-gray-400"
+        className="inline-block rounded-full bg-ys-muted"
         style={{ width: props.size || 16, height: props.size || 16 }}
       />
     );

@@ -39,7 +39,7 @@ export const IconAttribution: React.FC<IconAttributionProps> = ({
         href="https://game-icons.net"
         target="_blank"
         rel="noopener noreferrer"
-        className={`text-xs text-gray-500 hover:text-purple-500 transition-colors ${className}`}
+        className={`text-xs text-ys-muted hover:text-ys-accent transition-colors ${className}`}
       >
         Icons by game-icons.net
       </a>
@@ -48,10 +48,10 @@ export const IconAttribution: React.FC<IconAttributionProps> = ({
 
   if (variant === "footer") {
     return (
-      <div className={`text-xs text-gray-500 dark:text-gray-400 ${className}`}>
+      <div className={`text-xs text-ys-muted ${className}`}>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="hover:text-purple-500 transition-colors underline decoration-dotted"
+          className="hover:text-ys-accent transition-colors underline decoration-dotted"
         >
           Icons from game-icons.net
         </button>{" "}
@@ -60,12 +60,12 @@ export const IconAttribution: React.FC<IconAttributionProps> = ({
           href="https://creativecommons.org/licenses/by/3.0/"
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:text-purple-500 transition-colors"
+          className="hover:text-ys-accent transition-colors"
         >
           CC BY 3.0
         </a>
         {isExpanded && (
-          <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-900 rounded-lg max-h-48 overflow-y-auto">
+          <div className="mt-2 p-3 bg-ys-bg rounded-lg max-h-48 overflow-y-auto">
             <p className="mb-2 font-medium">
               {GAME_ICON_COUNT.toLocaleString()} icons from{" "}
               {GAME_ICON_AUTHORS.length} artists:
@@ -74,14 +74,14 @@ export const IconAttribution: React.FC<IconAttributionProps> = ({
               {attributionAuthors.map((author) => (
                 <span
                   key={author.id}
-                  className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-800 rounded text-xs"
+                  className="px-1.5 py-0.5 bg-ys-surface rounded text-xs"
                 >
                   {author.name}
                 </span>
               ))}
             </div>
             {cc0Authors.length > 0 && (
-              <p className="mt-2 text-gray-400">
+              <p className="mt-2 text-ys-muted">
                 CC0 (Public Domain): {cc0Authors.map((a) => a.name).join(", ")}
               </p>
             )}
@@ -94,18 +94,18 @@ export const IconAttribution: React.FC<IconAttributionProps> = ({
   // Full panel variant
   return (
     <div
-      className={`p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}
+      className={`p-4 bg-ys-bg rounded-lg border border-ys-border ${className}`}
     >
-      <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+      <h3 className="font-semibold text-ys-text mb-2">
         Icon Credits
       </h3>
-      <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+      <p className="text-sm text-ys-muted mb-3">
         This project uses {GAME_ICON_COUNT.toLocaleString()} icons from{" "}
         <a
           href="https://game-icons.net"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+          className="hover:opacity-80 text-ys-accent"
         >
           game-icons.net
         </a>
@@ -114,7 +114,7 @@ export const IconAttribution: React.FC<IconAttributionProps> = ({
           href="https://creativecommons.org/licenses/by/3.0/"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+          className="hover:opacity-80 text-ys-accent"
         >
           Creative Commons 3.0 BY
         </a>{" "}
@@ -122,7 +122,7 @@ export const IconAttribution: React.FC<IconAttributionProps> = ({
       </p>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+        <p className="text-xs font-medium text-ys-muted">
           Icons made by:
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -133,7 +133,7 @@ export const IconAttribution: React.FC<IconAttributionProps> = ({
 
         {cc0Authors.length > 0 && (
           <>
-            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-3">
+            <p className="text-xs font-medium text-ys-muted mt-3">
               CC0 (Public Domain):
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -179,8 +179,8 @@ const AuthorBadge: React.FC<{ author: GameIconAuthor; isCC0?: boolean }> = ({
     <span
       className={`px-2 py-1 rounded text-xs ${
         isCC0
-          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-          : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+          ? "bg-ys-success/15 text-ys-success"
+          : "bg-ys-surface text-ys-accent"
       }`}
     >
       {author.name}

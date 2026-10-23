@@ -66,14 +66,14 @@ export default function PictureSettings({
   };
 
   return (
-    <div className="border border-white/10 rounded-2xl p-4 bg-white/[0.03] backdrop-blur-md space-y-4">
-      <p className="text-xs text-blue-200/60">
+    <div className="border border-ys-border rounded-2xl p-4 bg-ys-surface backdrop-blur-md space-y-4">
+      <p className="text-xs text-ys-muted">
         Pictures are kept on this device only and are not synced. The global
         switches, the per-scene limit and the models are in Settings, under
         Images.
       </p>
       <div>
-        <label className="block text-sm font-medium text-blue-200 mb-2">
+        <label className="block text-sm font-medium text-ys-text mb-2">
           Art style for this story
         </label>
         <input
@@ -87,17 +87,17 @@ export default function PictureSettings({
             }
           }}
           placeholder={defaultStyle}
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 placeholder:text-blue-400/40 transition-colors"
+          className="w-full px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 placeholder:text-ys-muted transition-colors"
         />
-        <p className="text-xs text-blue-200/50 mt-1">
+        <p className="text-xs text-ys-muted mt-1">
           The same line ends every picture, which is what makes them look like
           one book. Leave empty to use the default.
         </p>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-blue-200/70">
+        <span className="text-sm text-ys-muted">
           Space used:{" "}
-          <span className="text-white font-semibold">
+          <span className="text-ys-text font-semibold">
             {bytes === null ? "…" : formatBytes(bytes)}
           </span>
         </span>
@@ -105,7 +105,7 @@ export default function PictureSettings({
           type="button"
           onClick={clear}
           disabled={clearing || bytes === 0}
-          className="px-3 py-2 text-sm rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-blue-100 disabled:opacity-50 flex items-center gap-2"
+          className="px-3 py-2 text-sm rounded-xl border border-ys-border bg-ys-surface hover:bg-ys-surface-2 text-ys-text disabled:opacity-50 flex items-center gap-2"
         >
           <DynamicIcon name="Trash2" className="w-4 h-4" />
           Clear this story&apos;s pictures

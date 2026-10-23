@@ -44,18 +44,18 @@ export default function NetStatusBadge({ netSession, peers }: NetStatusBadgeProp
 
   return (
     <div
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-950/80 backdrop-blur border border-blue-700/40 shadow-sm text-[11px] font-medium text-blue-100 max-w-[220px]"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ys-surface/80 backdrop-blur border border-ys-border shadow-sm text-[11px] font-medium text-ys-text max-w-[220px]"
       title={`${isHost ? "Hosting" : "Guest"} · room code ${netSession.roomId} · ${netSession.backend}`}
     >
       {noPeersYet ? (
         <DynamicIcon
           name="Loader2"
-          className={`w-3 h-3 shrink-0 ${waitingAWhile ? "text-amber-400" : "text-blue-300"} animate-spin`}
+          className={`w-3 h-3 shrink-0 ${waitingAWhile ? "text-ys-warning" : "text-ys-accent"} animate-spin`}
         />
       ) : (
         <span className="relative flex h-2 w-2 shrink-0">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-ys-success opacity-60" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-ys-success" />
         </span>
       )}
       <span className="truncate">{label}</span>

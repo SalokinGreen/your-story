@@ -41,26 +41,26 @@ const NOTE_TYPE_LABELS: Partial<Record<LoreType, string>> = {
 };
 
 const NOTE_TYPE_COLORS: Partial<Record<LoreType, string>> = {
-  lore: "bg-blue-500/15 text-blue-300",
-  secret: "bg-rose-500/15 text-rose-300",
-  mechanics: "bg-amber-500/15 text-amber-300",
-  character_sheet: "bg-emerald-500/15 text-emerald-300",
-  dm_instructions: "bg-purple-500/15 text-purple-300",
-  story_instructions: "bg-purple-500/15 text-purple-300",
-  summary_instructions: "bg-purple-500/15 text-purple-300",
-  gm_plan: "bg-cyan-500/15 text-cyan-300",
+  lore: "bg-ys-accent/15 text-ys-accent",
+  secret: "bg-ys-warning/15 text-ys-warning",
+  mechanics: "bg-ys-surface-2 text-ys-muted",
+  character_sheet: "bg-ys-accent/15 text-ys-accent",
+  dm_instructions: "bg-ys-surface-2 text-ys-muted",
+  story_instructions: "bg-ys-surface-2 text-ys-muted",
+  summary_instructions: "bg-ys-surface-2 text-ys-muted",
+  gm_plan: "bg-ys-surface-2 text-ys-muted",
 };
 
 const ATTITUDE_COLORS: Record<NPC["attitude"], string> = {
-  hostile: "bg-red-500/15 text-red-300",
-  unfriendly: "bg-orange-500/15 text-orange-300",
-  neutral: "bg-gray-500/15 text-gray-300",
-  friendly: "bg-green-500/15 text-green-300",
-  allied: "bg-emerald-500/15 text-emerald-300",
+  hostile: "bg-ys-danger/15 text-ys-danger",
+  unfriendly: "bg-ys-warning/15 text-ys-warning",
+  neutral: "bg-ys-surface-2 text-ys-muted",
+  friendly: "bg-ys-success/15 text-ys-success",
+  allied: "bg-ys-accent/15 text-ys-accent",
 };
 
 const inputClass =
-  "w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-purple-400/50 transition-colors";
+  "w-full bg-ys-surface-2 border border-ys-border rounded-lg px-3 py-2 text-sm text-ys-text placeholder:text-ys-muted focus:outline-none focus:border-ys-accent transition-colors";
 
 function Field({
   label,
@@ -71,7 +71,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-[11px] uppercase tracking-wide text-white/40 mb-1.5">
+      <span className="block text-[11px] uppercase tracking-wide text-ys-muted mb-1.5">
         {label}
       </span>
       {children}
@@ -81,7 +81,7 @@ function Field({
 
 function EmptyHint({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-sm text-white/30 italic py-3 text-center">{children}</p>
+    <p className="text-sm text-ys-muted italic py-3 text-center">{children}</p>
   );
 }
 
@@ -149,29 +149,29 @@ export default function AdventureInspector({
     return (
       <div
         key={note.title}
-        className="bg-white/[0.03] border border-white/10 rounded-xl p-3"
+        className="bg-ys-surface-2 border border-ys-border rounded-xl p-3"
       >
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-white text-sm truncate">
+              <span className="font-medium text-ys-text text-sm truncate">
                 {note.title}
               </span>
               <span
                 className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                  NOTE_TYPE_COLORS[type] ?? "bg-white/10 text-white/60"
+                  NOTE_TYPE_COLORS[type] ?? "bg-ys-surface-2 text-ys-muted"
                 }`}
               >
                 {NOTE_TYPE_LABELS[type] ?? type}
               </span>
               {note.alwaysOn && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/50">
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-ys-surface-2 text-ys-muted">
                   always on
                 </span>
               )}
             </div>
             {note.keys && note.keys.length > 0 && (
-              <p className="text-[11px] text-white/35 mt-1 truncate">
+              <p className="text-[11px] text-ys-muted mt-1 truncate">
                 triggers: {note.keys.join(", ")}
               </p>
             )}
@@ -179,7 +179,7 @@ export default function AdventureInspector({
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setEditingNote(isEditing ? null : note.title)}
-              className="p-1.5 rounded-md hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+              className="p-1.5 rounded-md hover:bg-ys-surface-2 text-ys-muted hover:text-ys-text transition-colors"
               title={isEditing ? "Collapse" : "Edit"}
             >
               <DynamicIcon
@@ -189,7 +189,7 @@ export default function AdventureInspector({
             </button>
             <button
               onClick={() => removeNote(note.title)}
-              className="p-1.5 rounded-md hover:bg-red-500/20 text-white/40 hover:text-red-300 transition-colors"
+              className="p-1.5 rounded-md hover:bg-ys-danger/25 text-ys-muted hover:text-ys-danger transition-colors"
               title="Delete note"
             >
               <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
@@ -204,14 +204,14 @@ export default function AdventureInspector({
             className={`${inputClass} font-mono text-xs leading-relaxed`}
           />
         ) : (
-          <p className="text-xs text-white/50 line-clamp-3 whitespace-pre-wrap">
+          <p className="text-xs text-ys-muted line-clamp-3 whitespace-pre-wrap">
             {note.content || "(empty)"}
           </p>
         )}
         {pinnedNoteWarning(note) && (
           <p
             role="status"
-            className="mt-2 text-[11px] leading-relaxed text-amber-300/90"
+            className="mt-2 text-[11px] leading-relaxed text-ys-warning"
           >
             {pinnedNoteWarning(note)}
           </p>
@@ -221,16 +221,16 @@ export default function AdventureInspector({
   };
 
   return (
-    <div className="h-full flex flex-col bg-black/20">
+    <div className="h-full flex flex-col bg-ys-surface">
       {/* Readiness banner */}
-      <div className="px-4 py-3 border-b border-white/10 shrink-0">
+      <div className="px-4 py-3 border-b border-ys-border shrink-0">
         {readiness.ready ? (
-          <div className="flex items-center gap-2 text-sm text-emerald-300">
+          <div className="flex items-center gap-2 text-sm text-ys-success">
             <DynamicIcon name="CheckCircle2" className="w-4 h-4 shrink-0" />
             <span>Ready to play</span>
           </div>
         ) : (
-          <div className="flex items-start gap-2 text-sm text-amber-300/90">
+          <div className="flex items-start gap-2 text-sm text-ys-warning">
             <DynamicIcon name="CircleDashed" className="w-4 h-4 shrink-0 mt-0.5" />
             <span className="text-xs leading-relaxed">
               Still needs {readiness.missing.join(", ")}
@@ -240,21 +240,21 @@ export default function AdventureInspector({
       </div>
 
       {/* Section tabs */}
-      <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-white/10 shrink-0">
+      <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-ys-border shrink-0">
         {sections.map((section) => (
           <button
             key={section.id}
             onClick={() => setOpenSection(section.id)}
             className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
               openSection === section.id
-                ? "bg-purple-500/20 text-purple-200"
-                : "text-white/45 hover:text-white/80 hover:bg-white/5"
+                ? "bg-ys-accent/20 text-ys-accent"
+                : "text-ys-muted hover:text-ys-text hover:bg-ys-surface-2"
             }`}
           >
             <DynamicIcon name={section.icon} className="w-3.5 h-3.5" />
             {section.label}
             {section.count !== undefined && section.count > 0 && (
-              <span className="text-[10px] text-white/40">{section.count}</span>
+              <span className="text-[10px] text-ys-muted">{section.count}</span>
             )}
           </button>
         ))}
@@ -332,12 +332,12 @@ export default function AdventureInspector({
                 />
               </Field>
             </div>
-            <label className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-ys-muted cursor-pointer">
               <input
                 type="checkbox"
                 checked={draft.nsfw}
                 onChange={(e) => onChange({ nsfw: e.target.checked })}
-                className="rounded border-white/20 bg-black/30"
+                className="rounded border-ys-border bg-ys-surface"
               />
               Contains adult content
             </label>
@@ -375,7 +375,7 @@ export default function AdventureInspector({
             </Field>
 
             <div>
-              <span className="block text-[11px] uppercase tracking-wide text-white/40 mb-2">
+              <span className="block text-[11px] uppercase tracking-wide text-ys-muted mb-2">
                 Opening choices
               </span>
               {draft.startingChoices.length === 0 ? (
@@ -406,7 +406,7 @@ export default function AdventureInspector({
                             ),
                           })
                         }
-                        className="p-2 rounded-md hover:bg-red-500/20 text-white/40 hover:text-red-300 transition-colors shrink-0"
+                        className="p-2 rounded-md hover:bg-ys-danger/25 text-ys-muted hover:text-ys-danger transition-colors shrink-0"
                       >
                         <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
                       </button>
@@ -452,7 +452,7 @@ export default function AdventureInspector({
                   <option value="off">Off</option>
                 </select>
               </Field>
-              <p className="text-[11px] text-white/30 mt-1">
+              <p className="text-[11px] text-ys-muted mt-1">
                 Offers the GM meters, progress tracks, session ends and the
                 action roll. Automatic turns them on when this adventure
                 carries a built-in system&apos;s rules notes.
@@ -460,10 +460,10 @@ export default function AdventureInspector({
             </div>
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[11px] uppercase tracking-wide text-white/40">
+                <span className="text-[11px] uppercase tracking-wide text-ys-muted">
                   Mechanics
                 </span>
-                <span className="text-[11px] text-white/25">
+                <span className="text-[11px] text-ys-muted">
                   how dice work at the table
                 </span>
               </div>
@@ -479,7 +479,7 @@ export default function AdventureInspector({
               )}
             </div>
             <div>
-              <span className="block text-[11px] uppercase tracking-wide text-white/40 mb-2">
+              <span className="block text-[11px] uppercase tracking-wide text-ys-muted mb-2">
                 Character sheet
               </span>
               {sheetNotes.length === 0 ? (
@@ -490,21 +490,21 @@ export default function AdventureInspector({
             </div>
             {draft.presets.length > 0 && (
               <div>
-                <span className="block text-[11px] uppercase tracking-wide text-white/40 mb-2">
+                <span className="block text-[11px] uppercase tracking-wide text-ys-muted mb-2">
                   Pre-made characters
                 </span>
                 <div className="space-y-2">
                   {draft.presets.map((preset) => (
                     <div
                       key={preset.id}
-                      className="bg-white/[0.03] border border-white/10 rounded-xl p-3 flex items-start gap-3"
+                      className="bg-ys-surface-2 border border-ys-border rounded-xl p-3 flex items-start gap-3"
                     >
                       <span className="text-xl shrink-0">{preset.icon}</span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-white truncate">
+                        <p className="text-sm font-medium text-ys-text truncate">
                           {preset.name}
                         </p>
-                        <p className="text-xs text-white/45 line-clamp-2">
+                        <p className="text-xs text-ys-muted line-clamp-2">
                           {preset.description}
                         </p>
                       </div>
@@ -516,7 +516,7 @@ export default function AdventureInspector({
                             ),
                           })
                         }
-                        className="p-1.5 rounded-md hover:bg-red-500/20 text-white/40 hover:text-red-300 transition-colors shrink-0"
+                        className="p-1.5 rounded-md hover:bg-ys-danger/25 text-ys-muted hover:text-ys-danger transition-colors shrink-0"
                       >
                         <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
                       </button>
@@ -545,13 +545,13 @@ export default function AdventureInspector({
               {draft.npcs.map((npc) => (
                 <div
                   key={npc.id}
-                  className="bg-white/[0.03] border border-white/10 rounded-xl p-3"
+                  className="bg-ys-surface-2 border border-ys-border rounded-xl p-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         {npc.symbol && <span>{npc.symbol}</span>}
-                        <span className="font-medium text-white text-sm">
+                        <span className="font-medium text-ys-text text-sm">
                           {npc.name}
                         </span>
                         <span
@@ -562,15 +562,15 @@ export default function AdventureInspector({
                           {npc.attitude}
                         </span>
                       </div>
-                      <p className="text-[11px] text-white/40 mt-0.5">
+                      <p className="text-[11px] text-ys-muted mt-0.5">
                         {npc.role}
                         {npc.faction ? ` · ${npc.faction}` : ""}
                       </p>
-                      <p className="text-xs text-white/50 mt-1.5 line-clamp-3">
+                      <p className="text-xs text-ys-muted mt-1.5 line-clamp-3">
                         {npc.description}
                       </p>
                       {npc.notes && (
-                        <p className="text-[11px] text-amber-300/50 mt-1.5 line-clamp-2">
+                        <p className="text-[11px] text-ys-warning mt-1.5 line-clamp-2">
                           GM: {npc.notes}
                         </p>
                       )}
@@ -581,7 +581,7 @@ export default function AdventureInspector({
                           npcs: draft.npcs.filter((n) => n.id !== npc.id),
                         })
                       }
-                      className="p-1.5 rounded-md hover:bg-red-500/20 text-white/40 hover:text-red-300 transition-colors shrink-0"
+                      className="p-1.5 rounded-md hover:bg-ys-danger/25 text-ys-muted hover:text-ys-danger transition-colors shrink-0"
                     >
                       <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
                     </button>
@@ -599,20 +599,20 @@ export default function AdventureInspector({
               {draft.goals.map((goal) => (
                 <div
                   key={goal.id}
-                  className="bg-white/[0.03] border border-white/10 rounded-xl p-3 flex items-start justify-between gap-2"
+                  className="bg-ys-surface-2 border border-ys-border rounded-xl p-3 flex items-start justify-between gap-2"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-white text-sm">
+                      <span className="font-medium text-ys-text text-sm">
                         {goal.title}
                       </span>
                       {!goal.active && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/45">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-ys-surface-2 text-ys-muted">
                           hidden at start
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-white/50 mt-1">
+                    <p className="text-xs text-ys-muted mt-1">
                       {goal.shortDescription}
                     </p>
                   </div>
@@ -622,7 +622,7 @@ export default function AdventureInspector({
                         goals: draft.goals.filter((g) => g.id !== goal.id),
                       })
                     }
-                    className="p-1.5 rounded-md hover:bg-red-500/20 text-white/40 hover:text-red-300 transition-colors shrink-0"
+                    className="p-1.5 rounded-md hover:bg-ys-danger/25 text-ys-muted hover:text-ys-danger transition-colors shrink-0"
                   >
                     <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
                   </button>

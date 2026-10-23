@@ -18,8 +18,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-      <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+    <section className="bg-ys-surface rounded-xl border border-ys-border p-6">
+      <h2 className="text-xl font-semibold text-ys-text mb-3 flex items-center gap-2">
         <DynamicIcon name={icon} className={`w-5 h-5 ${iconClassName}`} />
         {title}
       </h2>
@@ -39,11 +39,11 @@ function Point({
     <div className="flex items-start gap-3">
       <DynamicIcon
         name="Check"
-        className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
+        className="w-5 h-5 text-ys-success shrink-0 mt-0.5"
       />
       <div>
-        <h3 className="font-medium text-white">{title}</h3>
-        <p className="text-sm text-blue-200/60">{children}</p>
+        <h3 className="font-medium text-ys-text">{title}</h3>
+        <p className="text-sm text-ys-muted">{children}</p>
       </div>
     </div>
   );
@@ -52,7 +52,7 @@ function Point({
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2">
-      <span className="text-blue-400 shrink-0">•</span>
+      <span className="text-ys-accent shrink-0">•</span>
       <span className="flex-1 min-w-0">{children}</span>
     </li>
   );
@@ -61,7 +61,7 @@ function Bullet({ children }: { children: React.ReactNode }) {
 function Forbidden({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2">
-      <DynamicIcon name="X" className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+      <DynamicIcon name="X" className="w-4 h-4 text-ys-danger shrink-0 mt-0.5" />
       <span className="flex-1 min-w-0">{children}</span>
     </li>
   );
@@ -72,7 +72,7 @@ function Summary({ children }: { children: React.ReactNode }) {
     <li className="flex items-start gap-2">
       <DynamicIcon
         name="Check"
-        className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
+        className="w-4 h-4 text-ys-success shrink-0 mt-0.5"
       />
       <span className="flex-1 min-w-0">{children}</span>
     </li>
@@ -84,30 +84,30 @@ export default function TermsOfService() {
   useRouteBack(() => router.back());
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+    <div className="min-h-screen bg-[image:var(--ys-gradient)]">
       <main className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-blue-200/60 hover:text-blue-200 transition-colors mb-4"
+            className="flex items-center gap-2 text-ys-muted hover:text-ys-text transition-colors mb-4"
           >
             <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
             Back
           </button>
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className="text-3xl font-bold text-ys-text mb-2">
             Terms of Service
           </h1>
-          <p className="text-blue-200/40 text-sm">
+          <p className="text-ys-muted text-sm">
             Last updated: October 21, 2026
           </p>
         </div>
 
         {/* Content */}
-        <div className="space-y-8 text-blue-200/80">
+        <div className="space-y-8 text-ys-text">
           <Section
             icon="FileText"
-            iconClassName="text-blue-400"
+            iconClassName="text-ys-accent"
             title="Welcome to Your Story"
           >
             <p className="leading-relaxed">
@@ -117,8 +117,8 @@ export default function TermsOfService() {
               you bring yourself. The core principles are simple: be
               respectful, create responsibly, and have fun.
             </p>
-            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-              <p className="text-sm text-amber-200 flex items-start gap-2">
+            <div className="mt-4 p-3 bg-ys-warning/10 border border-ys-warning/30 rounded-lg">
+              <p className="text-sm text-ys-warning flex items-start gap-2">
                 <DynamicIcon
                   name="TriangleAlert"
                   className="w-4 h-4 shrink-0 mt-0.5"
@@ -133,16 +133,16 @@ export default function TermsOfService() {
           </Section>
 
           {/* Age Requirement */}
-          <section className="bg-red-500/10 rounded-xl border border-red-500/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="UserX" className="w-5 h-5 text-red-400" />
+          <section className="bg-ys-danger/10 rounded-xl border border-ys-danger/30 p-6">
+            <h2 className="text-xl font-semibold text-ys-text mb-3 flex items-center gap-2">
+              <DynamicIcon name="UserX" className="w-5 h-5 text-ys-danger" />
               Age Requirement
             </h2>
             <div className="space-y-3">
-              <p className="text-lg font-medium text-white">
+              <p className="text-lg font-medium text-ys-text">
                 You must be at least 18 years old to use Your Story.
               </p>
-              <p className="text-sm text-blue-200/60">
+              <p className="text-sm text-ys-muted">
                 The AI can generate mature themes, violence, and other content
                 not suitable for minors. By using the app, you confirm that you
                 are 18 years of age or older.
@@ -152,7 +152,7 @@ export default function TermsOfService() {
 
           <Section
             icon="ThumbsUp"
-            iconClassName="text-green-400"
+            iconClassName="text-ys-success"
             title="Acceptable Use"
           >
             <div className="space-y-4">
@@ -176,7 +176,7 @@ export default function TermsOfService() {
 
           <Section
             icon="Ban"
-            iconClassName="text-red-400"
+            iconClassName="text-ys-danger"
             title="Prohibited Content"
           >
             <div className="space-y-3">
@@ -196,7 +196,7 @@ export default function TermsOfService() {
                 </Forbidden>
                 <Forbidden>Spam, scams, or malicious content</Forbidden>
               </ul>
-              <p className="text-sm text-blue-200/60 mt-4">
+              <p className="text-sm text-ys-muted mt-4">
                 These rules apply to everything you share: what you send to
                 other players in online play, and stories, adventures or notes
                 you pass on as exported files. Content sexualizing minors is
@@ -210,7 +210,7 @@ export default function TermsOfService() {
 
           <Section
             icon="Scale"
-            iconClassName="text-purple-400"
+            iconClassName="text-ys-accent"
             title="Your Responsibility"
           >
             <div className="space-y-4">
@@ -239,7 +239,7 @@ export default function TermsOfService() {
 
           <Section
             icon="PenTool"
-            iconClassName="text-pink-400"
+            iconClassName="text-ys-accent"
             title="Your Content"
           >
             <ul className="space-y-2 text-sm">
@@ -266,7 +266,7 @@ export default function TermsOfService() {
 
           <Section
             icon="KeyRound"
-            iconClassName="text-yellow-400"
+            iconClassName="text-ys-warning"
             title="AI Provider Keys"
           >
             <div className="space-y-3 text-sm">
@@ -304,7 +304,7 @@ export default function TermsOfService() {
 
           <Section
             icon="Server"
-            iconClassName="text-cyan-400"
+            iconClassName="text-ys-accent"
             title="Service Availability"
           >
             <div className="space-y-3 text-sm">
@@ -312,7 +312,7 @@ export default function TermsOfService() {
                 Your Story runs on your device, so most of it doesn&apos;t
                 depend on us. Still, as an alpha app:
               </p>
-              <ul className="space-y-2 text-blue-200/60">
+              <ul className="space-y-2 text-ys-muted">
                 <Bullet>
                   The app is provided &quot;as is&quot; without guarantees
                 </Bullet>
@@ -345,7 +345,7 @@ export default function TermsOfService() {
 
           <Section
             icon="MessageCircle"
-            iconClassName="text-blue-400"
+            iconClassName="text-ys-accent"
             title="Questions?"
           >
             <p className="text-sm leading-relaxed">
@@ -354,7 +354,7 @@ export default function TermsOfService() {
                 href={ISSUES_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-300 underline hover:text-blue-200"
+                className="text-ys-muted underline hover:text-ys-text"
               >
                 our GitHub
               </a>
@@ -364,9 +364,9 @@ export default function TermsOfService() {
           </Section>
 
           {/* Summary Box */}
-          <section className="bg-green-500/10 rounded-xl border border-green-500/30 p-6">
-            <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Sparkles" className="w-5 h-5 text-green-400" />
+          <section className="bg-ys-success/10 rounded-xl border border-ys-success/30 p-6">
+            <h2 className="text-lg font-semibold text-ys-text mb-3 flex items-center gap-2">
+              <DynamicIcon name="Sparkles" className="w-5 h-5 text-ys-success" />
               TL;DR
             </h2>
             <ul className="space-y-2 text-sm">
@@ -401,7 +401,7 @@ export default function TermsOfService() {
         <div className="mt-8 text-center">
           <button
             onClick={() => router.push("/")}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="px-6 py-2 bg-ys-accent text-ys-on-accent font-medium rounded-lg transition-colors hover:opacity-90"
           >
             Back to Home
           </button>

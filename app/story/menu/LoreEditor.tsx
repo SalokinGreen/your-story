@@ -27,6 +27,10 @@ import {
 } from "../../misc/localNotesLibraryManager";
 import { pinnedNoteWarning } from "../../misc/contextLimits";
 import { isBuiltinId } from "../../misc/systems";
+import {
+  PLAYER_FALLBACK_COLOR,
+  PLAYER_TEXT_COLOR,
+} from "../../misc/multiplayer/palette";
 import PDFImporter from "../../components/PDFImporter";
 import LibraryPickerModal from "../../components/LibraryPickerModal";
 
@@ -314,16 +318,16 @@ export default function LoreEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-          <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
-            <DynamicIcon name="Book" className="w-4 h-4 text-purple-300" />
+        <h4 className="text-lg font-bold text-ys-text mb-3 flex items-center gap-2">
+          <span className="p-1.5 rounded-lg bg-ys-accent/10 ring-1 ring-ys-accent/20">
+            <DynamicIcon name="Book" className="w-4 h-4 text-ys-accent" />
           </span>
           Lore Entries ({localLore.length})
         </h4>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowLibraryPicker(true)}
-            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-100 text-sm rounded-lg transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text text-sm rounded-lg transition-colors flex items-center gap-1.5"
           >
             <DynamicIcon name="Library" className="w-4 h-4" />
             Import from Library
@@ -335,7 +339,7 @@ export default function LoreEditor({
           />
           <button
             onClick={addLore}
-            className="px-3 py-1.5 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white text-sm font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all"
+            className="px-3 py-1.5 bg-ys-success/15 text-ys-success text-sm font-medium rounded-lg transition-all border border-ys-success/40"
           >
             + Add Lore
           </button>
@@ -346,7 +350,7 @@ export default function LoreEditor({
           editingLoreIndex === index ? (
             <div
               key={index}
-              className="p-4 bg-white/[0.04] backdrop-blur-xl border border-purple-400/30 rounded-2xl shadow-[0_0_20px_rgba(168,85,247,0.1)]"
+              className="p-4 bg-ys-surface backdrop-blur-xl border border-ys-accent/30 rounded-2xl shadow-[0_0_20px_color-mix(in_srgb,var(--ys-accent)_10%,transparent)]"
             >
               <div className="space-y-3">
                 <input
@@ -356,7 +360,7 @@ export default function LoreEditor({
                     setEditLore({ ...editLore, title: e.target.value })
                   }
                   placeholder="Note title"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text font-semibold focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                 />
                 <textarea
                   value={editLore.content || ""}
@@ -364,13 +368,13 @@ export default function LoreEditor({
                     setEditLore({ ...editLore, content: e.target.value })
                   }
                   placeholder="Note content (supports Markdown)"
-                  className="w-full h-32 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                  className="w-full h-32 px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text resize-none focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                 />
                 {pinnedNoteWarning({
                   type: editLore.type,
                   content: editLore.content || "",
                 }) && (
-                  <p role="status" className="text-xs leading-relaxed text-amber-300/90">
+                  <p role="status" className="text-xs leading-relaxed text-ys-warning/90">
                     {pinnedNoteWarning({
                       type: editLore.type,
                       content: editLore.content || "",
@@ -379,7 +383,7 @@ export default function LoreEditor({
                 )}
                 {/* Note Type Selector */}
                 <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                  <label className="block text-sm font-semibold text-ys-text mb-2">
                     <DynamicIcon
                       name="FileType"
                       className="inline-block w-4 h-4 mr-1"
@@ -398,7 +402,7 @@ export default function LoreEditor({
                           | "table",
                       })
                     }
-                    className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                    className="w-full px-3 py-2 text-sm bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   >
                     <option value="lore">📜 Lore (Standard note)</option>
                     <option value="character_sheet">
@@ -407,7 +411,7 @@ export default function LoreEditor({
                     <option value="mechanics">⚙️ Mechanics (Game rules)</option>
                     <option value="table">🎲 Table (Random table to roll on)</option>
                   </select>
-                  <p className="text-xs text-blue-300/60 mt-1">
+                  <p className="text-xs text-ys-muted mt-1">
                     {editLore.type === "character_sheet"
                       ? "Character sheet notes appear at the very top of AI context for character details."
                       : editLore.type === "mechanics"
@@ -425,7 +429,7 @@ export default function LoreEditor({
                   couchPlayers &&
                   couchPlayers.length > 1 && (
                     <div>
-                      <label className="block text-sm font-semibold text-blue-200 mb-2">
+                      <label className="block text-sm font-semibold text-ys-text mb-2">
                         <DynamicIcon
                           name="User"
                           className="inline-block w-4 h-4 mr-1"
@@ -440,7 +444,7 @@ export default function LoreEditor({
                             ownerCouchPlayerId: e.target.value || undefined,
                           })
                         }
-                        className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                        className="w-full px-3 py-2 text-sm bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                       >
                         <option value="">Shared / unspecified</option>
                         {couchPlayers.map((player) => (
@@ -449,7 +453,7 @@ export default function LoreEditor({
                           </option>
                         ))}
                       </select>
-                      <p className="text-xs text-blue-300/60 mt-1">
+                      <p className="text-xs text-ys-muted mt-1">
                         Links this character sheet to a specific player. Leave
                         unspecified if everyone shares one sheet.
                       </p>
@@ -467,14 +471,14 @@ export default function LoreEditor({
                   }
                 />
                 <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 text-sm text-blue-200">
+                  <label className="flex items-center gap-2 text-sm text-ys-text">
                     <input
                       type="checkbox"
                       checked={editLore.secrtet ?? false}
                       onChange={(e) =>
                         setEditLore({ ...editLore, secrtet: e.target.checked })
                       }
-                      className="rounded accent-purple-500"
+                      className="rounded accent-ys-accent"
                     />
                     <span>
                       <DynamicIcon
@@ -484,36 +488,36 @@ export default function LoreEditor({
                       Secret Lore (hidden until discovered)
                     </span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-blue-200">
+                  <label className="flex items-center gap-2 text-sm text-ys-text">
                     <input
                       type="checkbox"
                       checked={editLore.on !== false}
                       onChange={(e) =>
                         setEditLore({ ...editLore, on: e.target.checked })
                       }
-                      className="rounded accent-purple-500"
+                      className="rounded accent-ys-accent"
                     />
                     <span>
                       <DynamicIcon
                         name="CheckCircle"
-                        className="inline-block w-4 h-4 mr-1 text-green-600"
+                        className="inline-block w-4 h-4 mr-1 text-ys-success"
                       />
                       Enabled
                     </span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-blue-200">
+                  <label className="flex items-center gap-2 text-sm text-ys-text">
                     <input
                       type="checkbox"
                       checked={!!editLore.alwaysOn}
                       onChange={(e) =>
                         setEditLore({ ...editLore, alwaysOn: e.target.checked })
                       }
-                      className="rounded accent-purple-500"
+                      className="rounded accent-ys-accent"
                     />
                     <span>
                       <DynamicIcon
                         name="Circle"
-                        className="inline-block w-4 h-4 mr-1 text-blue-500"
+                        className="inline-block w-4 h-4 mr-1 text-ys-accent"
                       />
                       Always On
                     </span>
@@ -523,10 +527,10 @@ export default function LoreEditor({
                 {/* Folder and Tags for organization */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    <label className="block text-sm font-semibold text-ys-text mb-2">
                       <DynamicIcon
                         name="Folder"
-                        className="inline-block w-4 h-4 mr-1 text-yellow-500"
+                        className="inline-block w-4 h-4 mr-1 text-ys-warning"
                       />
                       Folder
                     </label>
@@ -538,7 +542,7 @@ export default function LoreEditor({
                       }
                       placeholder="e.g., Characters, Locations..."
                       list="lore-folders-list"
-                      className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                      className="w-full px-3 py-2 text-sm bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                     />
                     <datalist id="lore-folders-list">
                       {[
@@ -551,10 +555,10 @@ export default function LoreEditor({
                     </datalist>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    <label className="block text-sm font-semibold text-ys-text mb-2">
                       <DynamicIcon
                         name="Tag"
-                        className="inline-block w-4 h-4 mr-1 text-purple-400"
+                        className="inline-block w-4 h-4 mr-1 text-ys-accent"
                       />
                       Tags
                     </label>
@@ -566,7 +570,7 @@ export default function LoreEditor({
                           onChange={(e) => setEditLoreTag(e.target.value)}
                           placeholder="Add tag..."
                           list="lore-tags-list"
-                          className="flex-1 px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                          className="flex-1 px-3 py-2 text-sm bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
@@ -599,7 +603,7 @@ export default function LoreEditor({
                               setEditLoreTag("");
                             }
                           }}
-                          className="px-3 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 text-sm rounded-lg transition-colors"
+                          className="px-3 py-2 bg-ys-accent/10 hover:bg-ys-accent/20 text-ys-text border border-ys-accent/20 text-sm rounded-lg transition-colors"
                         >
                           Add
                         </button>
@@ -608,7 +612,7 @@ export default function LoreEditor({
                         {(editLore.tags || []).map((tag, idx) => (
                           <span
                             key={idx}
-                            className="px-2 py-1 bg-purple-500/10 text-purple-300 border border-purple-400/20 rounded-full text-xs flex items-center gap-1"
+                            className="px-2 py-1 bg-ys-accent/10 text-ys-accent border border-ys-accent/20 rounded-full text-xs flex items-center gap-1"
                           >
                             <DynamicIcon name="Tag" className="w-3 h-3" />
                             {tag}
@@ -621,7 +625,7 @@ export default function LoreEditor({
                                   ),
                                 })
                               }
-                              className="hover:text-purple-100 transition-colors"
+                              className="hover:text-ys-text transition-colors"
                             >
                               ×
                             </button>
@@ -635,10 +639,10 @@ export default function LoreEditor({
                 {/* ON/OFF Trigger Words */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    <label className="block text-sm font-semibold text-ys-text mb-2">
                       <DynamicIcon
                         name="CheckCircle"
-                        className="inline-block w-4 h-4 mr-1 text-green-600"
+                        className="inline-block w-4 h-4 mr-1 text-ys-success"
                       />
                       ON Trigger Words
                     </label>
@@ -647,7 +651,7 @@ export default function LoreEditor({
                         <input
                           type="text"
                           placeholder="e.g., Found the Ancient Map"
-                          className="flex-1 px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                          className="flex-1 px-3 py-2 text-sm bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               const input = e.currentTarget;
@@ -673,7 +677,7 @@ export default function LoreEditor({
                         {(editLore.on_triggers || []).map((trigger, idx) => (
                           <span
                             key={idx}
-                            className="px-2 py-1 bg-green-500/10 text-green-300 border border-green-400/20 rounded-full text-xs flex items-center gap-1"
+                            className="px-2 py-1 bg-ys-success/10 text-ys-success border border-ys-success/20 rounded-full text-xs flex items-center gap-1"
                           >
                             <DynamicIcon
                               name="CheckCircle"
@@ -689,7 +693,7 @@ export default function LoreEditor({
                                   ).filter((_, i) => i !== idx),
                                 })
                               }
-                              className="hover:text-green-100 transition-colors"
+                              className="hover:text-ys-text transition-colors"
                             >
                               ×
                             </button>
@@ -700,10 +704,10 @@ export default function LoreEditor({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    <label className="block text-sm font-semibold text-ys-text mb-2">
                       <DynamicIcon
                         name="XCircle"
-                        className="inline-block w-4 h-4 mr-1 text-red-600"
+                        className="inline-block w-4 h-4 mr-1 text-ys-danger"
                       />
                       OFF Trigger Words
                     </label>
@@ -712,7 +716,7 @@ export default function LoreEditor({
                         <input
                           type="text"
                           placeholder="e.g., Destroyed the Map"
-                          className="flex-1 px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                          className="flex-1 px-3 py-2 text-sm bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               const input = e.currentTarget;
@@ -738,7 +742,7 @@ export default function LoreEditor({
                         {(editLore.off_triggers || []).map((trigger, idx) => (
                           <span
                             key={idx}
-                            className="px-2 py-1 bg-red-500/10 text-red-300 border border-red-400/20 rounded-full text-xs flex items-center gap-1"
+                            className="px-2 py-1 bg-ys-danger/10 text-ys-danger border border-ys-danger/20 rounded-full text-xs flex items-center gap-1"
                           >
                             <DynamicIcon name="XCircle" className="w-3 h-3" />
                             {trigger}
@@ -751,7 +755,7 @@ export default function LoreEditor({
                                   ).filter((_, i) => i !== idx),
                                 })
                               }
-                              className="hover:text-red-100 transition-colors"
+                              className="hover:text-ys-text transition-colors"
                             >
                               ×
                             </button>
@@ -763,21 +767,21 @@ export default function LoreEditor({
                 </div>
 
                 {/* Advanced Triggers Section (Expandable) */}
-                <div className="border border-white/10 rounded-xl overflow-hidden">
+                <div className="border border-ys-border rounded-xl overflow-hidden">
                   <button
                     onClick={() =>
                       setEditLoreAdvancedExpanded(!editLoreAdvancedExpanded)
                     }
-                    className="w-full px-4 py-3 flex items-center justify-between bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between bg-ys-surface hover:bg-ys-surface-2 transition-colors"
                   >
-                    <span className="text-sm font-semibold text-blue-200">
+                    <span className="text-sm font-semibold text-ys-text">
                       <DynamicIcon
                         name="Settings"
                         className="inline-block w-4 h-4 mr-1"
                       />
                       Advanced Section
                     </span>
-                    <span className="text-blue-300/50">
+                    <span className="text-ys-muted">
                       {editLoreAdvancedExpanded ? (
                         <DynamicIcon name="ChevronDown" className="w-4 h-4" />
                       ) : (
@@ -791,17 +795,17 @@ export default function LoreEditor({
                       {/* Lore-based Triggers */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-2">
+                          <label className="block text-sm font-semibold text-ys-text mb-2">
                             <DynamicIcon
                               name="CheckCircle"
-                              className="inline-block w-4 h-4 mr-1 text-green-600"
+                              className="inline-block w-4 h-4 mr-1 text-ys-success"
                             />
                             Lores that turn this ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
+                          <div className="max-h-40 overflow-y-auto border border-ys-border rounded-lg p-2 bg-ys-surface">
                             {localLore.filter((_, i) => i !== index).length ===
                             0 ? (
-                              <p className="text-xs text-blue-300/50 italic">
+                              <p className="text-xs text-ys-muted italic">
                                 No other lore entries.
                               </p>
                             ) : (
@@ -810,7 +814,7 @@ export default function LoreEditor({
                                 .map((loreEntry, loreIdx) => (
                                   <label
                                     key={loreIdx}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-ys-surface-2 rounded-lg cursor-pointer transition-colors"
                                   >
                                     <input
                                       type="checkbox"
@@ -829,9 +833,9 @@ export default function LoreEditor({
                                               ),
                                         });
                                       }}
-                                      className="w-4 h-4 rounded accent-green-500"
+                                      className="w-4 h-4 rounded accent-ys-success"
                                     />
-                                    <span className="text-xs text-white">
+                                    <span className="text-xs text-ys-text">
                                       {loreEntry.title}
                                     </span>
                                   </label>
@@ -840,17 +844,17 @@ export default function LoreEditor({
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-2">
+                          <label className="block text-sm font-semibold text-ys-text mb-2">
                             <DynamicIcon
                               name="XCircle"
-                              className="inline-block w-4 h-4 mr-1 text-red-600"
+                              className="inline-block w-4 h-4 mr-1 text-ys-danger"
                             />
                             Lores that turn this OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
+                          <div className="max-h-40 overflow-y-auto border border-ys-border rounded-lg p-2 bg-ys-surface">
                             {localLore.filter((_, i) => i !== index).length ===
                             0 ? (
-                              <p className="text-xs text-blue-300/50 italic">
+                              <p className="text-xs text-ys-muted italic">
                                 No other lore entries.
                               </p>
                             ) : (
@@ -859,7 +863,7 @@ export default function LoreEditor({
                                 .map((loreEntry, loreIdx) => (
                                   <label
                                     key={loreIdx}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-ys-surface-2 rounded-lg cursor-pointer transition-colors"
                                   >
                                     <input
                                       type="checkbox"
@@ -878,9 +882,9 @@ export default function LoreEditor({
                                               ),
                                         });
                                       }}
-                                      className="w-4 h-4 rounded accent-red-500"
+                                      className="w-4 h-4 rounded accent-ys-danger"
                                     />
-                                    <span className="text-xs text-white">
+                                    <span className="text-xs text-ys-text">
                                       {loreEntry.title}
                                     </span>
                                   </label>
@@ -897,13 +901,13 @@ export default function LoreEditor({
                 <div className="flex gap-2">
                   <button
                     onClick={() => saveEditLore(index)}
-                    className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-lg shadow-md shadow-emerald-950/40 transition-all"
+                    className="px-4 py-2 bg-ys-success/15 text-ys-success rounded-lg transition-all border border-ys-success/40"
                   >
                     Save
                   </button>
                   <button
                     onClick={cancelEditLore}
-                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
+                    className="px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text rounded-lg transition-all"
                   >
                     Cancel
                   </button>
@@ -917,23 +921,23 @@ export default function LoreEditor({
               onDragStart={() => handleLoreDragStart(index)}
               onDragOver={(e) => handleLoreDragOver(e, index)}
               onDragEnd={handleLoreDragEnd}
-              className={`p-3 sm:p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-xl cursor-move hover:bg-white/[0.05] transition-colors ${
+              className={`p-3 sm:p-4 bg-ys-surface backdrop-blur-md border border-ys-border rounded-xl cursor-move hover:bg-ys-surface-2 transition-colors ${
                 draggedLoreIndex === index ? "opacity-50" : ""
               }`}
             >
               <div className="flex items-start gap-2 sm:gap-3">
-                <span className="text-blue-300/40 select-none mt-1">
+                <span className="text-ys-muted select-none mt-1">
                   <DynamicIcon
                     name="GripVertical"
                     className="w-4 h-4 sm:w-5 sm:h-5"
                   />
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-white flex items-center gap-2">
+                  <div className="font-medium text-ys-text flex items-center gap-2">
                     {loreItem.secrtet && (
                       <DynamicIcon
                         name="Lock"
-                        className="w-4 h-4 text-blue-300/50"
+                        className="w-4 h-4 text-ys-muted"
                       />
                     )}
                     {loreItem.title}
@@ -948,8 +952,8 @@ export default function LoreEditor({
                       }}
                       className={`px-2 py-1 rounded-full text-xs font-semibold transition-colors border ${
                         loreItem.on
-                          ? "bg-green-500/15 text-green-300 border-green-400/20 hover:bg-green-500/25"
-                          : "bg-white/5 text-blue-300/50 border-white/10 hover:bg-white/10"
+                          ? "bg-ys-success/15 text-ys-success border-ys-success/20 hover:bg-ys-success/25"
+                          : "bg-ys-surface text-ys-muted border-ys-border hover:bg-ys-surface-2"
                       }`}
                       title={
                         loreItem.on ? "Note is enabled" : "Note is disabled"
@@ -962,8 +966,8 @@ export default function LoreEditor({
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${
                           loreItem.type === "character_sheet"
-                            ? "bg-purple-500/15 text-purple-300 border-purple-400/20"
-                            : "bg-amber-500/15 text-amber-300 border-amber-400/20"
+                            ? "bg-ys-accent/15 text-ys-accent border-ys-accent/20"
+                            : "bg-ys-warning/15 text-ys-warning border-ys-warning/20"
                         }`}
                         title={
                           loreItem.type === "character_sheet"
@@ -980,12 +984,13 @@ export default function LoreEditor({
                       loreItem.ownerCouchPlayerId &&
                       couchPlayers && (
                         <span
-                          className="px-2 py-0.5 rounded-full text-xs font-semibold text-white"
+                          className="px-2 py-0.5 rounded-full text-xs font-semibold"
                           style={{
                             backgroundColor:
                               couchPlayers.find(
                                 (p) => p.id === loreItem.ownerCouchPlayerId,
-                              )?.color || "#6b7280",
+                              )?.color || PLAYER_FALLBACK_COLOR,
+                            color: PLAYER_TEXT_COLOR,
                           }}
                           title="This character sheet belongs to this player"
                         >
@@ -999,14 +1004,14 @@ export default function LoreEditor({
                     <img
                       src={loreItem.thumbnailUrl}
                       alt={loreItem.title}
-                      className="mt-2 w-20 h-20 object-cover rounded-lg border border-white/10"
+                      className="mt-2 w-20 h-20 object-cover rounded-lg border border-ys-border"
                     />
                   )}
-                  <div className="text-sm text-blue-200/60 mt-1 line-clamp-2">
+                  <div className="text-sm text-ys-muted mt-1 line-clamp-2">
                     {loreItem.content}
                   </div>
                   {loreItem.on_triggers && loreItem.on_triggers.length > 0 && (
-                    <div className="text-xs text-green-400/80 mt-1 flex items-center gap-1">
+                    <div className="text-xs text-ys-success/80 mt-1 flex items-center gap-1">
                       <strong className="flex items-center gap-1">
                         <DynamicIcon name="CheckCircle" className="w-3 h-3" />{" "}
                         ON Triggers:
@@ -1016,7 +1021,7 @@ export default function LoreEditor({
                   )}
                   {loreItem.off_triggers &&
                     loreItem.off_triggers.length > 0 && (
-                      <div className="text-xs text-red-400/80 mt-1 flex items-center gap-1">
+                      <div className="text-xs text-ys-danger/80 mt-1 flex items-center gap-1">
                         <strong className="flex items-center gap-1">
                           <DynamicIcon name="XCircle" className="w-3 h-3" /> OFF
                           Triggers:
@@ -1031,7 +1036,7 @@ export default function LoreEditor({
                     <button
                       onClick={() => moveLoreUp(index)}
                       disabled={index === 0}
-                      className="w-7 h-7 sm:w-8 sm:h-8 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-blue-200 border border-white/10 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-surface hover:bg-ys-surface-2 disabled:opacity-30 disabled:cursor-not-allowed text-ys-text border border-ys-border rounded-lg flex items-center justify-center transition-colors"
                       title="Move up"
                     >
                       <DynamicIcon
@@ -1042,7 +1047,7 @@ export default function LoreEditor({
                     <button
                       onClick={() => moveLoreDown(index)}
                       disabled={index === localLore.length - 1}
-                      className="w-7 h-7 sm:w-8 sm:h-8 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-blue-200 border border-white/10 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-surface hover:bg-ys-surface-2 disabled:opacity-30 disabled:cursor-not-allowed text-ys-text border border-ys-border rounded-lg flex items-center justify-center transition-colors"
                       title="Move down"
                     >
                       <DynamicIcon
@@ -1057,7 +1062,7 @@ export default function LoreEditor({
                         <button
                           onClick={() => pushLoreToLibrary(index)}
                           disabled={!!librarySyncBusy[index]}
-                          className="w-7 h-7 sm:w-8 sm:h-8 bg-indigo-500/10 hover:bg-indigo-500/20 disabled:opacity-40 text-indigo-200 border border-indigo-400/20 rounded-lg flex items-center justify-center transition-colors"
+                          className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-accent/10 hover:bg-ys-accent/20 disabled:opacity-40 text-ys-text border border-ys-accent/20 rounded-lg flex items-center justify-center transition-colors"
                           title="Push this version to your notes library"
                         >
                           <DynamicIcon
@@ -1068,7 +1073,7 @@ export default function LoreEditor({
                         <button
                           onClick={() => pullLoreFromLibrary(index)}
                           disabled={!!librarySyncBusy[index]}
-                          className="w-7 h-7 sm:w-8 sm:h-8 bg-indigo-500/10 hover:bg-indigo-500/20 disabled:opacity-40 text-indigo-200 border border-indigo-400/20 rounded-lg flex items-center justify-center transition-colors"
+                          className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-accent/10 hover:bg-ys-accent/20 disabled:opacity-40 text-ys-text border border-ys-accent/20 rounded-lg flex items-center justify-center transition-colors"
                           title="Pull the latest version from your notes library"
                         >
                           <DynamicIcon
@@ -1081,7 +1086,7 @@ export default function LoreEditor({
                       <button
                         onClick={() => saveLoreToLibrary(index)}
                         disabled={!!librarySyncBusy[index]}
-                        className="w-7 h-7 sm:w-8 sm:h-8 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-40 text-purple-200 border border-purple-400/20 rounded-lg flex items-center justify-center transition-colors"
+                        className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-accent/10 hover:bg-ys-accent/20 disabled:opacity-40 text-ys-text border border-ys-accent/20 rounded-lg flex items-center justify-center transition-colors"
                         title="Save to your notes library for reuse in other stories"
                       >
                         <DynamicIcon
@@ -1094,7 +1099,7 @@ export default function LoreEditor({
                   <div className="flex gap-0.5">
                     <button
                       onClick={() => startEditLore(index)}
-                      className="w-7 h-7 sm:w-8 sm:h-8 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-accent/10 hover:bg-ys-accent/20 text-ys-text border border-ys-accent/20 rounded-lg flex items-center justify-center transition-colors"
                       title="Edit"
                     >
                       <DynamicIcon
@@ -1104,7 +1109,7 @@ export default function LoreEditor({
                     </button>
                     <button
                       onClick={() => removeLore(index)}
-                      className="w-7 h-7 sm:w-8 sm:h-8 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-danger/10 hover:bg-ys-danger/20 text-ys-danger border border-ys-danger/20 rounded-lg flex items-center justify-center transition-colors"
                       title="Remove"
                     >
                       <DynamicIcon

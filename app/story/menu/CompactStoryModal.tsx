@@ -144,14 +144,14 @@ export default function CompactStoryModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-60 p-4">
-      <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl border border-white/10 w-full max-w-md shadow-2xl shadow-black/50">
-        <div className="p-4 border-b border-white/10">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <DynamicIcon name="Minimize2" className="w-5 h-5 text-sky-400" />
+    <div className="fixed inset-0 ys-modal-backdrop flex items-center justify-center z-60 p-4">
+      <div className="bg-ys-surface/95 backdrop-blur-2xl rounded-2xl border border-ys-border w-full max-w-md shadow-2xl">
+        <div className="p-4 border-b border-ys-border">
+          <h3 className="text-lg font-semibold text-ys-text flex items-center gap-2">
+            <DynamicIcon name="Minimize2" className="w-5 h-5 text-ys-accent" />
             Compact Story
           </h3>
-          <p className="text-sm text-blue-300/60 mt-1">
+          <p className="text-sm text-ys-muted mt-1">
             Current size: {formatBytes(currentSize)} · {partCount} exchanges
           </p>
         </div>
@@ -159,7 +159,7 @@ export default function CompactStoryModal({
         {mode === "menu" && (
           <>
             <div className="p-4 space-y-4">
-              <p className="text-sm text-blue-200/80">
+              <p className="text-sm text-ys-text/80">
                 Always safe: clears old debug/reasoning data from past turns
                 and archives resolved threads &amp; completed goals into the
                 story summary. Your narrative text is never touched by this
@@ -171,10 +171,10 @@ export default function CompactStoryModal({
                   type="checkbox"
                   checked={summarizeNarrative}
                   onChange={(e) => setSummarizeNarrative(e.target.checked)}
-                  className="mt-1 w-4 h-4 rounded border-white/20 bg-white/5 accent-orange-500"
+                  className="mt-1 w-4 h-4 rounded border-ys-border bg-ys-surface accent-ys-warning"
                 />
-                <span className="text-sm text-blue-200 group-hover:text-white transition-colors">
-                  <span className="font-medium text-orange-300">
+                <span className="text-sm text-ys-muted group-hover:text-ys-text transition-colors">
+                  <span className="font-medium text-ys-warning">
                     Also summarize older narrative
                   </span>{" "}
                   — folds everything except the last {DEFAULT_KEEP_RECENT_PARTS}{" "}
@@ -186,9 +186,9 @@ export default function CompactStoryModal({
               </label>
             </div>
 
-            <div className="p-4 border-t border-white/10 space-y-2">
-              <p className="text-sm text-blue-200/80">
-                <span className="font-medium text-sky-300">Summarise now</span>{" "}
+            <div className="p-4 border-t border-ys-border space-y-2">
+              <p className="text-sm text-ys-text/80">
+                <span className="font-medium text-ys-accent">Summarise now</span>{" "}
                 — folds everything except the last {COMPACT_NOW_KEEP_PARTS / 2}{" "}
                 turns into the story-so-far the AI reads. Nothing is removed
                 from your story. Say what to hold on to, if you like.
@@ -198,26 +198,26 @@ export default function CompactStoryModal({
                 value={focus}
                 onChange={(e) => setFocus(e.target.value)}
                 placeholder="Focus (optional), e.g. keep everything about the Salon"
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-400/40 text-sm"
+                className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-xl text-ys-text placeholder-ys-muted focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 text-sm"
               />
               <button
                 onClick={handleSummariseNow}
                 disabled={busy}
-                className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-sky-200 hover:text-white font-medium rounded-lg transition-all border border-white/10 flex items-center justify-center gap-2"
+                className="w-full px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 disabled:opacity-50 text-ys-muted hover:text-ys-text font-medium rounded-lg transition-all border border-ys-border flex items-center justify-center gap-2"
               >
                 <DynamicIcon name="Minimize2" className="w-4 h-4" />
                 Summarise Now
               </button>
             </div>
 
-            <div className="p-4 border-t border-white/10 flex flex-col gap-2">
+            <div className="p-4 border-t border-ys-border flex flex-col gap-2">
               <button
                 onClick={handleCompactInPlace}
                 disabled={busy}
-                className="w-full px-4 py-2 bg-linear-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 disabled:opacity-50 text-white font-medium rounded-lg transition-all shadow-md shadow-sky-950/40 flex items-center justify-center gap-2"
+                className="w-full px-4 py-2 bg-ys-accent disabled:opacity-50 text-ys-on-accent font-medium rounded-lg transition-all shadow-md shadow-ys-accent/40 flex items-center justify-center gap-2"
               >
                 {busy ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-ys-border border-t-transparent" />
                 ) : (
                   <DynamicIcon name="Minimize2" className="w-4 h-4" />
                 )}
@@ -228,7 +228,7 @@ export default function CompactStoryModal({
               <button
                 onClick={() => setMode("spinoff-name")}
                 disabled={busy}
-                className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-blue-200 hover:text-white font-medium rounded-lg transition-all border border-white/10 flex items-center justify-center gap-2"
+                className="w-full px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 disabled:opacity-50 text-ys-muted hover:text-ys-text font-medium rounded-lg transition-all border border-ys-border flex items-center justify-center gap-2"
               >
                 <DynamicIcon name="GitBranch" className="w-4 h-4" />
                 Spin Off Condensed Copy
@@ -236,7 +236,7 @@ export default function CompactStoryModal({
               <button
                 onClick={onClose}
                 disabled={busy}
-                className="w-full px-4 py-2 text-blue-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                className="w-full px-4 py-2 text-ys-accent hover:text-ys-text hover:bg-ys-surface-2 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -247,12 +247,12 @@ export default function CompactStoryModal({
         {mode === "spinoff-name" && (
           <>
             <div className="p-4 space-y-3">
-              <p className="text-sm text-blue-200/80">
+              <p className="text-sm text-ys-text/80">
                 Creates a new story with your character sheet, world lore, and
                 a fresh summary of everything that happened so far. This story
                 is left completely untouched.
               </p>
-              <label className="block text-sm font-medium text-blue-200">
+              <label className="block text-sm font-medium text-ys-text">
                 New Story Name
               </label>
               <input
@@ -260,7 +260,7 @@ export default function CompactStoryModal({
                 value={spinoffName}
                 onChange={(e) => setSpinoffName(e.target.value)}
                 placeholder="Enter a name for the new story..."
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40"
+                className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-xl text-ys-text placeholder-ys-muted focus:outline-none focus:ring-2 focus:ring-ys-success/40 focus:border-ys-success/40"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && spinoffName.trim()) {
@@ -271,21 +271,21 @@ export default function CompactStoryModal({
                 }}
               />
             </div>
-            <div className="p-4 border-t border-white/10 flex justify-end gap-3">
+            <div className="p-4 border-t border-ys-border flex justify-end gap-3">
               <button
                 onClick={() => setMode("menu")}
                 disabled={busy}
-                className="px-4 py-2 text-blue-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                className="px-4 py-2 text-ys-accent hover:text-ys-text hover:bg-ys-surface-2 rounded-lg transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleSpinOff}
                 disabled={busy || !spinoffName.trim()}
-                className="px-4 py-2 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-white/5 disabled:to-white/5 disabled:text-emerald-300/30 text-white font-medium rounded-lg transition-all shadow-md shadow-emerald-950/40 disabled:shadow-none flex items-center gap-2"
+                className="px-4 py-2 bg-ys-success/15 disabled:text-ys-muted text-ys-success font-medium rounded-lg transition-all flex items-center gap-2 border border-ys-success/40"
               >
                 {busy ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-ys-border border-t-transparent" />
                 ) : (
                   <DynamicIcon name="GitBranch" className="w-4 h-4" />
                 )}

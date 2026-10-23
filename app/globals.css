@@ -1,44 +1,87 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Per-screen colour tokens, Ink's values. The theme picker, the bootstrap
+   script in <head> (app/misc/themeBootstrap.ts) and `applyThemeVars`
+   (app/story/themeTokens.ts) override them on <html>; change a default here
+   and in `themeTokens()` together. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
   --header-height: 57px; /* Fixed header height for CLS prevention */
-  /* Story screen colour tokens (Ink); a reading theme overrides them on <html>
-     (FontSettingsTab). */
   --ys-bg: #121212;
   --ys-surface: #1c1c1c;
+  --ys-surface-2: #262626;
   --ys-text: #ececec;
   --ys-muted: #9a9a9a;
   --ys-border: #2a2a2a;
   --ys-accent: #e8dcc4;
+  --ys-on-accent: #121212;
+  --ys-danger: #fca5a5;
+  --ys-success: #4ade80;
+  --ys-warning: #fbbf24;
+  --ys-gradient: linear-gradient(160deg, #121212, rgb(33, 32, 30));
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-ys-bg: var(--ys-bg);
   --color-ys-surface: var(--ys-surface);
+  --color-ys-surface-2: var(--ys-surface-2);
   --color-ys-text: var(--ys-text);
   --color-ys-muted: var(--ys-muted);
   --color-ys-border: var(--ys-border);
   --color-ys-accent: var(--ys-accent);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-ys-on-accent: var(--ys-on-accent);
+  --color-ys-danger: var(--ys-danger);
+  --color-ys-success: var(--ys-success);
+  --color-ys-warning: var(--ys-warning);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--ys-bg);
+  color: var(--ys-text);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+/* The typography plugin colours body text, code, quotes and list markers
+   itself. Point all of it at the theme, the -invert set too, so a leftover
+   `prose-invert` cannot bring the dark palette back. */
+.prose {
+  --tw-prose-body: var(--ys-text);
+  --tw-prose-headings: var(--ys-text);
+  --tw-prose-lead: var(--ys-muted);
+  --tw-prose-links: var(--ys-accent);
+  --tw-prose-bold: var(--ys-text);
+  --tw-prose-counters: var(--ys-muted);
+  --tw-prose-bullets: var(--ys-muted);
+  --tw-prose-hr: var(--ys-border);
+  --tw-prose-quotes: var(--ys-text);
+  --tw-prose-quote-borders: var(--ys-border);
+  --tw-prose-captions: var(--ys-muted);
+  --tw-prose-kbd: var(--ys-text);
+  --tw-prose-code: var(--ys-text);
+  --tw-prose-pre-code: var(--ys-text);
+  --tw-prose-pre-bg: var(--ys-surface-2);
+  --tw-prose-th-borders: var(--ys-border);
+  --tw-prose-td-borders: var(--ys-border);
+  --tw-prose-invert-body: var(--ys-text);
+  --tw-prose-invert-headings: var(--ys-text);
+  --tw-prose-invert-lead: var(--ys-muted);
+  --tw-prose-invert-links: var(--ys-accent);
+  --tw-prose-invert-bold: var(--ys-text);
+  --tw-prose-invert-counters: var(--ys-muted);
+  --tw-prose-invert-bullets: var(--ys-muted);
+  --tw-prose-invert-hr: var(--ys-border);
+  --tw-prose-invert-quotes: var(--ys-text);
+  --tw-prose-invert-quote-borders: var(--ys-border);
+  --tw-prose-invert-captions: var(--ys-muted);
+  --tw-prose-invert-kbd: var(--ys-text);
+  --tw-prose-invert-code: var(--ys-text);
+  --tw-prose-invert-pre-code: var(--ys-text);
+  --tw-prose-invert-pre-bg: var(--ys-surface-2);
+  --tw-prose-invert-th-borders: var(--ys-border);
+  --tw-prose-invert-td-borders: var(--ys-border);
 }
 
 /* Prose typography overrides - inherit text color for bold/italic/etc */
@@ -108,12 +151,12 @@ body {
 }
 
 .prose a {
-  color: #a78bfa; /* violet-400 for links */
+  color: var(--ys-accent);
   text-decoration: underline;
 }
 
 .prose a:hover {
-  color: #c4b5fd; /* violet-300 on hover */
+  color: color-mix(in srgb, var(--ys-accent) 75%, var(--ys-text));
 }
 
 /* CSS Containment for better performance */
@@ -212,7 +255,9 @@ body {
   animation: shimmer 2s ease-in-out infinite;
 }
 
-/* Custom Scrollbar Styling */
+/* Custom Scrollbar Styling: a thumb in the theme's border colour (muted on
+   hover) on a transparent track. No OS dark-mode switch: the theme decides,
+   and `color-scheme` on <html> covers the native scrollbars that are left. */
 /* Webkit browsers (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
   width: 12px;
@@ -220,93 +265,73 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--ys-border);
+  background-clip: padding-box;
   border-radius: 10px;
-  border: 2px solid #f1f1f1;
+  border: 2px solid transparent;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #764ba2 0%, #f093fb 100%);
-}
-
-/* Dark mode scrollbar */
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-track {
-    background: #1a1a1a;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-color: #1a1a1a;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #764ba2 0%, #f093fb 100%);
-  }
+  background: var(--ys-muted);
+  background-clip: padding-box;
 }
 
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #667eea #f1f1f1;
+  scrollbar-color: var(--ys-border) transparent;
 }
 
-@media (prefers-color-scheme: dark) {
-  * {
-    scrollbar-color: #764ba2 #1a1a1a;
-  }
-}
-
-/* Styled Select/Dropdown Elements */
+/* Styled Select/Dropdown Elements. The arrow is two gradients in the muted
+   colour (a data-URI image cannot read a custom property). */
 select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-image: linear-gradient(45deg, transparent 50%, var(--ys-muted) 50%),
+    linear-gradient(135deg, var(--ys-muted) 50%, transparent 50%);
   background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 1.25em 1.25em;
+  background-position: calc(100% - 1.15rem) 50%, calc(100% - 0.8rem) 50%;
+  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
   padding-right: 2.5rem;
   cursor: pointer;
   transition: all 0.15s ease-out;
 }
 
 select:hover {
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.1);
+  border-color: color-mix(in srgb, var(--ys-accent) 50%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ys-accent) 10%, transparent);
 }
 
 select:focus {
   outline: none;
-  border-color: rgba(139, 92, 246, 0.6);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), 0 0 12px rgba(139, 92, 246, 0.1);
+  border-color: color-mix(in srgb, var(--ys-accent) 70%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ys-accent) 18%, transparent),
+    0 0 12px color-mix(in srgb, var(--ys-accent) 10%, transparent);
 }
 
 /* Option styling - limited browser support but helps where possible */
 select option {
-  background-color: #0f172a;
-  color: #e2e8f0;
+  background-color: var(--ys-surface);
+  color: var(--ys-text);
   padding: 0.75rem 1rem;
 }
 
 select option:hover,
 select option:focus,
 select option:checked {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-  background-color: #1e3a5f !important;
-  color: #ffffff;
+  background-color: var(--ys-surface-2) !important;
+  color: var(--ys-text);
 }
 
 /* Disabled select styling */
 select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234b5563'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
 }
 
 /* Small select variant */
@@ -314,7 +339,8 @@ select.select-sm {
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
   font-size: 0.75rem;
-  background-size: 1em 1em;
+  background-position: calc(100% - 1rem) 50%, calc(100% - 0.65rem) 50%;
+  background-size: 0.3rem 0.3rem, 0.3rem 0.3rem;
   padding-right: 2rem;
 }
 
@@ -369,7 +395,7 @@ select.select-sm {
 }
 
 .focus-ring:focus-visible {
-  outline: 2px solid #a855f7;
+  outline: 2px solid var(--ys-accent);
   outline-offset: 2px;
 }
 
@@ -381,7 +407,7 @@ select.select-sm {
   top: 0;
   bottom: 0;
   width: 40px;
-  background: linear-gradient(to right, transparent, var(--background));
+  background: linear-gradient(to right, transparent, var(--ys-bg));
   pointer-events: none;
 }
 
@@ -392,4 +418,139 @@ select.select-sm {
 
 .text-shadow-lg {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Shared component classes, written once on the tokens, so a screen does not
+   restate the same card, field or button in a dozen files. */
+@layer components {
+  .ys-card {
+    background: var(--ys-surface);
+    border: 1px solid var(--ys-border);
+    border-radius: 0.75rem;
+    color: var(--ys-text);
+  }
+
+  .ys-input {
+    width: 100%;
+    background: var(--ys-surface-2);
+    color: var(--ys-text);
+    border: 1px solid var(--ys-border);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .ys-input::placeholder {
+    color: var(--ys-muted);
+  }
+
+  .ys-input:focus {
+    outline: none;
+    border-color: var(--ys-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ys-accent) 30%, transparent);
+  }
+
+  .ys-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ys-input option {
+    background-color: var(--ys-surface);
+    color: var(--ys-text);
+  }
+
+  .ys-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ys-border);
+    background: var(--ys-surface-2);
+    color: var(--ys-text);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease-out, border-color 0.15s ease-out,
+      opacity 0.15s ease-out;
+  }
+
+  .ys-button:hover:not(:disabled) {
+    border-color: var(--ys-muted);
+  }
+
+  .ys-button:focus-visible {
+    outline: 2px solid var(--ys-accent);
+    outline-offset: 2px;
+  }
+
+  .ys-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ys-button--primary {
+    background: var(--ys-accent);
+    border-color: var(--ys-accent);
+    color: var(--ys-on-accent);
+  }
+
+  .ys-button--primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ys-accent) 85%, var(--ys-text));
+    border-color: transparent;
+  }
+
+  .ys-button--ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ys-muted);
+  }
+
+  .ys-button--ghost:hover:not(:disabled) {
+    background: var(--ys-surface-2);
+    border-color: transparent;
+    color: var(--ys-text);
+  }
+
+  .ys-button--danger {
+    background: color-mix(in srgb, var(--ys-danger) 15%, transparent);
+    border-color: color-mix(in srgb, var(--ys-danger) 40%, transparent);
+    color: var(--ys-danger);
+  }
+
+  .ys-button--danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ys-danger) 25%, transparent);
+    border-color: var(--ys-danger);
+  }
+
+  .ys-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid var(--ys-border);
+    background: var(--ys-surface-2);
+    color: var(--ys-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  /* A scrim: the theme's background pushed toward black, 70% opaque. */
+  .ys-modal-backdrop {
+    background: color-mix(
+      in srgb,
+      color-mix(in srgb, var(--ys-bg) 40%, black) 70%,
+      transparent
+    );
+    backdrop-filter: blur(4px);
+  }
+
+  .ys-modal {
+    background: var(--ys-surface);
+    color: var(--ys-text);
+    border: 1px solid var(--ys-border);
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+  }
 }

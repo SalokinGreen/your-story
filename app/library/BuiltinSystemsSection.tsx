@@ -37,7 +37,7 @@ export default function BuiltinSystemsSection({
     <section>
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-lg font-bold">Built-in systems</h2>
-        <span className="text-xs text-blue-200/50">
+        <span className="text-xs text-ys-muted">
           Ready to play, and read-only
         </span>
       </div>
@@ -45,13 +45,13 @@ export default function BuiltinSystemsSection({
         {systems.map((system) => (
           <div
             key={system.id}
-            className="rounded-xl border border-amber-300/15 bg-linear-to-br from-amber-900/20 to-purple-900/20 p-4"
+            className="rounded-xl border border-ys-warning/40 p-4 bg-ys-warning/15"
           >
             <h3 className="font-semibold flex items-center gap-2">
-              <DynamicIcon name="Package" className="w-4 h-4 text-amber-300" />
+              <DynamicIcon name="Package" className="w-4 h-4 text-ys-warning" />
               {system.title}
             </h3>
-            <p className="text-sm text-blue-100/70 mt-1">
+            <p className="text-sm text-ys-muted mt-1">
               {system.description}
             </p>
 
@@ -61,7 +61,7 @@ export default function BuiltinSystemsSection({
                 return (
                   <div
                     key={pack.id}
-                    className="rounded-lg border border-white/10 bg-white/[0.03]"
+                    className="rounded-lg border border-ys-border bg-ys-surface"
                   >
                     <button
                       onClick={() => setOpenPack(isOpen ? null : pack.id)}
@@ -70,7 +70,7 @@ export default function BuiltinSystemsSection({
                     >
                       <span className="min-w-0">
                         <span className="font-medium">{pack.title}</span>
-                        <span className="text-blue-200/50">
+                        <span className="text-ys-muted">
                           {" "}
                           · {pack.notes.length} note
                           {pack.notes.length === 1 ? "" : "s"}
@@ -78,15 +78,15 @@ export default function BuiltinSystemsSection({
                       </span>
                       <DynamicIcon
                         name={isOpen ? "ChevronUp" : "ChevronDown"}
-                        className="w-4 h-4 text-blue-300/60 shrink-0"
+                        className="w-4 h-4 text-ys-muted shrink-0"
                       />
                     </button>
                     {isOpen && (
                       <div className="px-3 pb-2">
-                        <p className="text-xs text-blue-200/60 mb-1.5">
+                        <p className="text-xs text-ys-muted mb-1.5">
                           {pack.description}
                         </p>
-                        <ul className="text-xs text-blue-100/80 space-y-0.5 columns-1 sm:columns-2">
+                        <ul className="text-xs text-ys-text space-y-0.5 columns-1 sm:columns-2">
                           {pack.notes.map((n) => (
                             <li key={n.id} className="truncate">
                               {n.title}
@@ -107,14 +107,14 @@ export default function BuiltinSystemsSection({
                   return (
                     <div
                       key={starter.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ys-border bg-ys-surface px-3 py-2"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">
                           {local.title}
                         </p>
                         {local.description && (
-                          <p className="text-xs text-blue-200/60 line-clamp-2">
+                          <p className="text-xs text-ys-muted line-clamp-2">
                             {local.description}
                           </p>
                         )}
@@ -122,14 +122,14 @@ export default function BuiltinSystemsSection({
                       <div className="flex gap-2 shrink-0">
                         <button
                           onClick={() => onPlay(local)}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white flex items-center gap-1.5"
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-ys-accent text-ys-on-accent hover:opacity-90"
                         >
                           <DynamicIcon name="Play" className="w-4 h-4" />
                           Play
                         </button>
                         <button
                           onClick={() => onOpenCopy(local)}
-                          className="px-3 py-1.5 rounded-lg text-sm bg-white/5 hover:bg-white/10 border border-white/10 text-blue-100 flex items-center gap-1.5"
+                          className="px-3 py-1.5 rounded-lg text-sm bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text flex items-center gap-1.5"
                         >
                           <DynamicIcon name="Copy" className="w-4 h-4" />
                           Open a copy in the Designer

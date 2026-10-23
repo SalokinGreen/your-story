@@ -88,7 +88,7 @@ export default function NPCReactionToast({
           )}
         </StoredPortrait>
         {/* Online-style indicator dot */}
-        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-ys-surface flex items-center justify-center">
+        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-ys-success rounded-full border-2 border-ys-surface flex items-center justify-center">
           {reaction.emoji && (
             <span className="text-[10px]">{reaction.emoji}</span>
           )}

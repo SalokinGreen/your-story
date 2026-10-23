@@ -113,15 +113,15 @@ export default function GoalEditor({
       {/* Goals Editor */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
-              <DynamicIcon name="Scroll" className="w-4 h-4 text-purple-300" />
+          <h4 className="text-lg font-bold text-ys-text flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-ys-accent/10 ring-1 ring-ys-accent/20">
+              <DynamicIcon name="Scroll" className="w-4 h-4 text-ys-accent" />
             </span>
             Goals
           </h4>
           <button
             onClick={addGoal}
-            className="px-3 py-1.5 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white text-sm font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all"
+            className="px-3 py-1.5 bg-ys-success/15 text-ys-success text-sm font-medium rounded-lg transition-all border border-ys-success/40"
           >
             + Add Goal
           </button>
@@ -131,7 +131,7 @@ export default function GoalEditor({
             editingGoalIndex === index ? (
               <div
                 key={goal.id}
-                className="p-4 bg-white/[0.04] backdrop-blur-xl border border-purple-400/30 rounded-2xl shadow-[0_0_20px_rgba(168,85,247,0.1)]"
+                className="p-4 bg-ys-surface backdrop-blur-xl border border-ys-accent/30 rounded-2xl shadow-[0_0_20px_color-mix(in_srgb,var(--ys-accent)_10%,transparent)]"
               >
                 <div className="space-y-3">
                   <input
@@ -141,7 +141,7 @@ export default function GoalEditor({
                       setEditGoal({ ...editGoal!, title: e.target.value })
                     }
                     placeholder="Goal Title"
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                    className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   />
                   <input
                     type="text"
@@ -153,7 +153,7 @@ export default function GoalEditor({
                       })
                     }
                     placeholder="Short Description"
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                    className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   />
                   <textarea
                     value={editGoal?.description || ""}
@@ -164,11 +164,11 @@ export default function GoalEditor({
                       })
                     }
                     placeholder="Full Description"
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
+                    className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                     rows={4}
                   />
                   <div className="flex gap-4">
-                    <label className="flex items-center gap-2 text-white">
+                    <label className="flex items-center gap-2 text-ys-text">
                       <input
                         type="checkbox"
                         checked={!!editGoal?.active}
@@ -178,11 +178,11 @@ export default function GoalEditor({
                             active: e.target.checked,
                           })
                         }
-                        className="rounded accent-purple-500"
+                        className="rounded accent-ys-accent"
                       />
                       <span>Active</span>
                     </label>
-                    <label className="flex items-center gap-2 text-white">
+                    <label className="flex items-center gap-2 text-ys-text">
                       <input
                         type="checkbox"
                         checked={!!editGoal?.fulfilled}
@@ -192,7 +192,7 @@ export default function GoalEditor({
                             fulfilled: e.target.checked,
                           })
                         }
-                        className="rounded accent-purple-500"
+                        className="rounded accent-ys-accent"
                       />
                       <span>Fulfilled</span>
                     </label>
@@ -200,13 +200,13 @@ export default function GoalEditor({
                   <div className="flex gap-2">
                     <button
                       onClick={() => saveEditGoal()}
-                      className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-lg shadow-md shadow-emerald-950/40 transition-all"
+                      className="px-4 py-2 bg-ys-success/15 text-ys-success rounded-lg transition-all border border-ys-success/40"
                     >
                       Save
                     </button>
                     <button
                       onClick={cancelEditGoal}
-                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
+                      className="px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text rounded-lg transition-all"
                     >
                       Cancel
                     </button>
@@ -220,29 +220,29 @@ export default function GoalEditor({
                 onDragStart={() => handleGoalDragStart(index)}
                 onDragOver={(e) => handleGoalDragOver(e, index)}
                 onDragEnd={handleGoalDragEnd}
-                className={`p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-xl cursor-move flex items-center gap-3 transition-colors hover:bg-white/[0.05] ${
+                className={`p-4 bg-ys-surface backdrop-blur-md border border-ys-border rounded-xl cursor-move flex items-center gap-3 transition-colors hover:bg-ys-surface-2 ${
                   draggedGoalIndex === index ? "opacity-50" : ""
                 }`}
               >
-                <span className="text-blue-300/40 select-none">
+                <span className="text-ys-muted select-none">
                   <DynamicIcon name="GripVertical" className="w-5 h-5" />
                 </span>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 font-medium text-white">
+                  <div className="flex items-center gap-2 font-medium text-ys-text">
                     <span className="flex items-center gap-2">
                       <DynamicIcon
                         name="Scroll"
-                        className="w-5 h-5 text-amber-400"
+                        className="w-5 h-5 text-ys-warning"
                       />
                       {goal.title}
                     </span>
                     {goal.active && !goal.fulfilled && (
-                      <span className="px-2 py-0.5 bg-blue-500/15 text-blue-300 rounded-full text-xs font-bold border border-blue-400/20">
+                      <span className="px-2 py-0.5 bg-ys-accent/15 text-ys-accent rounded-full text-xs font-bold border border-ys-accent/20">
                         Active
                       </span>
                     )}
                     {goal.fulfilled && (
-                      <span className="text-green-400">
+                      <span className="text-ys-success">
                         <DynamicIcon
                           name="Check"
                           className="w-4 h-4 inline mr-1"
@@ -250,12 +250,12 @@ export default function GoalEditor({
                       </span>
                     )}
                     {!goal.active && !goal.fulfilled && (
-                      <span className="px-2 py-0.5 bg-white/5 text-blue-300/50 rounded-full text-xs font-bold border border-white/10">
+                      <span className="px-2 py-0.5 bg-ys-surface text-ys-muted rounded-full text-xs font-bold border border-ys-border">
                         Inactive
                       </span>
                     )}
                   </div>
-                  <div className="text-sm text-blue-200/60">
+                  <div className="text-sm text-ys-muted">
                     {goal.shortDescription}
                   </div>
                 </div>
@@ -264,7 +264,7 @@ export default function GoalEditor({
                     <button
                       onClick={() => moveGoalUp(index)}
                       disabled={index === 0}
-                      className="w-7 h-7 sm:w-8 sm:h-8 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-blue-200 border border-white/10 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-surface hover:bg-ys-surface-2 disabled:opacity-30 disabled:cursor-not-allowed text-ys-text border border-ys-border rounded-lg flex items-center justify-center transition-colors"
                       title="Move up"
                     >
                       <DynamicIcon
@@ -275,7 +275,7 @@ export default function GoalEditor({
                     <button
                       onClick={() => moveGoalDown(index)}
                       disabled={index === localGoals.length - 1}
-                      className="w-7 h-7 sm:w-8 sm:h-8 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed text-blue-200 border border-white/10 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-surface hover:bg-ys-surface-2 disabled:opacity-30 disabled:cursor-not-allowed text-ys-text border border-ys-border rounded-lg flex items-center justify-center transition-colors"
                       title="Move down"
                     >
                       <DynamicIcon
@@ -287,7 +287,7 @@ export default function GoalEditor({
                   <div className="flex gap-0.5">
                     <button
                       onClick={() => startEditGoal(index)}
-                      className="w-7 h-7 sm:w-8 sm:h-8 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-accent/10 hover:bg-ys-accent/20 text-ys-text border border-ys-accent/20 rounded-lg flex items-center justify-center transition-colors"
                       title="Edit"
                     >
                       <DynamicIcon
@@ -297,7 +297,7 @@ export default function GoalEditor({
                     </button>
                     <button
                       onClick={() => removeGoal(index)}
-                      className="w-7 h-7 sm:w-8 sm:h-8 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 sm:w-8 sm:h-8 bg-ys-danger/10 hover:bg-ys-danger/20 text-ys-danger border border-ys-danger/20 rounded-lg flex items-center justify-center transition-colors"
                       title="Remove"
                     >
                       <DynamicIcon
@@ -311,7 +311,7 @@ export default function GoalEditor({
             ),
           )}
           {localGoals.length === 0 && (
-            <p className="text-sm text-blue-200/60">No goals yet.</p>
+            <p className="text-sm text-ys-muted">No goals yet.</p>
           )}
         </div>
       </div>

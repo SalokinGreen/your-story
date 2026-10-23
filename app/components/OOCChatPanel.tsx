@@ -49,13 +49,13 @@ export default function OOCChatPanel({
   return (
     <>
       <button
-        className="fixed top-1/2 -translate-y-1/2 z-40 bg-ys-text text-ys-bg hover:opacity-90 p-1.5 rounded-l-lg shadow-md shadow-black/30 transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
+        className="fixed top-1/2 -translate-y-1/2 z-40 bg-ys-text text-ys-bg hover:opacity-90 p-1.5 rounded-l-lg shadow-md transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
         onClick={onClose}
         title="Close OOC Chat"
       >
         <DynamicIcon name="ChevronRight" className="w-4 h-4" />
       </button>
-      <div className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-ys-surface shadow-2xl shadow-black/50 border-l border-ys-border animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-2xl">
+      <div className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-ys-surface shadow-2xl border-l border-ys-border animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-ys-border px-4 py-3">
           <div className="flex items-center gap-2 min-w-0">
