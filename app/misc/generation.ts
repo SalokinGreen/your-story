@@ -3210,18 +3210,6 @@ async function generateStoryTurnOnce(
         },
       ];
 
-      // Clear pending player actions after they've been included in the prompt
-      // (they were shown to the AI in the user choice message)
-      if (
-        storyData.pendingPlayerActions &&
-        storyData.pendingPlayerActions.length > 0
-      ) {
-        logger.action(
-          `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`,
-        );
-        storyData.pendingPlayerActions = [];
-      }
-
       // Narration always runs on the (user-configurable) narration model,
       // regardless of which tier adjudication used - this is what keeps
       // the GM's voice consistent even when a turn escalated to a heavier

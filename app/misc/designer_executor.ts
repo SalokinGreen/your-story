@@ -498,12 +498,6 @@ export function executeDesignerTool(
         } else {
           next.presets.push({
             id: newId("preset"),
-            // Legacy stat-block fields the GM no longer reads, kept empty so
-            // old consumers still see well-formed arrays.
-            stats: [],
-            resources: [],
-            inventory: [],
-            relationships: [],
             authorNotes: "",
             ...patch,
           });

@@ -419,3 +419,68 @@ staying up for all of session zero covers the gap this change opens.
   `gmTools.sixPlaces` +7. No `take_rest`, `end_combat` stat-sync or `reverseDC`
   test existed that needed changing (the `reverseDC` line only asserts a field is
   absent, still true).
+
+
+### 2026-10-23, slice 4
+
+- **Undo and Retry are stripped in `getUndoStack()`, not at the three
+  `Object.assign` sites in `page.tsx`.** Old snapshots only come from that read,
+  and every snapshot taken in a session is a `structuredClone` of an already
+  stripped story, so one strip as the stack is read covers Undo, Retry and Stop.
+- **The guest shim is applied inside `NetSession.broadcastSnapshot()`**
+  (`multiplayer/session.ts`), the one function both of `useNetSession`'s
+  broadcast calls reach, rather than at each call. `multiplayer.session.test.ts`
+  now expects the shimmed copy. A new guest strips on receive in `onSnapshot`
+  (`ensureStoryDataArrays(received)`, in place: the message is the guest's own
+  deserialised object).
+- **`stripRemovedFields` also reaches** `chapters[].scene.parts` and
+  `observerRewriteOriginal.choices` (both hold choices and parts), and
+  `agmt_context_only` is in the removed choice fields (it was in the arcade
+  block). `REMOVED_STORY_FIELDS` is exported so the test iterates the same list.
+- **`Preset.npcs` went too** (the brief listed it); no reader existed.
+- **Types kept:** `AdventureDifficulty` (`toolExecutor.ts` uses it),
+  `SkillCheckResult` (`skillCheckHistory` is still on `AGMTState`),
+  `CustomTable`/`CustomTableEntry` (migration input). `customTables` carries a
+  "migration input only" comment. Everything else in design §4 is deleted,
+  including the skill-tree types, `ReactionCategory`/`IncidentalReaction`,
+  `AGMTThread`, `DCTier`, `StatChangeTier`, `ChallengeTier`, `ItemGrade`,
+  `AbilityGrade` and the rest tsc showed unused.
+- **Not in the plan:** `PDFSummarizeResult` (`ocr.ts`) lost its unused
+  `variables`/`stats`/`resources`/`abilities` fields (nothing set or read them);
+  `ocrSummarizeCall.ts`, `toolExecutor.ts` (`duplicate_lore`) and `page.tsx`
+  (the preset's sheet note) stopped writing `var_*_triggers`; five `menu/`
+  files and `page.tsx` dropped imports of the deleted types; `generation.ts`
+  lost the "clear pendingPlayerActions" block (no writer was left).
+- **Deleted, no importers:** `app/misc/starter_stories.ts` (three stories built
+  from the removed arrays) and `tests/advanced.commands.test.ts` (13 cases of
+  test-local stand-ins for the removed resource and stat commands; it imported
+  only the deleted types).
+- **Tests changed:** `designerAdventureStart` (`REQUIRED_ARRAYS` loses the
+  removed four plus `relationships`; asserts they are absent),
+  `ai.outputToScenePart` (asserts no `gameOver` key), `lore` and
+  `systems.builtins` (fixtures), `multiplayer.session` (shim). Counts: 172
+  files / 2,551 tests to 172 / 2,547 (13 cases and one file out, one file and 9
+  cases in).
+- **Not done here:** loading the "Inventory Crash Repro" story in the browser
+  preview (no preview tools in this session), and `tauri build` for the slice 3
+  capabilities change.
+
+### 2026-10-23, slice 4 — after review (coordinating session)
+
+- Also removed: the unused `StoryState.STATS` value in `page.tsx`, and the
+  `fuzzyMatch.ts` helpers only their own tests used (`findStatMatch`,
+  `findResourceMatch`, `findItemMatch`, `findRelationshipMatch`,
+  `findAbilityMatch`, with their 10 test cases; 2,547 → 2,537).
+- Engine review: nothing significant. Applied: the PDF importer's
+  mechanics-note builder (`ocrSummarizeCall.ts`) still wrote empty variable
+  triggers, which `tsc` missed behind an `any` callback; and `tableRoller.ts`
+  lost its last caller with `Choice.table` and is deleted. Noted, not changed:
+  sync pull, library moves and the picture job's patch re-save a stored blob
+  as it is, so an old save keeps its removed keys in storage (and in sync)
+  until it is next opened, when the load strips them; nothing reads them.
+- Checked by hand: the "Inventory Crash Repro" save, given a stat, an item, a
+  variable, a variable trigger, a New Game+ count, a rest state and an arcade
+  choice, opens without an error, and after Save none of those keys is left in
+  IndexedDB; the choice is `{ "text": "Climb the wall" }`. `tauri build`
+  succeeded and the built app launched to its home page (its own WebView2
+  profile and debugging port, owner checked).

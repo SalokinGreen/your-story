@@ -1175,8 +1175,6 @@ export function processParserResult(parsed: any): ExtractedContent {
     off_triggers: [],
     trigger_lores: [],
     untrigger_lores: [],
-    var_on_triggers: [],
-    var_off_triggers: [],
   }));
 
   const mechanicNotes: StoryLore[] = entryList(parsed.mechanicNotes)
@@ -1197,8 +1195,6 @@ export function processParserResult(parsed: any): ExtractedContent {
       off_triggers: [],
       trigger_lores: [],
       untrigger_lores: [],
-      var_on_triggers: [],
-      var_off_triggers: [],
     }),
   );
 
@@ -1280,8 +1276,6 @@ function toTableNote(entry: any, index: number): StoryLore {
     off_triggers: [],
     trigger_lores: [],
     untrigger_lores: [],
-    var_on_triggers: [],
-    var_off_triggers: [],
   };
 }
 

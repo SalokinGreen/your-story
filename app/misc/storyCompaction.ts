@@ -329,7 +329,6 @@ export async function buildCondensedStorySeed(
   seed.currentChapter = 0;
   seed.threads = (seed.threads || []).filter((t) => t.status === "active");
   seed.goals = (seed.goals || []).filter((g) => g.active && !g.fulfilled);
-  seed.gameOver = undefined;
   seed.activeChallenge = undefined;
   seed.timers = [];
   // Meters and tracks carry over; scene count restarts, so scene-scoped keys
@@ -341,8 +340,6 @@ export async function buildCondensedStorySeed(
   seed.reasoningTierState = undefined;
   seed.pendingRandomEvents = [];
   seed.pendingDirectorMoves = [];
-  seed.incidentalReactions = {};
-  seed.newGamePlusMode = false;
   if (seed.agmtState) {
     seed.agmtState = {
       ...seed.agmtState,

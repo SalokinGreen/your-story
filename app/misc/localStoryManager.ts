@@ -7,7 +7,7 @@ import {
 } from "./structs";
 import { customTableToNote } from "./tableNotes";
 import { mergeImportedLore } from "./localNotesLibraryManager";
-import { ensureStoryDataArrays } from "./storyDataDefaults";
+import { ensureStoryDataArrays, stripRemovedFields } from "./storyDataDefaults";
 import { ARCHETYPE_INFO } from "./gmAdvice";
 import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
 import { deleteImagesForStory } from "./imageStore";
@@ -416,13 +416,8 @@ export async function startFreeformStoryLocally(
         },
       ],
     },
-    stats: [],
-    resources: [],
-    inventory: [],
-    abilities: [],
     lore,
     goals: [],
-    relationships: [],
     npcs: [],
   } as unknown as StoryData;
 
@@ -468,13 +463,8 @@ export async function createJoinPlaceholderStory(
         },
       ],
     },
-    stats: [],
-    resources: [],
-    inventory: [],
-    abilities: [],
     lore: [],
     goals: [],
-    relationships: [],
     npcs: [],
   } as unknown as StoryData;
 
@@ -593,7 +583,10 @@ export async function getUndoStack(storyId: string): Promise<StoryData[]> {
 
     request.onsuccess = () => {
       const record = request.result as UndoStackRecord | undefined;
-      resolve(record?.snapshots || []);
+      // A snapshot saved before the legacy removal still holds the removed
+      // fields, and Undo/Retry restore one with Object.assign - so they are
+      // stripped as the stack is read, the one place old snapshots come from.
+      resolve((record?.snapshots || []).map((s) => stripRemovedFields(s)));
     };
     request.onerror = () => reject(request.error);
   });

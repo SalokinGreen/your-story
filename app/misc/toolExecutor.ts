@@ -1628,12 +1628,6 @@ export function executeTools(
           off_triggers: sourceLore.off_triggers
             ? [...sourceLore.off_triggers]
             : undefined,
-          var_on_triggers: sourceLore.var_on_triggers
-            ? [...sourceLore.var_on_triggers]
-            : undefined,
-          var_off_triggers: sourceLore.var_off_triggers
-            ? [...sourceLore.var_off_triggers]
-            : undefined,
           type: sourceLore.type,
           // A copy of a hidden note stays hidden.
           visibility: sourceLore.visibility,

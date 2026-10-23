@@ -73,6 +73,6 @@ You walk into the cave. It's cold and dripping, the smell of wet stone filling y
   it("no longer reads the game over marker", () => {
     const part = outputToScenePart(`<story>The end.</story>
 !!! GAME OVER !!!`);
-    expect(part.gameOver).toBeUndefined();
+    expect("gameOver" in part).toBe(false);
   });
 });

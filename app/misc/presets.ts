@@ -11,10 +11,6 @@ export const DEFAULT_PRESET: Preset = {
   icon: "Sparkles",
   characterSheet: "",
   intro: "",
-  stats: [],
-  resources: [],
-  inventory: [],
-  relationships: [],
   authorNotes: "",
 };
 

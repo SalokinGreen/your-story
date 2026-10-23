@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   findBestMatch,
-  findItemMatch,
-  findResourceMatch,
-  findStatMatch,
   findGoalMatch,
 } from "../app/misc/fuzzyMatch";
 
@@ -98,95 +95,6 @@ describe("fuzzyMatch", () => {
       expect(result).not.toBeNull();
       expect(result?.name).toBe("Sword's Edge (Legendary)");
       expect(result?.score).toBeGreaterThan(0.7);
-    });
-  });
-
-  describe("findItemMatch", () => {
-    const inventory = [
-      { name: "Health Potion", quantity: 3, type: "consumable" },
-      { name: "Stamina Potion", quantity: 2, type: "consumable" },
-      { name: "Rusty Sword", quantity: 1, type: "normal" },
-    ];
-
-    it("should match exact item name", () => {
-      const result = findItemMatch("Health Potion", inventory);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Health Potion");
-      expect(result?.item.quantity).toBe(3);
-    });
-
-    it("should fuzzy match 'health' to 'Health Potion'", () => {
-      const result = findItemMatch("health", inventory);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Health Potion");
-    });
-
-    it("should fuzzy match 'potion stamina' to 'Stamina Potion'", () => {
-      const result = findItemMatch("potion stamina", inventory);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Stamina Potion");
-    });
-  });
-
-  describe("findResourceMatch", () => {
-    const resources = [
-      { name: "Stamina", value: 50, maxValue: 100 },
-      { name: "Mana", value: 30, maxValue: 50 },
-      { name: "Health", value: 80, maxValue: 100 },
-    ];
-
-    it("should match exact resource name", () => {
-      const result = findResourceMatch("Stamina", resources);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Stamina");
-      expect(result?.item.value).toBe(50);
-    });
-
-    it("should fuzzy match 'stamina' (lowercase)", () => {
-      const result = findResourceMatch("stamina", resources);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Stamina");
-    });
-
-    it("should fuzzy match 'hp' to 'Health' if threshold is low enough", () => {
-      const result = findResourceMatch("hp", resources);
-      // This might not match depending on similarity - that's ok
-      // Just test that the function doesn't crash
-      expect(result === null || result.item.name === "Health").toBe(true);
-    });
-  });
-
-  describe("findStatMatch", () => {
-    const stats = [
-      { name: "Strength", value: 50 },
-      { name: "Dexterity", value: 60 },
-      { name: "Intelligence", value: 70 },
-      { name: "Stealth", value: 40 },
-    ];
-
-    it("should match exact stat name", () => {
-      const result = findStatMatch("Stealth", stats);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Stealth");
-      expect(result?.item.value).toBe(40);
-    });
-
-    it("should fuzzy match 'strength' (lowercase)", () => {
-      const result = findStatMatch("strength", stats);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Strength");
-    });
-
-    it("should fuzzy match 'dex' to 'Dexterity'", () => {
-      const result = findStatMatch("dex", stats);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Dexterity");
-    });
-
-    it("should fuzzy match 'int' to 'Intelligence'", () => {
-      const result = findStatMatch("int", stats);
-      expect(result).not.toBeNull();
-      expect(result?.item.name).toBe("Intelligence");
     });
   });
 

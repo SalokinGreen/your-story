@@ -7,9 +7,6 @@ import {
   StoryLore,
   Choices,
   Choice,
-  Resource,
-  InventoryItem,
-  Ability,
   Preset,
   CommandResponse,
   getMemoryContent,
@@ -419,7 +416,6 @@ function handleObserverRewrite(
 
 enum StoryState {
   STORY = "STORY",
-  STATS = "STATS",
   LORE = "LORE",
   NPCS = "NPCS",
   GOALS = "GOALS",
@@ -805,7 +801,10 @@ function StoryPageContent() {
     },
     onFloorTake: (localPlayerId) => hostHandleFloorTake(localPlayerId),
     onFloorRelease: (localPlayerId) => hostHandleFloorRelease(localPlayerId),
-    onSnapshot: (incoming) => {
+    onSnapshot: (received) => {
+      // The host may still send the removed fields (an older build's story, or
+      // the shim for older guests); strip them like a load does.
+      const incoming = ensureStoryDataArrays(received);
       setStoryData(incoming);
       const lastPart = incoming.scene.parts[incoming.scene.parts.length - 1];
       if (lastPart) {
@@ -1533,8 +1532,6 @@ function StoryPageContent() {
           on: true,
           on_triggers: [],
           off_triggers: [],
-          var_on_triggers: [],
-          var_off_triggers: [],
         };
         updatedStoryData.lore = [
           ...(updatedStoryData.lore || []),

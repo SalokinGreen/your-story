@@ -28,13 +28,8 @@ import { ensureStoryDataArrays } from "@/app/misc/storyDataDefaults";
 const REQUIRED_ARRAYS = [
   "memory",
   "chapters",
-  "stats",
-  "resources",
-  "inventory",
-  "abilities",
   "lore",
   "goals",
-  "relationships",
   "npcs",
 ] as const;
 
@@ -128,9 +123,11 @@ describe("starting a story from a Designer-made adventure", () => {
       expect(Array.isArray(story[key]), `storyData.${key}`).toBe(true);
     }
     expect(Array.isArray(story.scene.parts)).toBe(true);
-    // The legacy stat-block arrays start empty; nothing is invented for them.
-    expect(story.inventory).toEqual([]);
-    expect(story.stats).toEqual([]);
+    // The legacy stat-block arrays are gone (decision 126); nothing is
+    // invented for them.
+    for (const key of ["stats", "resources", "inventory", "abilities"]) {
+      expect(key in story, `storyData.${key}`).toBe(false);
+    }
     expect(story.npcs).toEqual([]);
   });
 
@@ -170,7 +167,7 @@ describe("ensureStoryDataArrays", () => {
       ...draftToAdventure(createEmptyDraft()).storyTemplate,
       player_name: "Player",
     } as unknown as StoryData;
-    expect(broken.inventory).toBeUndefined();
+    expect(broken.npcs).toBeUndefined();
 
     ensureStoryDataArrays(broken);
 
