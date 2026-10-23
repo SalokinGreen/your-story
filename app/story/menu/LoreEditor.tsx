@@ -2,20 +2,8 @@
 
 import {
   StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
   StoryLore,
-  Relationship,
   AGMTState,
-  Variable,
-  NumberVariable,
-  BooleanVariable,
-  StringVariable,
-  ListVariable,
-  Ability,
-  AbilityCost,
-  AbilityGrade,
   MemoryEntry,
   getMemoryContent,
   NPC,
@@ -44,12 +32,10 @@ import LibraryPickerModal from "../../components/LibraryPickerModal";
 
 export default function LoreEditor({
   lore,
-  variables,
   onUpdate,
   couchPlayers,
 }: {
   lore: StoryLore[];
-  variables: Variable[];
   onUpdate: (lore: StoryLore[]) => void;
   couchPlayers?: CouchPlayer[];
 }) {
@@ -904,96 +890,6 @@ export default function LoreEditor({
                         </div>
                       </div>
 
-                      {/* Variable Triggers (Boolean) */}
-                      {variables.filter((v) => v.type === "boolean").length >
-                        0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-blue-200 mb-2">
-                              <DynamicIcon
-                                name="ToggleRight"
-                                className="inline-block w-4 h-4 mr-1 text-cyan-500"
-                              />
-                              Variables that turn this ON (when true)
-                            </label>
-                            <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
-                              {variables
-                                .filter((v) => v.type === "boolean")
-                                .map((variable) => (
-                                  <label
-                                    key={variable.id}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={(
-                                        editLore.var_on_triggers || []
-                                      ).includes(variable.name)}
-                                      onChange={(e) => {
-                                        const current =
-                                          editLore.var_on_triggers || [];
-                                        setEditLore({
-                                          ...editLore,
-                                          var_on_triggers: e.target.checked
-                                            ? [...current, variable.name]
-                                            : current.filter(
-                                                (n) => n !== variable.name,
-                                              ),
-                                        });
-                                      }}
-                                      className="w-4 h-4 rounded accent-cyan-500"
-                                    />
-                                    <span className="text-xs text-white">
-                                      {variable.name}
-                                    </span>
-                                  </label>
-                                ))}
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-blue-200 mb-2">
-                              <DynamicIcon
-                                name="ToggleLeft"
-                                className="inline-block w-4 h-4 mr-1 text-orange-500"
-                              />
-                              Variables that turn this OFF (when true)
-                            </label>
-                            <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
-                              {variables
-                                .filter((v) => v.type === "boolean")
-                                .map((variable) => (
-                                  <label
-                                    key={variable.id}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={(
-                                        editLore.var_off_triggers || []
-                                      ).includes(variable.name)}
-                                      onChange={(e) => {
-                                        const current =
-                                          editLore.var_off_triggers || [];
-                                        setEditLore({
-                                          ...editLore,
-                                          var_off_triggers: e.target.checked
-                                            ? [...current, variable.name]
-                                            : current.filter(
-                                                (n) => n !== variable.name,
-                                              ),
-                                        });
-                                      }}
-                                      className="w-4 h-4 rounded accent-orange-500"
-                                    />
-                                    <span className="text-xs text-white">
-                                      {variable.name}
-                                    </span>
-                                  </label>
-                                ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -1126,26 +1022,6 @@ export default function LoreEditor({
                           Triggers:
                         </strong>{" "}
                         {loreItem.off_triggers.join(", ")}
-                      </div>
-                    )}
-                  {loreItem.var_on_triggers &&
-                    loreItem.var_on_triggers.length > 0 && (
-                      <div className="text-xs text-cyan-400/80 mt-1 flex items-center gap-1">
-                        <strong className="flex items-center gap-1">
-                          <DynamicIcon name="ToggleRight" className="w-3 h-3" />{" "}
-                          Vars turning ON:
-                        </strong>{" "}
-                        {loreItem.var_on_triggers.join(", ")}
-                      </div>
-                    )}
-                  {loreItem.var_off_triggers &&
-                    loreItem.var_off_triggers.length > 0 && (
-                      <div className="text-xs text-orange-400/80 mt-1 flex items-center gap-1">
-                        <strong className="flex items-center gap-1">
-                          <DynamicIcon name="ToggleLeft" className="w-3 h-3" />{" "}
-                          Vars turning OFF:
-                        </strong>{" "}
-                        {loreItem.var_off_triggers.join(", ")}
                       </div>
                     )}
                 </div>

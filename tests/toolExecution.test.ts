@@ -8,7 +8,6 @@
 import { describe, test, expect } from "vitest";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import type { StoryData } from "@/app/misc/structs";
-import { getMemoryContent } from "@/app/misc/structs";
 
 // Helper to create minimal story data
 function createTestStory(): StoryData {
@@ -38,87 +37,6 @@ function createTestStory(): StoryData {
 }
 
 describe("Tool Execution", () => {
-  describe("add_memory tool", () => {
-    test("should add memory directly to array", () => {
-      const storyData = createTestStory();
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "add_memory",
-            arguments: {
-              entry: "Met the mysterious merchant Aldric in the tavern",
-            },
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses).toHaveLength(1);
-      expect(responses[0].success).toBe(true);
-      expect(responses[0].message).toContain("Added memory");
-      expect(storyData.memory).toHaveLength(1);
-      expect(getMemoryContent(storyData.memory[0])).toBe(
-        "Met the mysterious merchant Aldric in the tavern"
-      );
-    });
-
-    test("should handle multiple memory additions", () => {
-      const storyData = createTestStory();
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "add_memory",
-            arguments: {
-              entry: "First memory",
-            },
-          },
-        },
-        {
-          type: "function",
-          function: {
-            name: "add_memory",
-            arguments: {
-              entry: "Second memory",
-            },
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses).toHaveLength(2);
-      expect(responses[0].success).toBe(true);
-      expect(responses[1].success).toBe(true);
-      expect(storyData.memory).toHaveLength(2);
-      expect(getMemoryContent(storyData.memory[0])).toBe("First memory");
-      expect(getMemoryContent(storyData.memory[1])).toBe("Second memory");
-    });
-
-    test("should truncate long memory entries in message", () => {
-      const storyData = createTestStory();
-      const longEntry = "A".repeat(100);
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "add_memory",
-            arguments: { entry: longEntry },
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses[0].success).toBe(true);
-      expect(responses[0].message).toContain("...");
-      expect(responses[0].message.length).toBeLessThan(100);
-      expect(getMemoryContent(storyData.memory[0])).toBe(longEntry); // Full entry stored
-    });
-  });
-
   describe("create_note tool", () => {
     test("should create note entry (agentic notes are always visible)", () => {
       const storyData = createTestStory();
@@ -215,15 +133,17 @@ describe("Tool Execution", () => {
   });
 
   describe("Mixed tool execution", () => {
-    test("should handle memory and note tools together", () => {
+    test("should handle goal and note tools together", () => {
       const storyData = createTestStory();
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "add_memory",
+            name: "create_goal",
             arguments: {
-              entry: "Discovered ancient ruins",
+              title: "Find the ruins",
+              shortDescription: "Locate the ruins",
+              description: "Discovered ancient ruins",
             },
           },
         },
@@ -245,7 +165,7 @@ describe("Tool Execution", () => {
       expect(responses).toHaveLength(2);
       expect(responses[0].success).toBe(true);
       expect(responses[1].success).toBe(true);
-      expect(storyData.memory).toHaveLength(1);
+      expect(storyData.goals).toHaveLength(1);
       expect(storyData.lore).toHaveLength(1);
     });
 
@@ -255,9 +175,11 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "add_memory",
+            name: "create_goal",
             arguments: {
-              entry: "Valid memory",
+              title: "Valid goal",
+              shortDescription: "Locate the ruins",
+              description: "Discovered ancient ruins",
             },
           },
         },
@@ -287,35 +209,33 @@ describe("Tool Execution", () => {
       expect(responses[1].success).toBe(false);
       expect(responses[1].message).toContain("Unknown tool");
       expect(responses[2].success).toBe(true);
-      expect(storyData.memory).toHaveLength(1);
+      expect(storyData.goals).toHaveLength(1);
       expect(storyData.lore).toHaveLength(1);
+    });
+
+    test("a removed tool name returns the unknown-tool error and changes nothing", () => {
+      const storyData = createTestStory();
+      const before = JSON.stringify(storyData);
+      const removed = ["add_memory", "game_over", "take_rest", "add_ability"];
+      const { responses, stateChanges } = executeTools(
+        removed.map((name) => ({
+          type: "function" as const,
+          function: { name, arguments: {} },
+        })),
+        storyData
+      );
+
+      expect(responses).toHaveLength(removed.length);
+      for (const response of responses) {
+        expect(response.success).toBe(false);
+        expect(response.message).toContain("Unknown tool");
+      }
+      expect(stateChanges).toHaveLength(0);
+      expect(JSON.stringify(storyData)).toBe(before);
     });
   });
 
   describe("JSON string arguments", () => {
-    test("should parse JSON string arguments for add_memory", () => {
-      const storyData = createTestStory();
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "add_memory",
-            arguments: JSON.stringify({
-              entry: "Memory from JSON string",
-            }),
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses).toHaveLength(1);
-      expect(responses[0].success).toBe(true);
-      expect(getMemoryContent(storyData.memory[0])).toBe(
-        "Memory from JSON string"
-      );
-    });
-
     test("should parse JSON string arguments for create_note", () => {
       const storyData = createTestStory();
       const toolCalls: ToolCall[] = [
@@ -349,7 +269,7 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "add_memory",
+            name: "create_note",
             arguments: "{invalid json",
           },
         },
@@ -363,78 +283,16 @@ describe("Tool Execution", () => {
     });
   });
 
-  describe("game_over tool", () => {
-    test("rejects game_over with no downed player", () => {
-      const storyData = createTestStory();
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "game_over",
-            arguments: {
-              reason: "The character succumbs to their wounds",
-            },
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses).toHaveLength(1);
-      expect(responses[0].success).toBe(false);
-      expect(storyData.gameOver).toBeUndefined();
-    });
-
-    test("accepts game_over when the player's combatant is downed in active combat", () => {
-      const storyData = createTestStory();
-      storyData.combatState = {
-        active: true,
-        combatants: [
-          {
-            id: "player-1",
-            name: "Player",
-            type: "player",
-            stats: { HP: 0 },
-            conditions: [],
-            initiative: "10",
-            isActive: true,
-          },
-        ],
-        turnOrder: ["player-1"],
-        currentTurnIndex: 0,
-        round: 1,
-      };
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "game_over",
-            arguments: {
-              reason: "Falls in battle against overwhelming odds",
-            },
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses[0].success).toBe(true);
-      expect(storyData.gameOver).toBeDefined();
-    });
-  });
-
   describe("stateChanges tracking", () => {
-    test("should NOT generate stateChanges for memory additions", () => {
+    test("should NOT generate stateChanges for a read-only tool", () => {
       const storyData = createTestStory();
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "add_memory",
-            arguments: {
-              entry: "Met the blacksmith",
-            },
+            name: "search_notes",
+            arguments: { query: "blacksmith" },
           },
         },
       ];
@@ -443,7 +301,7 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      // Memory is not in STATE_CHANGE_TOOLS, so no stateChange
+      // search_notes is not in STATE_CHANGE_TOOLS, so no stateChange
       expect(stateChanges).toHaveLength(0);
     });
   });

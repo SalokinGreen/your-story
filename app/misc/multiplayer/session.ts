@@ -14,6 +14,7 @@
 // appropriate).
 import { getLocalPlayerId } from "@/app/misc/localPlayerId";
 import type { PlayerArchetype, StoryData } from "@/app/misc/structs";
+import { withLegacyGuestShim } from "@/app/misc/storyDataDefaults";
 import type { MultiplayerTransport } from "./transport";
 import { createTransport, generateRoomCode } from "./transports";
 import type {
@@ -441,7 +442,9 @@ export class NetSession {
     if (this.role !== "host") return;
     this.transport.send({
       type: "state_snapshot",
-      storyData,
+      // A guest on a build from before the legacy removal needs the empty
+      // arrays back (see withLegacyGuestShim); the host's own story is untouched.
+      storyData: withLegacyGuestShim(storyData),
       seq: this.nextSeq++,
     });
   }

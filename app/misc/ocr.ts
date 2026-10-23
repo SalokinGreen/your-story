@@ -9,7 +9,7 @@
  * plus the selected model's own AI summarization cost.
  */
 
-import { StoryLore, Variable, Stat, Resource, Ability } from "./structs";
+import { StoryLore } from "./structs";
 
 // ============================================================================
 // OCR API Types (Mistral)
@@ -81,12 +81,8 @@ export interface OCRProcessResult {
 export interface PDFSummarizeResult {
   success: boolean;
   lore: StoryLore[];
-  variables?: Variable[];
   /** Random tables, as `type: "table"` notes (see tableNotes.ts). */
   tableNotes?: StoryLore[];
-  stats?: Stat[];
-  resources?: Resource[];
-  abilities?: Ability[];
   mechanicNotes?: string; // Raw mechanic rules extracted
   summary?: string; // Brief summary of the document
   error?: string;

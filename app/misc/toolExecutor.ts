@@ -10,8 +10,6 @@ import {
   StoryData,
   CommandResponse,
   AdventureDifficulty,
-  RestType,
-  REST_CONFIG,
   StoryThread,
   StoryLore,
   MAX_PENDING_RANDOM_EVENTS,
@@ -25,12 +23,6 @@ import {
   applyUpdateGoal,
   applyDeleteGoal,
   applyDeleteNote,
-  applyRemoveAbility,
-  applyModifyAbility,
-  applyUpgradeAbility,
-  applyResetAbilityCooldown,
-  applyReduceCooldown,
-  applyAdjustResource,
 } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { logger } from "@/app/misc/logger";
@@ -53,10 +45,8 @@ import {
   initPlanState,
   CAMPAIGN_SPINE_PRESETS,
 } from "@/app/misc/campaignPlan";
-import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
-import { countNameMentions } from "@/app/misc/compaction";
+import { findBestMatch } from "@/app/misc/fuzzyMatch";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
-import { initializeAbility } from "@/app/misc/abilitySystem";
 
 const VISIBILITY_RESTRICTION: Record<string, number> = {
   always_reveal: 0,
@@ -203,25 +193,11 @@ export interface ExecuteToolsResult {
  * tool."
  */
 export const STATE_CHANGE_TOOLS = new Set([
-  // Abilities - tool names and command names
-  "add_ability",
-  "remove_ability",
-  "modify_ability",
-  "upgrade_ability",
-  "reset_ability_cooldown",
-  "reduce_cooldown",
-  "refresh_ability",
   // NPC Management
   "add_npc",
-  // Game state
-  "game_over",
   // Scene Challenges
   "start_challenge",
-  "update_challenge",
-  "resolve_challenge",
   "cancel_challenge",
-  // Rest System
-  "take_rest",
   // Thread Management
   "create_thread",
   "update_thread",
@@ -239,8 +215,6 @@ export const STATE_CHANGE_TOOLS = new Set([
  * commandResponses.ts's executeCommandWithResponse. Each entry here takes
  * the already-parsed tool `args` object directly - no string round trip.
  *
- * `reset_ability_cooldown` and `refresh_ability` share a single
- * implementation since their behavior is identical.
  */
 const TOOL_DISPATCH: Record<
   string,
@@ -254,13 +228,6 @@ const TOOL_DISPATCH: Record<
   update_goal: applyUpdateGoal,
   delete_goal: applyDeleteGoal,
   delete_note: applyDeleteNote,
-  remove_ability: applyRemoveAbility,
-  modify_ability: applyModifyAbility,
-  upgrade_ability: applyUpgradeAbility,
-  reset_ability_cooldown: applyResetAbilityCooldown,
-  refresh_ability: applyResetAbilityCooldown,
-  reduce_cooldown: applyReduceCooldown,
-  adjust_resource: applyAdjustResource,
 };
 
 /**
@@ -595,9 +562,6 @@ export function executeTools(
     }
   }
 
-  // Extract difficulty for tier conversion (used by challenge and other tools)
-  const difficulty: AdventureDifficulty = storyData.difficulty || "medium";
-
   for (const toolCall of toolCalls) {
     const toolName = toolCall.function.name;
     const toolId = toolCall.id || "unknown";
@@ -675,166 +639,6 @@ export function executeTools(
           command: toolCall.function.name,
           success: false,
           message: errorMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Special handling for skip_tools (no-op when no changes needed)
-      if (toolCall.function.name === "skip_tools") {
-        const reason = args.reason || "No changes needed";
-        logger.action(`Tool stage skipped: ${reason}`, { toolCallId: toolId });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: `Skipped: ${reason}`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Special handling for add_memory (direct array manipulation)
-      if (toolCall.function.name === "add_memory") {
-        logger.action("Special handling: add_memory", {
-          toolCallId: toolId,
-          entry: args.entry.substring(0, 100),
-        });
-        if (!storyData.memory) storyData.memory = [];
-        const entry = args.entry;
-
-        // Exact-name-matching against tracked entities (same approach
-        // compaction.ts's dropped-entity check already uses) - a
-        // lightweight version of Generative Agents' recency/importance/
-        // entity-relevance memory scoring, not NLP-style extraction.
-        const entityIds: string[] = [];
-        for (const npc of storyData.npcs || []) {
-          if (npc.name && countNameMentions(entry, npc.name) > 0) {
-            entityIds.push(npc.name);
-          }
-        }
-        for (const thread of storyData.threads || []) {
-          if (thread.title && countNameMentions(entry, thread.title) > 0) {
-            entityIds.push(thread.title);
-          }
-        }
-
-        const rawImportance = args.importance;
-        const importance =
-          typeof rawImportance === "number" && !isNaN(rawImportance)
-            ? Math.max(0, Math.min(10, rawImportance))
-            : undefined;
-
-        // Add as MemoryEntry with embedded: false so it gets embedded on next sync
-        storyData.memory.push({
-          content: entry,
-          embedded: false,
-          timestamp: Date.now(),
-          sceneIndex: storyData.scene.parts.length,
-          entityIds: entityIds.length > 0 ? entityIds : undefined,
-          importance,
-        });
-        const successMsg = `Added memory: "${entry.substring(0, 50)}${
-          entry.length > 50 ? "..." : ""
-        }"`;
-        logger.action(`Tool call succeeded: ${successMsg}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: successMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Special handling for list_inactive_notes (query tool - returns data directly)
-      if (toolCall.function.name === "list_inactive_notes") {
-        logger.action("Special handling: list_inactive_notes", {
-          toolCallId: toolId,
-        });
-
-        if (!storyData.lore || storyData.lore.length === 0) {
-          responses.push({
-            command: toolCall.function.name,
-            success: true,
-            message: "No note entries defined in this adventure.",
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Find inactive notes (not revealed, not always-on, on=false or no triggers matched)
-        const currentPartIndex = storyData.scene.parts.length;
-        const inactiveNotes = storyData.lore.filter((l) => {
-          if (l.enabled === false) return false; // Completely disabled in editor
-          if (l.alwaysOn) return false; // Always visible, not "inactive"
-
-          // Check if already revealed via show_note
-          const wasRevealed = storyData.scene.parts.some((p) =>
-            p.revealedLore?.some(
-              (title) => title.toLowerCase() === l.title.toLowerCase()
-            )
-          );
-          if (wasRevealed) return false;
-
-          // Check standard activation
-          if (l.on === true) {
-            // If recently triggered, it's active
-            if (
-              l.lastTriggeredIndex &&
-              currentPartIndex - l.lastTriggeredIndex <= 15
-            ) {
-              return false;
-            }
-          }
-
-          // If we get here, note is inactive
-          return true;
-        });
-
-        if (inactiveNotes.length === 0) {
-          responses.push({
-            command: toolCall.function.name,
-            success: true,
-            message:
-              "All note entries are currently active/visible. No hidden notes available.",
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Format inactive notes for AI
-        const noteList = inactiveNotes
-          .map((l) => {
-            const preview =
-              l.content.length > 80
-                ? l.content.substring(0, 77) + "..."
-                : l.content;
-            return `- ${l.title}: ${preview}`;
-          })
-          .join("\n");
-
-        const successMsg = `Inactive/Hidden Note Entries (${inactiveNotes.length}):\n${noteList}\n\nUse show_note({ title: "..." }) to reveal any of these to the player.`;
-
-        logger.action(
-          `Tool call succeeded: list_inactive_notes found ${inactiveNotes.length} entries`,
-          {
-            toolCallId: toolId,
-            count: inactiveNotes.length,
-          }
-        );
-
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: successMsg,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -1215,87 +1019,6 @@ export function executeTools(
         continue;
       }
 
-      // Special handling for add_ability (description may contain | characters)
-      if (toolCall.function.name === "add_ability") {
-        logger.action("Special handling: add_ability", {
-          toolCallId: toolId,
-          name: args.name,
-        });
-
-        // Initialize abilities array if needed
-        if (!storyData.abilities) {
-          storyData.abilities = [];
-        }
-
-        const existing = storyData.abilities.find(
-          (a) => a.name.toLowerCase() === args.name.toLowerCase()
-        );
-        if (existing) {
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: `Ability "${args.name}" already exists`,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Parse costs array (already structured from tool args)
-        const costs: Array<{
-          type: "resource" | "variable";
-          name: string;
-          amount: number;
-        }> = args.costs || [];
-
-        // Validate stat exists if specified
-        const stat = args.stat?.trim() || undefined;
-        let statWarning = "";
-        if (
-          stat &&
-          !storyData.stats.find((s) => s.name.toLowerCase() === stat.toLowerCase())
-        ) {
-          statWarning = ` (note: stat "${stat}" not found, ability will work with any skill check)`;
-        }
-
-        const ability = initializeAbility({
-          name: args.name,
-          description: args.description,
-          grade: args.grade || "novice",
-          stat,
-          cost: costs,
-          cooldown: args.maxCooldown || 0,
-          symbol: "✨",
-        });
-
-        storyData.abilities.push(ability);
-
-        logger.action("Ability added via direct tool handling", {
-          name: args.name,
-          grade: args.grade || "novice",
-          costs,
-          maxCooldown: args.maxCooldown || 0,
-        });
-
-        const costDesc =
-          costs.length > 0
-            ? ` (costs: ${costs.map((c) => `${c.amount} ${c.name}`).join(", ")})`
-            : "";
-        const cooldownDesc =
-          args.maxCooldown > 0 ? `, ${args.maxCooldown} turn cooldown` : "";
-        const stateChange = `✨ Added ${args.grade || "novice"} ability "${args.name}"${costDesc}${cooldownDesc}${statWarning}`;
-        stateChanges.push(stateChange);
-
-        responses.push({
-          command: toolCall.function.name,
-          success: statWarning ? "partial" as const : true,
-          message: stateChange,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
       // Special handling for edit_note (content may contain | characters like markdown tables)
       if (toolCall.function.name === "edit_note") {
         logger.action("Special handling: edit_note", {
@@ -1568,55 +1291,6 @@ export function executeTools(
             ? prependContent.substring(0, 47) + "..."
             : prependContent;
         const stateChange = `📝 Prepended to note "${lore.title}": "${preview}"`;
-        stateChanges.push(stateChange);
-
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: stateChange,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Special handling for toggle_lore
-      if (toolCall.function.name === "toggle_lore") {
-        logger.action("Special handling: toggle_lore", {
-          toolCallId: toolId,
-        });
-
-        if (!storyData.lore || storyData.lore.length === 0) {
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: "No lore entries defined.",
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const match = findBestMatch(args.title, storyData.lore, (l) => l.title);
-        if (!match) {
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: `Could not find lore entry matching "${args.title}"`,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const lore = match.item;
-
-        const wasOn = lore.on !== false;
-        lore.on = !wasOn;
-
-        const stateChange = wasOn
-          ? `📝 Hid note "${lore.title}"`
-          : `📝 Revealed note "${lore.title}"`;
         stateChanges.push(stateChange);
 
         responses.push({
@@ -1953,12 +1627,6 @@ export function executeTools(
             : undefined,
           off_triggers: sourceLore.off_triggers
             ? [...sourceLore.off_triggers]
-            : undefined,
-          var_on_triggers: sourceLore.var_on_triggers
-            ? [...sourceLore.var_on_triggers]
-            : undefined,
-          var_off_triggers: sourceLore.var_off_triggers
-            ? [...sourceLore.var_off_triggers]
             : undefined,
           type: sourceLore.type,
           // A copy of a hidden note stays hidden.
@@ -2361,256 +2029,10 @@ export function executeTools(
         continue;
       }
 
-      // Game over
-      if (toolCall.function.name === "game_over") {
-        const reason = args.reason?.trim();
-
-        if (!reason || reason.length < 10) {
-          const errorMsg = "Game over reason must be at least 10 characters";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/game_over`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Deterministic gate: game_over is a fatal, irreversible outcome and
-        // must be earned through state the engine already tracks - the
-        // player's own combatant being downed in active combat - not
-        // narrative say-so alone. This mirrors the tool's own schema
-        // description.
-        const playerCombatant = storyData.combatState?.active
-          ? storyData.combatState.combatants.find((c) => c.type === "player")
-          : undefined;
-        const playerIsDowned =
-          !!playerCombatant &&
-          (!playerCombatant.isActive ||
-            (typeof playerCombatant.stats?.HP === "number" &&
-              playerCombatant.stats.HP <= 0));
-
-        if (!playerIsDowned) {
-          const errorMsg =
-            "Cannot end the game: no downed player combatant was found. Reduce the player's HP to 0 in active combat before calling game_over.";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/game_over`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Mark story as game over
-        storyData.gameOver = {
-          reason,
-          timestamp: Date.now(),
-        };
-
-        logger.action("Game over triggered via tool", {
-          toolCallId: toolId,
-          reason,
-        });
-        responses.push({
-          command: `/game_over: ${reason}`,
-          success: true,
-          message: `⚠️ GAME OVER: ${reason}`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
       // === SCENE CHALLENGE (PROGRESS CLOCK) TOOL HANDLERS ===
 
       // (start_challenge lives only in gmExecutor.ts: the GM switch handles it
       // before anything reaches here, and its schema was never offered here.)
-
-      // Update challenge progress
-      if (toolCall.function.name === "update_challenge") {
-        const successIncrement = args.successIncrement ?? 0;
-        const failureIncrement = args.failureIncrement ?? 0;
-
-        if (!storyData.activeChallenge?.active) {
-          const errorMsg = "No active challenge to update";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/update_challenge`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (successIncrement === 0 && failureIncrement === 0) {
-          const errorMsg = "Must specify successIncrement or failureIncrement";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/update_challenge`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const challenge = storyData.activeChallenge;
-        const oldSuccesses = challenge.currentSuccesses;
-        const oldFailures = challenge.currentFailures;
-
-        challenge.currentSuccesses += successIncrement;
-        challenge.currentFailures += failureIncrement;
-
-        // Check for automatic resolution (best of X - first to majority wins)
-        const majority = Math.ceil(challenge.rounds / 2);
-        let autoResolved = false;
-        let autoResult: "won" | "lost" | null = null;
-
-        if (challenge.currentSuccesses >= majority) {
-          autoResolved = true;
-          autoResult = "won";
-          challenge.active = false;
-          challenge.resolvedAt = Date.now();
-          challenge.result = "won";
-        } else if (challenge.currentFailures >= majority) {
-          autoResolved = true;
-          autoResult = "lost";
-          challenge.active = false;
-          challenge.resolvedAt = Date.now();
-          challenge.result = "lost";
-        }
-
-        const scoreStr = `[Score: ${challenge.currentSuccesses}-${challenge.currentFailures}]`;
-        let message = "";
-
-        if (successIncrement > 0 && failureIncrement > 0) {
-          message = `${challenge.name}: +${successIncrement} success, +${failureIncrement} failure ${scoreStr}`;
-        } else if (successIncrement > 0) {
-          message = `${challenge.name}: +${successIncrement} success${
-            successIncrement > 1 ? "es" : ""
-          } ${scoreStr}`;
-        } else {
-          message = `${challenge.name}: +${failureIncrement} failure${
-            failureIncrement > 1 ? "s" : ""
-          } ${scoreStr}`;
-        }
-
-        if (autoResolved) {
-          if (autoResult === "won") {
-            message += `\n🏆 CHALLENGE WON: ${challenge.name}!`;
-          } else {
-            message += `\n💀 CHALLENGE LOST: ${challenge.name}!`;
-          }
-        }
-
-        logger.action("Challenge updated via tool", {
-          toolCallId: toolId,
-          name: challenge.name,
-          oldSuccesses,
-          newSuccesses: challenge.currentSuccesses,
-          oldFailures,
-          newFailures: challenge.currentFailures,
-          autoResolved,
-          autoResult,
-        });
-        responses.push({
-          command: `/update_challenge: +${successIncrement}s, +${failureIncrement}f`,
-          success: true,
-          message,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Manually resolve challenge
-      if (toolCall.function.name === "resolve_challenge") {
-        const result = args.result as "won" | "lost";
-        const reason = args.reason?.trim();
-
-        if (!storyData.activeChallenge?.active) {
-          const errorMsg = "No active challenge to resolve";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/resolve_challenge`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (result !== "won" && result !== "lost") {
-          const errorMsg = "Result must be 'won' or 'lost'";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/resolve_challenge`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const challenge = storyData.activeChallenge;
-        challenge.active = false;
-        challenge.resolvedAt = Date.now();
-        challenge.result = result;
-
-        let message = "";
-        if (result === "won") {
-          message = `🏆 CHALLENGE WON: ${challenge.name}!${
-            reason ? ` - ${reason}` : ""
-          }`;
-        } else {
-          message = `💀 CHALLENGE LOST: ${challenge.name}!${
-            reason ? ` - ${reason}` : ""
-          }`;
-        }
-
-        logger.action("Challenge resolved via tool", {
-          toolCallId: toolId,
-          name: challenge.name,
-          result,
-          reason,
-        });
-        responses.push({
-          command: `/resolve_challenge: ${result}`,
-          success: true,
-          message,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
 
       // Cancel challenge (no win/loss)
       if (toolCall.function.name === "cancel_challenge") {
@@ -2826,15 +2248,6 @@ export function executeTools(
         continue;
       }
 
-      // === REST SYSTEM TOOL HANDLER ===
-      if (toolCall.function.name === "take_rest") {
-        const restResult = executeRestTool(args, storyData, toolId);
-        responses.push({
-          ...restResult,
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
 
       // === THREAD MANAGEMENT TOOL HANDLERS ===
       if (toolCall.function.name === "create_thread") {
@@ -3123,9 +2536,7 @@ export function executeTools(
 
       // Direct typed dispatch - no string command round trip. Handles
       // complete_goal, fail_goal, update_goal, delete_goal,
-      // delete_note, remove_ability, modify_ability,
-      // upgrade_ability, reset_ability_cooldown, refresh_ability,
-      // reduce_cooldown, and adjust_resource.
+      // delete_note.
       const dispatchFn = TOOL_DISPATCH[toolCall.function.name];
       if (dispatchFn) {
         const response = dispatchFn(args, storyData);
@@ -3248,233 +2659,6 @@ export function executeTools(
   }
 
   return { responses, stateChanges };
-}
-
-/**
- * Execute rest tool - handles resource recovery, cooldown reduction, condition healing, item repair
- * Returns CommandResponse for the operation
- */
-function executeRestTool(
-  args: Record<string, any>,
-  storyData: StoryData,
-  toolId: string
-): Omit<CommandResponse, "toolCallId"> {
-  const restType = args.type as RestType;
-  const narrativeSummary = args.narrative_summary?.trim() || "";
-  const resourcesArg = args.resources as
-    | Array<{ name: string; amount: number; percentage?: boolean }>
-    | undefined;
-  const difficulty = storyData.difficulty || "medium";
-  const config = REST_CONFIG[difficulty];
-
-  // Initialize rest state if not present
-  if (!storyData.restState) {
-    storyData.restState = {
-      quickRestsUsed: 0,
-      shortRestsUsed: 0,
-    };
-  }
-
-  // Check if rest is available
-  if (
-    restType === "quick" &&
-    storyData.restState.quickRestsUsed >= config.maxQuickRests
-  ) {
-    return {
-      command: "take_rest",
-      success: false,
-      message: `Cannot quick rest: ${config.maxQuickRests} quick rests already used (long rest required to recharge)`,
-      timestamp: Date.now(),
-    };
-  }
-
-  if (
-    restType === "short" &&
-    storyData.restState.shortRestsUsed >= config.maxShortRests
-  ) {
-    return {
-      command: "take_rest",
-      success: false,
-      message: `Cannot short rest: ${config.maxShortRests} short rests already used (long rest required to recharge)`,
-      timestamp: Date.now(),
-    };
-  }
-
-  // Check for active challenge - cannot rest during challenges
-  if (storyData.activeChallenge?.active) {
-    return {
-      command: "take_rest",
-      success: false,
-      message: `Cannot rest while "${storyData.activeChallenge.name}" challenge is active`,
-      timestamp: Date.now(),
-    };
-  }
-
-  // Track effects for summary message
-  const effects: string[] = [];
-
-  // 1. Resource Recovery (GM-specified list only)
-  if (resourcesArg && resourcesArg.length > 0 && storyData.resources?.length) {
-    for (const resourceReq of resourcesArg) {
-      // Find matching resource using fuzzy match
-      const match = findBestMatch(
-        resourceReq.name,
-        storyData.resources,
-        (r) => r.name,
-        0.6
-      );
-
-      if (!match) {
-        // Resource not found - skip silently (don't fail the whole rest)
-        continue;
-      }
-
-      const resource = match.item;
-      if (resource.value >= resource.maxValue) {
-        // Already at max - skip
-        continue;
-      }
-
-      // Calculate recovery amount
-      const isPercentage = resourceReq.percentage !== false; // Default to true
-      let recoveryAmount: number;
-      if (isPercentage) {
-        recoveryAmount = Math.ceil(
-          (resource.maxValue * resourceReq.amount) / 100
-        );
-      } else {
-        recoveryAmount = Math.ceil(resourceReq.amount);
-      }
-
-      const oldValue = resource.value;
-      resource.value = Math.min(
-        resource.maxValue,
-        resource.value + recoveryAmount
-      );
-      const actualRecovery = resource.value - oldValue;
-      if (actualRecovery > 0) {
-        effects.push(`${resource.name} +${actualRecovery}`);
-      }
-    }
-  }
-
-  // 2. Stress Reduction
-  const stressReduction = config.stressReduction[restType];
-  if (stressReduction > 0 && (storyData.stress ?? 0) > 0) {
-    const oldStress = storyData.stress ?? 0;
-    storyData.stress = Math.max(0, oldStress - stressReduction);
-    const actualReduction = oldStress - (storyData.stress ?? 0);
-    if (actualReduction > 0) {
-      effects.push(`Stress -${actualReduction}`);
-    }
-  }
-
-  // 3. Cooldown Reduction
-  const cooldownReduction = config.cooldownReduction[restType];
-  if (cooldownReduction > 0 && storyData.abilities?.length) {
-    let cooldownsReset = 0;
-    for (const ability of storyData.abilities) {
-      if ((ability.currentCooldown ?? 0) > 0) {
-        if (cooldownReduction >= 999) {
-          // Full reset
-          ability.currentCooldown = 0;
-          cooldownsReset++;
-        } else {
-          const oldCooldown = ability.currentCooldown ?? 0;
-          ability.currentCooldown = Math.max(
-            0,
-            oldCooldown - cooldownReduction
-          );
-          if (ability.currentCooldown < oldCooldown) {
-            cooldownsReset++;
-          }
-        }
-      }
-    }
-    if (cooldownsReset > 0) {
-      if (cooldownReduction >= 999) {
-        effects.push(
-          `${cooldownsReset} ability cooldown${
-            cooldownsReset > 1 ? "s" : ""
-          } reset`
-        );
-      } else {
-        effects.push(
-          `${cooldownsReset} ability cooldown${
-            cooldownsReset > 1 ? "s" : ""
-          } reduced`
-        );
-      }
-    }
-  }
-
-  // 4. Update rest state tracking
-  if (restType === "long") {
-    // Long rest resets quick/short rest counts
-    storyData.restState.quickRestsUsed = 0;
-    storyData.restState.shortRestsUsed = 0;
-  } else if (restType === "short") {
-    storyData.restState.shortRestsUsed++;
-    // Short rest also resets quick rest count
-    storyData.restState.quickRestsUsed = 0;
-  } else {
-    storyData.restState.quickRestsUsed++;
-  }
-
-  storyData.restState.lastRestType = restType;
-  storyData.restState.lastRestTimestamp = Date.now();
-
-  // Build summary message
-  const restTypeLabel =
-    restType === "quick"
-      ? "Quick Rest"
-      : restType === "short"
-      ? "Short Rest"
-      : "Long Rest";
-  const durationLabel =
-    restType === "quick"
-      ? "~30 minutes"
-      : restType === "short"
-      ? "4-8 hours"
-      : "several days";
-
-  let summary = `🛏️ ${restTypeLabel} (${durationLabel})`;
-  if (narrativeSummary) {
-    summary += `: ${narrativeSummary}`;
-  }
-
-  if (effects.length > 0) {
-    summary += `\nEffects: ${effects.join(" | ")}`;
-  } else {
-    summary += "\nNo recovery needed - already at full capacity";
-  }
-
-  // Add remaining rest counts
-  if (restType !== "long") {
-    const remainingQuick =
-      config.maxQuickRests - storyData.restState.quickRestsUsed;
-    const remainingShort =
-      config.maxShortRests - storyData.restState.shortRestsUsed;
-    summary += `\n[Rests remaining: ${remainingQuick} quick, ${remainingShort} short]`;
-  }
-
-  logger.action(`Rest executed: ${restType}`, {
-    toolId,
-    restType,
-    difficulty,
-    effects: effects.length,
-    quickRestsRemaining:
-      config.maxQuickRests - storyData.restState.quickRestsUsed,
-    shortRestsRemaining:
-      config.maxShortRests - storyData.restState.shortRestsUsed,
-  });
-
-  return {
-    command: `take_rest: ${restType}`,
-    success: true,
-    message: summary,
-    timestamp: Date.now(),
-  };
 }
 
 /**

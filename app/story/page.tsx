@@ -7,9 +7,6 @@ import {
   StoryLore,
   Choices,
   Choice,
-  Resource,
-  InventoryItem,
-  Ability,
   Preset,
   CommandResponse,
   getMemoryContent,
@@ -45,14 +42,8 @@ import {
   FLOOR_STEAL_COOLDOWN_MS,
 } from "../misc/multiplayer/floorControl";
 import {
-  askFate,
-  generateElement,
-  generateEventFocus,
-  generateEventMeaning,
   classifyPlayerStyle,
   classifyToolActivityStyle,
-  type Likelihood,
-  type ElementCategory,
 } from "../misc/mythic";
 import {
   getEffectiveNarrationEffort,
@@ -134,24 +125,24 @@ function getModelsFromPreset() {
   };
 }
 
-import { DEFAULT_PRESET } from "../misc/presets";
+import {
+  DEFAULT_PRESET,
+  hasPremadeCharacters,
+  shouldUseIntroOverride,
+} from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import SyncConflictModal from "../components/SyncConflictModal";
 import SyncIndicator from "../components/SyncIndicator";
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
-import { fillTemplate } from "../misc/characterSheetTemplate";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn } from "../misc/generation";
 import { MAX_UNDO_STACK_SIZE } from "../misc/localStoryManager";
 import { GMNPCReactionResult } from "../misc/gmExecutor";
-import { tickCooldowns } from "../misc/abilitySystem";
-import CharacterCreationForm from "./create-character/form";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
 import { useViewportHeight } from "../misc/useViewportHeight";
-import { MAX_DICE_COUNT, MAX_DICE_SIDES } from "../misc/diceFormula";
 import { SYNC_COMPLETED_EVENT, SyncResult } from "../misc/syncManager";
 
 // Cryptographically secure random number generator
@@ -173,14 +164,6 @@ function getSecureRandomInt(min: number, max: number): number {
   } while (randomNumber >= maxValue - (maxValue % range));
 
   return min + (randomNumber % range);
-}
-
-// Helper to track player actions between turns (shown to AI on next generation)
-function trackPlayerAction(storyData: StoryData, action: string) {
-  if (!storyData.pendingPlayerActions) {
-    storyData.pendingPlayerActions = [];
-  }
-  storyData.pendingPlayerActions.push(action);
 }
 
 // Helper to trigger notifications for goal-related tool responses
@@ -433,14 +416,12 @@ function handleObserverRewrite(
 
 enum StoryState {
   STORY = "STORY",
-  STATS = "STATS",
   LORE = "LORE",
   NPCS = "NPCS",
   GOALS = "GOALS",
   MENU = "MENU",
   LOGS = "LOGS",
   CONTEXT = "CONTEXT",
-  CHARACTER_CREATION = "CHARACTER_CREATION",
 }
 
 function trimStoryData(data: StoryData): StoryData {
@@ -464,7 +445,6 @@ function StoryPageContent() {
     deepinfraKey,
     zaiKey,
     falKey,
-    braveSearchKey,
   } = apiKeys;
   // The story menu is a sheet over the page (StoryMenuSheet), not a page of
   // its own, so the story stays mounted underneath it.
@@ -821,7 +801,10 @@ function StoryPageContent() {
     },
     onFloorTake: (localPlayerId) => hostHandleFloorTake(localPlayerId),
     onFloorRelease: (localPlayerId) => hostHandleFloorRelease(localPlayerId),
-    onSnapshot: (incoming) => {
+    onSnapshot: (received) => {
+      // The host may still send the removed fields (an older build's story, or
+      // the shim for older guests); strip them like a load does.
+      const incoming = ensureStoryDataArrays(received);
       setStoryData(incoming);
       const lastPart = incoming.scene.parts[incoming.scene.parts.length - 1];
       if (lastPart) {
@@ -1105,7 +1088,7 @@ function StoryPageContent() {
   const [canRetry, setCanRetry] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [showPresetSelection, setShowPresetSelection] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
+  const startCustomPendingRef = useRef(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -1120,83 +1103,6 @@ function StoryPageContent() {
     message: "",
     onConfirm: () => {},
   });
-
-  const handleCharacterCreate = async (
-    characterData: Record<string, string>,
-  ) => {
-    if (!storyData || !selectedPreset) return;
-    logger.action("User created custom character", { characterData });
-
-    const updatedStoryData = {
-      ...storyData,
-      characterData,
-      selected_preset: selectedPreset.id,
-    };
-
-    // For custom preset, generate a character sheet from the template and filled data
-    if (
-      updatedStoryData.characterSheetTemplate?.template &&
-      Object.keys(characterData).length > 0
-    ) {
-      // Use the proper fillTemplate function that handles "FieldName (Category)" syntax
-      const filledSheet = fillTemplate(
-        updatedStoryData.characterSheetTemplate.template,
-        characterData,
-      );
-      updatedStoryData.characterSheet = filledSheet;
-
-      // Add character sheet to lore as "character_sheet" type for AI context
-      const characterSheetLore: StoryLore = {
-        title: "Player Character Sheet",
-        content: filledSheet,
-        relatedCharacters: [],
-        relatedLocations: [],
-        secrtet: false,
-        keys: [],
-        type: "character_sheet",
-        on: true,
-        on_triggers: [],
-        off_triggers: [],
-        var_on_triggers: [],
-        var_off_triggers: [],
-      };
-      updatedStoryData.lore = [
-        ...(updatedStoryData.lore || []),
-        characterSheetLore,
-      ];
-    }
-
-    // Determine starting choices
-    const startingChoices = updatedStoryData.starting_choices?.length
-      ? updatedStoryData.starting_choices.map((sc) => ({
-          text: sc.text,
-          intro_override: sc.intro_override,
-        }))
-      : [{ text: "Start Story" }];
-
-    // Add starting scene part
-    updatedStoryData.scene.parts.push({
-      content: updatedStoryData.intro || "The story begins.",
-      imageUrl: "",
-      user: false,
-      role: "assistant",
-      choices: startingChoices,
-    });
-
-    setStoryData(updatedStoryData);
-    setShowPresetSelection(false);
-    setCurrentState(StoryState.STORY);
-    setStarted(true);
-
-    // Set story text and choices from the first part
-    const lastPart =
-      updatedStoryData.scene.parts[updatedStoryData.scene.parts.length - 1];
-    setStoryText(lastPart.content);
-    setChoices({ choices: lastPart.choices || [] });
-
-    // Save the story
-    await performSave(updatedStoryData);
-  };
 
   // NPC Reaction notifications (social media style)
   const [pendingNPCReactions, setPendingNPCReactions] = useState<NPCReaction[]>(
@@ -1394,18 +1300,13 @@ function StoryPageContent() {
       hasLoadedStoryRef.current = storyId;
 
       // Migrate AGMT state to include new performance tracking fields
-      // Also migrate "mythic" item grades to "mythic" for backward compatibility
-      import("@/app/misc/mythicChaos").then(
-        ({ migrateAGMTState, migrateItemGrades }) => {
-          if (loadedStoryData.agmtState) {
-            loadedStoryData.agmtState = migrateAGMTState(
-              loadedStoryData.agmtState!,
-            );
-          }
-          // Migrate item grades from "mythic" to "mythic"
-          migrateItemGrades(loadedStoryData);
-        },
-      );
+      import("@/app/misc/mythicChaos").then(({ migrateAGMTState }) => {
+        if (loadedStoryData.agmtState) {
+          loadedStoryData.agmtState = migrateAGMTState(
+            loadedStoryData.agmtState!,
+          );
+        }
+      });
 
       // Backfill the arrays StoryData requires. Older saves can lack goals,
       // and a story started from a Designer-made adventure before the fix
@@ -1444,7 +1345,11 @@ function StoryPageContent() {
 
       //Initializestoryifnopartsyet-showpresetselection
       if (loadedStoryData.scene.parts.length === 0) {
-        setShowPresetSelection(true);
+        if (hasPremadeCharacters(loadedStoryData)) {
+          setShowPresetSelection(true);
+        } else {
+          startCustomPendingRef.current = true;
+        }
         setLoadingStory(false);
         return true; // early return signal
       }
@@ -1607,50 +1512,12 @@ function StoryPageContent() {
     if (!storyData) return;
     logger.action("User selected preset", { preset: preset.name });
 
-    // For custom preset with a character sheet template, redirect to character creation
     const isCustom = preset.id === "custom";
-    if (isCustom) {
-      // Check if storyData has characterSheetTemplate with fields
-      let templateWithFields = storyData.characterSheetTemplate;
-
-      // If not in storyData, try to fetch from the source adventure
-      if (!templateWithFields?.fields?.length && sourceAdventureId) {
-        try {
-          const { getLocalAdventure } =
-            await import("@/app/misc/localAdventureManager");
-          const localAdv = await getLocalAdventure(sourceAdventureId);
-          const adventure = localAdv?.adventureData;
-          if (adventure?.characterSheetTemplate?.fields?.length) {
-            templateWithFields = adventure.characterSheetTemplate;
-            // Also update storyData so we have it for later
-            setStoryData((prev) =>
-              prev
-                ? { ...prev, characterSheetTemplate: templateWithFields }
-                : prev,
-            );
-          }
-        } catch (error) {
-          console.error(
-            "Failed to fetch adventure for character template:",
-            error,
-          );
-        }
-      }
-
-      if (templateWithFields?.fields?.length) {
-        setSelectedPreset(preset);
-        setCurrentState(StoryState.CHARACTER_CREATION);
-        setShowPresetSelection(false);
-        return;
-      }
-    }
-
     const updatedStoryData = { ...storyData };
 
-    // For custom preset, use default values but don't apply any preset-specific overrides
-    // The user can customize via the menu after starting
-
-    // Apply preset to story data (skip for custom - use adventure defaults)
+    // Custom starts with no sheet: the GM builds it with the player in session
+    // zero, from the adventure's template when it has one. A pre-made
+    // character brings its own sheet.
     if (!isCustom) {
       // Add character sheet to lore if preset has one
       if (preset.characterSheet) {
@@ -1665,31 +1532,19 @@ function StoryPageContent() {
           on: true,
           on_triggers: [],
           off_triggers: [],
-          var_on_triggers: [],
-          var_off_triggers: [],
         };
         updatedStoryData.lore = [
           ...(updatedStoryData.lore || []),
           characterSheetLore,
         ];
       }
-      if (preset.stats?.length)
-        updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
-      if (preset.resources?.length)
-        updatedStoryData.resources = JSON.parse(
-          JSON.stringify(preset.resources),
-        );
-      if (preset.inventory?.length)
-        updatedStoryData.inventory = JSON.parse(
-          JSON.stringify(preset.inventory),
-        );
-      if (preset.relationships?.length)
-        updatedStoryData.relationships = JSON.parse(
-          JSON.stringify(preset.relationships),
-        );
       if (preset.authorNotes)
         updatedStoryData.author_notes = preset.authorNotes;
     }
+
+    // Every new adventure starts in session zero: the observer stays
+    // suspended and start_game closes setup.
+    updatedStoryData.sessionZeroActive = true;
 
     // Determine starting choices - use custom ones if available, otherwise default
     // Choices are now plain text only - GM stage handles all dice mechanics
@@ -1735,22 +1590,24 @@ function StoryPageContent() {
     setInput({ StartStory: false });
     setStarted(true);
     setShowPresetSelection(false);
-    setSelectedPreset(preset);
 
-    // For custom preset, open the menu so user can customize their character
-    if (isCustom) {
-      setMenuOpen(true);
-      addNotification(
-        "Customize your character in the menu, then return to the story!",
-        "success",
-      );
-    } else {
+    if (!isCustom) {
       addNotification(
         `Character preset "${preset.name}" applied! ?`,
         "success",
       );
     }
   };
+
+  // An adventure with no pre-made character skips the picker and starts as
+  // Custom. setupUIFromStory only flags it: handlePresetSelect reads the
+  // storyData and storyDbId state, which are set by the time this effect runs.
+  useEffect(() => {
+    if (!startCustomPendingRef.current || !storyData || !storyDbId) return;
+    startCustomPendingRef.current = false;
+    void handlePresetSelect(DEFAULT_PRESET);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyData, storyDbId]);
 
   // Best-effort persist of the undo stack to IndexedDB so it survives a
   // reload - fire-and-forget like saveProgress's debounced writes below,
@@ -2447,10 +2304,6 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("embeddingsEnabled") === "true"
           : false;
-      const webResearchEnabled =
-        typeof window !== "undefined"
-          ? localStorage.getItem("webResearchEnabled") === "true"
-          : false;
       const embeddingThreshold =
         typeof window !== "undefined"
           ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -2521,8 +2374,6 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
-          webResearchEnabled,
-          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -2838,17 +2689,6 @@ function StoryPageContent() {
               );
             }
 
-            // Tick ability cooldowns at end of turn
-            if (storyData.abilities && storyData.abilities.length > 0) {
-              const offCooldown = tickCooldowns(storyData.abilities);
-              if (offCooldown.length > 0) {
-                addNotification(
-                  `Abilities ready: ${offCooldown.join(", ")}`,
-                  "success",
-                );
-              }
-            }
-
             // Copy gmConversation from result.scenePart to the last scene part
             // This preserves the full GM conversation history for future context
             const lastIdx = storyData.scene.parts.length - 1;
@@ -3067,10 +2907,6 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
         : false;
-    const webResearchEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("webResearchEnabled") === "true"
-        : false;
     const embeddingThreshold =
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -3137,8 +2973,6 @@ function StoryPageContent() {
           scenePartId: partialPart.id,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
-          webResearchEnabled,
-          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -3418,17 +3252,6 @@ function StoryPageContent() {
               );
             }
 
-            // Tick ability cooldowns at end of turn
-            if (storyData.abilities && storyData.abilities.length > 0) {
-              const offCooldown = tickCooldowns(storyData.abilities);
-              if (offCooldown.length > 0) {
-                addNotification(
-                  `Abilities ready: ${offCooldown.join(", ")}`,
-                  "success",
-                );
-              }
-            }
-
             const lastIdx = storyData.scene.parts.length - 1;
             if (lastIdx >= 0 && result.scenePart?.gmConversation) {
               storyData.scene.parts[lastIdx] = {
@@ -3584,8 +3407,9 @@ function StoryPageContent() {
     setPendingUserChoice(choice.text);
 
     // Check if this choice has intro_override (for starting choices)
-    // If so, skip AI generation and use the preset intro directly
-    if (choice.intro_override) {
+    // If so, skip AI generation and use the preset intro directly. Not during
+    // session zero: then the choice goes to the GM (see the flavor lines below).
+    if (choice.intro_override && shouldUseIntroOverride(storyData, choice)) {
       logger.action("Using intro_override instead of AI generation", {
         choice: choice.text,
       });
@@ -3659,138 +3483,18 @@ function StoryPageContent() {
       return;
     }
 
-    // Build the player-facing text: the choice itself, plus lightweight
-    // flavor annotations (oracle question, table roll, context dice).
-    // No mechanical resolution happens client-side anymore - the GM decides
-    // whether/how to roll via its own formula_roll tool once it reads this.
+    // Build the player-facing text: the choice itself, plus a line for an
+    // authored opening. No mechanical resolution happens client-side - the GM
+    // decides whether/how to roll via its own formula_roll tool once it reads
+    // this.
     const flavorLines: string[] = [];
 
-    if (choice.agmt_check) {
-      try {
-        const LIKELIHOODS: Likelihood[] = [
-          "Impossible",
-          "No Way",
-          "Very Unlikely",
-          "Unlikely",
-          "50/50",
-          "Somewhat Likely",
-          "Likely",
-          "Very Likely",
-          "Near Sure Thing",
-          "A Sure Thing",
-          "Has To Be",
-        ];
-        const match = choice.agmt_check.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-        const question = (match ? match[1] : choice.agmt_check).trim();
-        const rawLikelihood = (match ? match[2] : "50/50").trim();
-        const likelihood: Likelihood =
-          LIKELIHOODS.find(
-            (l) => l.toLowerCase() === rawLikelihood.toLowerCase(),
-          ) || "50/50";
-        const chaosFactor = storyData.agmtState?.chaosFactor ?? 5;
-        const fateResult = askFate(likelihood, chaosFactor);
-
-        flavorLines.push(`[AGMT Question: ${question}]`);
-        const answerLine = fateResult.randomEvent
-          ? `[AGMT Answer: ${fateResult.answer} - RANDOM EVENT TRIGGERED!]`
-          : `[AGMT Answer: ${fateResult.answer}]`;
-        flavorLines.push(answerLine);
-
-        if (fateResult.randomEvent) {
-          const focus = generateEventFocus();
-          const meaning = generateEventMeaning();
-          flavorLines.push(
-            `[Random Event: ${focus.focus} - ${meaning.action} ${meaning.subject}]`,
-          );
-        }
-      } catch (error) {
-        console.error("Error processing agmt_check:", error);
-      }
-    }
-
-    // Table roll: unified `table` field, with legacy fallbacks
-    const tableForChoice = choice.table || choice.agmt_table || choice.custom_table;
-    if (tableForChoice) {
-      try {
-        if (storyData.customTables) {
-          const { getTableByName, rollOnCustomTable } =
-            await import("../misc/tableRoller");
-          const customTable = getTableByName(
-            storyData.customTables,
-            tableForChoice,
-          );
-          if (customTable) {
-            const result = rollOnCustomTable(customTable);
-            if (result) {
-              flavorLines.push(`[${customTable.name}: ${result.text}]`);
-            } else {
-              addNotification(`Table "${customTable.name}" is empty`, "warning");
-            }
-          } else {
-            const result = generateElement(tableForChoice as ElementCategory);
-            if (result) {
-              flavorLines.push(`[${tableForChoice} Table: ${result.element}]`);
-            }
-          }
-        } else {
-          const result = generateElement(tableForChoice as ElementCategory);
-          if (result) {
-            flavorLines.push(`[${tableForChoice} Table: ${result.element}]`);
-          }
-        }
-      } catch (error) {
-        console.error("Error processing table roll:", error);
-      }
-    }
-
-    // Context rolls from action analysis (flavor dice unrelated to skill checks)
-    if (choice.rolls && choice.rolls.length > 0) {
-      for (const roll of choice.rolls) {
-        if (!roll.dice) continue;
-        try {
-          const diceMatch = roll.dice.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
-          if (diceMatch) {
-            const count = parseInt(diceMatch[1] || "1");
-            const sides = parseInt(diceMatch[2]);
-            const modifier = parseInt(diceMatch[3] || "0");
-
-            // Same bound diceFormula.ts enforces on every other roll in the
-            // app - this flavor-dice path parses its own notation instead
-            // of going through diceFormula.ts, so it needs the same DoS
-            // guard applied explicitly rather than inheriting it.
-            if (count < 1 || count > MAX_DICE_COUNT) {
-              throw new Error(
-                `Invalid dice count in "${roll.dice}": must be between 1 and ${MAX_DICE_COUNT}`,
-              );
-            }
-            if (sides < 1 || sides > MAX_DICE_SIDES) {
-              throw new Error(
-                `Invalid dice sides in "${roll.dice}": must be between 1 and ${MAX_DICE_SIDES}`,
-              );
-            }
-
-            let total = modifier;
-            const diceResults: number[] = [];
-            for (let i = 0; i < count; i++) {
-              const dieRoll = Math.floor(Math.random() * sides) + 1;
-              diceResults.push(dieRoll);
-              total += dieRoll;
-            }
-
-            const rollStr =
-              count > 1 ? `(${diceResults.join("+")})` : `${diceResults[0]}`;
-            const modStr =
-              modifier !== 0 ? `${modifier > 0 ? "+" : ""}${modifier}` : "";
-            flavorLines.push(
-              `[Context: ${roll.description} (${roll.dice}) = ${rollStr}${modStr} → ${total}]`,
-            );
-          } else {
-            console.warn(`Invalid dice notation: ${roll.dice}`);
-          }
-        } catch (error) {
-          console.error("Error processing context roll:", error);
-        }
-      }
+    // A starting choice with an authored opening, picked during session zero:
+    // the GM gets it as the opening to narrate once setup is done.
+    if (choice.intro_override && !shouldUseIntroOverride(storyData, choice)) {
+      flavorLines.push(
+        `The adventure's opening for this choice, to narrate once setup is done: ${choice.intro_override}`,
+      );
     }
 
     let text = ">" + choice.text;
@@ -4184,10 +3888,6 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
         : false;
-    const webResearchEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("webResearchEnabled") === "true"
-        : false;
     const embeddingThreshold =
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -4274,8 +3974,6 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
-          webResearchEnabled,
-          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -4877,10 +4575,6 @@ function StoryPageContent() {
     );
   }
 
-  //Checkforgameoverstate
-  const isGameOver =
-    storyData?.scene.parts.some((part) => part.gameOver) || false;
-
   if (!storyData) {
     return (
       <div
@@ -4900,377 +4594,6 @@ function StoryPageContent() {
             >
               Browse Adventures
             </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  //GameOverScreen
-  if (isGameOver && storyData) {
-    const completedGoals =
-      storyData.goals?.filter((g) => g.fulfilled).length || 0;
-    const totalGoals = storyData.goals?.length || 0;
-
-    return (
-      <div
-        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4"
-        style={fullHeightStyle}
-      >
-        <div className="w-full px-2 sm:max-w-3xl mx-auto">
-          {/* Game Over Header */}
-          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-6 mb-4 text-center">
-            <div className="flex items-center justify-center gap-3 text-red-400 mb-3">
-              <DynamicIcon name="Skull" className="w-8 h-8" />
-              <h1 className="text-3xl font-bold">Game Over</h1>
-              <DynamicIcon name="Skull" className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-semibold text-white mb-1">
-              {storyData.story_name}
-            </h2>
-            <p className="text-sm text-blue-200/60">
-              {storyData.player_name}&apos;s journey has concluded
-            </p>
-          </div>
-
-          {/* Stats Summary */}
-          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 mb-4">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <DynamicIcon name="BarChart2" className="w-5 h-5 text-blue-400" />
-              Final Statistics
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-green-500/10 rounded-lg border border-green-400/20">
-                <div className="flex items-center gap-2 mb-1">
-                  <DynamicIcon
-                    name="Target"
-                    className="w-5 h-5 text-green-400"
-                  />
-                  <span className="text-sm font-medium text-white">Goals</span>
-                </div>
-                <div className="text-2xl font-bold text-green-400">
-                  {completedGoals}/{totalGoals}
-                </div>
-                <div className="text-xs text-blue-200/40">
-                  {totalGoals > 0
-                    ? Math.round((completedGoals / totalGoals) * 100)
-                    : 0}
-                  % Complete
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Goals Completed */}
-          {completedGoals > 0 && (
-            <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 mb-4">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <DynamicIcon name="Target" className="w-5 h-5 text-green-400" />
-                Goals Completed
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {storyData.goals
-                  .filter((g) => g.fulfilled)
-                  .map((goal, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-green-500/10 rounded-lg border border-green-400/20"
-                    >
-                      <div className="flex items-start gap-2">
-                        <DynamicIcon
-                          name="Check"
-                          className="w-5 h-5 text-green-400 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <div className="font-medium text-white text-sm">
-                            {goal.title}
-                          </div>
-                          <div className="text-xs text-blue-200/40 line-clamp-1">
-                            {goal.shortDescription}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4">
-            <h3 className="text-lg font-semibold text-white mb-4 text-center">
-              What&apos;s Next?
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => {
-                  setConfirmDialog({
-                    isOpen: true,
-                    title: "Replay Story",
-                    message:
-                      "Start this adventure from the beginning? All progress will be lost.",
-                    icon: "RotateCcw",
-                    confirmText: "Replay",
-                    confirmButtonClass: "bg-blue-600 hover:bg-blue-700",
-                    onConfirm: async () => {
-                      setConfirmDialog({ ...confirmDialog, isOpen: false });
-                      //Replaysamestory-resettobeginning
-                      if (!storyDbId) return;
-                      try {
-                        // Try to fetch fresh adventure data if we have a source adventure
-                        let freshTemplate: Partial<StoryData> | null = null;
-                        if (sourceAdventureId) {
-                          try {
-                            const { getLocalAdventure } =
-                              await import("@/app/misc/localAdventureManager");
-                            const localAdv =
-                              await getLocalAdventure(sourceAdventureId);
-                            freshTemplate =
-                              (localAdv?.adventureData as Partial<Adventure>)
-                                ?.storyTemplate || null;
-                          } catch (e) {
-                            console.warn(
-                              "Could not fetch fresh adventure data, using current story values",
-                            );
-                          }
-                        }
-
-                        //Resetstorytoinitialstatebutkeepadventuretemplate
-                        const resetStoryData: StoryData = {
-                          ...storyData,
-                          // Reset dynamic fields from fresh adventure template or current story
-                          stats: freshTemplate?.stats || storyData.stats,
-                          resources:
-                            freshTemplate?.resources || storyData.resources,
-                          inventory:
-                            freshTemplate?.inventory || storyData.inventory,
-                          abilities:
-                            freshTemplate?.abilities || storyData.abilities,
-                          relationships:
-                            freshTemplate?.relationships ||
-                            storyData.relationships,
-                          variables:
-                            freshTemplate?.variables || storyData.variables,
-                          skillTrees:
-                            freshTemplate?.skillTrees || storyData.skillTrees,
-                          agmtState:
-                            freshTemplate?.agmtState || storyData.agmtState,
-                          customTables:
-                            freshTemplate?.customTables ||
-                            storyData.customTables,
-                          restState: freshTemplate?.restState || {
-                            quickRestsUsed: 0,
-                            shortRestsUsed: 0,
-                          },
-                          unlockedNodes:
-                            freshTemplate?.unlockedNodes ||
-                            storyData.unlockedNodes,
-                          // Always reset these
-                          scene: { parts: [] },
-                          memory: [],
-                          currentChapter: 0,
-                          chapters: [],
-                          goals:
-                            (freshTemplate?.goals || storyData.goals)?.map(
-                              (g) => ({
-                                ...g,
-                                fulfilled: false,
-                                active: false,
-                              }),
-                            ) || [],
-                          lore: (freshTemplate?.lore || storyData.lore).map(
-                            (l) => ({
-                              ...l,
-                              on:
-                                l.on_triggers && l.on_triggers.length > 0
-                                  ? false
-                                  : true,
-                            }),
-                          ),
-                          newGamePlusMode: false,
-                        };
-
-                        // Save reset story locally
-                        const { saveLocalStory } =
-                          await import("@/app/misc/localStoryManager");
-                        await saveLocalStory(storyDbId, resetStoryData);
-
-                        addNotification(
-                          "Story reset! Starting fresh...",
-                          "success",
-                        );
-                        router.push(`/story?storyId=${storyDbId}`);
-                        window.location.reload();
-                      } catch (error) {
-                        console.error("Error replaying story:", error);
-                        addNotification("Failed to replay story", "failure");
-                      }
-                    },
-                  });
-                }}
-                className="p-3 bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium rounded-lg shadow-md shadow-blue-950/40 transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="RotateCcw" className="w-5 h-5" />
-                <div className="text-left text-sm">
-                  <div>Replay</div>
-                  <div className="text-xs opacity-70">Fresh start</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => {
-                  setConfirmDialog({
-                    isOpen: true,
-                    title: "New Game Plus",
-                    message:
-                      "Start a New Game Plus run? You&apos;ll keep all stats, resources, and items!",
-                    icon: "Star",
-                    confirmText: "Start NG+",
-                    confirmButtonClass:
-                      "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
-                    onConfirm: async () => {
-                      setConfirmDialog({ ...confirmDialog, isOpen: false });
-                      //New Game Plus - keep progress and increase difficulty
-                      if (!storyDbId) return;
-                      try {
-                        const ngPlusCount =
-                          (storyData.newGamePlusCount || 0) + 1;
-
-                        // Try to fetch fresh adventure data for story-specific fields (lore, goals)
-                        let freshTemplate: Partial<StoryData> | null = null;
-                        if (sourceAdventureId) {
-                          try {
-                            const { getLocalAdventure } =
-                              await import("@/app/misc/localAdventureManager");
-                            const localAdv =
-                              await getLocalAdventure(sourceAdventureId);
-                            freshTemplate =
-                              (localAdv?.adventureData as Partial<Adventure>)
-                                ?.storyTemplate || null;
-                          } catch (e) {
-                            console.warn(
-                              "Could not fetch fresh adventure data, using current story values",
-                            );
-                          }
-                        }
-
-                        //Resetstorybutkeepstats,resources,andinventory
-                        const ngPlusStoryData: StoryData = {
-                          ...storyData,
-                          scene: { parts: [] },
-                          memory: [],
-                          currentChapter: 0,
-                          chapters: [],
-                          //Keepstats,resources,inventory,abilities!
-                          stats: storyData.stats, //Keepstats
-                          resources: storyData.resources, //Keepresources
-                          inventory: storyData.inventory, //Keepinventory
-                          abilities: storyData.abilities, //Keepabilities
-                          // Reset story-specific fields from fresh adventure
-                          relationships:
-                            freshTemplate?.relationships ||
-                            storyData.relationships, // Reset relationships
-                          variables:
-                            freshTemplate?.variables || storyData.variables,
-                          agmtState:
-                            freshTemplate?.agmtState || storyData.agmtState,
-                          customTables:
-                            freshTemplate?.customTables ||
-                            storyData.customTables,
-                          restState: { quickRestsUsed: 0, shortRestsUsed: 0 },
-                          // Keep skill tree progress!
-                          skillTrees: storyData.skillTrees,
-                          unlockedNodes: storyData.unlockedNodes,
-                          // Reset goals from fresh adventure or current story
-                          goals:
-                            (freshTemplate?.goals || storyData.goals)?.map(
-                              (g) => ({
-                                ...g,
-                                fulfilled: false,
-                                active: false,
-                              }),
-                            ) || [],
-                          // Reset lore from fresh adventure or current story
-                          lore: (freshTemplate?.lore || storyData.lore).map(
-                            (l) => ({
-                              ...l,
-                              on:
-                                l.on_triggers && l.on_triggers.length > 0
-                                  ? false
-                                  : true,
-                            }),
-                          ),
-                          newGamePlusCount: ngPlusCount,
-                          newGamePlusMode: true,
-                        };
-
-                        // Save NG+ story locally
-                        const { saveLocalStory } =
-                          await import("@/app/misc/localStoryManager");
-                        await saveLocalStory(storyDbId, ngPlusStoryData);
-
-                        addNotification(
-                          `New Game Plus ${ngPlusCount} activated!`,
-                          "success",
-                        );
-                        router.push(`/story?storyId=${storyDbId}`);
-                        window.location.reload();
-                      } catch (error) {
-                        console.error("Error starting NG+:", error);
-                        addNotification(
-                          "Failed to start New Game Plus",
-                          "failure",
-                        );
-                      }
-                    },
-                  });
-                }}
-                className="p-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg shadow-md shadow-purple-950/40 transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="Star" className="w-5 h-5" />
-                <div className="text-left text-sm">
-                  <div>New Game+</div>
-                  <div className="text-xs opacity-70">Keep progress</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => router.push("/library")}
-                className="p-3 bg-white/5 hover:bg-white/10 text-white font-medium rounded-lg border border-white/10 transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="Library" className="w-5 h-5" />
-                <div className="text-left text-sm">
-                  <div>Library</div>
-                  <div className="text-xs opacity-70">Your stories</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => router.push("/creator")}
-                className="p-3 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="Map" className="w-5 h-5" />
-                <div className="text-left text-sm">
-                  <div>Explore</div>
-                  <div className="text-xs opacity-70">New adventures</div>
-                </div>
-              </button>
-            </div>
-
-            {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
-              <div className="mt-4 p-3 bg-amber-500/10 rounded-lg border border-amber-400/20 text-center">
-                <div className="font-medium text-sm text-amber-300 flex items-center justify-center gap-2">
-                  <DynamicIcon name="Star" className="w-4 h-4" />
-                  New Game Plus: Run #{storyData.newGamePlusCount}
-                </div>
-                <div className="text-xs text-blue-200/40 mt-0.5">
-                  Completed {storyData.newGamePlusCount}{" "}
-                  {storyData.newGamePlusCount === 1
-                    ? "playthrough"
-                    : "playthroughs"}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -5344,37 +4667,6 @@ function StoryPageContent() {
                           {preset.description}
                         </p>
                       </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {preset.id !== "custom" ? (
-                        <>
-                          {preset.stats && preset.stats.length > 0 && (
-                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">
-                              {preset.stats.length} Stats
-                            </span>
-                          )}
-                          {preset.resources && preset.resources.length > 0 && (
-                            <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded">
-                              {preset.resources.length} Resources
-                            </span>
-                          )}
-                          {preset.inventory && preset.inventory.length > 0 && (
-                            <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded">
-                              {preset.inventory.length} Items
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
-                            Default Stats
-                          </span>
-                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
-                            Starter Items
-                          </span>
-                        </>
-                      )}
                     </div>
                   </button>
                 ))}
@@ -5600,12 +4892,6 @@ function StoryPageContent() {
             router.push("/library");
           }}
         />
-        {currentState === StoryState.CHARACTER_CREATION && (
-          <CharacterCreationForm
-            storyData={storyData}
-            onCharacterCreate={handleCharacterCreate}
-          />
-        )}
         {currentState === StoryState.LORE && (
           <LorePage
             {...storyData}

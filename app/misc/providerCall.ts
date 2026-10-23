@@ -185,7 +185,7 @@ export interface GenerateError {
  * Google's API can only handle ~25-30 tools with complex schemas.
  * We keep only the most essential GM tools.
  */
-const GOOGLE_ESSENTIAL_TOOLS = new Set([
+export const GOOGLE_ESSENTIAL_TOOLS = new Set([
   // Core rolling
   "formula_roll",
   "opposed_formula",
@@ -198,7 +198,6 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "read_notes",
   "search_memory",
   // Tracking
-  "add_memory",
   "create_note",
   "edit_note",
   // NPC management
@@ -226,8 +225,6 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "manage_track",
   "end_session",
   "action_roll",
-  // Terminal - required
-  "end_gm_thinking",
 ]);
 
 function filterToolsForGoogle(tools: any[]): any[] {

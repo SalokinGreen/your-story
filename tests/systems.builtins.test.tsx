@@ -162,7 +162,7 @@ describe("a built-in starter", () => {
     expect(data.meters?.[0].name).toBe("Heat");
     expect(data.progressTracks?.[0].name).toBe("Find the truth");
     // ensureStoryDataArrays ran: the arrays the app reads without guarding exist
-    expect(Array.isArray(data.inventory)).toBe(true);
+    expect(Array.isArray(data.npcs)).toBe(true);
     expect(Array.isArray(data.goals)).toBe(true);
     expect(resolveSystem(data, BUILTIN_SYSTEMS).usesSystemTools).toBe(true);
   });

@@ -33,11 +33,11 @@ Windows (#193); stories from Designer-made adventures no longer crashing
 stripped (#200); a text invite and system-browser OpenRouter sign-in in the
 native apps (#198, #201). **Still open from §6:** `auto_advance` timers never
 tick (6.1), Fronts never linked to their clocks (6.2), random ids and keys
-during render (6.3–6.5), the dead Embeddings toggle (6.9), tools the GM
-cannot call (6.10), online guests receiving the GM's secrets (6.12), and the
+during render (6.3–6.5), the dead Embeddings toggle (6.9), online guests
+receiving the GM's secrets (6.12), and the
 stale Google tool filter (6.14, partly fixed 2026-10-22: `start_game` and the
 challenge and scene tools now reach Gemini, the rest of the list is still
-dropped). Four more were found on 2026-10-22 (decision 65): rules notes listed
+dropped). The unoffered GM tools (6.10) were deleted on 2026-10-23 (decision 128). Four more were found on 2026-10-22 (decision 65): rules notes listed
 by title only while the prompt, comments and docs say pinned (6.15), hidden
 note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
 as 1210 (6.17), and `search_notes` returning disabled notes (6.18); and
@@ -690,7 +690,17 @@ report's §11.3. The ones that shape play:
   tray).
 - `start_game`, `advance_plan`, `open_side_beat` / `close_side_beat` —
   session zero ends with `start_game`, and play runs against a campaign plan
-  (`gm_plan` notes, `campaignPlan.ts`).
+  (`gm_plan` notes, `campaignPlan.ts`). Every new adventure starts in session
+  zero (`sessionZeroActive`), with or without pre-made characters. The preset
+  picker shows only when the adventure has pre-made characters
+  (`hasPremadeCharacters()`, `presets.ts`); otherwise the story starts as
+  Custom with no screen between. There is no character form. While session
+  zero is active the GM is shown the adventure's sheet template
+  (`buildSheetTemplateBlock()`, `ai_staged.ts`, in the live block) and builds
+  the sheet in conversation. A starting choice's `intro_override` waits for
+  `start_game` (`shouldUseIntroOverride()`, `presets.ts`); during session zero
+  the choice goes to the GM with the authored opening attached. Decisions 129,
+  130.
 - `increment_scene`, `resolve_random_event`, `acknowledge_director_move` —
   the director's side of a turn.
 - `start_combat` / `add_combatant` / `remove_combatant` /
@@ -699,60 +709,53 @@ report's §11.3. The ones that shape play:
   blocks, independent of the player's character sheet.
 - `add_npc` / `update_npc` / `remove_npc` / `npc_reaction`, `generate_name`,
   `get_game_state`, `set_reasoning_tier`.
-- `take_rest` — quick/short/long rest by the per-difficulty `REST_CONFIG`.
-  It only restores deprecated structured data, so on a freeform adventure it
-  mostly increments counters; whether to remove or rework it is an open
-  product call.
 - `create_thread` / `update_thread` / `resolve_thread` / `abandon_thread`
   (open plotlines) and `create_goal` / `update_goal` / `complete_goal` /
   `fail_goal` / `delete_goal` (player-facing objectives). **No points or XP
   attach to any of this.**
 - `manage_timer` — countdown timers. **`auto_advance` timers never tick
-  (§6.1)**: the only ticking code is gated on `end_gm_thinking`, which the GM
-  cannot call.
+  (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
+  behind `end_gm_thinking`) and was deleted on 2026-10-23 (decision 128).
 - `read_notes` / `search_notes` / `create_note` / `edit_note` / `delete_note`
   and the `edit_lore_*` / `merge_lore` / `duplicate_lore` family — the GM's
   way of reading and updating lore, secrets, the character sheet and the
   mechanics note.
 - `search_memory` — durable recall. The GM does not write memory:
-  `add_memory` is no longer offered. The Memory Keeper (`memoryAgent.ts`)
+  `add_memory` was deleted (decision 128). The Memory Keeper (`memoryAgent.ts`)
   writes the turn memories, and Reflection (`reflection.ts`) appends its
   synthesised insights.
 
-**Executors that exist but are not offered:** `game_over` (so the GM cannot
-end a game), `delegate_task` (so the Web Research toggle and Brave key do
-nothing), `reaction_check`, `negotiate_price`, `request_continuation` (the GM
-prompt still mentions it), the ability tools, and `end_gm_thinking` (dead).
-Re-offering or deleting each is an open product call (§6.10).
+**The unoffered GM tools were deleted on 2026-10-23** (decision 128): a call
+to one by name gets "Unknown tool", and `tests/gmTools.sixPlaces.test.ts`
+holds the six places a tool lives together.
 
-**Removed or deprecated systems — do not build new features assuming these
-are live** (see `docs/game-mechanics.md` "What Changed"):
+**Removed — do not build new features assuming these are live** (see
+`docs/game-mechanics.md` "What Changed"):
 
 - Momentum (reroll/guarantee-success currency) — gone.
-- The eight-system RPG picker and its client-side advantage/disadvantage —
-  gone from play. `rpgSystems.ts` is still 1,941 lines exporting every system
-  definition, but no live code uses any of it any more (the last caller of
-  `parseChallengeRoundsValue` went with the duplicate `start_challenge`); tests
-  use it.
-- Structured `Stat[]`/`Resource[]` editors and `InventoryItem[]` — gone;
-  describe these in the character sheet note. `Choice.item_used` still reads
-  legacy `inventory` on old saves.
+- The eight-system RPG picker, its client-side advantage/disadvantage and
+  `rpgSystems.ts` — deleted.
+- Structured stats, resources, inventory, abilities, relationships, variables,
+  skill trees, the shop and upgrades, New Game+ and the game-over screen —
+  deleted from `StoryData` on 2026-10-23 (decision 126; the keys are listed in
+  `REMOVED_STORY_FIELDS`, `storyDataDefaults.ts`). An old save is stripped when
+  it loads by `stripRemovedFields()`, which also reaches the nested places
+  (presets, a note's variable triggers, `agmtState.threads`, a saved choice's
+  arcade fields). The host sends older online guests six empty legacy arrays
+  (`withLegacyGuestShim()`), so their Story Editor does not crash. Describe
+  any of this in the character sheet note.
+- Arcade tags on choices (`skill_used`, `item_used`, `agmt_check`, `table`,
+  `rolls` and the rest): no parser reads them, and saved choices lose them on
+  load.
 - `Condition[]` — gone; injuries are narrative prose or `formula_roll`
   consequences. (`toggle_combatant_condition`, the combat-only toggle, is
   unrelated and live.)
 - `Achievement[]`, `Quest[]` and the XP/levelling economy — gone; replaced by
   Goals and Story Threads with no points.
-- `Ability[]` — no longer offered to the GM; describe abilities in the
-  character sheet note. The Story Editor still shows an Abilities section.
 - `Passives` — gone.
-- `CustomTable[]` / `StoryData.customTables` — gone; tables are
-  `type: "table"` notes, and old data converts on load (`tableNotes.ts`,
-  `tablesLibraryMigration.ts`). `rollOnCustomTable` survives for a choice's
-  legacy `table` field.
-
-Old saves keep these fields for backward compatibility; the GM doesn't read
-them. The Story Editor still exposes Abilities, Variables and Relationships
-sections.
+- `CustomTable[]` / `StoryData.customTables` — kept only as migration input:
+  `tableNotes.ts` and `tablesLibraryMigration.ts` turn old tables into
+  `type: "table"` notes on load. Nothing else reads the field.
 
 ## The creator is conversational — a Game Designer, not a Game Master
 
@@ -772,9 +775,11 @@ improvises from. The prompt is `app/misc/designer_ai.ts`.
   and converts with `draftToAdventure` / `adventureToDraft`. It forces
   `mechanics` and `character_sheet` notes `alwaysOn`, but the GM prompt never
   reads that flag: character sheets load in full by type, and rules notes
-  are listed by title (§6.15). Its adventures carry none
-  of the legacy arrays; `ensureStoryDataArrays()` backfills them when a story
-  starts or loads.
+  are listed by title (§6.15). Its adventures carry none of the removed
+  arrays (the types have no fields for them). `ensureStoryDataArrays()`
+  backfills the arrays the GM reads and strips the removed fields when a story
+  starts or loads. A starting choice's `intro_override` skips the GM only after
+  `start_game` (see the `start_game` bullet above).
 - `useDesignerSession.ts` — the bounded tool loop (`MAX_TOOL_ROUNDS = 5`), the
   chat transcript, the IndexedDB save, and `importFromLibrary()`, which merges
   notes picked from the notes library (`LibraryPickerModal`) into the draft
@@ -881,7 +886,7 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   only `NotificationProvider` and `APIKeysProvider`.
 - **AI is BYOK, always.** Keys live in the player's storage, read through
   `useAPIKeys()` (`APIKeysContext.tsx`): six LLM keys (OpenRouter, DeepSeek,
-  Google, Mistral, DeepInfra, Z.ai) plus Brave Search, Cartesia, ElevenLabs
+  Google, Mistral, DeepInfra, Z.ai) plus Cartesia, ElevenLabs
   and fal.ai (pictures in play; kept on the device, sent only to fal, never
   synced and not in `pickProviderKeys`, decision 58). **The Z.ai key is for Z.ai's general pay-as-you-go API only**
   (decision 18): `providerCall.ts` calls `ZAI_CHAT_COMPLETIONS_URL`
@@ -984,8 +989,7 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   `syncManager.ts`), and `multiplayer/`.
 - `app/api/` — the BYOK proxies: `generate`, `generate-stream`,
   `ocr/{process,merge,summarize,summarize-stream}`, `tts/generate`,
-  `stt/transcribe`, `creator/generate-image`, `web-search` (only reachable
-  from the unoffered `delegate_task`).
+  `stt/transcribe`, `creator/generate-image`.
 - `app/story/` — gameplay UI: `page.tsx` (the orchestration shell, ~5,000
   lines), `story.tsx` (presentational: the feed, the edit panel and
   `StoryComposer`), `StoryTurn.tsx` (how a turn renders: `PlayerLine`,
@@ -994,9 +998,8 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   `StoryMenuSheet.tsx` (the one-row header and the ☰ sheet that `MenuPage`
   renders in), `themeTokens.ts` (the six `--ys-*` colour tokens and the Ink
   default), `menu.tsx` and `menu/` (the in-story editors), `lore.tsx`,
-  `npcs.tsx`, `goals.tsx`, `variables.tsx`, `ContextViewer.tsx` and
-  `LogViewer.tsx` (the debug views), `NPCReactionToast.tsx`,
-  `create-character/`. The design is `docs/story-screen-design.md`
+  `npcs.tsx`, `goals.tsx`, `ContextViewer.tsx` and
+  `LogViewer.tsx` (the debug views), `NPCReactionToast.tsx`. The design is `docs/story-screen-design.md`
   (decisions 112–117).
 - `app/creator/` — the Game Designer: `page.tsx`, `DesignerChat.tsx`,
   `AdventureInspector.tsx`, `useDesignerSession.ts`.
@@ -1004,10 +1007,10 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   `FolderDetailView.tsx`), stories, adventures and the notes library.
 - `app/components/` — shared UI: the dice tray (`DiceThrowModal.tsx`,
   `ManualRollModal.tsx`), TTS/STT controls, the API key modal,
-  `PDFImporter.tsx`, the Settings tabs. `CharacterSheetEditor.tsx` and
-  `CharacterSheetTemplateEditor.tsx` are imported nowhere; during play the
-  sheet is a pinned note on the Lore page (`app/story/lore.tsx`), and the
-  nine `CHARACTER_SHEET_PRESET_TEMPLATES` reach no live screen.
+  `PDFImporter.tsx`, the Settings tabs. During play the sheet is a pinned
+  note on the Lore page (`app/story/lore.tsx`). The nine
+  `CHARACTER_SHEET_PRESET_TEMPLATES` in `characterSheetTemplate.ts`, and the
+  two lookups beside them, have no caller.
 - `app/misc/party/` and `app/party/` — party mode: the protocol, the pure host
   state machine, the runtime and Tauri bridge, and the phone controller page.
 - `src-tauri/`, `android/`, `ios/` — the native shells (`src-tauri/src/party_server.rs`
@@ -1015,7 +1018,8 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, about 1,700 tests, largely against `app/misc/`.
+- `tests/` — Vitest, 172 files and 2,537 tests (the count after the legacy
+  removal, 2026-10-23), largely against `app/misc/`.
   Deterministic tests seed `Math.random`; follow that for new dice and oracle
   tests.
 - `docs/` — mixed freshness (see the top of this file). The `*.sql` files are

@@ -2,20 +2,8 @@
 
 import {
   StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
   StoryLore,
-  Relationship,
   AGMTState,
-  Variable,
-  NumberVariable,
-  BooleanVariable,
-  StringVariable,
-  ListVariable,
-  Ability,
-  AbilityCost,
-  AbilityGrade,
   MemoryEntry,
   getMemoryContent,
   NPC,
@@ -38,13 +26,10 @@ import { getActiveObjectives } from "../misc/objectives";
 import type { SyncStatus } from "../misc/localStoryManager";
 import BasicSettings, { BasicSettingsForm } from "./menu/BasicSettings";
 import GoalEditor from "./menu/GoalEditor";
-import AbilitiesEditor from "./menu/AbilitiesEditor";
 import LoreEditor from "./menu/LoreEditor";
-import RelationshipsEditor from "./menu/RelationshipsEditor";
 import NPCEditor from "./menu/NPCEditor";
 import ThreadsEditor from "./menu/ThreadsEditor";
 import PictureSettings from "./menu/PictureSettings";
-import VariablesEditor from "./menu/VariablesEditor";
 import StoryMetaEditor from "./menu/StoryMetaEditor";
 import CouchPlayersEditor from "./menu/CouchPlayersEditor";
 import OnlinePlayEditor from "./menu/OnlinePlayEditor";
@@ -117,12 +102,9 @@ type MenuTab =
   | "hotseat"
   | "online"
   | "party"
-  | "abilities"
   | "goals"
   | "lore"
   | "npcs"
-  | "relationships"
-  | "variables"
   | "threads"
   | "mythic"
   | "story";
@@ -232,9 +214,6 @@ export default function MenuPage({
   });
 
   // Advanced editing states
-  const [editingStats, setEditingStats] = useState(false);
-  const [editingResources, setEditingResources] = useState(false);
-  const [editingInventory, setEditingInventory] = useState(false);
   const [editingLore, setEditingLore] = useState(false);
 
   const [activeTab, setActiveTab] = useState<MenuTab>("basic");
@@ -247,12 +226,9 @@ export default function MenuPage({
     ...(party?.available
       ? [{ id: "party" as const, label: "Party Mode", icon: "Smartphone" }]
       : []),
-    { id: "abilities", label: "Abilities", icon: "Wand2" },
     { id: "goals", label: "Goals", icon: "Scroll" },
     { id: "lore", label: "Notes", icon: "Book" },
     { id: "npcs", label: "NPCs", icon: "Users" },
-    { id: "variables", label: "Variables", icon: "Variable" },
-    { id: "relationships", label: "Relationships", icon: "Heart" },
     { id: "threads", label: "Threads", icon: "GitBranch" },
     { id: "mythic", label: "Chaos/Oracle", icon: "Sparkles" },
     { id: "story", label: "Story", icon: "BookOpen" },
@@ -820,29 +796,10 @@ export default function MenuPage({
                   const resetStoryData = {
                     ...storyData,
                     // Reset dynamic fields from fresh adventure template or current story
-                    stats: freshTemplate?.stats || storyData.stats,
-                    resources:
-                      freshTemplate?.resources || storyData.resources,
-                    inventory:
-                      freshTemplate?.inventory || storyData.inventory,
-                    abilities:
-                      freshTemplate?.abilities || storyData.abilities,
-                    relationships:
-                      freshTemplate?.relationships || storyData.relationships,
-                    variables:
-                      freshTemplate?.variables || storyData.variables,
-                    skillTrees:
-                      freshTemplate?.skillTrees || storyData.skillTrees,
                     agmtState:
                       freshTemplate?.agmtState || storyData.agmtState,
                     customTables:
                       freshTemplate?.customTables || storyData.customTables,
-                    restState: freshTemplate?.restState || {
-                      quickRestsUsed: 0,
-                      shortRestsUsed: 0,
-                    },
-                    unlockedNodes:
-                      freshTemplate?.unlockedNodes || storyData.unlockedNodes,
                     // Always reset these
                     scene: { parts: [] },
                     memory: [],
@@ -865,7 +822,6 @@ export default function MenuPage({
                             : true,
                       }),
                     ),
-                    newGamePlusMode: false,
                   };
                   const { saveLocalStory } =
                     await import("@/app/misc/localStoryManager");
@@ -1265,23 +1221,6 @@ export default function MenuPage({
 
                 <div
                   ref={(el) => {
-                    sectionRefs.current["abilities"] = el;
-                  }}
-                  data-section-id="abilities"
-                  style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
-                >
-                  <SectionHeading tab={getSection("abilities")} />
-                  <AbilitiesEditor
-                    abilities={storyData.abilities || []}
-                    resources={storyData.resources}
-                    variables={storyData.variables || []}
-                    onUpdate={(abilities) => onUpdateStoryData({ abilities })}
-                  />
-                </div>
-
-                <div
-                  ref={(el) => {
                     sectionRefs.current["goals"] = el;
                   }}
                   data-section-id="goals"
@@ -1306,7 +1245,6 @@ export default function MenuPage({
                   <SectionHeading tab={getSection("lore")} />
                   <LoreEditor
                     lore={storyData.lore}
-                    variables={storyData.variables || []}
                     onUpdate={(lore) => onUpdateStoryData({ lore })}
                     couchPlayers={storyData.multiplayer?.couchPlayers}
                   />
@@ -1324,38 +1262,6 @@ export default function MenuPage({
                   <NPCEditor
                     npcs={storyData.npcs || []}
                     onUpdate={(npcs) => onUpdateStoryData({ npcs })}
-                  />
-                </div>
-
-                <div
-                  ref={(el) => {
-                    sectionRefs.current["variables"] = el;
-                  }}
-                  data-section-id="variables"
-                  style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
-                >
-                  <SectionHeading tab={getSection("variables")} />
-                  <VariablesEditor
-                    variables={storyData.variables || []}
-                    onUpdate={(variables) => onUpdateStoryData({ variables })}
-                  />
-                </div>
-
-                <div
-                  ref={(el) => {
-                    sectionRefs.current["relationships"] = el;
-                  }}
-                  data-section-id="relationships"
-                  style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
-                >
-                  <SectionHeading tab={getSection("relationships")} />
-                  <RelationshipsEditor
-                    relationships={storyData.relationships}
-                    onUpdate={(relationships) =>
-                      onUpdateStoryData({ relationships })
-                    }
                   />
                 </div>
 

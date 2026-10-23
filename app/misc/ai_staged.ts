@@ -3,7 +3,6 @@
   Choice,
   CommandResponse,
   StoryLore,
-  REST_CONFIG,
   getMemoryContent,
   MemoryEntry,
   CombatState,
@@ -864,34 +863,6 @@ ${pendingEvents
 ${pendingMoves.map(formatDirectorMoveLine).join("\n")}`
     : "";
 
-  // Build variables section if any exist - clean, simple format
-  const variablesSection =
-    storyData.variables && storyData.variables.length > 0
-      ? `## Variables\n${storyData.variables
-          .map((v) => {
-            if (v.type === "number") {
-              return `- ${v.name}: ${v.value}${
-                v.description ? ` (${v.description})` : ""
-              }`;
-            } else if (v.type === "boolean") {
-              return `- ${v.name}: ${v.value ? "true" : "false"}${
-                v.description ? ` (${v.description})` : ""
-              }`;
-            } else if (v.type === "string") {
-              return `- ${v.name}: "${v.value}"${
-                v.description ? ` (${v.description})` : ""
-              }`;
-            } else {
-              // list type
-              const items = v.items.length ? v.items.join(", ") : "empty";
-              return `- ${v.name}: [${items}]${
-                v.description ? ` (${v.description})` : ""
-              }`;
-            }
-          })
-          .join("\n")}`
-      : "";
-
   // Build threads section - show active storylines/quests being tracked
   const activeThreads =
     storyData.threads?.filter((t) => t.status === "active") || [];
@@ -951,7 +922,6 @@ ${
     memorySection,
     // Other game state
     goalsSection,
-    variablesSection,
     threadsSection,
     agmtSection,
     pendingEventsSection,
@@ -1186,6 +1156,8 @@ export interface LiveBlockInput {
   pendingEventsSection: string;
   pendingMovesSection: string;
   freshStorySetupBlock: string;
+  // The adventure's character sheet template, for as long as session zero lasts.
+  sheetTemplateBlock?: string;
   sessionZeroStartGameReminder: string;
   setupOverdueBlock: string;
   observerNoteBlock: string;
@@ -1194,6 +1166,26 @@ export interface LiveBlockInput {
   knowledgeNoteBlock: string;
   pacingFeedbackLine: string;
   gmAdviceSection: string;
+}
+
+/**
+ * The adventure's character sheet template, shown to the GM for all of
+ * session zero (so a second player at the table gets it too) and gone once
+ * `start_game` ends setup. It rides in the live block because it appears and
+ * disappears with the story's state. Empty when there is no template.
+ */
+export function buildSheetTemplateBlock(
+  storyData: Pick<StoryData, "sessionZeroActive" | "characterSheetTemplate">,
+): string {
+  const template = storyData.characterSheetTemplate?.template;
+  if (!storyData.sessionZeroActive || !template) return "";
+  return `
+## CHARACTER SHEET TEMPLATE
+This adventure comes with a character sheet template. Build each player's sheet in this shape: fill in every field with the player in conversation. The \`| default\` values are examples, not choices made for the player. Write the finished sheet with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one note per player.
+\`\`\`
+${template}
+\`\`\`
+`;
 }
 
 export function buildLiveBlock(input: LiveBlockInput): string {
@@ -1217,6 +1209,7 @@ export function buildLiveBlock(input: LiveBlockInput): string {
   // prompt, which made it different every turn).
   const nudges =
     input.freshStorySetupBlock +
+    (input.sheetTemplateBlock ?? "") +
     input.sessionZeroStartGameReminder +
     input.setupOverdueBlock +
     input.observerNoteBlock +
@@ -1423,7 +1416,7 @@ export function buildGMStagePrompt({
     }
   }
   if (characterSheetLore.length > 0) {
-    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details - traits, background, abilities, resources.\nThis is not opening-scene set dressing: the player picked these, and they expect them to keep mattering. Every turn, let the sheet decide something concrete - which skill/stat a roll uses and at what difficulty, whether an NPC recognises a title or a reputation, what a flaw or bond costs them right now, what their background lets them notice that someone else wouldn't. If a turn could have gone the same way for any character at all, you didn't use it.\nTo update: edit_note("title", content="new content") - Keep stats, HP, XP, etc. current!\n`;
+    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details - traits, background and whatever the sheet note tracks (wounds, resources, gear).\nThis is not opening-scene set dressing: the player picked these, and they expect them to keep mattering. Every turn, let the sheet decide something concrete - which skill/stat a roll uses and at what difficulty, whether an NPC recognises a title or a reputation, what a flaw or bond costs them right now, what their background lets them notice that someone else wouldn't. If a turn could have gone the same way for any character at all, you didn't use it.\nTo update: edit_note("title", content="new content") - keep what changes (wounds, resources, gear) current in the sheet!\n`;
     for (const l of characterSheetLore) {
       loreSection += `\n### ${l.title}.md\n${pinnedContent(l)}\n`;
     }
@@ -1711,7 +1704,7 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
       ? `\n## 🆕 FRESH STORY - SETUP NEEDED
 This is a brand-new story with no established setting or character yet - the player skipped adventure creation to talk to you directly.
 - If the player's message doesn't give you enough to go on (genre, tone, character concept), ask up to 1-3 concise, friendly questions before creating anything. Do NOT narrate a full opening scene yet - just respond conversationally (use OOC round-brackets or plain text).
-- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one). Then call \`start_game\` with a title for the story and a short premise summary, and narrate the opening scene. The plan note must come BEFORE \`start_game\` - \`start_game\` is blocked until it exists.
+- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (the character sheet - from the CHARACTER SHEET TEMPLATE below when there is one, otherwise fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one). Then call \`start_game\` with a title for the story and a short premise summary, and narrate the opening scene. The plan note must come BEFORE \`start_game\` - \`start_game\` is blocked until it exists.
 - If ANY lore/mechanics/dm_instructions notes already exist on this story (e.g. from an adventure template), \`read_notes\` or \`search_notes\` them before writing the character sheet, mechanics, or plan notes - ground what you create in what's already established instead of inventing a setting from scratch. This is ENFORCED for the plan: \`create_note\` will refuse to create the "Campaign Plan" note until you've called \`read_notes\`/\`search_notes\` this turn, if any such notes exist.
 - Keep the interview short - one or two exchanges at most before diving in.
 `
@@ -1831,7 +1824,6 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
 - Know which one is which: the player character is named in the PLAYER CHARACTER section of the game state below, and "you" in your narration always means them. Give NPCs all the dialogue and initiative you like - that's your job - but the moment a line puts words, a decision, or a next move into the player character's mouth, you've taken their turn for them.
 - Use the character sheet and their chosen traits every turn (see the CHARACTER SHEET section): pick difficulties from it, let NPCs react to who they actually are, and give their traits, flaws, and background something to push against. Referencing what a character IS is not the same as deciding what they DO.
 - Resolve ONE beat at a time: the current action and its immediate consequence. Don't chain a second unrequested event, enemy turn, or complication onto the same turn "for free" - stop and hand control back at the next decision point.
-- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.
 
 ## LENGTH & PACING
 A real tabletop GM talks in a few sentences and hands the mic back - they don't narrate a mini scene around every action. Match your narration length to the moment, and end the instant the player has something to react to:
@@ -1889,14 +1881,13 @@ You and the player can talk OOC by wrapping text in (round brackets).
 
 ### Creating Records
 - **New enemy encountered without stats**: Create a note with their combat stats (HP, attacks, abilities)
-- **Important event happens**: Add a memory entry (discoveries, decisions, plot twists)
 - **Meet a named NPC**: Use \`add_npc\` to track them (name, role, attitude, description)
 - **Discover new location/faction/item**: Create a note documenting it
 
 ### Updating Records
 - **Enemy HP changes**: Use \`update_combatant_stat\` during combat
 - **NPC attitude/relationship changes**: Use \`update_npc\`
-- **Character sheet changes**: Use \`edit_note\` to keep stats, resources, abilities current
+- **Character sheet changes**: Use \`edit_note\` to keep the character sheet note current (wounds, resources, gear)
 - **Small note edits**: Use \`edit_lore_replace\` (find/replace), \`edit_lore_append\` (add to end), \`edit_lore_prepend\` (add to top), or \`edit_lore_insert\` (insert near a pattern)
 - **Large note rewrites**: Use \`edit_note\` with full new content
 - **Merge related notes**: Use \`merge_lore\` to combine multiple entries
@@ -2036,7 +2027,6 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     // Flow control
     "start_challenge",
     "cancel_challenge",
-    "take_rest",
     // Combat tools
     "start_combat",
     "add_combatant",
@@ -2140,6 +2130,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     pendingEventsSection: gmStagePendingEventsSection,
     pendingMovesSection: gmStagePendingDirectorMovesSection,
     freshStorySetupBlock,
+    sheetTemplateBlock: buildSheetTemplateBlock(storyData),
     sessionZeroStartGameReminder,
     setupOverdueBlock,
     observerNoteBlock,

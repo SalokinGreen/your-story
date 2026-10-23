@@ -280,7 +280,12 @@ describe("NetSession", () => {
     const storyData = fakeStoryData({ story_name: "Broadcast Test" });
     host.broadcastSnapshot(storyData);
 
-    expect(snapshot).toHaveBeenCalledWith(storyData);
+    // The host adds the empty legacy arrays for guests on older builds
+    // (withLegacyGuestShim); everything else arrives as it was.
+    expect(snapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ ...storyData, stats: [], variables: [] }),
+    );
+    expect("stats" in storyData).toBe(false);
   });
 
   it("does not let a guest broadcast a snapshot or a host send a player action", async () => {

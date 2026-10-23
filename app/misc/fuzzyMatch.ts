@@ -100,41 +100,6 @@ export function findBestMatch<T>(
 }
 
 /**
- * Convenience function for matching stats by name
- */
-export function findStatMatch(
-  searchName: string | undefined,
-  stats: Array<{ name: string; value: number; [key: string]: any }>
-) {
-  return findBestMatch(searchName, stats, (stat) => stat.name, 0.6);
-}
-
-/**
- * Convenience function for matching resources by name
- */
-export function findResourceMatch(
-  searchName: string | undefined,
-  resources: Array<{
-    name: string;
-    value: number;
-    maxValue: number;
-    [key: string]: any;
-  }>
-) {
-  return findBestMatch(searchName, resources, (resource) => resource.name, 0.6);
-}
-
-/**
- * Convenience function for matching inventory items by name
- */
-export function findItemMatch(
-  searchName: string | undefined,
-  inventory: Array<{ name: string; quantity: number; [key: string]: any }>
-) {
-  return findBestMatch(searchName, inventory, (item) => item.name, 0.5);
-}
-
-/**
  * Convenience function for matching goals by title
  */
 export function findGoalMatch(
@@ -145,21 +110,6 @@ export function findGoalMatch(
 }
 
 /**
- * Convenience function for matching relationships by name
- */
-export function findRelationshipMatch(
-  searchName: string | undefined,
-  relationships: Array<{ name: string; [key: string]: any }>
-) {
-  return findBestMatch(
-    searchName,
-    relationships,
-    (relationship) => relationship.name,
-    0.6
-  );
-}
-
-/**
  * Convenience function for matching lore by title
  */
 export function findLoreMatch(
@@ -167,14 +117,4 @@ export function findLoreMatch(
   lore: Array<{ title: string; [key: string]: any }>
 ) {
   return findBestMatch(searchTitle, lore, (loreEntry) => loreEntry.title, 0.6);
-}
-
-/**
- * Convenience function for matching abilities by name
- */
-export function findAbilityMatch(
-  searchName: string | undefined,
-  abilities: Array<{ name: string; [key: string]: any }>
-) {
-  return findBestMatch(searchName, abilities, (ability) => ability.name, 0.6);
 }

@@ -14,7 +14,7 @@
  * chaos automatically.
  */
 
-import { AGMTState, StoryData, ItemGrade } from "./structs";
+import { AGMTState } from "./structs";
 
 /**
  * Initialize agmtState with new fields for existing adventures
@@ -30,19 +30,4 @@ export function migrateAGMTState(
     currentStreak: agmtState.currentStreak || 0,
     lastChaosAdjustment: agmtState.lastChaosAdjustment ?? -999,
   };
-}
-
-/**
- * Migrate "mythic" grade to "agmt" in inventory items
- * This handles backward compatibility after the mythic → agmt rename
- */
-export function migrateItemGrades(storyData: StoryData): void {
-  if (!storyData.inventory) return;
-
-  for (const item of storyData.inventory) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((item.grade as any) === "mythic") {
-      item.grade = "agmt" as ItemGrade;
-    }
-  }
 }

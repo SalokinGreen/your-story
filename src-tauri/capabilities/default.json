@@ -20,7 +20,6 @@
         { "url": "https://api.deepinfra.com/*" },
         { "url": "https://generativelanguage.googleapis.com/*" },
         { "url": "https://api.z.ai/api/paas/*" },
-        { "url": "https://api.search.brave.com/*" },
         { "url": "https://api.cartesia.ai/*" },
         { "url": "https://api.elevenlabs.io/*" },
         { "url": "https://fal.run/*" },

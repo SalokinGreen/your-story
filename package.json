@@ -23,7 +23,6 @@
     "@tauri-apps/plugin-opener": "^2.7.2",
     "@trystero-p2p/mqtt": "^0.25.3",
     "@trystero-p2p/torrent": "^0.25.3",
-    "compressorjs": "^1.2.1",
     "framer-motion": "^12.42.2",
     "js-tiktoken": "^1.0.21",
     "json5": "^2.2.3",

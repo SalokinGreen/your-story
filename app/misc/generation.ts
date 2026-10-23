@@ -247,10 +247,6 @@ export interface GenerationOptions {
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
   embeddingThreshold?: number; // Similarity threshold (0.1-0.5, default 0.25)
-  // Sub-agent delegation (delegate_task tool) - web_research needs both a
-  // BYOK search key and this explicit opt-in, off by default
-  webResearchEnabled?: boolean;
-  braveSearchKey?: string;
   // GM Stage (new architecture: AI determines mechanics via tool calls)
   enableGMStage?: boolean;
   gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
@@ -748,124 +744,16 @@ async function generateChoicesWithRetry(
 // CHOICE PARSER
 // ============================================================
 
-function parseChoices(content: string, storyData: StoryData): Choice[] {
-  const lines = content
+function parseChoices(content: string): Choice[] {
+  // A choice is its line. The old <use_skill: ...>-style tags are no longer
+  // read, so a model that still writes one leaves it in the choice text.
+  return content
     .split("\n")
     .map((l) => l.trim())
     // strip common bullet prefixes: -, *, •
     .map((l) => l.replace(/^[\-\*\u2022]\s+/, ""))
-    .filter((l) => l.length > 0);
-
-  return lines.map((line) => {
-    // Extract metadata from angle brackets: <use_skill: ...; use_item: ...; etc>
-    const metaMatch = line.match(/<([^>]+)>/);
-    // Remove angle brackets from the END of the line for clean display text
-    const text = line.replace(/\s*<[^>]*>\s*$/, "").trim();
-
-    const choice: Choice = { text };
-
-    if (metaMatch) {
-      const metadata = metaMatch[1];
-
-      // Parse use_skill: name (DC number), (tier name), or (X success(es) needed/required)
-      // Supports: "Stealth (DC 15)", "Stealth (hard)", "Stealth (15)", "Combat (2 successes needed)"
-      const skillMatch = metadata.match(
-        /use_skill:\s*([^(;]+?)(?:\s*\((?:DC\s*)?(\d+|trivial|easy|average|hard|very_hard|impossible)(?:\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)?\))?(?:;|$)/i,
-      );
-      if (skillMatch) {
-        const skillName = skillMatch[1].trim();
-        if (skillName.toLowerCase() !== "none") {
-          choice.skill_used = skillName;
-          const dcValue = skillMatch[2];
-          if (dcValue) {
-            // Check if it's a number or a tier name
-            const parsedNum = parseInt(dcValue, 10);
-            if (!isNaN(parsedNum)) {
-              choice.skill_dc = parsedNum;
-            } else {
-              // It's a tier name - store as skill_dc_tier
-              choice.skill_dc_tier =
-                dcValue.toLowerCase() as Choice["skill_dc_tier"];
-            }
-          }
-        }
-      }
-
-      // Parse use_resource: name (automatically at risk on failure)
-      const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
-      if (resourceMatch) {
-        // Strip DC notation like "(DC 6)" and clean up the name
-        let resourceName = resourceMatch[1]
-          .trim()
-          .replace(/\s*\(DC\s*\d+\)/gi, "")
-          .replace(
-            /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
-            "",
-          )
-          .trim();
-        if (resourceName.toLowerCase() !== "none" && resourceName.length > 0) {
-          choice.resource_used = resourceName;
-        }
-      }
-
-      // Parse use_item: name
-      const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
-      if (itemMatch) {
-        // Strip DC notation like "(DC 6)" and clean up the name
-        let itemName = itemMatch[1]
-          .trim()
-          .replace(/\s*\(DC\s*\d+\)/gi, "")
-          .replace(
-            /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
-            "",
-          )
-          .trim();
-        if (itemName.toLowerCase() !== "none" && itemName.length > 0) {
-          choice.item_used = itemName;
-        }
-      }
-
-      // Parse agmt_check: question (likelihood)
-      const agmtCheckMatch = metadata.match(/agmt_check:\s*([^;]+?)(?:;|$)/i);
-      if (agmtCheckMatch) {
-        const agmtCheck = agmtCheckMatch[1].trim();
-        if (agmtCheck.toLowerCase() !== "none") {
-          choice.agmt_check = agmtCheck;
-        }
-      }
-
-      // Parse unified table: field (replaces both agmt_table and custom_table)
-      const tableMatch = metadata.match(/table:\s*([^;]+?)(?:;|$)/i);
-      if (tableMatch) {
-        const tableName = tableMatch[1].trim();
-        if (tableName.toLowerCase() !== "none") {
-          choice.table = tableName;
-        }
-      }
-
-      // Legacy support: Parse agmt_table: category (migrate to unified table field)
-      const agmtTableMatch = metadata.match(/agmt_table:\s*([^;]+?)(?:;|$)/i);
-      if (agmtTableMatch && !choice.table) {
-        const agmtTable = agmtTableMatch[1].trim();
-        if (agmtTable.toLowerCase() !== "none") {
-          choice.table = agmtTable;
-        }
-      }
-
-      // Legacy support: Parse custom_table: table name (migrate to unified table field)
-      const customTableMatch = metadata.match(
-        /custom_table:\s*([^;]+?)(?:;|$)/i,
-      );
-      if (customTableMatch && !choice.table) {
-        const customTable = customTableMatch[1].trim();
-        if (customTable.toLowerCase() !== "none") {
-          choice.table = customTable;
-        }
-      }
-    }
-
-    return choice;
-  });
+    .filter((l) => l.length > 0)
+    .map((text) => ({ text }));
 }
 
 // ============================================================
@@ -1143,7 +1031,7 @@ export async function generateStoryTurn(
           options.usePrefill !== false
             ? stripAffirmationPrefill(rawChoicesContent, CHOICES_AFFIRMATION)
             : rawChoicesContent;
-        const rewrittenChoices = parseChoices(cleanedChoicesContent, storyData);
+        const rewrittenChoices = parseChoices(cleanedChoicesContent);
         callbacks.onChoicesComplete?.(
           rewrittenChoices,
           rewrittenChoicesMeta?.usage || {
@@ -2932,20 +2820,7 @@ async function generateStoryTurnOnce(
                 requestDiceThrow: callbacks.onRequestDiceThrow,
                 requestPlayerAnswer: callbacks.onAskQuestion,
               },
-              {
-                apiKeys: {
-                  openRouterKey: options.openRouterKey,
-                  deepseekKey: options.deepseekKey,
-                  googleKey: options.googleKey,
-                  mistralKey: options.mistralKey,
-                  deepinfraKey: options.deepinfraKey,
-                  zaiKey: options.zaiKey,
-                },
-                token,
-                webResearchEnabled: options.webResearchEnabled,
-                braveSearchKey: options.braveSearchKey,
-                imageJobs: options.imageToolContext,
-              },
+              { imageJobs: options.imageToolContext },
             );
 
             // Accumulate results across rounds
@@ -3036,39 +2911,7 @@ async function generateStoryTurnOnce(
             logger.action(`GM stage round ${gmRound} tools executed`, {
               toolCount: gmResult.toolCalls.length,
               toolNames: gmExecution.results.map((r) => r.toolName),
-              isComplete: gmExecution.isComplete,
             });
-
-            // Legacy: Check if gmExecution has isComplete flag (from end_gm_thinking)
-            // Note: This path is rarely used now - the loop ends when no tool calls
-            if (gmExecution.isComplete) {
-              isComplete = true;
-              // Use the final summary as the primary context for story
-              // Put outcome FIRST so it's most prominent
-              if (gmExecution.finalSummary) {
-                // Start with the authoritative outcome
-                const finalOutcomePart = `[FINAL OUTCOME: ${
-                  gmExecution.finalOutcome || "neutral"
-                }]`;
-                allGMContextParts.push(finalOutcomePart);
-
-                const summaryPart = `[GAME MASTER Summary: ${gmExecution.finalSummary}]`;
-                allGMContextParts.push(summaryPart);
-
-                if (gmExecution.narrativeHints) {
-                  const hintsPart = `[Narrative Hints: ${gmExecution.narrativeHints}]`;
-                  allGMContextParts.push(hintsPart);
-                }
-                if (gmExecution.dramaticMoment) {
-                  allGMContextParts.push(`[DRAMATIC MOMENT]`);
-                }
-              }
-              logger.action("GM stage complete - end_gm_thinking called", {
-                summary: gmExecution.finalSummary?.substring(0, 100),
-                outcome: gmExecution.finalOutcome,
-              });
-              break;
-            }
 
             // Continue looping - AI may make more tool calls
             // Loop ends when AI produces content WITHOUT tool calls
@@ -3366,18 +3209,6 @@ async function generateStoryTurnOnce(
           content: storyContinuationPrompt,
         },
       ];
-
-      // Clear pending player actions after they've been included in the prompt
-      // (they were shown to the AI in the user choice message)
-      if (
-        storyData.pendingPlayerActions &&
-        storyData.pendingPlayerActions.length > 0
-      ) {
-        logger.action(
-          `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`,
-        );
-        storyData.pendingPlayerActions = [];
-      }
 
       // Narration always runs on the (user-configurable) narration model,
       // regardless of which tier adjudication used - this is what keeps
@@ -3715,7 +3546,7 @@ async function generateStoryTurnOnce(
       }
 
       // Parse choices
-      choices = parseChoices(choicesContent, storyData);
+      choices = parseChoices(choicesContent);
 
       callbacks.onChoicesComplete?.(
         choices,
@@ -4080,7 +3911,7 @@ export async function generateChoicesOnly(
   );
 
   // Parse choices
-  const choices = parseChoices(choicesContent, storyData);
+  const choices = parseChoices(choicesContent);
 
   logger.action("Choices generation complete", { count: choices.length });
 

@@ -24,16 +24,6 @@ tabletop GM keeping notes rather than a video game character sheet.
 
 Some structured data still exists for systems that benefit from it:
 
-- **Abilities** (`Ability[]`) - named skills/spells/special moves with an
-  optional cost and cooldown, managed via `add_ability`, `modify_ability`,
-  `upgrade_ability`, `remove_ability`, `reset_ability_cooldown`. **Soft-
-  deprecated**: the tools still work for backward compatibility, but
-  `buildInfoMessage` (the GM stage's own context builder, in `ai_staged.ts`)
-  already treats abilities the same as stats/resources - "all mechanics
-  are now defined in mechanics-type lore entries" - and the creator AI
-  hasn't populated structured abilities for new adventures for some time.
-  New adventures should describe abilities in the freeform character sheet
-  note instead, the same as stats/resources/inventory below.
 - **NPCs** (`NPC[]`) - tracked characters with status/attitude, managed via
   `add_npc`, `update_npc`, `remove_npc`, plus `npc_reaction` for toast
   notifications when an NPC's opinion shifts.
@@ -228,21 +218,15 @@ Turn-based tactical combat is tracked via `start_combat`, `add_combatant`,
 allies, or enemies with their own stat blocks (HP, AC, initiative, etc.)
 independent of the player's own character sheet.
 
-## Rest & Recovery
-
-`take_rest` processes a quick (~30 min), short (4-8 hour), or long
-(multi-day) rest: it restores resources per the adventure's rest
-configuration, reduces stress, and ticks down ability cooldowns. It can't
-be used while a challenge is active.
-
 ## Notes, Memory & Goals
 
 - **Notes** (`read_notes`, `search_notes`, `create_note`, `edit_note`,
   `delete_note`, and the `edit_lore_*`/`merge_lore`/`duplicate_lore`
   family): the GM's primary way of reading and updating the world - lore,
   secrets, the character sheet, and the mechanics note all live here.
-- **Memory** (`add_memory`, `search_memory`): durable recall of key past
-  events, searched rather than replayed in full each turn.
+- **Memory** (`search_memory`): durable recall of key past events, searched
+  rather than replayed in full each turn. The GM does not write memory: the
+  Memory Keeper records each turn and Reflection adds its insights.
 - **Goals** (`create_goal`, `update_goal`, `complete_goal`, `fail_goal`,
   `delete_goal`): tracked objectives shown in the Goals tab, alongside
   Story Threads in the same Journal view. Purely narrative - completing a
@@ -250,6 +234,25 @@ be used while a challenge is active.
 - **Timers** (`manage_timer`): countdown timers for deadlines/events.
 
 ## What Changed From the Old System
+
+**2026-10-23: the arcade leftovers removed** (decisions 125–131,
+[`legacy-removal-design.md`](legacy-removal-design.md)). Gone: the character
+creation form (a Hollow Hour story now starts in session zero, and the GM
+builds the sheet from the adventure's template in conversation), the
+preset picker's stat, resource and item badges, the Abilities, Variables
+and Relationships editors, the game-over screen and New Game+, and the
+unoffered GM tools (`game_over`, `delegate_task`, `reaction_check`,
+`negotiate_price`, `request_continuation`, `end_gm_thinking`, `add_memory`,
+the ability tools, `update_challenge`, `resolve_challenge`, `skip_tools`,
+`list_inactive_notes`, `toggle_lore`) and `take_rest`. Also gone:
+`rpgSystems.ts`, the skill trees, and the Brave Search key and Web Research
+toggle. The structured stats, resources, inventory, abilities,
+relationships, variables, skill trees and shop fields leave `StoryData`; an
+old save is stripped when it loads, and its notes, sheet, NPCs, goals and
+history stay. `end_combat` no longer copies combatant stats into resources,
+and `formula_roll` and `opposed_formula` no longer take `stat_name`. Rests,
+abilities and their cooldowns are now prose in the sheet note (or a system's
+meters), like everything else.
 
 For reference, the following mechanics existed in an earlier version of
 the app and have been removed:
@@ -269,10 +272,8 @@ the app and have been removed:
   `upgrade_item`, `consume_item`), the Inventory tab, and the creator's
   starting-inventory authoring UI have all been removed. Items are now
   described in the character sheet note like everything else, following
-  the same pattern already used for Stats & Resources. `Choice.item_used`
-  gating (predefined choices that reference a starting item) still reads
-  the legacy `inventory` field on old saves/presets for backward
-  compatibility.
+  the same pattern already used for Stats & Resources. (`Choice.item_used`
+  and the last of the inventory field went on 2026-10-23.)
 - **Conditions**: the tiered (I-VI) status-effect system (`Condition[]`,
   `add_condition`/`upgrade_condition`/`downgrade_condition`/
   `remove_condition`/`modify_condition`) has been removed, along with the

@@ -1,4 +1,4 @@
-import { StoryData, BooleanVariable } from "./structs";
+import { StoryData } from "./structs";
 import { logger } from "./logger";
 
 // Process lore triggers based on story content
@@ -24,19 +24,6 @@ export function processLoreTriggers(
     return triggers.some((t) => recentContent.includes(t.toLowerCase()));
   };
 
-  // Helper to check boolean variable triggers
-  const checkVarTriggers = (varNames?: string[]) => {
-    if (!varNames || varNames.length === 0 || !storyData.variables)
-      return false;
-    return varNames.some((varName) => {
-      const variable = storyData.variables?.find(
-        (v) =>
-          v.type === "boolean" && v.name.toLowerCase() === varName.toLowerCase()
-      );
-      return variable && (variable as BooleanVariable).value === true;
-    });
-  };
-
   storyData.lore.forEach((loreItem) => {
     // Enabled check (default to true if undefined)
     if (loreItem.enabled === false) {
@@ -56,7 +43,6 @@ export function processLoreTriggers(
 
     // Check triggers
     const hasTextOn = checkTriggers(loreItem.on_triggers);
-    const hasVarOn = checkVarTriggers(loreItem.var_on_triggers);
 
     // Check lore triggers (referencing other lores)
     let hasLoreOn = false;
@@ -67,11 +53,10 @@ export function processLoreTriggers(
       });
     }
 
-    const shouldTurnOn = hasTextOn || hasLoreOn || hasVarOn;
+    const shouldTurnOn = hasTextOn || hasLoreOn;
 
     // Check suppressors
     const hasTextOff = checkTriggers(loreItem.off_triggers);
-    const hasVarOff = checkVarTriggers(loreItem.var_off_triggers);
 
     let hasLoreOff = false;
     if (loreItem.untrigger_lores && loreItem.untrigger_lores.length > 0) {
@@ -81,13 +66,12 @@ export function processLoreTriggers(
       });
     }
 
-    const shouldTurnOff = hasTextOff || hasLoreOff || hasVarOff;
+    const shouldTurnOff = hasTextOff || hasLoreOff;
 
     // Determine if any triggers are defined
     const hasAnyOnTriggersDefined =
       (loreItem.on_triggers && loreItem.on_triggers.length > 0) ||
-      (loreItem.trigger_lores && loreItem.trigger_lores.length > 0) ||
-      (loreItem.var_on_triggers && loreItem.var_on_triggers.length > 0);
+      (loreItem.trigger_lores && loreItem.trigger_lores.length > 0);
 
     let isActive = false;
 

@@ -450,7 +450,7 @@ export function classifyPlayerStyle(input: string): PlayerStyleType | null {
 // classifyPlayerStyle's freeform-text keyword read of what the player
 // *typed*. Neither replaces the other; page.tsx blends both into the same
 // playerStyleCounts accumulator. Tool names not listed here contribute no
-// signal (formula_roll, add_memory, etc. are too generic to imply a style
+// signal (formula_roll, generate_name, etc. are too generic to imply a style
 // on their own).
 const ACTION_TOOL_NAMES = new Set([
   "start_combat",
@@ -465,8 +465,6 @@ const ACTION_TOOL_NAMES = new Set([
 const SOCIAL_TOOL_NAMES = new Set(["npc_reaction", "update_npc"]);
 const TACTICAL_TOOL_NAMES = new Set([
   "start_challenge",
-  "update_challenge",
-  "resolve_challenge",
   "cancel_challenge",
   "record_challenge_result",
   "search_memory",

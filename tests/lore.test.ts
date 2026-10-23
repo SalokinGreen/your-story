@@ -11,10 +11,6 @@ describe("processLoreTriggers", () => {
     player_name: "Test Player",
     player_summary: "Test Summary",
     intro: "Starting content with keyword1.",
-    stats: [],
-    resources: [],
-    inventory: [],
-    abilities: [],
     lore: lore,
     memory: [],
     scene: {
@@ -32,7 +28,6 @@ describe("processLoreTriggers", () => {
     currentChapter: 1,
     max_chapters: 10,
     goals: [],
-    relationships: [],
     npcs: [],
   });
 

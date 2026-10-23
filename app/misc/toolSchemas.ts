@@ -129,197 +129,6 @@ const deleteGoalTool: ToolSchema = {
   },
 };
 
-// Ability Management Tools
-const addAbilityTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "add_ability",
-    description:
-      "Grant the player a new ability (spell, skill, special move). Abilities provide bonuses to skill checks and may have resource/variable costs. Grades: novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5)",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description:
-            "Ability name (e.g., 'Fireball', 'Power Strike', 'Lockpicking')",
-        },
-        description: {
-          type: "string",
-          description: "What the ability does and any narrative effects",
-        },
-        grade: {
-          type: "string",
-          enum: [
-            "novice",
-            "apprentice",
-            "adept",
-            "expert",
-            "master",
-            "legendary",
-          ],
-          description:
-            "Ability grade determines bonus: novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5). Default: novice",
-        },
-        stat: {
-          type: "string",
-          description:
-            "Optional: which stat this ability relates to (e.g., 'Strength', 'Magic')",
-        },
-        cooldown: {
-          type: "number",
-          description:
-            "Turns before ability can be used again (0 = no cooldown). Default: 0",
-          minimum: 0,
-        },
-        cost: {
-          type: "array",
-          description:
-            "Array of costs to use this ability (can be empty for free abilities)",
-          items: {
-            type: "object",
-            properties: {
-              type: {
-                type: "string",
-                enum: ["resource", "variable"],
-                description:
-                  "Whether cost is from a resource or number variable",
-              },
-              name: {
-                type: "string",
-                description: "Name of the resource or variable to deduct from",
-              },
-              amount: {
-                type: "number",
-                description: "Amount to deduct when ability is used",
-                minimum: 1,
-              },
-            },
-            required: ["type", "name", "amount"],
-          },
-        },
-      },
-      required: ["name", "description"],
-    },
-  },
-};
-
-const removeAbilityTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "remove_ability",
-    description:
-      "Remove an ability from the player (lost through curse, injury, story events, etc.)",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Ability name (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const modifyAbilityTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "modify_ability",
-    description:
-      "Modify an existing ability's description, cost, cooldown, or stat association",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Ability name (fuzzy matching supported)",
-        },
-        description: {
-          type: "string",
-          description: "New description (optional)",
-        },
-        stat: {
-          type: "string",
-          description: "New stat association (optional)",
-        },
-        cooldown: {
-          type: "number",
-          description: "New cooldown value in turns (optional)",
-          minimum: 0,
-        },
-        cost: {
-          type: "array",
-          description: "New cost array (optional, replaces existing costs)",
-          items: {
-            type: "object",
-            properties: {
-              type: {
-                type: "string",
-                enum: ["resource", "variable"],
-              },
-              name: {
-                type: "string",
-              },
-              amount: {
-                type: "number",
-                minimum: 1,
-              },
-            },
-            required: ["type", "name", "amount"],
-          },
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const upgradeAbilityTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "upgrade_ability",
-    description:
-      "Upgrade an ability to a higher grade, increasing its bonus. Use for training, level-ups, or narrative achievements.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Ability name (fuzzy matching supported)",
-        },
-        newGrade: {
-          type: "string",
-          enum: ["apprentice", "adept", "expert", "master", "legendary"],
-          description:
-            "The new grade to upgrade to (must be higher than current grade)",
-        },
-      },
-      required: ["name", "newGrade"],
-    },
-  },
-};
-
-const resetAbilityCooldownTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "reset_ability_cooldown",
-    description:
-      "Reset an ability's cooldown to 0 (ready to use). Use for narrative reasons like resting, potions, or special events.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Ability name (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
 // Note Management Tools
 const createNoteTool: ToolSchema = {
   type: "function",
@@ -387,20 +196,6 @@ const deleteNoteTool: ToolSchema = {
         },
       },
       required: ["title"],
-    },
-  },
-};
-
-const listInactiveNotesTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "list_inactive_notes",
-    description:
-      "List all inactive/hidden note entries that can be revealed. Use this to discover what notes exist before calling show_note. Returns titles and brief descriptions of hidden notes.",
-    parameters: {
-      type: "object",
-      properties: {},
-      required: [],
     },
   },
 };
@@ -538,25 +333,6 @@ const editLorePrependTool: ToolSchema = {
         },
       },
       required: ["title", "content"],
-    },
-  },
-};
-
-const toggleLoreTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "toggle_lore",
-    description:
-      "Toggle a lore entry's visibility (on→off or off→on). Simpler than show_lore/hide_lore when you don't know current state.",
-    parameters: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: "Lore entry title (fuzzy matching supported)",
-        },
-      },
-      required: ["title"],
     },
   },
 };
@@ -917,129 +693,6 @@ const acknowledgeDirectorMoveTool: ToolSchema = {
   },
 };
 
-// Memory Management Tool
-const addMemoryTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "add_memory",
-    description:
-      "RARELY USED. Add memory ONLY for: debts/promises ('Owes blacksmith 50g'), codes ('Password: MOONRISE'), deadlines ('Must reach temple by dawn'). NEVER for descriptions, atmosphere, or story summaries. Most turns need ZERO memories. Use skip_tools instead.",
-    parameters: {
-      type: "object",
-      properties: {
-        entry: {
-          type: "string",
-          description:
-            "Factual note only. GOOD: 'Mayor's daughter kidnapped by bandits'. BAD: 'The crow watches from the statue' (this is story text, not memory).",
-        },
-        importance: {
-          type: "number",
-          minimum: 0,
-          maximum: 10,
-          description:
-            "Optional: how significant this memory is to the story (0-10). Higher values should be reserved for facts that will clearly matter later (a debt, a deadline, a betrayal). Omit if unsure - most memories are mid-importance.",
-        },
-      },
-      required: ["entry"],
-    },
-  },
-};
-
-// No-op Tool - for when no game state changes are needed
-const skipToolsTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "skip_tools",
-    description:
-      "Call this when NO game state changes are needed this turn. Use when the story segment is purely dialogue, travel narration, or atmospheric description with no mechanical consequences.",
-    parameters: {
-      type: "object",
-      properties: {
-        reason: {
-          type: "string",
-          description:
-            "Brief reason why no changes needed (e.g., 'Purely atmospheric description' or 'Dialogue only, no state changes')",
-        },
-      },
-      required: ["reason"],
-    },
-  },
-};
-
-// Game Over Tool
-const gameOverTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "game_over",
-    description:
-      "End the game due to character death or permanent incapacitation. Requires the player's combatant being downed (HP 0 or inactive) in active combat - this call is rejected otherwise. Resolve combat down to 0 HP before calling this. This is a major decision - only use when there is no reasonable way to continue.",
-    parameters: {
-      type: "object",
-      properties: {
-        reason: {
-          type: "string",
-          description:
-            "Narrative reason for game over (e.g., 'Succumbed to wounds', 'Fell in battle')",
-        },
-      },
-      required: ["reason"],
-    },
-  },
-};
-
-// Scene Challenge (Progress Clock) Tools
-const updateChallengeTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "update_challenge",
-    description:
-      "Update the active challenge progress after a skill check. Call this after each roll during a challenge. Add successes when player succeeds, failures when they fail. Challenge auto-resolves when either side reaches majority (best of X).",
-    parameters: {
-      type: "object",
-      properties: {
-        successIncrement: {
-          type: "number",
-          description: "Successes to add (typically 1, or 2 for crits)",
-          minimum: 0,
-          maximum: 3,
-        },
-        failureIncrement: {
-          type: "number",
-          description: "Failures to add (typically 1, or 2 for crits)",
-          minimum: 0,
-          maximum: 3,
-        },
-      },
-      required: [],
-    },
-  },
-};
-
-const resolveChallengeTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "resolve_challenge",
-    description:
-      "Manually resolve the active challenge. Usually called automatically when success/failure thresholds are met, but can be called manually for narrative reasons (e.g., enemy surrenders, unexpected rescue).",
-    parameters: {
-      type: "object",
-      properties: {
-        result: {
-          type: "string",
-          enum: ["won", "lost"],
-          description: "Challenge outcome",
-        },
-        reason: {
-          type: "string",
-          description:
-            "Why the challenge ended (optional, for non-standard resolutions)",
-        },
-      },
-      required: ["result"],
-    },
-  },
-};
-
 const cancelChallengeTool: ToolSchema = {
   type: "function",
   function: {
@@ -1056,64 +709,6 @@ const cancelChallengeTool: ToolSchema = {
         },
       },
       required: ["reason"],
-    },
-  },
-};
-
-// Rest System Tool
-const takeRestTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "take_rest",
-    description: `Allow the player to rest and recover. Three types available:
-- QUICK (30 min): Brief break. Reduces cooldowns slightly. Limited uses before long rest.
-- SHORT (4-8 hours): Sleep/extended rest. Resets most cooldowns. Limited uses before long rest.
-- LONG (several days): Extended downtime/time skip. All cooldowns reset. Resets quick/short rest counts.
-
-IMPORTANT: Resource recovery is NOT automatic. You must specify which resources to restore using the 'resources' parameter. Only include resources that make sense to recover during rest (e.g., Health, Stamina, Mana). Do NOT include non-regenerating resources like Gold, Coins, Ammo, etc.
-
-Long rests involve a time skip. Use when narratively appropriate (safe haven, end of chapter, travel montage). Cannot rest during active danger/combat.`,
-    parameters: {
-      type: "object",
-      properties: {
-        type: {
-          type: "string",
-          enum: ["quick", "short", "long"],
-          description:
-            "Type of rest: quick (30 min), short (4-8 hours sleep), long (several days)",
-        },
-        narrative_summary: {
-          type: "string",
-          description:
-            "Brief description of how the rest happens narratively (e.g., 'You find a quiet corner to catch your breath', 'The party makes camp for the night', 'Several peaceful days pass at the inn')",
-        },
-        resources: {
-          type: "array",
-          description:
-            "List of resources to restore. Only include regenerating resources (Health, Stamina, Mana, Energy, etc). Do NOT include non-regenerating resources (Gold, Coins, Ammo, Arrows, etc).",
-          items: {
-            type: "object",
-            properties: {
-              name: {
-                type: "string",
-                description: "Resource name (fuzzy matching supported)",
-              },
-              amount: {
-                type: "number",
-                description:
-                  "Amount to restore. Use percentage of max for rest-type scaling (quick: 5-15%, short: 30-50%, long: 100%)",
-              },
-              percentage: {
-                type: "boolean",
-                description:
-                  "If true, 'amount' is treated as a percentage of max value. If false, it's a flat amount. Default: true",
-              },
-            },
-            required: ["name", "amount"],
-          },
-        },
-      },
-      required: ["type", "narrative_summary"],
     },
   },
 };
@@ -1215,22 +810,13 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   updateGoalTool,
   deleteGoalTool,
 
-  // Ability Management (5 tools)
-  addAbilityTool,
-  removeAbilityTool,
-  modifyAbilityTool,
-  upgradeAbilityTool,
-  resetAbilityCooldownTool,
-
-  // Note Management (8 tools)
+  // Note Management
   createNoteTool,
   deleteNoteTool,
   updateNoteTool,
-  listInactiveNotesTool,
   editLoreReplaceTool,
   editLoreAppendTool,
   editLorePrependTool,
-  toggleLoreTool,
   editLoreInsertTool,
   mergeLoreTool,
   duplicateLoreTool,
@@ -1258,21 +844,8 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Director move acknowledgement (1 tool)
   acknowledgeDirectorMoveTool,
 
-  // Memory (1 tool)
-  addMemoryTool,
-
-  gameOverTool,
-
-  // Scene Challenges (3 tools; start_challenge is a GM tool, gmTools.ts)
-  updateChallengeTool,
-  resolveChallengeTool,
+  // Scene Challenges (1 tool; start_challenge is a GM tool, gmTools.ts)
   cancelChallengeTool,
-
-  // Rest System (1 tool)
-  takeRestTool,
-
-  // No-op Tool (1 tool) - for when no changes are needed
-  skipToolsTool,
 
   // Advanced RPG Tools (9 tools)
   ...MYTHIC_TOOLS,

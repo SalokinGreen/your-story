@@ -8,10 +8,6 @@
 import {
   StoryData,
   SceneChallenge,
-  Stat,
-  REST_CONFIG,
-  InventoryItem,
-  Ability,
   Combatant,
   CombatState,
   CountdownTimer,
@@ -23,8 +19,6 @@ import {
   MAX_PENDING_RANDOM_EVENTS,
   PendingRandomEvent,
   LoreVisibility,
-  ReactionCategory,
-  IncidentalReaction,
   StoryLore,
   Meter,
   ProgressTrack,
@@ -59,7 +53,6 @@ import {
   StartChallengeParams,
   CancelChallengeParams,
   CalculateParams,
-  TakeRestParams,
   FormulaRollParams,
   GMRollParams,
   AskForRollParams,
@@ -76,8 +69,6 @@ import {
   SearchMemoryParams,
   GetGameStateParams,
   GameStateSection,
-  RequestContinuationParams,
-  RespondToPlayerParams,
   // Timer tools
   CreateTimerParams,
   AdvanceTimerParams,
@@ -107,18 +98,10 @@ import {
   UpdateNPCParams,
   RemoveNPCParams,
   NPCReactionParams,
-  ReactionCheckParams,
-  NegotiatePriceParams,
   GM_TOOL_MAP,
   SetReasoningTierParams,
-  DelegateTaskParams,
   StartGameParams,
 } from "./gmTools";
-import {
-  runDelegateTask,
-  SubagentContext,
-  DelegateTaskOutcome,
-} from "./subagentExecutor";
 import type { ImageToolContext, ImageJobTarget } from "./imageJobs";
 import { validateToolArgs, formatValidationErrors } from "./toolValidation";
 import {
@@ -156,19 +139,6 @@ import {
   SCENE_BASELINE_TIER,
 } from "./reasoningTiers";
 import {
-  getRPGSystem,
-  checkSuccess,
-  rollDice,
-  RPGSystemType,
-  RPGSystem,
-} from "./rpgSystems";
-import {
-  findStatMatch,
-  findAbilityMatch,
-  findResourceMatch,
-} from "./fuzzyMatch";
-import { getAbilityBonus } from "./abilitySystem";
-import {
   rollFormula,
   rollFormulasAsync,
   RollResult,
@@ -184,6 +154,14 @@ import { hasCampaignPlan } from "./campaignPlan";
 // RESULT INTERFACES
 // ============================================
 
+/**
+ * What the executor needs besides the story: the picture queue
+ * (generate_image, imageJobs.ts).
+ */
+export interface GMToolContext {
+  imageJobs?: ImageToolContext;
+}
+
 export interface GMToolResult {
   toolName: string;
   toolCallId: string;
@@ -196,7 +174,6 @@ export interface GMToolResult {
     | GMChallengeResult
     | GMCancelChallengeResult
     | GMCalculateResult
-    | GMRestResult
     | GMFormulaRollResult
     | GMHiddenRollResult
     | GMAskForRollResult
@@ -211,8 +188,6 @@ export interface GMToolResult {
     | GMReadNotesResult
     | GMSearchMemoryResult
     | GMGetGameStateResult
-    | GMRequestContinuationResult
-    | GMEndGmThinkingResult
     | GMSetReasoningTierResult
     | GMStartGameResult
     | GMStateChangeResult
@@ -242,8 +217,7 @@ export interface GMToolResult {
     | GMUpdateNPCResult
     | GMRemoveNPCResult
     | GMNPCReactionResult
-    | GMReactionCheckResult
-    | GMNegotiatePriceResult;
+;
   contextForStory: string; // Formatted bracket notation for story stage
 }
 
@@ -290,19 +264,6 @@ export interface GMCalculateResult {
   };
   reason: string;
   displayName?: string;
-}
-
-export interface GMRestResult {
-  type: "take_rest";
-  restType: "quick" | "short" | "long";
-  recovery: {
-    resources: { name: string; restored: number }[];
-    cooldowns: { name: string; reduced: number }[];
-    items: { name: string; restored: number }[];
-    stress?: { oldValue: number; newValue: number };
-  };
-  narrativeContext?: string;
-  error?: string;
 }
 
 // ============================================
@@ -487,21 +448,6 @@ export interface GMGetGameStateResult {
   hasActiveState: boolean; // False when nothing volatile is currently active
 }
 
-export interface GMRequestContinuationResult {
-  type: "request_continuation";
-  reason: string;
-  context: string;
-  nextAction?: string;
-}
-
-export interface GMEndGmThinkingResult {
-  type: "end_gm_thinking";
-  summary: string;
-  outcome: "success" | "failure" | "mixed" | "neutral";
-  narrativeHints?: string;
-  dramaticMoment?: boolean;
-}
-
 export interface GMSetReasoningTierResult {
   type: "set_reasoning_tier";
   requestedTier: number;
@@ -603,7 +549,6 @@ export interface GMEndCombatResult {
   outcome: "victory" | "defeat" | "fled" | "truce" | "interrupted";
   summary: string;
   rounds: number;
-  syncedStats?: { stat: string; value: number }[];
 }
 
 // ============================================
@@ -730,86 +675,9 @@ export interface GMNPCReactionResult {
   message: string;
 }
 
-export interface GMReactionCheckResult {
-  type: "reaction_check";
-  npcName: string;
-  rolls: number[];
-  bias: "hostile" | "neutral" | "favorable";
-  modifiers: number;
-  total: number;
-  category: ReactionCategory;
-  mandate: string;
-  reason: string;
-  cached?: boolean; // True if this returned an existing scene-cached reaction instead of rolling fresh
-}
-
-export interface GMNegotiatePriceResult {
-  type: "negotiate_price";
-  itemName: string;
-  listPrice: number;
-  playerRolls: number[];
-  playerTotal: number;
-  sellerRolls: number[];
-  sellerTotal: number;
-  margin: number;
-  discountPercent: number;
-  finalPrice: number;
-  clampedToFloor: boolean;
-  failed: boolean; // True if the negotiation failed outright (target below seller's floor)
-  reason: string;
-}
-
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
-
-// ============================================
-// DIFFICULTY PARSING
-// ============================================
-
-interface ParsedDifficulty {
-  dc: number;
-  tierName: string;
-}
-
-function parseDifficulty(
-  difficulty: string,
-  system: RPGSystem
-): ParsedDifficulty {
-  // Named tier to tier number mapping
-  const tierNames: Record<string, keyof typeof system.dc | null> = {
-    trivial: "trivial",
-    easy: "easy",
-    average: "medium",
-    moderate: "medium",
-    hard: "hard",
-    very_hard: "veryHard",
-    veryhard: "veryHard",
-    extreme: "veryHard",
-    impossible: "impossible",
-    legendary: "impossible",
-  };
-
-  const normalized = difficulty.toLowerCase().replace(/[_\s]/g, "");
-
-  // Check if it's a named tier
-  const tierKey = tierNames[normalized];
-  if (tierKey && tierKey in system.dc) {
-    const dc = system.dc[tierKey as keyof typeof system.dc];
-    if (typeof dc === "number") {
-      return { dc, tierName: difficulty };
-    }
-  }
-
-  // Try parsing as a number
-  const numDC = parseInt(difficulty, 10);
-  if (!isNaN(numDC)) {
-    return { dc: numDC, tierName: "custom" };
-  }
-
-  // Default to medium
-  return { dc: system.dc.medium, tierName: "average" };
-}
 
 // ============================================
 // MAIN EXECUTOR
@@ -887,15 +755,6 @@ export interface GMExecutionResult {
   results: GMToolResult[];
   modifiedStoryData: StoryData;
   storyContext: string; // Combined context for story stage
-  // Special flow control flags
-  requestsContinuation?: boolean; // AI wants another GM round (legacy)
-  continuationContext?: string; // Context for next round (legacy)
-  // Terminal condition (new loop-based GM)
-  isComplete?: boolean; // end_gm_thinking was called - GM stage is done
-  finalSummary?: string; // Summary from end_gm_thinking
-  finalOutcome?: "success" | "failure" | "mixed" | "neutral";
-  narrativeHints?: string;
-  dramaticMoment?: boolean;
 }
 
 // Tools whose successful execution counts as "the GM consulted the oracle"
@@ -1000,18 +859,8 @@ export async function executeGMTools(
   storyData: StoryData,
   semanticContext: SemanticSearchContext = {},
   interaction: GMInteractionHandlers = {},
-  subagentContext: SubagentContext = {}
+  toolContext: GMToolContext = {}
 ): Promise<GMExecutionResult> {
-  // Check for premature end_gm_thinking calls when there are other tools
-  // The AI sometimes calls end_gm_thinking before processing roll results
-  const endGmThinkingCall = toolCalls.find(
-    (c) => c.function.name === "end_gm_thinking"
-  );
-  const otherToolCalls = toolCalls.filter(
-    (c) => c.function.name !== "end_gm_thinking"
-  );
-  const hasOtherTools = otherToolCalls.length > 0;
-
   // Clone storyData to avoid mutations. structuredClone (vs. the previous
   // JSON.parse(JSON.stringify(...)) round-trip) is both faster and doesn't
   // silently drop values JSON can't represent (undefined, Map/Set, etc.).
@@ -1019,35 +868,7 @@ export async function executeGMTools(
   const results: GMToolResult[] = [];
   const contextParts: string[] = [];
 
-  // If end_gm_thinking was called with other tools, add an error result for it
-  if (endGmThinkingCall && hasOtherTools) {
-    console.log(
-      `[GM Tools] Rejecting premature end_gm_thinking (${toolCalls.length} total calls)`
-    );
-    const errorResult: GMToolResult = {
-      toolName: "end_gm_thinking",
-      toolCallId: endGmThinkingCall.id,
-      success: false,
-      result: {
-        type: "end_gm_thinking",
-        summary:
-          "ERROR: end_gm_thinking must be called ALONE, not with other tools.",
-        outcome: "failure",
-        narrativeHints:
-          "Process the other tools first, see their results, THEN call end_gm_thinking in a separate response.",
-      } as GMEndGmThinkingResult,
-      contextForStory:
-        "⚠️ ERROR: end_gm_thinking rejected - you called it with other tools. Review your other tool results below, then call end_gm_thinking ALONE in your next response.",
-    };
-    results.push(errorResult);
-    contextParts.push(errorResult.contextForStory);
-  }
-
-  // Process either filtered tools (if end_gm_thinking was premature) or all tools
-  const toolsToProcess =
-    hasOtherTools && endGmThinkingCall ? otherToolCalls : toolCalls;
-
-  for (const call of toolsToProcess) {
+  for (const call of toolCalls) {
     // route.ts marks a tool call this way when the response hit the token
     // limit before this call's arguments finished streaming - the raw
     // arguments string was unterminated JSON and got replaced with `{}`.
@@ -1162,9 +983,6 @@ export async function executeGMTools(
         case "calculate":
           result = executeCalculate(call.id, params as CalculateParams);
           break;
-        case "take_rest":
-          result = executeTakeRest(call.id, params as TakeRestParams, modified);
-          break;
         case "formula_roll":
           result = await executeFormulaRoll(
             call.id,
@@ -1238,7 +1056,7 @@ export async function executeGMTools(
             call.id,
             params as GenerateImageParams,
             modified,
-            subagentContext.imageJobs
+            toolContext.imageJobs
           );
           break;
         case "read_notes":
@@ -1265,18 +1083,6 @@ export async function executeGMTools(
             call.id,
             params as GetGameStateParams,
             modified
-          );
-          break;
-        case "request_continuation":
-          result = executeRequestContinuation(
-            call.id,
-            params as RequestContinuationParams
-          );
-          break;
-        case "end_gm_thinking":
-          result = executeEndGmThinking(
-            call.id,
-            params as RespondToPlayerParams
           );
           break;
         // Combat tools
@@ -1396,19 +1202,6 @@ export async function executeGMTools(
             modified
           );
           break;
-        case "reaction_check":
-          result = executeReactionCheck(
-            call.id,
-            params as ReactionCheckParams,
-            modified
-          );
-          break;
-        case "negotiate_price":
-          result = executeNegotiatePrice(
-            call.id,
-            params as NegotiatePriceParams
-          );
-          break;
         case "set_reasoning_tier":
           result = executeSetReasoningTier(
             call.id,
@@ -1423,16 +1216,11 @@ export async function executeGMTools(
             modified
           );
           break;
-        case "delegate_task":
-          result = await executeDelegateTask(
-            call.id,
-            params as DelegateTaskParams,
-            modified,
-            subagentContext
-          );
-          break;
         default:
-          // Delegate to state tool executor for tools like modify_stat, add_item, etc.
+          // Everything else goes to the state tool executor (notes, goals,
+          // threads, ...). A name it does not know (a tool this build no
+          // longer offers) comes back from it as an "Unknown tool" error
+          // result, which is fed to the model like any other failure.
           const stateToolCalls = [
             {
               id: call.id,
@@ -1579,64 +1367,10 @@ export async function executeGMTools(
     }
   }
 
-  // Check for special flow control results
-  let requestsContinuation = false;
-  let continuationContext: string | undefined;
-  // Terminal condition
-  let isComplete = false;
-  let finalSummary: string | undefined;
-  let finalOutcome: "success" | "failure" | "mixed" | "neutral" | undefined;
-  let narrativeHints: string | undefined;
-  let dramaticMoment: boolean | undefined;
-
-  for (const res of results) {
-    if (res.toolName === "request_continuation") {
-      requestsContinuation = true;
-      const contResult = res.result as GMRequestContinuationResult;
-      continuationContext = `Previous round: ${
-        contResult.context
-      }\nNext planned: ${contResult.nextAction || "See results"}`;
-    }
-    if (res.toolName === "end_gm_thinking") {
-      isComplete = true;
-      const respResult = res.result as GMEndGmThinkingResult;
-      finalSummary = respResult.summary;
-      finalOutcome = respResult.outcome;
-      narrativeHints = respResult.narrativeHints;
-      dramaticMoment = respResult.dramaticMoment;
-    }
-  }
-
-  // Auto-advance timers when GM turn completes
-  if (isComplete && modified.timers && modified.timers.length > 0) {
-    const timerUpdates: string[] = [];
-    for (const timer of modified.timers) {
-      if (timer.status === "active" && timer.autoAdvance) {
-        const prevTicks = timer.currentTicks;
-        timer.currentTicks = Math.max(0, timer.currentTicks - 1);
-
-        if (timer.currentTicks === 0 && timer.status === "active") {
-          // Timer triggered!
-          timer.status = "triggered";
-          timer.triggeredAt = Date.now();
-          timerUpdates.push(
-            `[⏰ TIMER TRIGGERED: "${timer.name}" has reached 0!${
-              timer.description ? ` - ${timer.description}` : ""
-            }]`
-          );
-        } else if (timer.currentTicks !== prevTicks) {
-          // Just ticked down
-          timerUpdates.push(
-            `[Timer: "${timer.name}" ${prevTicks} → ${timer.currentTicks} ticks]`
-          );
-        }
-      }
-    }
-    // Add timer updates to context
-    if (timerUpdates.length > 0) {
-      contextParts.push(...timerUpdates);
-    }
-  }
+  // Countdown timers do not tick here. They used to tick when the GM called
+  // end_gm_thinking, a tool no GM was ever offered, so `auto_advance` never
+  // advanced anything (status report 6.1). A tick would belong here, once
+  // per completed GM turn.
 
   // Log execution summary for debugging
   const failedResults = results.filter(isRealToolFailure);
@@ -1659,13 +1393,6 @@ export async function executeGMTools(
     results,
     modifiedStoryData: modified,
     storyContext: contextParts.join("\n"),
-    requestsContinuation,
-    continuationContext,
-    isComplete,
-    finalSummary,
-    finalOutcome,
-    narrativeHints,
-    dramaticMoment,
   };
 }
 
@@ -2042,214 +1769,6 @@ function executeCalculate(
 }
 
 // ============================================
-// TAKE REST EXECUTOR
-// ============================================
-
-function executeTakeRest(
-  toolCallId: string,
-  params: TakeRestParams,
-  storyData: StoryData
-): GMToolResult {
-  // Check if challenge is active
-  if (storyData.activeChallenge?.active) {
-    return {
-      toolName: "take_rest",
-      toolCallId,
-      success: false,
-      result: {
-        type: "take_rest",
-        restType: params.type,
-        recovery: {
-          resources: [],
-          cooldowns: [],
-          items: [],
-        },
-        error: `Cannot rest during active challenge "${storyData.activeChallenge.name}"`,
-      } as GMRestResult,
-      contextForStory: `[ERROR: Cannot rest during active challenge "${storyData.activeChallenge.name}"]`,
-    };
-  }
-
-  // Get difficulty-based recovery config
-  const difficulty = storyData.difficulty || "medium";
-  const restConfig = REST_CONFIG[difficulty];
-
-  // Initialize rest state if needed
-  if (!storyData.restState) {
-    storyData.restState = {
-      quickRestsUsed: 0,
-      shortRestsUsed: 0,
-    };
-  }
-
-  // Check rest limits
-  const restState = storyData.restState;
-  if (
-    params.type === "quick" &&
-    restState.quickRestsUsed >= restConfig.maxQuickRests
-  ) {
-    return {
-      toolName: "take_rest",
-      toolCallId,
-      success: false,
-      result: {
-        type: "take_rest",
-        restType: params.type,
-        recovery: { resources: [], cooldowns: [], items: [] },
-        error: `No quick rests remaining (${restConfig.maxQuickRests} max)`,
-      } as GMRestResult,
-      contextForStory: `[ERROR: No quick rests remaining (${restConfig.maxQuickRests} max)]`,
-    };
-  }
-  if (
-    params.type === "short" &&
-    restState.shortRestsUsed >= restConfig.maxShortRests
-  ) {
-    return {
-      toolName: "take_rest",
-      toolCallId,
-      success: false,
-      result: {
-        type: "take_rest",
-        restType: params.type,
-        recovery: { resources: [], cooldowns: [], items: [] },
-        error: `No short rests remaining (${restConfig.maxShortRests} max)`,
-      } as GMRestResult,
-      contextForStory: `[ERROR: No short rests remaining (${restConfig.maxShortRests} max)]`,
-    };
-  }
-
-  // Calculate recovery
-  const recovery: GMRestResult["recovery"] = {
-    resources: [],
-    cooldowns: [],
-    items: [],
-  };
-
-  // Get rest type specific config
-  const cooldownReduction = restConfig.cooldownReduction[params.type];
-
-  // Restore resources (custom calculation - RestConfig doesn't have resourceRestore)
-  // We'll use a simple percentage based on rest type
-  const resourceRestorePct =
-    params.type === "long" ? 1.0 : params.type === "short" ? 0.5 : 0.15;
-
-  // Restore resources
-  for (const resource of storyData.resources || []) {
-    if (resource.maxValue !== undefined) {
-      const restoreAmount = Math.floor(resource.maxValue * resourceRestorePct);
-      if (restoreAmount > 0) {
-        const oldValue = resource.value;
-        resource.value = Math.min(
-          resource.maxValue,
-          resource.value + restoreAmount
-        );
-        if (resource.value > oldValue) {
-          recovery.resources.push({
-            name: resource.name,
-            restored: resource.value - oldValue,
-          });
-        }
-      }
-    }
-  }
-
-  // Reduce cooldowns
-  for (const ability of storyData.abilities || []) {
-    if (ability.currentCooldown && ability.currentCooldown > 0) {
-      // 999 means full reset
-      const reduction =
-        cooldownReduction >= 999 ? ability.currentCooldown : cooldownReduction;
-      const oldCooldown = ability.currentCooldown;
-      ability.currentCooldown = Math.max(
-        0,
-        ability.currentCooldown - reduction
-      );
-      if (oldCooldown > ability.currentCooldown) {
-        recovery.cooldowns.push({
-          name: ability.name,
-          reduced: oldCooldown - ability.currentCooldown,
-        });
-      }
-    }
-  }
-
-  // Repair items (short/long rests only)
-  if (params.type !== "quick") {
-    for (const item of storyData.inventory || []) {
-      if (
-        item.durability !== undefined &&
-        item.maxDurability !== undefined &&
-        item.durability < item.maxDurability
-      ) {
-        const repairPct = params.type === "long" ? 0.75 : 0.15;
-        const repairAmount = Math.floor(item.maxDurability * repairPct);
-        const oldDurability = item.durability;
-        item.durability = Math.min(
-          item.maxDurability,
-          item.durability + repairAmount
-        );
-        if (item.durability > oldDurability) {
-          recovery.items.push({
-            name: item.name,
-            restored: item.durability - oldDurability,
-          });
-        }
-      }
-    }
-  }
-
-  // Update rest state
-  if (params.type === "quick") {
-    restState.quickRestsUsed++;
-  } else if (params.type === "short") {
-    restState.shortRestsUsed++;
-  } else {
-    // Long rest resets rest counters
-    restState.quickRestsUsed = 0;
-    restState.shortRestsUsed = 0;
-  }
-  restState.lastRestType = params.type;
-  restState.lastRestTimestamp = Date.now();
-
-  // Build context string
-  let contextForStory = `[Rest: ${params.type}`;
-  if (params.narrative_context) {
-    contextForStory += ` - ${params.narrative_context}`;
-  }
-  contextForStory += `]`;
-
-  if (recovery.resources.length > 0) {
-    contextForStory += `\n[Resources restored: ${recovery.resources
-      .map((r) => `${r.name} +${r.restored}`)
-      .join(", ")}]`;
-  }
-  if (recovery.cooldowns.length > 0) {
-    contextForStory += `\n[Cooldowns reduced: ${recovery.cooldowns
-      .map((c) => `${c.name} -${c.reduced}`)
-      .join(", ")}]`;
-  }
-  if (recovery.items.length > 0) {
-    contextForStory += `\n[Items repaired: ${recovery.items
-      .map((i) => `${i.name} +${i.restored}`)
-      .join(", ")}]`;
-  }
-
-  return {
-    toolName: "take_rest",
-    toolCallId,
-    success: true,
-    result: {
-      type: "take_rest",
-      restType: params.type,
-      recovery,
-      narrativeContext: params.narrative_context,
-    } as GMRestResult,
-    contextForStory,
-  };
-}
-
-// ============================================
 // FORMULA-BASED TOOL EXECUTORS
 // ============================================
 
@@ -2270,47 +1789,6 @@ function flattenRolls(rolls: RollResult["rolls"]): number[] {
  * calls `set_reasoning_tier` itself. Returns an extra `contextForStory`
  * line when escalation actually happens, or "" otherwise.
  */
-// H8: roll-input integrity check. Model-typed flat modifiers on formula_roll
-// / opposed_formula are entirely self-asserted with no cross-check against
-// the character sheet. A full cross-check isn't possible for every adventure
-// because character data can live in three different shapes: structured
-// storyData.stats/resources (numeric, always reliable when present),
-// storyData.characterData (freeform strings typed into a template form - no
-// type guarantee, could be "16" or "Very Strong"), or a "character_sheet"
-// type lore note (pure prose, no structure at all). Parsing the latter two
-// would mean guessing numbers out of natural language, which is exactly the
-// unreliable-heuristic failure mode this audit warns against elsewhere.
-// So this only fires when the model voluntarily names a stat/resource via
-// the new optional stat_name/player_stat_name param AND that name matches a
-// structured storyData.stats/resources entry. It never blocks or rewrites
-// the roll (stacking from items/abilities/conditions legitimately shifts the
-// modifier away from the base stat) - it only appends a non-blocking
-// integrity note to contextForStory so the story/GM stage can notice and
-// react if a claim is clearly out of bounds. SLACK is sized generously from
-// documented stacking rules: item grade tops out at +5 (agmt) and ability
-// grade tops out at +5 (legendary), so +10 comfortably covers legitimate
-// double-stacking without flagging normal play.
-const STAT_INTEGRITY_SLACK = 10;
-
-function checkStatIntegrity(
-  storyData: StoryData,
-  statName: string | undefined,
-  claimedModifier: number
-): string {
-  if (!statName) return "";
-  const statMatch = findStatMatch(statName, storyData.stats || []);
-  const resourceMatch = statMatch
-    ? null
-    : findResourceMatch(statName, storyData.resources || []);
-  const matched = statMatch?.item ?? resourceMatch?.item;
-  if (!matched) return "";
-  const ceiling = matched.value + STAT_INTEGRITY_SLACK;
-  if (claimedModifier > ceiling) {
-    return `\n[⚠ Roll integrity check: claimed modifier +${claimedModifier} attributed to "${statName}" exceeds the character sheet value (${matched.value}, even allowing for item/ability stacking) - verify this roll]`;
-  }
-  return "";
-}
-
 function applyStakesEscalation(
   storyData: StoryData,
   stakes: "low" | "medium" | "high" | "deadly" | undefined
@@ -2546,16 +2024,6 @@ async function executeFormulaRoll(
   if (params.stakes) {
     contextForStory += `\n[Stakes: ${params.stakes}]`;
     contextForStory += applyStakesEscalation(storyData, params.stakes);
-  }
-
-  // The stat-integrity check reads the flat modifier, which only makes sense
-  // for a single pool - with several, there's no one modifier to attribute.
-  if (pools.length === 1) {
-    contextForStory += checkStatIntegrity(
-      storyData,
-      params.stat_name,
-      rollResults[0].modifiers
-    );
   }
 
   contextForStory += describePlannedConsequences(
@@ -2916,12 +2384,6 @@ async function executeOpposedFormula(
     contextForStory += `\n[Stakes: ${params.stakes}]`;
     contextForStory += applyStakesEscalation(storyData, params.stakes);
   }
-
-  contextForStory += checkStatIntegrity(
-    storyData,
-    params.player_stat_name,
-    playerResult.modifiers
-  );
 
   // All planned branches go back, since the engine doesn't know which one
   // the comparison will land on.
@@ -4039,81 +3501,6 @@ async function executeSearchMemory(
       matchCount: matches.length,
       totalMemories: memoryEntries.length,
     },
-    contextForStory,
-  };
-}
-
-/**
- * Execute a request for continuation (another GM round)
- */
-function executeRequestContinuation(
-  toolCallId: string,
-  params: RequestContinuationParams
-): GMToolResult {
-  // Build context string
-  let contextForStory = `[GAME MASTER Continuation Requested]`;
-  contextForStory += `\n[Reason: ${params.reason}]`;
-  contextForStory += `\n[Context: ${params.context}]`;
-  if (params.next_action) {
-    contextForStory += `\n[Planned Next: ${params.next_action}]`;
-  }
-
-  return {
-    toolName: "request_continuation",
-    toolCallId,
-    success: true,
-    result: {
-      type: "request_continuation",
-      reason: params.reason,
-      context: params.context,
-      nextAction: params.next_action,
-    } as GMRequestContinuationResult,
-    contextForStory,
-  };
-}
-
-/**
- * Execute end_gm_thinking - terminal tool that ends the GM stage
- */
-function executeEndGmThinking(
-  toolCallId: string,
-  params: RespondToPlayerParams
-): GMToolResult {
-  // Defensive: Handle missing params (can happen if streaming truncates tool call arguments)
-  const summary = params?.summary || "(No summary provided)";
-  const outcome = params?.outcome || "neutral";
-  const narrativeHints = params?.narrative_hints;
-  const dramaticMoment = params?.dramatic_moment;
-
-  // Log warning if params are missing (helps debug streaming issues)
-  if (!params?.summary || !params?.outcome) {
-    console.warn(
-      `[GM Tools] end_gm_thinking called with missing params:`,
-      JSON.stringify(params)
-    );
-  }
-
-  // Build the final context for story stage
-  let contextForStory = `[GAME MASTER Summary: ${summary}]`;
-  contextForStory += `\n[Outcome: ${outcome}]`;
-  if (narrativeHints) {
-    contextForStory += `\n[Narrative Hints: ${narrativeHints}]`;
-  }
-  if (dramaticMoment) {
-    contextForStory += `\n[DRAMATIC MOMENT - Emphasize this beat]`;
-  }
-
-  return {
-    toolName: "end_gm_thinking",
-    toolCallId,
-    success: true,
-    result: {
-      type: "end_gm_thinking",
-      summary,
-      outcome,
-      narrativeHints,
-      dramaticMoment,
-    } as GMEndGmThinkingResult,
     contextForStory,
   };
 }
@@ -5284,7 +4671,7 @@ function executeAdvanceTurn(
 }
 
 /**
- * End combat and optionally sync player stats
+ * End combat
  */
 function executeEndCombat(
   toolCallId: string,
@@ -5307,29 +4694,6 @@ function executeEndCombat(
   }
 
   const rounds = storyData.combatState.round;
-  const syncStats = params.sync_player_stats !== false;
-  const syncedStats: { stat: string; value: number }[] = [];
-
-  // Find player combatant and sync stats
-  if (syncStats) {
-    const playerCombatant = storyData.combatState.combatants.find(
-      (c) => c.type === "player"
-    );
-    if (playerCombatant && storyData.resources) {
-      // Sync combatant stats to character resources
-      for (const [statName, statValue] of Object.entries(
-        playerCombatant.stats
-      )) {
-        const resource = storyData.resources.find(
-          (r) => r.name.toLowerCase() === statName.toLowerCase()
-        );
-        if (resource) {
-          resource.value = Math.max(0, Math.min(statValue, resource.maxValue));
-          syncedStats.push({ stat: resource.name, value: resource.value });
-        }
-      }
-    }
-  }
 
   // Log combat end
   logCombat(
@@ -5349,17 +4713,8 @@ function executeEndCombat(
       outcome: params.outcome,
       summary: params.summary,
       rounds,
-      syncedStats: syncedStats.length > 0 ? syncedStats : undefined,
     } as GMEndCombatResult,
-    contextForStory: `[Combat Ended: ${
-      params.outcome
-    } after ${rounds} rounds - ${params.summary}${
-      syncedStats.length > 0
-        ? ` | Stats synced: ${syncedStats
-            .map((s) => `${s.stat}=${s.value}`)
-            .join(", ")}`
-        : ""
-    }]`,
+    contextForStory: `[Combat Ended: ${params.outcome} after ${rounds} rounds - ${params.summary}]`,
   };
 }
 // ============================================
@@ -6798,432 +6153,4 @@ function executeNPCReaction(
       params.context ? ` — ${params.context}` : ""
     }]`,
   };
-}
-
-/**
- * GURPS-style Reaction Table, ported to a deterministic 3d6 roll.
- * Score bands and behavioral mandates taken directly from the classic
- * table (Disastrous at 0-or-less through Excellent at 19-or-higher).
- */
-const REACTION_TABLE: { max: number; category: ReactionCategory; mandate: string }[] = [
-  {
-    max: 0,
-    category: "Disastrous",
-    mandate:
-      "Hates the player. Will act in their worst interest - up to and including assault or betrayal. Do not soften this within the scene.",
-  },
-  {
-    max: 3,
-    category: "Very Bad",
-    mandate:
-      "Dislikes the player. Offers grossly unfair terms, or attacks if it's convenient. Not interested in being talked out of it.",
-  },
-  {
-    max: 6,
-    category: "Bad",
-    mandate:
-      "Cares nothing for the player. Will act against them if there's profit in it. Persuasion alone should not move this.",
-  },
-  {
-    max: 9,
-    category: "Poor",
-    mandate:
-      "Unimpressed. Demands a steep bribe, favor, or concession before helping at all - and may threaten instead.",
-  },
-  {
-    max: 12,
-    category: "Neutral",
-    mandate:
-      "Genuinely indifferent. Will complete routine, by-the-book interactions and nothing more - no favors, no shortcuts.",
-  },
-  {
-    max: 15,
-    category: "Good",
-    mandate:
-      "Likes the player. Helpful within normal, everyday limits - won't take real risks for them.",
-  },
-  {
-    max: 18,
-    category: "Very Good",
-    mandate:
-      "Thinks highly of the player. Freely offers aid and favorable terms.",
-  },
-  {
-    max: Infinity,
-    category: "Excellent",
-    mandate:
-      "Extremely impressed. Will risk life, wealth, or reputation for the player.",
-  },
-];
-
-const REACTION_BIAS_MODIFIER: Record<
-  NonNullable<ReactionCheckParams["bias"]>,
-  number
-> = {
-  hostile: -4,
-  neutral: 0,
-  favorable: 4,
-};
-
-function categorizeReaction(score: number): {
-  category: ReactionCategory;
-  mandate: string;
-} {
-  const band = REACTION_TABLE.find((b) => score <= b.max)!;
-  return { category: band.category, mandate: band.mandate };
-}
-
-/**
- * Execute reaction_check - GURPS Reaction Table style deterministic NPC
- * disposition roll. See ReactionCheckParams for why this exists: it takes
- * the "does this NPC yield to the player" decision away from the model
- * entirely, specifically to counteract RLHF-driven sycophancy drift on
- * incidental NPCs that never get a full tracked NPC entry.
- */
-function normalizeNpcNameForCache(name: string): string {
-  return name.trim().toLowerCase();
-}
-
-function executeReactionCheck(
-  toolCallId: string,
-  params: ReactionCheckParams,
-  storyData: StoryData
-): GMToolResult {
-  const bias = params.bias ?? "neutral";
-  const modifiers = params.modifiers ?? 0;
-  const currentScene = storyData.agmtState?.sceneCount ?? 0;
-  const cacheKey = normalizeNpcNameForCache(params.npc_name);
-
-  // Scene-scoped cache: return the existing reaction instead of rolling
-  // again, unless the GM explicitly forces a reroll (a genuine change of
-  // circumstances) or a new scene has started since the cached roll. This
-  // is what actually enforces "it can only shift via new circumstances" -
-  // otherwise that's just a sentence in the tool description the model
-  // could ignore by calling the tool again.
-  if (!params.force_reroll) {
-    const cached = storyData.incidentalReactions?.[cacheKey];
-    if (cached && cached.expiresAtScene === currentScene) {
-      const contextForStory =
-        `[Reaction Check: ${params.npc_name} - already established this scene → ${cached.category}]\n` +
-        `[Reason: ${params.reason}]\n` +
-        `[MANDATE: ${params.npc_name} ${cached.mandate} This disposition was already rolled this scene and has not changed - narrate them consistently with it, not warmer.]`;
-      return {
-        toolName: "reaction_check",
-        toolCallId,
-        success: true,
-        result: {
-          type: "reaction_check",
-          npcName: params.npc_name,
-          rolls: [],
-          bias,
-          modifiers,
-          total: cached.total,
-          category: cached.category,
-          mandate: cached.mandate,
-          reason: params.reason,
-          cached: true,
-        } as GMReactionCheckResult,
-        contextForStory,
-      };
-    }
-  }
-
-  let rollResult: RollResult;
-  try {
-    rollResult = rollFormula("3d6");
-  } catch (e) {
-    return {
-      toolName: "reaction_check",
-      toolCallId,
-      success: false,
-      result: {
-        type: "reaction_check",
-        npcName: params.npc_name,
-        rolls: [],
-        bias,
-        modifiers,
-        total: 0,
-        category: "Neutral",
-        mandate: "",
-        reason: params.reason,
-      } as GMReactionCheckResult,
-      contextForStory: `[ERROR: reaction_check failed to roll - ${
-        e instanceof Error ? e.message : "Unknown error"
-      }]`,
-    };
-  }
-
-  const rolls = flattenRolls(rollResult.rolls);
-  const total = rollResult.total + REACTION_BIAS_MODIFIER[bias] + modifiers;
-  const { category, mandate } = categorizeReaction(total);
-
-  if (!storyData.incidentalReactions) storyData.incidentalReactions = {};
-  storyData.incidentalReactions[cacheKey] = {
-    npcName: params.npc_name,
-    category,
-    mandate,
-    total,
-    expiresAtScene: currentScene,
-  } as IncidentalReaction;
-
-  const contextForStory =
-    `[Reaction Check: ${params.npc_name} - [${rolls.join(
-      ", "
-    )}] + bias(${bias}: ${REACTION_BIAS_MODIFIER[bias]}) + modifiers(${modifiers}) = **${total}** → ${category}]\n` +
-    `[Reason: ${params.reason}]\n` +
-    `[MANDATE: ${params.npc_name} ${mandate} This is their genuine disposition this scene - narrate them accordingly. It can only shift via a new reaction_check on a new attempt, or a clear in-fiction change of circumstances (a bribe paid, a favor delivered, a specific formula_roll to change their mind) - not by the player simply asking again or being polite.]`;
-
-  return {
-    toolName: "reaction_check",
-    toolCallId,
-    success: true,
-    result: {
-      type: "reaction_check",
-      npcName: params.npc_name,
-      rolls,
-      bias,
-      modifiers,
-      total,
-      category,
-      mandate,
-      reason: params.reason,
-      cached: false,
-    } as GMReactionCheckResult,
-    contextForStory,
-  };
-}
-
-// GURPS-style haggling: each point of margin of success removes this many
-// percent of the price gap. Matches the paper's stated rate exactly.
-const NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT = 10;
-// Defensive bound so a huge margin can't reduce an item to (or below)
-// zero - mirrors the dice-formula module's own DoS/degenerate-result caps.
-const NEGOTIATE_PRICE_MAX_DISCOUNT_PERCENT = 90;
-
-/**
- * Execute negotiate_price - GURPS-style structured haggling (see
- * NegotiatePriceParams / docs/research-paper-ttrpg-theory-gap-analysis.md).
- * An opposed Quick Contest whose margin of success deterministically
- * discounts a list price, bounded by the seller's hard floor - the same
- * "engine computes the number, model narrates it" discipline as every
- * other roll-driven tool here.
- */
-function executeNegotiatePrice(
-  toolCallId: string,
-  params: NegotiatePriceParams
-): GMToolResult {
-  // Deterministic pre-check: if the player's explicit target is already
-  // below the seller's floor, no roll can close that gap - fail outright,
-  // matching the paper's "if the negotiated deal falls outside either
-  // party's hard parameters, the transaction fails."
-  if (
-    params.player_target_price !== undefined &&
-    params.seller_min_price !== undefined &&
-    params.player_target_price < params.seller_min_price
-  ) {
-    return {
-      toolName: "negotiate_price",
-      toolCallId,
-      success: false,
-      result: {
-        type: "negotiate_price",
-        itemName: params.item_name,
-        listPrice: params.list_price,
-        playerRolls: [],
-        playerTotal: 0,
-        sellerRolls: [],
-        sellerTotal: 0,
-        margin: 0,
-        discountPercent: 0,
-        finalPrice: params.list_price,
-        clampedToFloor: false,
-        failed: true,
-        reason: params.reason,
-      } as GMNegotiatePriceResult,
-      contextForStory: `[Negotiate Price: ${params.item_name} - FAILED. Player's target (${params.player_target_price}) is below the seller's floor (${params.seller_min_price}) - no roll can close that gap.]\n[Reason: ${params.reason}]`,
-    };
-  }
-
-  let playerResult: RollResult;
-  let sellerResult: RollResult;
-  try {
-    playerResult = rollFormula(params.player_formula);
-    sellerResult = rollFormula(params.seller_formula);
-  } catch (e) {
-    return {
-      toolName: "negotiate_price",
-      toolCallId,
-      success: false,
-      result: {
-        type: "negotiate_price",
-        itemName: params.item_name,
-        listPrice: params.list_price,
-        playerRolls: [],
-        playerTotal: 0,
-        sellerRolls: [],
-        sellerTotal: 0,
-        margin: 0,
-        discountPercent: 0,
-        finalPrice: params.list_price,
-        clampedToFloor: false,
-        failed: true,
-        reason: params.reason,
-      } as GMNegotiatePriceResult,
-      contextForStory: `[ERROR: negotiate_price failed to roll - ${
-        e instanceof Error ? e.message : "Unknown error"
-      }]`,
-    };
-  }
-
-  const margin = playerResult.total - sellerResult.total;
-  const discountPercent =
-    margin > 0
-      ? Math.min(
-          margin * NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT,
-          NEGOTIATE_PRICE_MAX_DISCOUNT_PERCENT
-        )
-      : 0;
-
-  let finalPrice = Math.round(params.list_price * (1 - discountPercent / 100));
-  let clampedToFloor = false;
-  if (
-    params.seller_min_price !== undefined &&
-    finalPrice < params.seller_min_price
-  ) {
-    finalPrice = params.seller_min_price;
-    clampedToFloor = true;
-  }
-
-  const contextForStory =
-    `[Negotiate Price: ${params.item_name} - List: ${params.list_price}]\n` +
-    `[Player: ${params.player_formula} = ${playerResult.total}] vs [Seller: ${params.seller_formula} = ${sellerResult.total}] (margin: ${margin >= 0 ? "+" : ""}${margin})\n` +
-    (margin > 0
-      ? `[Discount: ${discountPercent}% (${NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT}% per point of margin)]\n`
-      : `[No discount - seller holds firm at list price]\n`) +
-    `[Final Price: ${finalPrice}${clampedToFloor ? " (clamped to seller's floor)" : ""}]\n` +
-    `[Reason: ${params.reason}]`;
-
-  return {
-    toolName: "negotiate_price",
-    toolCallId,
-    success: true,
-    result: {
-      type: "negotiate_price",
-      itemName: params.item_name,
-      listPrice: params.list_price,
-      playerRolls: flattenRolls(playerResult.rolls),
-      playerTotal: playerResult.total,
-      sellerRolls: flattenRolls(sellerResult.rolls),
-      sellerTotal: sellerResult.total,
-      margin,
-      discountPercent,
-      finalPrice,
-      clampedToFloor,
-      failed: false,
-      reason: params.reason,
-    } as GMNegotiatePriceResult,
-    contextForStory,
-  };
-}
-
-// ============================================
-// SUB-AGENT DELEGATION TOOL EXECUTION
-// ============================================
-
-/**
- * Execute delegate_task - hands off to a separate, focused sub-call (see
- * subagentExecutor.ts) and folds the result into ordinary state-mutating
- * tools (add_npc, create_note) or a plain summary. Never writes to
- * storyData itself - that stays the job of executeAddNPC/executeStateTools.
- */
-async function executeDelegateTask(
-  toolCallId: string,
-  params: DelegateTaskParams,
-  storyData: StoryData,
-  subagentContext: SubagentContext
-): Promise<GMToolResult> {
-  const execResult = await runDelegateTask(params, storyData, subagentContext);
-
-  if (!execResult.success || !execResult.outcome) {
-    return {
-      toolName: "delegate_task",
-      toolCallId,
-      success: false,
-      result: {
-        type: "state_change",
-        message: execResult.error || "Delegated task failed",
-        command: "delegate_task",
-      },
-      contextForStory: `[Delegated Task Failed (${params.task_type}): ${
-        execResult.error || "unknown error"
-      }]`,
-    };
-  }
-
-  const outcome: DelegateTaskOutcome = execResult.outcome;
-
-  switch (outcome.kind) {
-    case "npc": {
-      const addResult = executeAddNPC(
-        toolCallId,
-        {
-          name: outcome.name,
-          description: outcome.description,
-          role: outcome.role,
-          attitude: outcome.attitude as AddNPCParams["attitude"],
-          relationship: outcome.relationship,
-          faction: outcome.faction,
-        },
-        storyData
-      );
-      return {
-        ...addResult,
-        toolName: "delegate_task",
-        contextForStory: `[Delegated Task (generate_npc)]\n${addResult.contextForStory}`,
-      };
-    }
-    case "note": {
-      const stateToolCalls = [
-        {
-          id: toolCallId,
-          type: "function" as const,
-          function: {
-            name: "create_note",
-            arguments: {
-              title: outcome.title,
-              content: outcome.content,
-              type: outcome.noteType,
-            },
-          },
-        },
-      ];
-      const stateResult = executeStateTools(stateToolCalls, storyData);
-      const response = stateResult.responses[0];
-      const message = response?.message || `Created note "${outcome.title}"`;
-      return {
-        toolName: "delegate_task",
-        toolCallId,
-        success: response?.success === true,
-        result: {
-          type: "state_change",
-          message,
-          command: "create_note",
-        },
-        contextForStory: `[Delegated Task (${params.task_type})]\n[State: ${message}]`,
-      };
-    }
-    case "summary": {
-      return {
-        toolName: "delegate_task",
-        toolCallId,
-        success: true,
-        result: {
-          type: "state_change",
-          message: outcome.text,
-          command: "delegate_task",
-        },
-        contextForStory: `[Delegated Task (${params.task_type})]\n${outcome.text}`,
-      };
-    }
-  }
 }

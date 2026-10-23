@@ -485,6 +485,17 @@ See the full list in [§11.3](#113-gm-tool-catalogue). The user-visible conseque
 - `reaction_check` and `negotiate_price` have tests and struct support but are
   not offered — decide whether they come back.
 
+> **Update 2026-10-23 (legacy removal, decision 128): fixed by deleting, not
+> re-offering.** `game_over`, `delegate_task`, `reaction_check`,
+> `negotiate_price`, `request_continuation`, `end_gm_thinking`, `add_memory` and
+> the ability tools are gone from the schemas, executors, labels and the Google
+> list. `subagentExecutor.ts`, `webSearchCall.ts` and `/api/web-search` went
+> with `delegate_task`, and so did Settings' Web Research toggle and Brave key.
+> The prompt no longer names `request_continuation`, and `roll_table`'s
+> description no longer names `reaction_check`. A call to a removed name gets
+> the engine's "Unknown tool" result, pinned by `tests/gmTools.sixPlaces.test.ts`.
+> The "decide whether they come back" question above is answered: they did not.
+
 ### 6.11 PWA layer is inactive
 
 `next.config.ts` wraps the config with `@ducanh2912/next-pwa`, a **webpack**
@@ -1055,6 +1066,9 @@ currently has no way to end the game**), `add_ability`/`remove_ability`/
 the `gmTools.ts` version is sent. Caveat: `executeGMTools` still has `case`
 branches for several of these, so a model that emitted one anyway (e.g. via
 leaked-text recovery) would probably execute it.
+
+> **Update 2026-10-23 (decision 128):** all seventeen were deleted, with
+> `take_rest`, rather than re-offered; see the note under §6.10.
 
 ### 11.4 Observer (per turn) — `app/misc/observer.ts`
 
@@ -1657,6 +1671,7 @@ dead duplicates listed in [§10](#10-dead-code)). Know which one you're editing.
 5. **Unreachable tools** — re-offer or delete each of `game_over`,
    `delegate_task` (+ Web Research toggle, Brave key, `/api/web-search`),
    `reaction_check`, `negotiate_price`, `request_continuation` ([§6.10](#610-unreachable-gm-tools-with-live-looking-ui-or-prompt-references)).
+   *Decided 2026-10-23: delete them all (decision 128).*
 6. **PWA** — fix it (Turbopack-compatible service worker + real icons) or drop
    next-pwa and the manifest ([§6.11](#611-pwa-layer-is-inactive)).
 7. **Embeddings** — delete the toggle and client, or rebuild semantic search
