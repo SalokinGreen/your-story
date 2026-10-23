@@ -76,14 +76,30 @@ A small Capacitor plugin inside the Android project (not an npm dependency):
 - The manifest gains `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` and
   `POST_NOTIFICATIONS`, plus the `<service>` declaration with
   `android:foregroundServiceType="dataSync"`.
-- JS side: `app/misc/turnKeepAlive.ts`, a no-op everywhere but Android, with
-  `beginTurnKeepAlive()` and `endTurnKeepAlive({ ready })`. The page calls
-  `begin` when a turn starts. Android only allows a foreground service to
-  start while the app is visible, and the player has just tapped Send, so it
-  is. It calls `end` when the turn finishes, fails or is stopped. On a
-  finished turn with `document.visibilityState === "hidden"`, `end` posts the
-  "ready" notification. Calls nest (a counter), so a retry inside a turn
-  doesn't stop the service early.
+- JS side: `app/misc/turnKeepAlive.ts` is a no-op everywhere but Android.
+  It exposes `beginTurnKeepAlive(turnId)` and
+  `endTurnKeepAlive(turnId, { ready })`.
+  - **Begin** is called when a turn starts. Android only allows a foreground
+    service to start while the app is visible, and the player has just
+    tapped Send.
+    - The service starts at once, and calls `startForeground` within
+      Android's few-second limit.
+    - The notification permission is **not** waited for: Android lets a
+      foreground service run without it, and only the notification is
+      hidden. The permission is asked separately, once, alongside.
+  - **End** is called when the turn finishes, fails or is stopped.
+  - Native calls are serialised and carry the turn's id, so an `end` that
+    arrives before a slow `begin` finishes cannot leave a service running
+    (Codex's review).
+  - The "ready" notification is posted only for a turn that succeeded with
+    non-empty prose, was saved, and was not stopped, while the app is in the
+    background. The native side checks for that itself. A stale "ready" is
+    cleared when the app comes back or the next turn starts.
+- The service declares `android:stopWithTask="true"` and stops in
+  `onTaskRemoved`. Swiping the app away therefore ends the notification as
+  well as the turn, and §3.2 picks up the pieces. Android 15's six hours is a
+  total across 24 hours of background running, reset each time the app comes
+  to the foreground, not an allowance per turn.
 
 Why our own plugin rather than a third-party one: the repository is public
 and the native surface is small (two classes). We also control the
@@ -96,34 +112,52 @@ hand), so this is noted for when it is, not done.
 
 ### 3.2 The interrupted turn
 
-`app/misc/interruptedTurn.ts` keeps one record per story in localStorage
-(device-only, never synced, because another device has no turn in flight):
-`{ storyId, text, startedAt }`.
+`app/misc/interruptedTurn.ts` keeps one record per story in localStorage.
+It is device-only and never synced, because another device has no turn in
+flight. The record is `{ storyId, turnId, mode, text, partsBefore, startedAt }`:
+- `mode` is `"new"` for a player's line or choice, `"retry"` for a
+  reroll or reword of the last turn.
+- `partsBefore` is the number of scene parts before the turn began.
 
-- It is written when a turn starts, holding the player's line (the text the
-  page already builds for the GM).
-- It is cleared when the turn finishes, fails, or is stopped by the player.
+**Writing it.** The record is written at the one boundary every turn crosses,
+the start of `generateTrackedTurn`. So the reroll, reword and
+`intro_override` paths are covered as well as new input (Codex's review). It
+holds the player's line as the page built it.
 
-On story load, a record means the last turn never finished. The story then
-shows a slim banner above the composer: "The last turn was interrupted.
-Retry · Dismiss".
-- **Retry** sends the same line through the normal custom-input path.
-- **Dismiss** clears the record.
+**Clearing it.** The record is cleared only once the turn's story is saved:
+the final save is awaited, and a failed save keeps the record. It is also
+cleared when the player stops the turn. A failed turn that the page already
+reports with its own error and Retry clears it too.
+
+**On story load.** A record means the last turn never finished.
+- **Repair.** Nothing in the stored story is trusted past `partsBefore`. A
+  debounced autosave can have written the player's line, or half a reply,
+  before the kill. So the loaded story is cut back to `partsBefore` parts,
+  the state the turn started from.
+- **Banner.** A slim banner above the composer says "The last turn was
+  interrupted." with Retry and Dismiss.
+  - Retry sends the line again (`"new"`) or runs the page's own Retry of
+    the last turn (`"retry"`).
+  - Dismiss clears the record and keeps the repaired story.
 
 A record older than 24 hours is dropped silently.
 
-The undo snapshot taken at turn start (`persistUndoStack`) already restores
-the pre-turn story, so nothing else needs saving mid-turn.
-
 ### 3.3 Streaming and Stop on Android
 
-`platformFetch.ts` gains `getStreamingProviderFetch(url)`. On Capacitor it
-returns the WebView's own fetch (`window.CapacitorWebFetch`, which Capacitor
-keeps when it patches `window.fetch`), but only for a host on the
-CORS-capable list. Otherwise it returns `getProviderFetch()` as today. That
-fetch streams, and it honours `AbortSignal`. `providerCall.ts` uses it for
-streamed requests only. Non-streamed calls stay on native HTTP, which avoids
-CORS entirely.
+`platformFetch.ts` gains `getAbortableProviderFetch(url)`. On **Android**
+it returns the WebView's own fetch (`window.CapacitorWebFetch`, which
+Capacitor keeps when it patches `window.fetch`), but only for a host on the
+CORS-capable list. Otherwise it returns `getProviderFetch()` as today.
+- iOS keeps today's transport: its origin and CORS were not tested (Codex's
+  review).
+- The WebView fetch streams, and it honours `AbortSignal`.
+- `providerCall.ts` uses it for **every** request to such a host, streamed
+  or not, so Stop cancels the whole turn's calls on the default models. That
+  includes the tier classifier, which now receives the turn's abort signal.
+- The side agents that run after a turn's prose is shown keep their own
+  lifetimes, as today.
+- Google and Z.ai stay on native HTTP, which avoids CORS entirely and still
+  cannot be cancelled.
 
 The list comes from a CORS preflight sent 2026-10-23 as the app's origin,
 `https://localhost` (Capacitor's default Android origin):
@@ -137,11 +171,15 @@ The list comes from a CORS preflight sent 2026-10-23 as the app's origin,
 | generativelanguage.googleapis.com | 403 | no |
 | api.z.ai | 200, but no `Access-Control-Allow-*` headers | no |
 
-A host that later drops CORS would fail with a network error. So a streamed
-request that fails before any byte arrives, with a `TypeError` (how a CORS
-refusal surfaces), retries once on the native path, and the host is marked
-off the list for the session. That keeps a provider change from breaking
-turns.
+A host that later drops CORS would fail with a network error, a
+`TypeError`. Such a failure is **not** replayed automatically: the POST may
+already have reached the provider and been billed (Codex's review).
+Instead:
+- the host is marked off the list for the session, so later requests use
+  native HTTP;
+- the turn fails with the page's ordinary error and its Retry, as any
+  network failure does today;
+- the player retries once, and that retry goes the native way.
 
 ### 3.4 The back gesture
 
@@ -150,9 +188,18 @@ turns.
   Registering it switches off the default close.
 - `app/misc/backStack.ts` holds a LIFO stack of close handlers.
   `useBackHandler(open, onBack)` pushes one while `open` is true and removes
-  it when it closes. Every modal, sheet and overlay that already closes on
-  Escape or a close button registers this way, with the same function it
-  calls on Escape.
+  it when it closes.
+  - Each entry has a stable token and reads its callback through a ref, so a
+    rerender neither reorders the stack nor stacks a second copy.
+  - Every surface the player can dismiss registers this way, with the same
+    function it calls on Escape or its close button.
+  - The plan inventories them all: the Library's New Folder, Join, Host and
+    Export dialogs, the menu's Save Copy and Compact, the nested note and NPC
+    editors, the keys modal and the pickers. Shared primitives (the confirm
+    dialog, the full-screen view) register once inside themselves, so
+    callers get it for free.
+  - A child surface registers on its own entry. Its parent's entry is below
+    it, so one back closes only the child.
 - The listener pops the top handler and calls it. With an empty stack it
   asks the route: the story page's own back (a sub-page → the story; the
   story → `/library`), the Library's (`goHome()`, then background), the
@@ -179,7 +226,12 @@ turns.
   going behind a foreground service with the screen off, and in Doze. The
   service exempts the app from App Standby, and Android documents no Doze
   exemption for it. A long turn left with the screen off on a quiet phone is
-  the real test. It goes in `pending_tests.md`, and the CI builds the APK.
+  the real test.
+  - So slice 1 ends with an APK sent to the author **before** anything else
+    claims to work. Slices 2–4 are built meanwhile because they do not
+    depend on it.
+  - If the turn does not survive, slice 1 is revisited (a partial wake lock,
+    or moving the request into native code) before the PR is called done.
 - **CORS lists drift.** The fallback in §3.3 covers that.
 - **Streaming through the WebView** may behave differently on old WebView
   versions. `minSdk` is 24 and the WebView updates through Play, so it is

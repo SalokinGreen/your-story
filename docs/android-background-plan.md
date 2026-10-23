@@ -1,199 +1,312 @@
 # Android: turns that survive leaving the app, and the back gesture — implementation plan
 
-Status: **draft, waiting for the author's approval.** Design:
-[`android-background-design.md`](android-background-design.md). Decisions
-132–135. Branch `claude/android-background`, one PR, five slices. Line
-numbers are from `master` at e1000b1 (2026-10-23).
+Status: **draft, revised after Codex's review, waiting for the author's
+approval.** Design: [`android-background-design.md`](android-background-design.md).
+Decisions 132–135. Branch `claude/android-background`, one PR, five slices.
+Line numbers are from `master` at e1000b1 (2026-10-23).
 
-**Every slice ends with `tsc` clean and the suite green.** None of this can
-run on this machine's phone-less setup, so every slice that touches
-`android/` is checked by a CI build (`build-apps.yml`, which now signs with
-the shared key, #229). The author installs the APK and works the
-`pending_tests.md` list. Baseline: Vitest 172 files / 2,537 tests, `tsc`
-clean, lint counted per touched file.
+**Every slice ends with `tsc` clean and the suite green.** Nothing native
+can run here (no phone, no Android SDK), so a slice that touches `android/`
+is checked by a CI build (`build-apps.yml`, which signs with the shared key
+since #229) and by the author on the phone. **Slice 1's APK goes to the
+author as soon as it builds**: the central promise (a turn survives the
+background with the screen off) is unproven until then. Slices 2–4 do not
+depend on it and are built meanwhile. Baseline: Vitest 172 files / 2,537
+tests, `tsc` clean, lint counted per touched file.
 
-## Slice 1 — The keep-alive service (decisions 132)
+## Slice 1 — The keep-alive service (decision 132)
 
 **Native, `android/app/src/main/`**
-- `java/com/yourstory/app/TurnKeepAliveService.java`: a `Service` that
-  creates its notification channel `turn` ("Turns in progress", low
-  importance, no sound). In `onStartCommand` it calls
-  `startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)`
-  (the three-argument form on API 29+, the two-argument form below), with
-  title "Your Story is writing your turn…", ongoing, and a tap that opens
-  `MainActivity`. `onTimeout(int, int)` (API 35) calls `stopSelf()`.
-  `START_NOT_STICKY`.
-- `java/com/yourstory/app/TurnKeepAlivePlugin.java`: `@CapacitorPlugin(name =
-  "TurnKeepAlive")` with three methods.
-  - `begin(title?)`: requests `POST_NOTIFICATIONS` the first time on API
-    33+, through the plugin's permission alias, then starts the service with
-    `ContextCompat.startForegroundService`.
-  - `end()`: stops the service.
-  - `notifyReady(title, body)`: posts notification 2 on a `ready` channel
-    (default importance), auto-cancel, tap opens the app. It does nothing
-    without the permission.
+- `java/com/yourstory/app/TurnKeepAliveService.java`, a `Service`:
+  - Creates its channels on API 26+ (guarded): `turn` ("Turns in progress",
+    low importance, no sound) and `ready` (default importance).
+  - `onStartCommand` calls `startForeground` **immediately**. That is the
+    three-argument form with `ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC`
+    on API 29+, and the two-argument form below.
+  - Its notification reads "Your Story is writing your turn…", is ongoing,
+    and opens `MainActivity` when tapped.
+  - `onTimeout(int, int)` (API 35+) and `onTaskRemoved` both call
+    `stopSelf()`. It is `START_NOT_STICKY`.
+  - It holds the current turn id. An `end` for another id is ignored, and an
+    `end` that arrives before `begin` has been handled wins: a pending
+    `begin` with that id is dropped. All three methods go through one
+    handler on the main looper, so they are serialised.
+- `java/com/yourstory/app/TurnKeepAlivePlugin.java`,
+  `@CapacitorPlugin(name = "TurnKeepAlive", permissions = @Permission(alias = "notifications", strings = POST_NOTIFICATIONS))`:
+  - `begin({ turnId })` starts the service with
+    `ContextCompat.startForegroundService` **without** waiting for any
+    permission.
+  - `end({ turnId })`.
+  - `notifyReady({ turnId, title, body })` posts on `ready` only if the app
+    is not in the foreground (the plugin tracks `handleOnResume` and
+    `handleOnPause`), the permission is granted, and the id matches the last
+    `end`.
+  - `requestNotificationPermission()` uses the alias on API 33+ and resolves
+    at once below.
+  - Resuming clears a posted "ready".
 - `MainActivity.java`: `registerPlugin(TurnKeepAlivePlugin.class)` before
   `super.onCreate`.
-- `AndroidManifest.xml`: the `FOREGROUND_SERVICE`,
-  `FOREGROUND_SERVICE_DATA_SYNC` and `POST_NOTIFICATIONS` permissions, and
-  `<service android:name=".TurnKeepAliveService" android:exported="false"
-  android:foregroundServiceType="dataSync" />`.
+- `AndroidManifest.xml`:
+  - the `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` and
+    `POST_NOTIFICATIONS` permissions;
+  - `<service android:name=".TurnKeepAliveService" android:exported="false" android:stopWithTask="true" android:foregroundServiceType="dataSync" />`.
 
 **JS, `app/misc/turnKeepAlive.ts`**
-- `registerPlugin<TurnKeepAlivePlugin>("TurnKeepAlive")` from
-  `@capacitor/core`.
-- `beginTurnKeepAlive(): void` and `endTurnKeepAlive(opts: { ready: boolean }): void`.
-  - Both are a nesting counter.
-  - Both are no-ops unless `Capacitor.getPlatform() === "android"`.
-  - Native calls are fire-and-forget, with errors logged to the Debug Logs
-    and never thrown into the turn.
-  - `end` with `ready && document.visibilityState === "hidden"` calls
-    `notifyReady("Your turn is ready", <story name>)` before ending.
+- `registerPlugin<TurnKeepAlivePlugin>("TurnKeepAlive")`.
+- `beginTurnKeepAlive(turnId: string): void`:
+  - fires `begin`;
+  - the first time on a device it also fires
+    `requestNotificationPermission()`, remembered in localStorage and never
+    awaited by the turn.
+- `endTurnKeepAlive(turnId: string, outcome: "ready" | "stopped" | "failed"): void`
+  fires `end`. On `"ready"` it fires `notifyReady` first.
+- All calls are no-ops unless `Capacitor.getPlatform() === "android"`. They
+  are fire-and-forget, errors go to the Debug Logs, and nothing throws into
+  the turn.
 
-**`app/story/page.tsx`**: `generateTrackedTurn` (`574`) calls
-`beginTurnKeepAlive()` before `generateStoryTurn` and, in `finally`,
-`endTurnKeepAlive({ ready: <the turn produced a part> })`. Every turn path
-(`2354`, `2950`, `3954`) goes through it, so Stop and errors end it too.
+**`app/story/page.tsx`**:
+- `generateTrackedTurn` (`574`) gets a `turnId` (`crypto.randomUUID()` with
+  the existing fallback).
+- It calls `beginTurnKeepAlive(turnId)` before `generateStoryTurn`.
+- It **awaits the turn's final save** before `endTurnKeepAlive`:
+  - **The save becomes awaitable.** The success paths call
+    `saveProgress(storyData, true)` unawaited (`3295`), and the legacy Retry
+    uses the debounced save (`4260`). So `saveProgress` returns its promise,
+    and the paths that end a turn hand that promise back to the wrapper.
+  - **Ready** needs the turn to have succeeded, written a GM part with
+    non-empty prose, saved, and not been aborted. The abort check is
+    `generationAbortRef.current?.signal.aborted`.
+  - Stop gives `"stopped"`, a thrown error or rejected save gives
+    `"failed"`.
 
-**Tests.** `tests/turnKeepAlive.test.ts` mocks `@capacitor/core`:
-- a no-op on web and on iOS;
-- the begin/end nesting, with one native begin and one native end;
-- the ready ping only when hidden and `ready`;
-- a native error never throws.
+**Tests.** `tests/turnKeepAlive.test.ts` mocks `@capacitor/core`. It covers:
+- a no-op on web and iOS;
+- begin/end passing the turn id;
+- `notifyReady` only on `"ready"`;
+- the permission request once per device and never awaited;
+- a native rejection never throws.
+
+The native ordering rule (an early `end` beats a late `begin`) is Java, with
+no test harness here. It is written as one small pure method,
+`shouldStart(pendingId, endedId)`, and checked on the device.
+
+**Check.** CI builds the APK, which is sent to the author with a short
+script: Send → Home → wait; Send → screen off for 3 minutes; Send → Stop.
+The expected results go in `pending_tests.md`.
 
 ## Slice 2 — The interrupted turn (decision 135)
 
-**`app/misc/interruptedTurn.ts`** (pure plus localStorage behind try/catch):
-- `markTurnStarted(storyId, text)`, `clearTurn(storyId)`;
-- `readInterruptedTurn(storyId, now): { text; startedAt } | null`, which
-  drops and returns null past 24 h;
-- key `ys:interruptedTurn:<storyId>`, not on the sync allowlist.
+**`app/misc/interruptedTurn.ts`** (pure, with localStorage behind
+try/catch):
+- `type InterruptedTurn = { storyId; turnId; mode: "new" | "retry"; text; partsBefore; startedAt }`.
+- `markTurnStarted(rec)`, `clearTurn(storyId, turnId)` (it clears only that
+  turn).
+- `readInterruptedTurn(storyId, now)`, which drops and returns null past
+  24 h.
+- `repairInterruptedStory(story, rec): StoryData` cuts `scene.parts` back to
+  `rec.partsBefore` and returns the story.
+- Key `ys:interruptedTurn:<storyId>`, not on the sync allowlist.
 
-**`app/story/page.tsx`**:
-- `markTurnStarted` where a turn's player text is final, before
-  `generateTrackedTurn`. That is the same text `handleCustomInput` and
-  `handleChoice` push as the player's part.
-- `clearTurn` in `generateTrackedTurn`'s `finally`, and in `handleStop`.
-  (Only a killed process leaves the record.)
-- On load (`setupUIFromStory`), `readInterruptedTurn` feeds an
-  `interruptedTurn` state.
+**`app/story/page.tsx`**: marking happens inside `generateTrackedTurn`, the
+one boundary. Its callers pass `{ mode, text }`.
+- Custom input and choices (including the `intro_override` choices-only
+  branch, `3443`) pass `"new"` and the player's line.
+- Reroll (`runTurnGeneration`, `3802`) and reword (`3954`) pass `"retry"`.
+- Reroll calls `runTurnGeneration` directly. So the wrapper either moves
+  into `runTurnGeneration`, or `runTurnGeneration` calls the wrapper.
+  Whichever: one place marks and clears.
 
-**`app/story/story.tsx`**: a banner above the composer on the `ys-*`
-tokens: "The last turn was interrupted." with Retry (calls `onCustomInput`
-with the text) and Dismiss (clears). New `StoryProps`:
-`interruptedTurnText?: string`, `onRetryInterrupted?`,
-`onDismissInterrupted?`.
+`clearTurn`:
+- runs after the awaited save in the wrapper;
+- runs in `handleStop` (`3662`);
+- runs on a failed turn the page already reports with its error and Retry;
+- is kept when the save rejects.
 
-**Tests.** `tests/interruptedTurn.test.ts`:
-- mark → read → clear;
-- expiry at 24 h;
+On load (`setupUIFromStory`, after `ensureStoryDataArrays`), a record makes
+the page run `repairInterruptedStory` and sets an `interruptedTurn` state.
+
+**`app/story/story.tsx`**: a banner above the composer, on the `ys-*`
+tokens, says "The last turn was interrupted." with Retry and Dismiss.
+- Retry with `"new"` calls `onCustomInput(text)`; with `"retry"` it calls
+  `onRetry`.
+- Dismiss clears the record.
+- New `StoryProps`: `interruptedTurn?: { mode; text }`,
+  `onRetryInterrupted?`, `onDismissInterrupted?`.
+
+**Tests.** `tests/interruptedTurn.test.ts` covers:
+- mark, read, clear only the same turn id;
+- expiry;
 - per-story keys;
-- localStorage throwing.
+- localStorage throwing;
+- `repairInterruptedStory` with a story that gained a player part and a
+  half reply.
 
-**Check.** In the browser preview, start a turn with no key, so it fails
-fast and clears: no banner. Then write a record by hand and reload: the
-banner shows, Dismiss clears it, and Retry sends the line. Take a
-screenshot.
+**Check.** In the browser preview, start a turn with no key: it fails fast,
+and no banner appears afterwards. Write a record by hand with
+`partsBefore = n` and two extra parts, then reload. The extra parts are
+gone, the banner shows, Dismiss clears it, and Retry sends the line. Take a
+screenshot for the devlog.
 
 ## Slice 3 — Streaming and Stop on Android (decision 134)
 
 **`app/misc/platformFetch.ts`**:
-- `STREAMING_CORS_HOSTS = ["openrouter.ai", "api.mistral.ai", "api.deepinfra.com", "api.deepseek.com"]`,
-  with the preflight evidence from design §3.3 in its comment;
-- `getStreamingProviderFetch(url: string): typeof fetch`:
+- `CORS_HOSTS = ["openrouter.ai", "api.mistral.ai", "api.deepinfra.com", "api.deepseek.com"]`,
+  with the design §3.3 preflight table in the comment.
+- `getAbortableProviderFetch(url: string): typeof fetch`:
   - Tauri: unchanged;
-  - Capacitor native, with the host on the list and not marked down for the
-    session, and `window.CapacitorWebFetch` present: return it;
-  - else `getProviderFetch()`;
-- `markStreamingHostDown(host)`.
+  - **Android only** (`Capacitor.getPlatform() === "android"`), with the
+    host on the list, not marked down this session, and
+    `window.CapacitorWebFetch` present: return it;
+  - otherwise `getProviderFetch()`;
+  - iOS and the web are unchanged.
+- `markHostDown(host)`.
 
 **`app/misc/providerCall.ts`**:
-- `generateStream`'s request (`postChatRequest`, `650`) takes the fetch from
-  `getStreamingProviderFetch(url)`.
-- On a `TypeError` before the response, when that fetch was the WebView one,
-  call `markStreamingHostDown(host)` and retry once with
-  `getProviderFetch()`.
-- `generateNonStreaming` is unchanged.
+- `postChatRequest` (`650`), the one place both paths post, takes its fetch
+  from `getAbortableProviderFetch(url)`.
+- On a `TypeError` thrown by the WebView fetch **before any response**, it
+  calls `markHostDown(host)` and rethrows. It never replays, because the
+  POST may have been billed.
+- Reader errors after headers are untouched (today's behaviour).
+- The Capacitor comment in `generateNonStreaming` (`1004`) is updated: on
+  the listed hosts the fetch underneath now honours the signal.
 
-**Tests.** `tests/platformFetch.streaming.test.ts`:
-- host selection on web, on Capacitor and on Tauri;
-- marked-down fallback;
-- no `CapacitorWebFetch` means the patched fetch.
+**`app/misc/generation.ts`**: the tier classifier's `generateSimple` call
+(`2116`) passes `options.abortSignal`.
 
-`tests/providerCall.*`: a stream on the WebView fetch that throws
-`TypeError` retries once on the native one and marks the host.
+**Tests.**
+- `tests/platformFetch.abortable.test.ts`:
+  - Android with a listed host → `CapacitorWebFetch`;
+  - Android with an unlisted host → the patched fetch;
+  - iOS and the web → unchanged;
+  - a marked-down host → native;
+  - no `CapacitorWebFetch` → native.
+- `tests/providerCall.*`:
+  - a WebView `TypeError` before any response marks the host and rethrows,
+    with one fetch call (no replay);
+  - an abort cancels the WebView fetch, both streamed and not.
+- The classifier receives the signal.
 
-**Check.** The standalone build. The real proof is on the device (stream
-visible word by word; Stop ends the request), so it goes in
-`pending_tests.md`.
+**Check.** The standalone build. On the device, the stream shows word by
+word, and Stop mid-stream ends the request (OpenRouter's activity page
+shows it cut short). Both go in `pending_tests.md`.
 
 ## Slice 4 — The back gesture (decision 133)
 
 - `npm install @capacitor/app@^8`, then `npx cap sync android`. Check that
-  `android/app/src/main/assets/capacitor.plugins.json` lists it, and that
-  the diff outside it is the sync's own.
-- **`app/misc/backStack.ts`**: `pushBackHandler(fn): () => void` (returns
-  remove), `popBackHandler(): boolean`, plus a route fallback registry,
-  `setRouteBack(fn | null)`.
-- **`app/misc/useBackHandler.ts`**: `useBackHandler(active: boolean, onBack: () => void)`.
+  `capacitor.plugins.json` lists it, and that the rest of the diff is the
+  sync's own.
+- **`app/misc/backStack.ts`**:
+  - `pushBackHandler(token: symbol, fn: () => void): void`,
+    `removeBackHandler(token)`, `popBackHandler(): boolean`;
+  - `setRouteBack(fn | null)`.
+- **`app/misc/useBackHandler.ts`**: `useBackHandler(active, onBack)`.
+  - A `useRef` token is pushed when `active` turns true and removed when it
+    turns false or on unmount.
+  - The callback is read through a ref, so a rerender neither reorders nor
+    duplicates the entry.
 - **`app/components/NativeBackButton.tsx`**, mounted in `app/layout.tsx`:
   - only on Android;
-  - `App.addListener("backButton", …)`;
-  - `popBackHandler()`, otherwise the route fallback, otherwise
-    `App.minimizeApp()`.
-- **Registrations** use the function each one already calls on Escape:
-  - the story page's modals (`ProfilePickerModal`, `OOCChatPanel`,
-    `PartyLobbyModal`, `ManualRollModal`, `AskQuestionModal`,
-    `DiceThrowModal`, `ConfirmDialog`, `SyncConflictModal`);
-  - `StoryImage`'s full-screen view;
-  - `StoryMenuSheet` and the Story Editor inside it;
-  - the story sub-pages, where a `currentState !== STORY` route back sets
-    `STORY`;
-  - the story route back (→ `/library`);
-  - the library (`goHome()` when not home);
-  - the Designer (→ `/library`);
-  - `APIKeysModal` and `LibraryPickerModal`.
-- A modal that pauses the GM (manual roll, dice, ask-question) closes the
-  way its own cancel does (null answer), so back works like "skip", not like
-  a crash.
+  - `App.addListener("backButton", …)` runs `popBackHandler()`, then the
+    route back, then `App.minimizeApp()`.
+- **Registrations.** First inventory every surface the player can dismiss:
+  grep for `Escape` handlers, `fixed inset-0` overlays and `isOpen` /
+  `onClose` props across `app/`. The list goes in the slice's "Decisions
+  made" entry. At least:
+  - **Shared primitives** (registered once, inside): `ConfirmDialog` and
+    `FullScreenView` / the `StoryImage` full-screen view.
+  - **The story page**: `ProfilePickerModal`, `OOCChatPanel`,
+    `PartyLobbyModal`, `SyncConflictModal`, and `StoryMenuSheet` with the
+    Story Editor inside it.
+  - **The menu's** Save Copy, Compact Story and Export dialogs.
+  - **The nested note and NPC editors.**
+  - **`APIKeysModal`** (Settings), `LibraryPickerModal` and
+    `GuidedStoryStart`.
+  - **The Library's** New Folder, Join, Host and Export dialogs.
+  - **The modals that pause the GM** (`ManualRollModal`, `DiceThrowModal`,
+    `AskQuestionModal`) close through their own skip/cancel (a null
+    answer).
+- **Route backs**:
+  - the story page: `currentState !== STORY` → `STORY`, else `/library`;
+  - the Library: `goHome()` when not home, else none (falls to minimise);
+  - the Designer: `/library`;
+  - the privacy and terms pages: `router.back()`.
 
-**Tests.** `tests/backStack.test.ts`:
+**Tests.** `tests/backStack.test.ts` covers:
 - LIFO order;
-- remove out of order;
+- removing out of order;
+- the same token pushed twice stays one entry;
 - the route fallback;
 - an empty stack returns false.
 
-**Check.** The browser preview cannot fire a native back, so run the
-dispatch through `popBackHandler` from the console against open sheets and
-modals. Device checks go in `pending_tests.md`.
+`tests/useBackHandler.test.tsx` (render with a toggled `active` and
+rerenders): one entry, removed on close and on unmount, with the latest
+callback called.
+
+**Check.** The preview cannot fire a native back, so drive `popBackHandler`
+from the console against an open sheet, a dialog inside it, and the
+full-screen picture, and check the order. Device checks go in
+`pending_tests.md`.
 
 ## Slice 5 — Docs and the APK
 
-- `CLAUDE.md` "BYOK, no accounts, local storage, native shells": the
-  keep-alive service, the streaming fetch rule and the back stack. Also: "a
-  new modal registers `useBackHandler`".
-- `docs/pending_tests.md` (2026-10-23, Android), each with an expected
-  result and what failure looks like:
-  - Send, press Home and wait: the turn finishes and the notification shows
-    "ready".
-  - The same with the screen off for 3 minutes.
-  - Swipe the app away mid-turn: on reopening, the banner shows and Retry
-    works.
-  - Streaming is visible word by word on OpenRouter.
-  - Stop mid-stream: OpenRouter's activity page shows the request cut short.
-  - Back from each place in §2.
-  - Back on the Library home backgrounds the app, and reopening keeps it.
-  - On Android 13+, the notification prompt on the first Send.
-- Run `build-apps.yml` (the author's go is this plan's approval) and send
-  the APK.
-- Both docs marked built.
-- A devlog only if slice 2's banner is the one screen change, which it is.
+- **`CLAUDE.md`**, in the native-shells part:
+  - the keep-alive service and its ordering rule;
+  - the abortable fetch rule (Android only, the CORS list, no replay);
+  - the back stack ("a new dismissible surface calls `useBackHandler`");
+  - the interrupted-turn record.
+- **`docs/pending_tests.md`** (2026-10-23, Android), each check with the
+  expected result and what failure looks like:
+  - Send → Home → wait;
+  - screen off for 3 and for 10 minutes;
+  - swipe away mid-turn → reopen: the repaired story and the banner;
+    Retry works;
+  - streaming visible word by word;
+  - Stop mid-stream cancels on OpenRouter;
+  - back from every place in design §2;
+  - back on the Library home backgrounds the app, and reopening keeps it;
+  - on Android 13+, the permission prompt on the first Send, and "deny"
+    still finishing the turn;
+  - on Android 14/15, the "ready" ping only when away.
+- Run `build-apps.yml` (this plan's approval is the go) and send the APK.
+- Mark both docs built.
+- The devlog, with slice 2's banner and the back-stack console check.
 
 ## What breaks, and for whom
 
-- Nobody's data. The new localStorage key is per device.
-- A provider that drops CORS falls back once per session (design §3.3).
+- Nobody's data: the new localStorage key is per device. Repair cuts only
+  parts a dead turn left behind.
+- On Android, a provider that drops CORS fails one turn with the ordinary
+  error, and the player's Retry goes the native way.
 - The first Send on Android 13+ shows a permission prompt.
+- iOS and the web: no transport change.
+
+## Codex's review (2026-10-23)
+
+Codex (gpt-6.1-sol, high) found ten problems in the first draft. All were
+checked against the code, and all are taken in:
+
+1. The permission wait could start an orphan service. The service now
+   starts at once, and calls carry turn ids.
+2. The interrupted-turn record was cleared before an unawaited save, and
+   the design wrongly said the undo snapshot restores the story. The save is
+   now awaited, and the story is repaired to `partsBefore`.
+3. Reroll, reword and the `intro_override` branch bypassed the marking.
+   There is now one boundary with a `mode`.
+4. The automatic fallback could double-bill. There is no replay: the host
+   is marked down, and the player retries.
+5. Stop missed non-streaming calls and the classifier. Every call to a
+   listed host is now abortable, and the classifier gets the signal.
+6. The streaming change touched iOS. It is now Android only.
+7. Back coverage was incomplete, and rerenders could reorder entries. There
+   is now an inventory, shared primitives register once, and entries use
+   tokens and refs.
+8. Swiping away could leave "writing…" up. The service now has
+   `stopWithTask` and `onTaskRemoved`, and the six-hour cap is explained.
+9. "Produced a part" was not readiness. Ready now needs saved, non-empty
+   prose, no stop, and the app in the background.
+10. Tests and order. The missing tests are added, and slice 1's APK goes to
+    the author first.
 
 ## Decisions made during implementation
 
