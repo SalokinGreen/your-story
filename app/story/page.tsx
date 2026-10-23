@@ -103,6 +103,12 @@ import {
 } from "../misc/turnTimeline";
 import { logger } from "../misc/logger";
 import {
+  clearTurn,
+  markTurnStarted,
+  readInterruptedTurn,
+  repairInterruptedStory,
+} from "../misc/interruptedTurn";
+import {
   beginTurnKeepAlive,
   endTurnKeepAlive,
   newTurnId,
@@ -580,13 +586,41 @@ function StoryPageContent() {
   // The final save of the turn in flight, set by the turn's onComplete so the
   // wrapper below can await it before ending the Android keep-alive service.
   const turnSaveRef = useRef<Promise<boolean> | null>(null);
+  // The banner after a turn the OS killed (interruptedTurn.ts, decision 135),
+  // the id of the record on disk, and the id of the turn in flight.
+  const [interruptedTurn, setInterruptedTurn] = useState<{
+    mode: "new" | "retry";
+    text: string;
+  } | null>(null);
+  const interruptedTurnIdRef = useRef<string | null>(null);
+  const liveTurnRef = useRef<{ storyId: string; turnId: string } | null>(null);
+  // The one boundary every generating turn crosses. `turn` says how a killed
+  // turn is recovered: "new" resends `text`; "retry" (a reroll or reword)
+  // runs Retry again. partsBefore is scene.parts.length before the turn
+  // pushed anything, so the caller captures it, not this wrapper.
   async function generateTrackedTurn(
+    turn: { mode: "new" | "retry"; text: string; partsBefore: number },
     ...args: Parameters<typeof generateStoryTurn>
   ) {
     turnLiveRef.current = args[0];
     // Android: keep the process alive while the player is away (decision 132).
     // Ended only after the final save has settled, so "ready" means saved.
     const turnId = newTurnId();
+    const recordStoryId = storyDbId;
+    if (recordStoryId) {
+      liveTurnRef.current = { storyId: recordStoryId, turnId };
+      markTurnStarted({
+        storyId: recordStoryId,
+        turnId,
+        mode: turn.mode,
+        text: turn.text,
+        partsBefore: turn.partsBefore,
+        startedAt: Date.now(),
+      });
+    }
+    // Cleared once the turn is settled: saved, stopped, or failed in a way the
+    // page already reports. Kept only when a finished turn failed to save.
+    let settled = true;
     const turnSignal = args[2]?.abortSignal;
     const wasStopped = () =>
       turnSignal?.aborted === true ||
@@ -606,11 +640,14 @@ function StoryPageContent() {
       if (wasStopped()) outcome = "stopped";
       else if (result.success && result.content.trim() && saved)
         outcome = "ready";
+      settled = wasStopped() || !result.success || saved;
       return result;
     } catch (error) {
       outcome = wasStopped() ? "stopped" : "failed";
       throw error;
     } finally {
+      if (recordStoryId && settled) clearTurn(recordStoryId, turnId);
+      if (liveTurnRef.current?.turnId === turnId) liveTurnRef.current = null;
       turnLiveRef.current = null;
       turnSaveRef.current = null;
       endTurnKeepAlive(turnId, outcome, args[0].story_name);
@@ -1345,6 +1382,15 @@ function StoryPageContent() {
       // and a story started from a Designer-made adventure before the fix
       // was saved without the legacy stat-block arrays.
       ensureStoryDataArrays(loadedStoryData);
+
+      // A record still here means the last turn never finished (the OS killed
+      // the app mid-turn): cut the story back to before it and offer a retry.
+      const interrupted = readInterruptedTurn(storyId!, Date.now());
+      if (interrupted) {
+        repairInterruptedStory(loadedStoryData, interrupted);
+        setInterruptedTurn({ mode: interrupted.mode, text: interrupted.text });
+        interruptedTurnIdRef.current = interrupted.turnId;
+      }
 
       // Convert any legacy structured customTables into "table" notes. Runs
       // before processLoreTriggers so the new notes get their triggers
@@ -2239,6 +2285,9 @@ function StoryPageContent() {
     if (inputKind === "voice") {
       customContent += "\n[Voice Input - may contain transcription errors]";
     }
+    // Where an interrupted turn is cut back to (interruptedTurn.ts): before
+    // the player's line goes in.
+    const partsBeforeTurn = storyData.scene.parts.length;
     storyData.scene.parts.push({
       content: customContent,
       imageUrl: "",
@@ -2393,6 +2442,7 @@ function StoryPageContent() {
       generationAbortRef.current = new AbortController();
 
       await generateTrackedTurn(
+        { mode: "new", text: customText, partsBefore: partsBeforeTurn },
         storyData,
         "", // Custom input already in storyData.scene.parts
         {
@@ -2912,7 +2962,12 @@ function StoryPageContent() {
   async function runTurnGeneration(
     storyData: StoryData,
     partialPart: ScenePart,
-    opts: { logLabel: string; successNotification?: string },
+    opts: {
+      logLabel: string;
+      successNotification?: string;
+      // How a turn killed mid-way is recovered (see generateTrackedTurn).
+      turn: { mode: "new" | "retry"; text: string; partsBefore: number };
+    },
   ) {
     // So a picture asked for during this turn can find the part (imageJobs.ts).
     if (!partialPart.id) partialPart.id = crypto.randomUUID();
@@ -2989,6 +3044,7 @@ function StoryPageContent() {
 
     try {
       await generateTrackedTurn(
+        opts.turn,
         storyData,
         "", // User choice already in storyData.scene.parts
         {
@@ -3436,6 +3492,10 @@ function StoryPageContent() {
 
     logger.action("User selected choice", { choice: choice.text, index: key });
 
+    // Where an interrupted turn is cut back to (interruptedTurn.ts): before
+    // anything this choice pushes.
+    const partsBeforeChoice = storyData.scene.parts.length;
+
     // Plain choices don't carry which connected guest picked them (unlike
     // freeform/voice - see handleCustomInput), so a roll during this turn
     // always stays local/host-side rather than guessing who to relay to.
@@ -3462,6 +3522,25 @@ function StoryPageContent() {
         role: "assistant",
         choices: [], // Will need to generate choices next
       };
+      // This branch never reaches generateTrackedTurn, so it marks the same
+      // record itself and clears it once its (immediate) save has resolved.
+      const overrideTurnId = newTurnId();
+      const overrideChoiceText = choice.text;
+      if (storyDbId) {
+        markTurnStarted({
+          storyId: storyDbId,
+          turnId: overrideTurnId,
+          mode: "new",
+          text: overrideChoiceText,
+          partsBefore: partsBeforeChoice,
+          startedAt: Date.now(),
+        });
+      }
+      const finishOverrideTurn = async () => {
+        if ((await saveProgress(storyData, true)) && storyDbId) {
+          clearTurn(storyDbId, overrideTurnId);
+        }
+      };
       storyData.scene.parts.push(overridePart);
 
       setStoryText(choice.intro_override);
@@ -3472,7 +3551,7 @@ function StoryPageContent() {
       if (!storyData.autoGenerateChoices) {
         setLoadingStage(null);
         setChoices({ choices: [] });
-        saveProgress(storyData);
+        await finishOverrideTurn();
         addNotification("Story continues...", "success");
         return;
       }
@@ -3504,7 +3583,7 @@ function StoryPageContent() {
         setStoryData({ ...storyData });
         setLoadingStage(null);
 
-        saveProgress(storyData);
+        await finishOverrideTurn();
         addNotification("Story continues...", "success");
       } catch (error) {
         console.error("Error generating choices:", error);
@@ -3519,7 +3598,7 @@ function StoryPageContent() {
         setChoices({ choices: fallbackChoices });
         setStoryData({ ...storyData });
         setLoadingStage(null);
-        saveProgress(storyData);
+        await finishOverrideTurn();
       }
       return;
     }
@@ -3570,7 +3649,14 @@ function StoryPageContent() {
       id: crypto.randomUUID(),
     };
 
-    await runTurnGeneration(storyData, partialPart, { logLabel: "choice" });
+    await runTurnGeneration(storyData, partialPart, {
+      logLabel: "choice",
+      turn: {
+        mode: "new",
+        text: choice.text,
+        partsBefore: partsBeforeChoice,
+      },
+    });
   }
 
   function handleSelect(index: number): void {
@@ -3707,6 +3793,10 @@ function StoryPageContent() {
       generationAbortRef.current.abort();
       generationAbortRef.current = null;
     }
+    // A stopped turn is not an interrupted one: the revert below is the repair.
+    if (liveTurnRef.current) {
+      clearTurn(liveTurnRef.current.storyId, liveTurnRef.current.turnId);
+    }
 
     // A stopped generation is incomplete, not just paused - any tool calls
     // that already ran before the abort (start_combat, npc_roll, etc.) stay
@@ -3755,6 +3845,32 @@ function StoryPageContent() {
     addNotification("Generation stopped", "warning");
   }
 
+  // Drops the interrupted-turn record and its banner.
+  function forgetInterruptedTurn() {
+    if (storyDbId && interruptedTurnIdRef.current) {
+      clearTurn(storyDbId, interruptedTurnIdRef.current);
+    }
+    interruptedTurnIdRef.current = null;
+    setInterruptedTurn(null);
+  }
+
+  // The banner's Dismiss. The story was cut back in memory on load, so write
+  // that down too, or the half turn would come back on the next load.
+  function handleDismissInterrupted() {
+    forgetInterruptedTurn();
+    if (storyData) void saveProgress(storyData, true);
+  }
+
+  // The banner's Retry: a lost player line is sent again; a lost reroll or
+  // reword runs Retry again on the turn the story was cut back to.
+  function handleRetryInterrupted() {
+    const pending = interruptedTurn;
+    forgetInterruptedTurn();
+    if (!pending) return;
+    if (pending.mode === "new") void handleCustomInput(pending.text);
+    else void handleRetry();
+  }
+
   async function handleRetry() {
     if (!storyData || loading) return;
 
@@ -3777,6 +3893,15 @@ function StoryPageContent() {
       addNotification("Cannot retry initial story", "warning");
       return;
     }
+
+    // A killed Retry is cut back to the story as it stands now (the turn being
+    // redone included), and the banner's Retry runs Retry again.
+    const partsBeforeRetry = storyData.scene.parts.length;
+    const retryTurn = {
+      mode: "retry" as const,
+      text: userChoicePart.content,
+      partsBefore: partsBeforeRetry,
+    };
 
     setLoading(true);
     setLoadingStage("story");
@@ -3843,6 +3968,7 @@ function StoryPageContent() {
       await runTurnGeneration(storyData, partialPart, {
         logLabel: "reroll",
         successNotification: "Turn rerolled",
+        turn: retryTurn,
       });
       return;
     }
@@ -3993,6 +4119,7 @@ function StoryPageContent() {
 
     try {
       await generateTrackedTurn(
+        retryTurn,
         storyData,
         userChoiceContent, // Use the user's original choice content
         {
@@ -4821,6 +4948,9 @@ function StoryPageContent() {
             onCommentSubmit={handleCommentSubmit}
             onRerollChoices={handleRerollChoices}
             onRetry={handleRetry}
+            interruptedTurn={interruptedTurn ?? undefined}
+            onRetryInterrupted={handleRetryInterrupted}
+            onDismissInterrupted={handleDismissInterrupted}
             canRetry={canRetry}
             onUndo={handleUndo}
             canUndo={canUndo}

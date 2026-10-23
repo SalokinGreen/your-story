@@ -350,3 +350,35 @@ checked against the code, and all are taken in:
   ended. `shouldStart` is the pure rule.
 - Not checked here: nothing in `android/` compiled (no SDK); CI is the first
   compile.
+
+### 2026-10-23, slice 2 (the interrupted turn)
+
+- **The mark is a first argument to `generateTrackedTurn`**: `({ mode, text,
+  partsBefore }, ...generateStoryTurn args)`. The wrapper cannot know
+  `partsBefore` (custom input and choices have already pushed the player's
+  line by then), so each caller captures it. `runTurnGeneration` takes it as a
+  required `opts.turn`, so the choice and reroll paths share one marking point;
+  the legacy reword path calls the wrapper directly.
+- **For `"retry"` (reroll and reword) `partsBefore` is the length when
+  `handleRetry` began**, the turn being redone included, not the length after
+  its pops. Cutting to the shorter length would delete the whole previous
+  turn on load, and the banner's Retry (`handleRetry`) rerolls the last turn,
+  so it needs that turn to still be there. `text` is kept for display only.
+- **Banner Retry for `"new"` calls `handleCustomInput(text)`** with the
+  original line (`customText`, or `choice.text` for a choice), so it adds the
+  `>` prefix itself; a voice line is resent as freeform and a choice's
+  `playerComment` is not kept.
+- **Cleared** in the wrapper's `finally` when the turn is settled: stopped,
+  `result.success` false (the page's `onError` already reports it), a thrown
+  error (the callers' catch reports it), or saved. Kept only when a successful
+  turn's save did not resolve true. `handleStop` also clears through
+  `liveTurnRef`.
+- **`intro_override` branch** marks and clears itself (it never reaches the
+  wrapper), and its three `saveProgress(storyData)` calls became awaited
+  immediate saves so the clear can follow a resolved write. Only visible
+  effect: the write lands sooner than the 3 s debounce.
+- **Dismiss saves the repaired story** (`saveProgress(story, true)`); load only
+  repairs in memory, and without that save the half turn would come back from
+  disk on the next load.
+- The banner hides while a turn is loading.
+- Not run: the browser preview check in the slice's "Check".
