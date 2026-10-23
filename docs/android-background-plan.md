@@ -1,7 +1,8 @@
 # Android: turns that survive leaving the app, and the back gesture — implementation plan
 
-Status: **approved (decision 136), being built; revised after Codex's
-review.** Design: [`android-background-design.md`](android-background-design.md).
+Status: **built (decision 136) on `claude/android-background`, 2026-10-23**;
+revised after Codex's review. Not yet checked on a phone: see
+`pending_tests.md`. Design: [`android-background-design.md`](android-background-design.md).
 Decisions 132–135. Branch `claude/android-background`, one PR, five slices.
 Line numbers are from `master` at e1000b1 (2026-10-23).
 
@@ -476,6 +477,20 @@ story, not to the list.
 - Not verified: any device (the preview cannot fire a native back). The
   console check from the slice (`popBackHandler()` against an open sheet, a
   dialog in it, and the full-screen picture) was not run here.
+
+### 2026-10-23, after the author's first device test
+
+- **"The GM is waiting for you."** The author, on build 1: "When gm uses the
+  ask question tool, we get no notification." A turn paused on the player
+  (ask_question, a manual roll, a dice throw) fits neither "writing" nor
+  "ready".
+  - Added `notifyAttention({ title, body })` to the plugin (notification 3,
+    the `ready` channel, posted only in the background with the permission,
+    cleared on resume), and `notifyPlayerNeeded(kind, detail)` in
+    `turnKeepAlive.ts`.
+  - Called where the page shows the question, the manual roll and the dice
+    tray locally. The body is the question text or the roll's title.
+  - Four tests.
 
 ### 2026-10-23, after the engine review
 

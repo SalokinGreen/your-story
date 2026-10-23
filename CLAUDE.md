@@ -919,9 +919,13 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   export; `isStandalone()` (`standalone.ts`) switches code paths;
   `providerFetch` and `getProviderFetch()` (`platformFetch.ts` — Tauri's scoped
   HTTP plugin on the desktop) reach providers without routes. In the Capacitor
-  apps `capacitor.config.ts`'s `CapacitorHttp` patches `window.fetch`, which
-  reads any non-JSON POST answer as text, so a request whose answer is binary
-  (the TTS audio) goes through `getBinaryProviderFetch()` instead. A browser
+  apps `capacitor.config.ts`'s `CapacitorHttp` patches `window.fetch` and sends
+  each request through native HTTP, which reads the whole answer before
+  returning it, so a chat request does not stream there and ignores its
+  `AbortSignal`. The one exception is Android, for the hosts in `CORS_HOSTS`
+  (`platformFetch.ts`, see the abortable fetch bullet below). A request whose
+  answer is binary (the TTS audio) goes through `getBinaryProviderFetch()`
+  instead, because the patched fetch reads a non-JSON POST answer as text. A browser
   permission the WebView asks for (the microphone) must be declared in
   `android/app/src/main/AndroidManifest.xml` and `ios/App/App/Info.plist`, or
   it is refused without a prompt. Every host the
@@ -930,6 +934,55 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   the `claude_cli_*` ones so far) are named in `src-tauri/build.rs`'s app
   manifest, so each needs an explicit `allow-*` permission in that file; a
   new command must be added in both places.
+- **Android keeps a turn alive** (decision 132, `docs/android-background-design.md`
+  §3.1). `TurnKeepAliveService` is a `dataSync` foreground service with
+  `stopWithTask`, started and stopped by `TurnKeepAlivePlugin`, which
+  `MainActivity` registers. `app/misc/turnKeepAlive.ts` is called from
+  `generateTrackedTurn` in `app/story/page.tsx` with the turn's id: `begin`
+  when the turn starts, and `end` only after the turn's final save has
+  resolved, so "ready" means saved. The service posts "Your Story is writing
+  your turn…" while the turn runs. When it finishes, "Your turn is ready" is
+  posted only for a turn that succeeded with non-empty prose, was saved and was
+  not stopped, and only while the app is in the background. A turn that pauses
+  on the player (`notifyPlayerNeeded`: ask_question, a manual roll, a dice
+  throw) posts "The GM has a question for you" or "The GM needs a roll from
+  you" while the app is in the background. Resuming clears both. Native calls
+  are ordered by turn id: an `end` for an id that arrives before its `begin`
+  wins, through `shouldStart`. `POST_NOTIFICATIONS` is asked once per device
+  (`ys:turnKeepAlive:permissionAsked`) on the first turn, never awaited; a
+  refusal hides the notifications and the turn still runs.
+- **The interrupted turn** (decision 135, `app/misc/interruptedTurn.ts`). A
+  record per story sits in localStorage (`ys:interruptedTurn:<storyId>`). It is
+  device-only and not on the sync allowlist. The page writes it when a turn
+  starts, and clears it once the turn's final save has resolved, on Stop, or
+  when the page already reports the failure with its own Retry. Turns still
+  running in this JS process are tracked in memory, so a live turn is never
+  read as interrupted. On story load a record under 24 hours old cuts
+  `scene.parts` back to `partsBefore` (`repairInterruptedStory`) and shows a
+  banner: Retry sends the line again (`mode` "new") or runs the page's Retry
+  (`mode` "retry"), and Dismiss clears the record.
+- **The abortable fetch** (decision 134, `app/misc/platformFetch.ts`). On
+  Android only, `getAbortableProviderFetch(url)` returns `window.CapacitorWebFetch`,
+  the WebView's own fetch, for a host in `CORS_HOSTS` (OpenRouter, Mistral,
+  DeepInfra, DeepSeek). That fetch streams and honours the signal, so Stop
+  cancels the request. Every other host, and every host on iOS and the web,
+  stays on the patched fetch. `providerCall.ts` sends every chat request
+  through it, streamed or not. A `TypeError` before any response marks the
+  host down for the session (`markHostDown`) and the turn fails. It is never
+  replayed, because the POST may already have been billed. A new request header
+  needs a new CORS preflight check first. The list and its preflight results
+  are in the comment above `CORS_HOSTS`.
+- **The back stack** (decision 133, `app/misc/backStack.ts`,
+  `app/misc/useBackHandler.ts`, `app/components/NativeBackButton.tsx`). On
+  Android, `@capacitor/app`'s `backButton` event runs the top registered close
+  function, else the page's route back (`useRouteBack`), else
+  `App.minimizeApp()`. Back never closes the app. Every dismissible surface
+  calls `useBackHandler(open, onClose)` while it is open, with the function it
+  runs on Escape or its close button. The shared primitives (`FullScreenView`,
+  `ConfirmDialog`, the `StoryImage` picture, `StoryMenuSheet`) register inside
+  themselves. **A new dismissible surface calls `useBackHandler`.** The
+  story's route back declines during a live turn, so back minimises the app
+  then, and a route back that returns false is treated as declined.
 - **Multiplayer**: couch co-op on one device, and host-authoritative
   peer-to-peer online play (`app/misc/multiplayer/`, Trystero and PeerJS).
   The host broadcasts the whole `StoryData` to guests, GM secrets included,
@@ -1018,8 +1071,8 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 172 files and 2,537 tests (the count after the legacy
-  removal, 2026-10-23), largely against `app/misc/`.
+- `tests/` — Vitest, 179 files and 2,595 tests (the count after the Android
+  background work, 2026-10-23), largely against `app/misc/`.
   Deterministic tests seed `Math.random`; follow that for new dice and oracle
   tests.
 - `docs/` — mixed freshness (see the top of this file). The `*.sql` files are

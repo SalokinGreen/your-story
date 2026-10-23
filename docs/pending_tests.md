@@ -10,6 +10,89 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-23 — Android: background turns and back (`claude/android-background`, decisions 132–136)
+
+Built from [`android-background-plan.md`](android-background-plan.md). Nothing
+here ran on a phone: this machine has no Android SDK, and the APK is built by
+`build-apps.yml`. The suite and `tsc` cover the JS side and the shapes; these
+checks cover what the phone does. Use a story with an OpenRouter key, on a
+real turn, and leave the app on Home unless a check says otherwise.
+
+- **Send, leave, come back when done.** Send a turn, press Home at once, and
+  wait until the turn would have finished. *Expected:* a "Your Story is writing
+  your turn…" notification shows while it runs, and the turn finishes in the
+  background. If you are still away when it ends, the notification becomes
+  "Your turn is ready" with the story's name. Tapping it opens the app, with
+  the reply in the feed. If you come back first, there is no "ready" ping, and
+  the "writing" notification is gone. *Failure looks like:* no notification at
+  all, the reply missing when you return (the turn died with the app in the
+  background), "writing" still showing after the reply has landed, or a
+  "ready" ping with no reply in the feed.
+- **Screen off for 3 minutes, then 10 minutes.** Send a turn, lock the phone,
+  and wait 3 minutes; repeat with 10 minutes on a second turn (a long
+  reply helps). *Expected:* the reply is in the feed on unlock, and "ready"
+  shows if the phone was locked when it finished. *Failure looks like:* the
+  reply missing or cut short after the wait, or the turn stuck at "writing"
+  with no reply and no banner after unlock.
+- **A GM question while away.** Send an action that makes the GM ask a question
+  (a question, or a roll the GM asks you for), then leave the app. *Expected:*
+  a notification "The GM has a question for you" (for a roll, "The GM needs a
+  roll from you"), with the question's text as the body. Tapping it opens the
+  app, and the notification clears when the app comes back. *Failure looks like:* no notification while the turn sits waiting, or the
+  question still showing in the notification after you return.
+- **Swipe away mid-turn, then reopen.** Send a turn, open the recents list and
+  swipe the app away before the reply arrives, then open the app again.
+  *Expected:* the story opens with the last turn taken back to where it began
+  (your line is gone as well, and any half reply), the banner "The last turn
+  was interrupted." sits above the input, and Retry sends the line again and
+  gets a reply. Dismiss removes the banner, and it stays gone
+  after a restart. *Failure looks like:* half a reply or an empty bubble left in
+  the feed, no banner, Retry doing nothing, or the banner coming back after
+  Dismiss.
+- **Streaming on the phone.** On OpenRouter, send a turn and watch the reply.
+  *Expected:* words appear as they are generated, not all at once at the end.
+  *Failure looks like:* the whole reply appearing in one go after a pause.
+- **Stop mid-stream cancels.** Send a long turn on OpenRouter and tap Stop
+  while words are still arriving. *Expected:* the reply stops at once, and the
+  OpenRouter activity page shows the request as cut short, not completed.
+  *Failure looks like:* the text keeps coming in the activity log, the request
+  shows as complete, or the reply is stored as if it finished.
+- **A bad key on a listed host shows its error.** Put a wrong key in
+  OpenRouter, then in Mistral and in DeepSeek (one at a time), and send a turn
+  with each. *Expected:* the provider's own error text appears (for example an
+  "invalid key" or "unauthorized" message). This also checks that the CORS
+  headers on error replies are there, which the preflight did not test.
+  *Failure looks like:* "Failed to fetch" or "Load failed" instead of the
+  provider's text. If that happens, the host's error replies lack CORS headers,
+  and that host must be taken out of `CORS_HOSTS` in `app/misc/platformFetch.ts`
+  (the app then uses the native path for it, which reads the error text).
+- **Back from each surface.** With the story open, press the Android back
+  gesture once for each row, and check the order. *Expected:* each back closes
+  only the top thing: a confirm dialog, then the full-screen picture (open a
+  portrait or a picture in the feed), the story menu sheet, the Story Editor
+  inside it, a sub-page (Notes, NPCs, Goals, AI Context, Logs) back to the
+  story, and the story back to the Library. From the Library, a sub-view
+  (Stories, Adventures, Notes) goes back to the Library home, and the Library
+  home backgrounds the app; reopening it shows the same screen as before.
+  *Failure looks like:* the app closing on back, one back closing two surfaces,
+  a surface that does not close on back at all, or the Library home sent to the
+  start page instead of the background.
+- **Back on the story during a live turn.** Send a turn and press back while it
+  is still writing. *Expected:* the app goes to the background (as Home does),
+  the turn carries on, and "ready" follows if you stay away. *Failure looks
+  like:* the app going to the Library, or closing.
+- **The permission prompt, on Android 13 and later.** On a fresh install, the
+  first Send shows the notification permission prompt. Tap "Deny" and send
+  another turn, then leave the app. *Expected:* the prompt appears once, in
+  the middle of the first Send, and the turn still finishes after "Deny" (only
+  the notifications are hidden). *Failure looks like:* the prompt on every
+  turn, or a turn that never finishes after "Deny".
+- **"Ready" only when away, on Android 14 and 15.** Send a turn and stay in the
+  app until the reply lands. *Expected:* no "Your turn is ready" notification.
+  Repeat with Home pressed before the reply. *Expected:* the ping appears
+  once. *Failure looks like:* a ping while you are looking at the reply, or no
+  ping when you were away.
+
 ## 2026-10-23 — Legacy removal (`claude/legacy-removal`, decisions 125–131)
 
 Built from [`legacy-removal-plan.md`](legacy-removal-plan.md). Nothing here

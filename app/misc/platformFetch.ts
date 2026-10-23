@@ -13,6 +13,8 @@
  * takes a different route to the same result - capacitor.config.ts sets
  * plugins.CapacitorHttp.enabled, which overrides window.fetch itself on
  * native, so the plain `fetch` fallback is already CORS-free there too.
+ * That native fetch buffers the answer and ignores an AbortSignal, so chat
+ * requests on Android go through getAbortableProviderFetch() below instead.
  */
 
 import { isTauri } from "@tauri-apps/api/core";

@@ -1,6 +1,7 @@
 # Android: turns that survive leaving the app, and the back gesture — design
 
-Status: **approved (decision 136), being built.** The implementation plan
+Status: **built (decision 136) on `claude/android-background`, 2026-10-23.**
+Not yet checked on a phone: see `pending_tests.md`. The implementation plan
 is [`android-background-plan.md`](android-background-plan.md). Decisions
 132–135 in [`decisions.md`](decisions.md).
 
@@ -44,7 +45,9 @@ What the code does today (traced 2026-10-23):
 - **The back gesture steps back inside the app** (decision 133). It closes
   the top thing that is open: a dialog or modal, the full-screen picture, the
   story menu sheet, then a story sub-page (Notes, NPCs, Goals, AI Context,
-  Logs). On the story itself it goes to the Library. On a Library sub-view it
+  Logs). On the story itself it goes to the Library, except while a turn
+  is running, when it puts the app in the background instead: leaving the
+  story mid-turn is what let a live turn look interrupted (engine review). On a Library sub-view it
   goes to the Library home, and from the Designer it goes to the Library. On
   the Library home (or the start page) it puts the app in the background,
   like Home: the app is never killed, and coming back finds it as it was.
@@ -71,14 +74,17 @@ A small Capacitor plugin inside the Android project (not an npm dependency):
   job the player started. Android 15+ caps `dataSync` at 6 hours per 24 hours
   and calls `onTimeout`, where the service stops itself. That is far above
   any turn.
-- `TurnKeepAlivePlugin`, with `begin({ title })`, `end()` and
-  `notifyReady({ title, body })`. Registered in `MainActivity`.
+- `TurnKeepAlivePlugin`, with `begin({ turnId })`, `end({ turnId })`,
+  `notifyReady({ turnId, title, body })`, `notifyAttention({ title, body })`
+  (added in testing, see below) and `requestNotificationPermission()`.
+  Registered in `MainActivity`.
 - The manifest gains `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` and
   `POST_NOTIFICATIONS`, plus the `<service>` declaration with
   `android:foregroundServiceType="dataSync"`.
 - JS side: `app/misc/turnKeepAlive.ts` is a no-op everywhere but Android.
   It exposes `beginTurnKeepAlive(turnId)` and
-  `endTurnKeepAlive(turnId, { ready })`.
+  `endTurnKeepAlive(turnId, outcome)`, outcome being `"ready"`, `"stopped"` or
+  `"failed"`, plus `notifyPlayerNeeded(kind, detail)`.
   - **Begin** is called when a turn starts. Android only allows a foreground
     service to start while the app is visible, and the player has just
     tapped Send.
@@ -95,6 +101,11 @@ A small Capacitor plugin inside the Android project (not an npm dependency):
     non-empty prose, was saved, and was not stopped, while the app is in the
     background. The native side checks for that itself. A stale "ready" is
     cleared when the app comes back or the next turn starts.
+- **A turn that pauses for the player** (a GM question, a manual roll, a
+  dice throw) posts "The GM has a question for you" or "The GM needs a roll
+  from you", only while the app is in the background, cleared on return. The
+  author found the gap testing the first build: a paused turn fits neither
+  "writing" nor "ready".
 - The service declares `android:stopWithTask="true"` and stops in
   `onTaskRemoved`. Swiping the app away therefore ends the notification as
   well as the turn, and §3.2 picks up the pieces. Android 15's six hours is a
