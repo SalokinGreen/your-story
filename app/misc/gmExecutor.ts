@@ -985,6 +985,23 @@ export async function executeGMTools(
               : String(parseError),
         }
       );
+      // A result for every call keeps results[i] aligned with toolCalls[i].
+      const errorMsg = `Tool call "${call.function.name}" had arguments that are not valid JSON, so this call did not go through. Send it again with well-formed arguments.`;
+      const parseErrorResult: GMToolResult = {
+        toolName: call.function.name,
+        toolCallId: call.id,
+        success: false,
+        result: {
+          type: "state_change" as const,
+          message: errorMsg,
+          command: call.function.name,
+        },
+        contextForStory: `[ERROR: ${errorMsg}]`,
+      };
+      parseErrorResult.hiddenFromPlayer =
+        isHiddenFromPlayerTool(call.function.name) || undefined;
+      results.push(parseErrorResult);
+      contextParts.push(parseErrorResult.contextForStory);
       continue;
     }
 
@@ -3668,6 +3685,22 @@ function executeStartGame(
   storyData: StoryData,
   setupPlayers?: { id: string; name: string }[]
 ): GMToolResult {
+  // Outside session zero there is nothing to start (a second call, an old
+  // save): refuse, so it can't rename the story or reset the tier state.
+  if (storyData.sessionZeroActive !== true) {
+    return {
+      toolName: "start_game",
+      toolCallId,
+      success: false,
+      result: {
+        type: "start_game",
+        story_name: params.story_name,
+        premise: params.premise,
+      } as GMStartGameResult,
+      contextForStory: "[ERROR: The game has already started.]",
+    };
+  }
+
   // Session zero is over only when the character sheet(s) and the plan exist
   // and the player approved exactly those (getSetupProgress, campaignPlan.ts).
   // Judged on the working copy, which holds this batch's earlier edits.
@@ -3762,6 +3795,10 @@ async function executeConfirmSetup(
     } as GMConfirmSetupResult,
     contextForStory,
   });
+
+  if (storyData.sessionZeroActive !== true) {
+    return make(false, "refused", "[ERROR: The game has already started.]");
+  }
 
   const progress = getSetupProgress(storyData, setupPlayers);
   const missing: string[] = [];

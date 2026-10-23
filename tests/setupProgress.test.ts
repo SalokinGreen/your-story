@@ -63,26 +63,29 @@ describe("getSetupProgress: the steps", () => {
     });
   });
 
-  it("needs a chosen mode for the concept, and an answer or a sheet", () => {
-    expect(getSetupProgress(story({ setup: { conceptDone: true } })).concept).toBe(false);
+  it("ticks the concept on an answer or a sheet, with no mode needed", () => {
+    expect(getSetupProgress(story({ setup: { conceptDone: true } })).concept).toBe(true);
     expect(getSetupProgress(story({ setup: { mode: "quick" } })).concept).toBe(false);
     expect(
       getSetupProgress(story({ setup: { mode: "quick", conceptDone: true } })).concept,
     ).toBe(true);
   });
 
-  it("counts a pre-made sheet as the concept once a mode is chosen", () => {
+  it("counts a pre-made sheet as the concept, with or without a mode", () => {
     const s = story({ lore: [sheet()], setup: { mode: "full" } });
     const p = getSetupProgress(s);
     expect(p.concept).toBe(true);
     expect(p.character).toBe(true);
     expect(p.next).toBe("campaign");
+    const noMode = getSetupProgress(story({ lore: [sheet()] }));
+    expect(noMode.concept).toBe(true);
+    expect(noMode.next).toBe("campaign");
   });
 
-  it("does not tick the concept for a pre-made sheet before a style is chosen", () => {
-    const p = getSetupProgress(story({ lore: [sheet()] }));
-    expect(p.concept).toBe(false);
-    expect(p.next).toBe("concept");
+  it("reaches start_game with sheet, plan and approval but no mode", () => {
+    const base = story({ lore: [sheet(), plan()] });
+    const s = { ...base, setup: { approval: currentSetupHashes(base) } } as StoryData;
+    expect(getSetupProgress(s).next).toBe("start_game");
   });
 
   it("walks concept, character, campaign, confirm, start_game", () => {

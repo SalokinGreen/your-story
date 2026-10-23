@@ -11,7 +11,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import type { GenerationCallbacks } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
-import { SETUP_APPROVED } from "@/app/misc/setupConfirmAnswer";
+import { SETUP_APPROVED, SETUP_DISMISSED } from "@/app/misc/setupConfirmAnswer";
 import { setSlotOverride } from "@/app/misc/reasoningTiers";
 import { CAMPAIGN_SPINE_BEATS, setupEngineLine } from "@/app/misc/campaignPlan";
 import type { StoryData, StoryLore } from "@/app/misc/structs";
@@ -354,6 +354,70 @@ describe("setup gate - a session-zero turn may not end on prose alone", () => {
     expect(story.sessionZeroActive).toBe(false);
     expect(result.content).toBe("INTRO: it begins.");
     expect(result.content).not.toContain("you approved");
+  });
+
+  it("a closed card is progress: prose ends the turn without re-opening it", async () => {
+    const story = sessionZeroStory({
+      lore: [
+        note("Character: Mara", "character_sheet", "Mara, a courier."),
+        note("Campaign Plan", "gm_plan", "# Campaign Plan\n## Current beat - Opening Image"),
+      ],
+    });
+    const { fetchMock, gmStageCalls } = createMockGMFetch([
+      {
+        toolCalls: [
+          {
+            name: "confirm_setup",
+            arguments: { character_summary: "Mara", campaign_hook: "A debt." },
+          },
+        ],
+      },
+      { content: "No problem. What would you like to change?" },
+    ]);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { cb } = recordingCallbacks();
+    cb.onRequestSetupConfirmation = async () => SETUP_DISMISSED;
+
+    const result = await generateStoryTurn(story, "ok", baseOptions, cb);
+
+    const calls = gmStageCalls();
+    expect(calls).toHaveLength(2);
+    for (const call of calls) expect(hasUser(call, GATE_TEXT)).toBe(false);
+    expect(result.content).toBe("No problem. What would you like to change?");
+    expect(story.sessionZeroActive).toBe(true);
+  });
+
+  it("a session-zero precomputed conversation never reaches the narration call", async () => {
+    const story = sessionZeroStory();
+    const { fetchMock } = createMockGMFetch([]);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { cb } = recordingCallbacks();
+
+    // The saved turn ended on prose: that text is kept, nothing is narrated.
+    const kept = await generateStoryTurn(
+      story,
+      "go",
+      {
+        ...baseOptions,
+        precomputedGMConversation: [{ role: "assistant", content: "Saved reply." }],
+        precomputedGMResults: [],
+      },
+      cb,
+    );
+    expect(kept.content).toBe("Saved reply.");
+
+    // No usable text: the engine line for the next step.
+    const line = await generateStoryTurn(
+      sessionZeroStory(),
+      "go",
+      {
+        ...baseOptions,
+        precomputedGMConversation: [],
+        precomputedGMResults: [],
+      },
+      cb,
+    );
+    expect(line.content).toBe(setupEngineLine("concept"));
   });
 
   it("after the cap the turn ends on the engine line: no narration, no continuation call", async () => {

@@ -326,3 +326,23 @@ describe("cancellation", () => {
     expect(out.modifiedStoryData.sessionZeroActive).toBe(false);
   });
 });
+
+describe("confirm_setup and start_game outside session zero", () => {
+  it("both refuse with 'already started', and the card never opens", async () => {
+    const { h, requests } = handlers({ approved: true });
+    const started = story({ sessionZeroActive: false, story_name: "Kept" });
+    const out = await executeGMTools(
+      [call("confirm_setup", CONFIRM_ARGS), call("start_game", { story_name: "Renamed" })],
+      started,
+      {},
+      h,
+    );
+    expect(requests).toHaveLength(0);
+    for (const r of out.results) {
+      expect(r.success).toBe(false);
+      expect(r.contextForStory).toContain("The game has already started.");
+    }
+    expect(out.modifiedStoryData.story_name).toBe("Kept");
+    expect(out.modifiedStoryData.setup?.approval).toBeUndefined();
+  });
+});

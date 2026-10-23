@@ -494,3 +494,34 @@ the code and taken in:
 - **Tests:** `tests/generation.setupGate.test.ts` (13). The forced-choice case
   stubs `localStorage` and sets the Advanced slot (session zero runs on tier 3)
   to Qwen 3.8 Max.
+
+### 2026-10-23, after the engine review
+
+Six fixes to slices 1-4, from the engine review's findings:
+
+1. **Concept no longer depends on `setup.mode`.** Nothing writes `mode`, so
+   Concept never ticked. `getSetupProgress` now uses
+   `!!setup?.conceptDone || sheets.length > 0`; `mode` still shapes the strip
+   and the prompt (which defaults to quick). Tests: a no-mode concept case and
+   a sheet + plan + approval, no mode, reaches `next === "start_game"`.
+2. **A session-zero Retry/Reword runs the full GM loop.** `handleRetry`'s
+   no-snapshot path in `app/story/page.tsx` no longer passes
+   `precomputedGMConversation`/`precomputedGMResults` when
+   `storyData.sessionZeroActive`, so the gate and buffering apply (the
+   snapshot reroll path already ran the full loop). Defensive guard in
+   `generation.ts`: if the precomputed branch is entered in session zero with
+   no successful `start_game` in the results, the narration call is skipped;
+   the turn keeps the last assistant text of the saved conversation (the saved
+   part itself is not passed in), else `setupEngineLine(next)`. Tested.
+3. **A closed card no longer reopens.** Any `confirm_setup` outcome except
+   `refused` and `stopped` (so `dismissed` and `changes` too) counts as setup
+   progress; only `approved` sets `setupApprovedThisTurn`. Tested: dismissed
+   then prose ends the turn with no re-prompt.
+4. **`confirm_setup` and `start_game` outside session zero** refuse with "The
+   game has already started." (no card, no rename). Tested.
+5. **System-prompt order line** (`ai_staged.ts`) now reads: character(s) ->
+   plan -> `confirm_setup` (the player's OK) -> `start_game` -> the campaign
+   intro (a short briefing, then the opening scene). Static text.
+6. **Pre-existing: an unparseable tool call** in `executeGMTools` now pushes an
+   error `GMToolResult` before `continue`, like the truncated-arguments branch,
+   so `results[i]` stays aligned with `toolCalls[i]`. Tested.

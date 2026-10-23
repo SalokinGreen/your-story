@@ -67,6 +67,34 @@ describe("GM tool execution: truncated tool-call arguments", () => {
     );
   });
 
+  it("answers an unparseable call with an error result, keeping results aligned with the calls", async () => {
+    const storyData = createMockStoryData();
+    const calls = [
+      {
+        id: "ok_1",
+        function: {
+          name: "create_note",
+          arguments: JSON.stringify({ title: "First", content: "a", type: "location" }),
+        },
+      },
+      { id: "bad_2", function: { name: "create_note", arguments: "{not json" } },
+      {
+        id: "ok_3",
+        function: {
+          name: "create_note",
+          arguments: JSON.stringify({ title: "Third", content: "c", type: "location" }),
+        },
+      },
+    ];
+
+    const result = await executeGMTools(calls as any, storyData);
+
+    expect(result.results.map((r) => r.toolCallId)).toEqual(["ok_1", "bad_2", "ok_3"]);
+    expect(result.results[1].success).toBe(false);
+    expect(result.results[1].contextForStory).toContain("not valid JSON");
+    expect(result.results[2].success).toBe(true);
+  });
+
   it("executes normally when a call is not marked as truncated", async () => {
     const storyData = createMockStoryData();
     const goodCall = {

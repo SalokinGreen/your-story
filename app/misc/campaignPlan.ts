@@ -348,7 +348,9 @@ export function getSetupProgress(
   const plan = findSpinePlanNote(story);
   const campaign = !!plan;
   const setup = story.setup;
-  const concept = !!setup?.mode && (!!setup.conceptDone || sheets.length > 0);
+  // No mode dependency: nothing writes setup.mode (it only shapes the strip
+  // and the prompt), so a sheet or an answered concept is what ticks Concept.
+  const concept = !!setup?.conceptDone || sheets.length > 0;
 
   const approval = setup?.approval;
   let approved = false;

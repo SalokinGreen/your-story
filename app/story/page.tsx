@@ -4240,14 +4240,21 @@ function StoryPageContent() {
           // Skip GM stage on retry - reuse the saved conversation (dice
           // rolls, tool results, reasoning) from the popped part instead
           enableGMStage: false, // Don't re-run GM stage
-          precomputedGMConversation: savedGMConversation,
+          // In session zero a reword would skip the setup gate and narrate
+          // from the saved conversation, so it runs the full GM loop instead
+          // (the gate and the buffering then apply).
+          precomputedGMConversation: storyData.sessionZeroActive
+            ? undefined
+            : savedGMConversation,
           // Also carry the reused tool results through so the observer's
           // outcome-mismatch/tool-usage-gap checks and the Director
           // Assistant still have something to look at (see
           // precomputedGMResults's doc comment in generation.ts) - without
           // this, generateStoryTurn saw an empty gmResults for every
           // reword-only retry and those checks silently never fired.
-          precomputedGMResults: savedGMToolCalls,
+          precomputedGMResults: storyData.sessionZeroActive
+            ? undefined
+            : savedGMToolCalls,
           abortSignal: generationAbortRef.current.signal,
           imageJobDeps: buildImageJobDeps(),
           scenePartId: partialPart.id,

@@ -2078,6 +2078,28 @@ async function generateStoryTurnOnce(
       logger.action("Using precomputed GM conversation (retry flow)", {
         historyEntries: gmConversationHistory.length,
       });
+
+      // Defensive guard for session zero: the narration call below would
+      // skip the setup gate. A precomputed conversation that never started
+      // the game is not narrated; the turn keeps its own text (the last
+      // assistant message that made no tool call), else the engine line.
+      // (The page runs a session-zero retry through the full GM loop, so
+      // this is only reached by a caller that forgot to.)
+      if (
+        storyData.sessionZeroActive === true &&
+        !gmResults.some((r) => r.toolName === "start_game" && r.success)
+      ) {
+        const lastText = [...gmConversationHistory]
+          .reverse()
+          .find((m) => m.role === "assistant" && !m.tool_calls?.length);
+        const saved = lastText ? extractVisibleText(lastText.content).trim() : "";
+        gmFinalStoryContent =
+          saved ||
+          setupEngineLine(getSetupProgress(storyData, options.setupPlayers).next);
+        logger.action("Session-zero retry: skipping the narration call", {
+          usedSavedText: !!saved,
+        });
+      }
     } else {
       // GM Stage is always enabled - legacy tool calling has been removed
       // The enableGMStage option is now ignored and GM stage always runs
@@ -2946,12 +2968,22 @@ async function generateStoryTurnOnce(
             // a game that started.
             if (sessionZeroTurn && setupHashesBefore) {
               for (const r of gmExecution.results) {
+                // A card the player answered (changes, closed) is progress
+                // too, or closing it would re-open it; only a refusal and a
+                // stop are not. Only an approval counts as approved.
+                if (r.toolName === "confirm_setup") {
+                  const outcome = (r.result as { outcome?: string } | undefined)
+                    ?.outcome;
+                  if (outcome && outcome !== "refused" && outcome !== "stopped") {
+                    setupProgressThisTurn = true;
+                  }
+                  if (r.success && outcome === "approved") {
+                    setupApprovedThisTurn = true;
+                  }
+                  continue;
+                }
                 if (!r.success) continue;
                 if (r.toolName === "ask_question") setupProgressThisTurn = true;
-                if (r.toolName === "confirm_setup") {
-                  setupProgressThisTurn = true;
-                  setupApprovedThisTurn = true;
-                }
                 if (r.toolName === "start_game") {
                   setupProgressThisTurn = true;
                   startGameSucceededThisTurn = true;
