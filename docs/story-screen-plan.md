@@ -578,3 +578,35 @@ belongs to:
 - `ChapterNav`'s dropdown.
 
 None was dropped.
+
+## Decisions made during implementation
+
+### 2026-10-23, slice 3
+
+- **`formatTurnWork(summary)` added to `turnWork.ts`**, beyond the plan's two
+  exports: it owns "at most two headlines, then +N more, then the counts", so
+  the rule is tested and `TurnWorkLine` only displays it.
+- **Speaker prefix needs a space after the `>`** (`> Ana: …`). A solo part is
+  stored as `>I say: hello` (the page prepends a bare `>`), so without that
+  rule the colon in ordinary solo text read as a speaker name. Both couch
+  writers (the composer and `buildTurnText`) put the space there.
+- **An OOC segment's `body` has its outer brackets removed**; the "to the GM"
+  tag carries the meaning. `isWrappedInParens` is exported and shared with
+  `wrapOutOfCharacter`.
+- **Multi-pool headlines:** a pool with one die shows `formula = total`; a pool
+  with several dice shows `formula: faces` and no sum (`2d10: 3, 8`), so a
+  system that rolls dice against each other never reads as one total.
+- **An errored roll (`[ERROR …]`) is not a roll**: `rollHeadline` returns null
+  and the call counts as an ordinary tool.
+- **`TimelineView` gained an `only` prop** (`"text"` or `"work"`), so the prose
+  and the expanded pills render from one list in their original order.
+- **A streaming thinking pill no longer auto-expands** (the plan said so); the
+  pill's own override still works once the turn is saved.
+- **Edited turns:** `handleEdit` writes `content`, so `narrationCameFromGMStage`
+  compares the rebuilt GM text with the edited `content`, fails, and the turn
+  shows `content` through `prettify` (the edit), with the rebuilt blocks
+  contributing only their pills. Tested in `tests/storyTurn.markup.test.tsx`.
+  An edit that only changes whitespace still matches and shows the same text.
+- **`stripNode` helper in `StoryTurn.tsx`** replaces the destructured unused
+  `node` props in the markdown components (ten lint warnings in a new file).
+- **Regenerate in the full-screen picture closes the dialog** before it runs.

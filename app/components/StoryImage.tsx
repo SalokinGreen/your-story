@@ -120,7 +120,7 @@ export function StoredPortrait({
   if (view.status === "pending") {
     return (
       <div
-        className={`${className} animate-pulse bg-white/10`}
+        className={`${className} animate-pulse bg-ys-border`}
         title="Painting…"
         role="status"
       />
@@ -161,21 +161,27 @@ export default function StoryImage({
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const frame =
-    "mt-3 rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden";
+  // The picture itself runs edge to edge with no frame (its caller bleeds it
+  // out of the page's gutters); the cards for a picture that is not there are
+  // quiet notes, inset like the prose, and keep their Retry inline.
+  const card =
+    "mx-4 rounded-lg border border-ys-border bg-ys-surface text-ys-muted";
 
   if (view.status === "none") return null;
 
   if (view.status === "loading") {
     return (
-      <div className={`${frame} h-24 animate-pulse ${className}`} aria-busy="true" />
+      <div
+        className={`${card} h-24 animate-pulse ${className}`}
+        aria-busy="true"
+      />
     );
   }
 
   if (view.status === "pending") {
     return (
       <div
-        className={`${frame} flex items-center justify-center gap-2 aspect-[4/3] max-h-64 animate-pulse text-sm text-purple-200/70 ${className}`}
+        className={`${card} flex items-center justify-center gap-2 aspect-[4/3] max-h-64 animate-pulse text-sm ${className}`}
         role="status"
       >
         <DynamicIcon name="Image" className="w-4 h-4" />
@@ -188,7 +194,7 @@ export default function StoryImage({
     const { image, url } = view;
     const cost = formatCost(image.costUsd);
     return (
-      <figure className={`${frame} ${className}`}>
+      <figure className={className}>
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -201,36 +207,21 @@ export default function StoryImage({
             alt="Picture of this moment"
             width={image.width}
             height={image.height}
-            className="w-full h-auto max-h-96 object-contain bg-black/30"
+            className="w-full h-auto"
           />
         </button>
-        {(cost || onRegenerate) && (
-          <figcaption className="px-2 py-1 flex items-center justify-between gap-2 text-[10px] text-blue-200/40">
-            <span>{cost ? `${cost} · ${image.model}` : image.model}</span>
-            {onRegenerate && (
-              <button
-                type="button"
-                onClick={onRegenerate}
-                className="px-1.5 py-0.5 rounded border border-white/10 hover:bg-white/10 text-blue-200/60 hover:text-white"
-                title="Paint this one again (costs again)"
-              >
-                Regenerate
-              </button>
-            )}
-          </figcaption>
-        )}
         {open && (
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/90 p-2"
+            className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/90 p-2"
             onClick={() => setOpen(false)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={url}
               alt="Picture of this moment"
-              className="max-w-full max-h-full object-contain"
+              className="max-w-full min-h-0 flex-1 object-contain"
             />
             <button
               type="button"
@@ -240,6 +231,27 @@ export default function StoryImage({
             >
               <DynamicIcon name="X" className="w-5 h-5" />
             </button>
+            {/* The cost, the model and Regenerate live here, not under the
+                picture in the feed. */}
+            <div
+              className="shrink-0 w-full max-w-[68ch] px-2 pt-2 flex items-center justify-between gap-2 text-xs text-white/60"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span>{cost ? `${cost} · ${image.model}` : image.model}</span>
+              {onRegenerate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    onRegenerate();
+                  }}
+                  className="px-2 py-1 rounded border border-white/20 hover:bg-white/10 text-white/80 hover:text-white"
+                  title="Paint this one again (costs again)"
+                >
+                  Regenerate
+                </button>
+              )}
+            </div>
           </div>
         )}
       </figure>
@@ -263,7 +275,7 @@ export default function StoryImage({
 
   return (
     <div
-      className={`${frame} flex items-center justify-between gap-3 px-3 py-2 text-xs text-blue-200/60 ${className}`}
+      className={`${card} flex items-center justify-between gap-3 px-3 py-2 text-xs ${className}`}
       role="status"
     >
       <span className="flex items-center gap-2">
@@ -274,7 +286,7 @@ export default function StoryImage({
         <button
           type="button"
           onClick={onRegenerate}
-          className="shrink-0 px-2 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-blue-100"
+          className="shrink-0 px-2 py-1 rounded-lg border border-ys-border hover:text-ys-text text-ys-text"
         >
           {view.status === "missing" ? "Regenerate" : "Retry"}
         </button>
