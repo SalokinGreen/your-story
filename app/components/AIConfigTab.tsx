@@ -7,19 +7,16 @@ import { getModelConfig } from "@/app/misc/ai_prices";
 import {
   REASONING_TIERS,
   REASONING_EFFORTS,
-  DEFAULT_REASONING_EFFORT,
-  NARRATION_MODEL_KEY,
-  ReasoningEffort,
-  TierOverride,
-  getTierOverrides,
-  setTierOverride,
-  resetTierOverrides,
-  getNarrationModelOverride,
-  setNarrationModelOverride,
-  getNarrationEffortOverride,
-  setNarrationEffortOverride,
+  REASONING_CONFIG_CHANGED_EVENT,
+  ModelSlot,
+  SLOT_TIERS,
+  getSlotOverride,
+  setSlotOverride,
+  getDefaultSlotMix,
+  getTierModelDisplayName,
   isReasoningEffort,
 } from "@/app/misc/reasoningTiers";
+import { SYNC_COMPLETED_EVENT } from "@/app/misc/syncManager";
 import {
   getUserSettings,
   updateUserSettings,
@@ -45,7 +42,7 @@ import {
 } from "@/app/misc/claudeCliModels";
 
 // Maps an AI_MODELS provider string to the APIKeys field that must be
-// configured for that provider - used to flag tiers with a missing key.
+// configured for that provider - used to flag slots with a missing key.
 const PROVIDER_KEY_FIELD: Record<string, keyof APIKeys | undefined> = {
   openrouter: "openRouterKey",
   deepseek: "deepseekKey",
@@ -55,24 +52,159 @@ const PROVIDER_KEY_FIELD: Record<string, keyof APIKeys | undefined> = {
   zai: "zaiKey",
 };
 
-export default function AIConfigTab() {
+/**
+ * One slot of the Models card (decisions 118-124): a model, an effort, the
+ * "No key" and subscription badges, and Reset once the player has chosen. The
+ * slot writes every tier entry it owns (setSlotOverride), and re-reads on a
+ * config change and on an incoming sync, which writes localStorage directly.
+ */
+export function ModelSlotRow({
+  slot,
+  title,
+  description,
+  customModels,
+}: {
+  slot: ModelSlot;
+  title: string;
+  description: string;
+  customModels: CustomModel[];
+}) {
   const { hasKey } = useAPIKeys();
   const cliStatus = useClaudeCliStatus();
   const onlineSession = useOnlineSessionActive();
+  const [, setVersion] = useState(0);
+  useEffect(() => {
+    const refresh = () => setVersion((n) => n + 1);
+    window.addEventListener(REASONING_CONFIG_CHANGED_EVENT, refresh);
+    window.addEventListener(SYNC_COMPLETED_EVENT, refresh);
+    return () => {
+      window.removeEventListener(REASONING_CONFIG_CHANGED_EVENT, refresh);
+      window.removeEventListener(SYNC_COMPLETED_EVENT, refresh);
+    };
+  }, []);
 
-  // Reasoning-tier + narration model overrides, and user-added custom
-  // (OpenRouter BYOK) models. All persisted to localStorage - see
-  // app/misc/reasoningTiers.ts and app/misc/user_settings.ts.
-  const [tierOverrides, setTierOverridesState] = useState<
-    (TierOverride | null)[]
-  >(() => getTierOverrides());
-  const [narrationOverride, setNarrationOverrideState] = useState<
-    string | null
-  >(() => getNarrationModelOverride());
-  // How hard the narration voice thinks (decision 53); "none" until picked.
-  const [narrationEffort, setNarrationEffortState] = useState<ReasoningEffort>(
-    () => getNarrationEffortOverride() ?? DEFAULT_REASONING_EFFORT,
+  // Default is tier 1 and only tier 1 (the baseline); Advanced is tier 3.
+  const override = getSlotOverride(slot);
+  const shipped =
+    REASONING_TIERS[slot === "default" ? 1 : REASONING_TIERS.length - 1];
+  const shown = override ?? shipped;
+  const mix = slot === "default" ? getDefaultSlotMix() : [];
+
+  const config = getModelConfig(shown.modelKey);
+  const isSubscription = config.provider === "claude-cli";
+  const keyField = PROVIDER_KEY_FIELD[config.provider];
+  const keyConfigured = keyField ? hasKey(keyField) : true;
+  // A subscription slot needs no key but a signed-in CLI, and the turn stops
+  // (no fallback to a paid model) when it has none.
+  const cliProblem = !isSubscription
+    ? null
+    : !isClaudeCliAvailablePlatform()
+      ? "Desktop only"
+      : onlineSession
+        ? "Not used online"
+        : isClaudeCliUsable(cliStatus)
+          ? null
+          : describeClaudeCliStatus(cliStatus);
+
+  return (
+    <div className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-medium text-white">{title}</span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-blue-300/50 truncate">
+            {isSubscription ? "claude subscription" : config.provider}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {!keyConfigured && (
+            <span
+              title="No API key configured for this provider"
+              className="flex items-center gap-1 text-[10px] text-amber-300"
+            >
+              <DynamicIcon name="AlertTriangle" className="w-3 h-3" />
+              No key
+            </span>
+          )}
+          {cliProblem && (
+            <span
+              title="This slot runs through the claude CLI on your Claude plan - see Claude subscription below"
+              className="flex items-center gap-1 text-[10px] text-amber-300"
+            >
+              <DynamicIcon name="TriangleAlert" className="w-3 h-3" />
+              {cliProblem}
+            </span>
+          )}
+          {override && (
+            <button
+              onClick={() => {
+                setSlotOverride(slot, null);
+                setVersion((n) => n + 1);
+              }}
+              className="text-[10px] text-purple-300 hover:text-purple-200 hover:underline"
+              title={`Reset ${title} to its default model`}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="text-xs text-blue-300/60">{description}</p>
+      <div className="flex items-center gap-2">
+        <ModelSelect
+          value={shown.modelKey}
+          onChange={(modelKey) => {
+            setSlotOverride(slot, {
+              modelKey,
+              reasoningEffort: shown.reasoningEffort,
+            });
+            setVersion((n) => n + 1);
+          }}
+          customModels={customModels}
+          requireToolCalling
+          className="flex-1 min-w-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white"
+        />
+        <select
+          aria-label={`${title} effort`}
+          value={shown.reasoningEffort}
+          onChange={(e) => {
+            if (!isReasoningEffort(e.target.value)) return;
+            setSlotOverride(slot, {
+              modelKey: shown.modelKey,
+              reasoningEffort: e.target.value,
+            });
+            setVersion((n) => n + 1);
+          }}
+          className="w-24 shrink-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white capitalize"
+        >
+          {REASONING_EFFORTS.map((effort) => (
+            <option key={effort} value={effort}>
+              {effort}
+            </option>
+          ))}
+        </select>
+      </div>
+      {mix.length > 0 && (
+        <p className="text-xs text-amber-300/80">
+          Mixed:{" "}
+          {mix
+            .map(
+              (m) =>
+                `tier ${m.tier} runs ${getTierModelDisplayName(m.modelKey)}`,
+            )
+            .join(", ")}
+          . Saving here sets all three.
+        </p>
+      )}
+    </div>
   );
+}
+
+export default function AIConfigTab() {
+  const { hasKey } = useAPIKeys();
+
+  // User-added custom (OpenRouter BYOK) models, persisted to localStorage - see
+  // app/misc/user_settings.ts. The Default and Advanced slots are read by
+  // ModelSlotRow itself (app/misc/reasoningTiers.ts).
   const [customModels, setCustomModelsState] = useState<CustomModel[]>(() =>
     getCustomModels(),
   );
@@ -91,43 +223,6 @@ export default function AIConfigTab() {
     return () =>
       window.removeEventListener("custom-models-changed", refreshCustomModels);
   }, [refreshCustomModels]);
-
-  const handleTierModelChange = (index: number, modelKey: string) => {
-    const effort =
-      tierOverrides[index]?.reasoningEffort ??
-      REASONING_TIERS[index].reasoningEffort;
-    setTierOverride(index, { modelKey, reasoningEffort: effort });
-    setTierOverridesState(getTierOverrides());
-  };
-
-  const handleTierEffortChange = (index: number, effort: ReasoningEffort) => {
-    const modelKey =
-      tierOverrides[index]?.modelKey ?? REASONING_TIERS[index].modelKey;
-    setTierOverride(index, { modelKey, reasoningEffort: effort });
-    setTierOverridesState(getTierOverrides());
-  };
-
-  const handleResetTier = (index: number) => {
-    setTierOverride(index, null);
-    setTierOverridesState(getTierOverrides());
-  };
-
-  const handleResetAllTiers = () => {
-    resetTierOverrides();
-    setTierOverridesState(getTierOverrides());
-  };
-
-  const handleNarrationChange = (modelKey: string) => {
-    const override = modelKey === NARRATION_MODEL_KEY ? null : modelKey;
-    setNarrationModelOverride(override);
-    setNarrationOverrideState(getNarrationModelOverride());
-  };
-
-  const handleNarrationEffortChange = (effort: string) => {
-    if (!isReasoningEffort(effort)) return;
-    setNarrationEffortOverride(effort);
-    setNarrationEffortState(effort);
-  };
 
   const handleAddCustomModel = () => {
     if (!newModelName.trim() || !newModelId.trim()) return;
@@ -148,12 +243,11 @@ export default function AIConfigTab() {
   const handleRemoveCustomModel = (id: string) => {
     removeCustomModel(id);
     refreshCustomModels();
-    // Clear any tier/narration overrides that pointed at the removed model
-    // so they cleanly fall back to defaults instead of dangling.
-    tierOverrides.forEach((o, i) => {
-      if (o?.modelKey === id) handleResetTier(i);
+    // Clear any slot choice that pointed at the removed model so it cleanly
+    // falls back to the slot's default instead of dangling.
+    (Object.keys(SLOT_TIERS) as ModelSlot[]).forEach((slot) => {
+      if (getSlotOverride(slot)?.modelKey === id) setSlotOverride(slot, null);
     });
-    if (narrationOverride === id) handleNarrationChange(NARRATION_MODEL_KEY);
   };
 
   // Generation settings
@@ -394,173 +488,35 @@ export default function AIConfigTab() {
     );
   }
 
-  const effectiveNarrationKey = narrationOverride || NARRATION_MODEL_KEY;
-
   return (
     <div className="space-y-6">
-      {/* Narration Voice Banner */}
-      <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-4 text-white space-y-2.5">
-        <span className="inline-block text-[11px] font-semibold uppercase tracking-wide bg-white/20 px-2 py-0.5 rounded-full">
-          Narration Voice
-        </span>
-        <div className="flex items-center gap-2">
-          <ModelSelect
-            value={effectiveNarrationKey}
-            onChange={handleNarrationChange}
-            customModels={customModels}
-            className="flex-1 min-w-0 text-sm font-semibold bg-white/15 border border-white/30 rounded-md px-3 py-2 text-white [&>option]:text-gray-900"
-          />
-          <select
-            aria-label="Narration voice effort"
-            value={narrationEffort}
-            onChange={(e) => handleNarrationEffortChange(e.target.value)}
-            className="w-24 shrink-0 text-sm font-semibold bg-white/15 border border-white/30 rounded-md px-2 py-2 text-white capitalize [&>option]:text-gray-900"
-          >
-            {REASONING_EFFORTS.map((effort) => (
-              <option key={effort} value={effort}>
-                {effort}
-              </option>
-            ))}
-          </select>
-        </div>
-        <p className="text-xs text-white/75">
-          Always used for player-facing prose, no matter which reasoning tier
-          handles adjudication - this is what keeps the GM&rsquo;s voice
-          consistent even during a boss fight.
-        </p>
-        <p className="text-xs text-white/75">
-          {"Higher effort means slower, dearer prose. 'none' is the cheapest each model allows."}
-        </p>
-      </div>
-
-      {/* Reasoning Tier Ladder */}
-      {/* What the configuration above and below actually costs to play.
-          Sits between the narration voice and the tier ladder on purpose -
-          every control on this tab moves this number. */}
+      {/* What the configuration below actually costs to play. Sits above the
+          Models card on purpose - every control on this tab moves this
+          number. */}
       <TurnCostPanel />
 
       <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-white flex items-center gap-2">
-            <DynamicIcon name="Brain" className="w-4 h-4" />
-            Reasoning Tiers
-          </h4>
-          {tierOverrides.some((o) => o !== null) && (
-            <button
-              onClick={handleResetAllTiers}
-              className="text-xs text-purple-300 hover:text-purple-200"
-            >
-              Reset all to defaults
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-blue-300/60">
-          The GM automatically escalates through these tiers per turn based on
-          what&rsquo;s happening - banter runs cheap, combat and boss fights
-          escalate automatically. Pick which model/effort fills each tier below,
-          mixing any provider you like.
-        </p>
+        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+          <DynamicIcon name="Brain" className="w-4 h-4" />
+          Models
+        </h4>
         <div className="space-y-2">
-          {REASONING_TIERS.map((defaultTier, index) => {
-            const override = tierOverrides[index];
-            const tier = override ?? defaultTier;
-            const config = getModelConfig(tier.modelKey);
-            const isSubscription = config.provider === "claude-cli";
-            const keyField = PROVIDER_KEY_FIELD[config.provider];
-            const keyConfigured = keyField ? hasKey(keyField) : true;
-            // A subscription tier needs no key but a signed-in CLI, and the
-            // turn stops (no fallback to a paid tier) when it has none.
-            const cliProblem = !isSubscription
-              ? null
-              : !isClaudeCliAvailablePlatform()
-                ? "Desktop only"
-                : onlineSession
-                  ? "Not used online"
-                  : isClaudeCliUsable(cliStatus)
-                    ? null
-                    : describeClaudeCliStatus(cliStatus);
-            return (
-              <div
-                key={index}
-                className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-purple-500/15 text-purple-300 text-[11px] font-bold">
-                      {index}
-                    </span>
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-blue-300/50 truncate">
-                      {isSubscription ? "claude subscription" : config.provider}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {!keyConfigured && (
-                      <span
-                        title="No API key configured for this provider"
-                        className="flex items-center gap-1 text-[10px] text-amber-300"
-                      >
-                        <DynamicIcon name="AlertTriangle" className="w-3 h-3" />
-                        No key
-                      </span>
-                    )}
-                    {cliProblem && (
-                      <span
-                        title="This tier runs through the claude CLI on your Claude plan - see Claude subscription below"
-                        className="flex items-center gap-1 text-[10px] text-amber-300"
-                      >
-                        <DynamicIcon name="TriangleAlert" className="w-3 h-3" />
-                        {cliProblem}
-                      </span>
-                    )}
-                    {override && (
-                      <button
-                        onClick={() => handleResetTier(index)}
-                        className="text-[10px] text-purple-300 hover:text-purple-200 hover:underline"
-                        title="Reset this tier to its default model"
-                      >
-                        Reset
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-blue-300/60">
-                  {defaultTier.note}
-                </p>
-                <div className="flex items-center gap-2">
-                  <ModelSelect
-                    value={tier.modelKey}
-                    onChange={(modelKey) =>
-                      handleTierModelChange(index, modelKey)
-                    }
-                    customModels={customModels}
-                    requireToolCalling
-                    className="flex-1 min-w-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white"
-                  />
-                  <select
-                    value={tier.reasoningEffort}
-                    onChange={(e) =>
-                      handleTierEffortChange(
-                        index,
-                        e.target.value as ReasoningEffort,
-                      )
-                    }
-                    className="w-24 shrink-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white capitalize"
-                  >
-                    {REASONING_EFFORTS.map((effort) => (
-                      <option key={effort} value={effort}>
-                        {effort}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            );
-          })}
+          <ModelSlotRow
+            slot="default"
+            title="Default"
+            description="Everyday turns, combat and rules, and the story's prose. Combat and rules always think at high or more."
+            customModels={customModels}
+          />
+          <ModelSlotRow
+            slot="advanced"
+            title="Advanced"
+            description="Session zero, boss fights, deadly stakes and campaign-shaping moments. The game switches to it by itself."
+            customModels={customModels}
+          />
         </div>
         <p className="text-xs text-blue-300/60">
-          Tiers with &ldquo;no key&rdquo; will automatically fall back to the
-          next-lower tier until one has a configured key. Add provider keys in
-          the API Keys tab.
+          A slot whose model has no key can&rsquo;t run. Pick a model you have a
+          key for. Add provider keys in the API Keys tab.
         </p>
       </div>
 
@@ -581,8 +537,8 @@ export default function AIConfigTab() {
           </button>
         </div>
         <p className="text-xs text-blue-300/60">
-          Register any OpenRouter model ID to use it for narration or any
-          reasoning tier above, in addition to the built-in models. Requires an
+          Register any OpenRouter model ID to use it for Default or Advanced
+          above, in addition to the built-in models. Requires an
           OpenRouter key in the API Keys tab.
         </p>
 
@@ -668,25 +624,35 @@ export default function AIConfigTab() {
         )}
       </div>
 
-      {/* Recent Reasoning Tier Calls */}
-      {recentTierLogs.length > 0 && (
-        <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-2">
-          <h4 className="text-sm font-medium text-white flex items-center gap-2">
-            <DynamicIcon name="History" className="w-4 h-4" />
-            Recent Tier Calls
-          </h4>
-          <div className="space-y-1 max-h-40 overflow-y-auto">
-            {recentTierLogs.map((log, i) => (
-              <div
-                key={`${log.timestamp}-${i}`}
-                className="text-xs text-blue-300/60 font-mono"
-              >
-                {log.data?.describe || log.message}
+      {/* Advanced settings: the side agents and the tier log. Closed by
+          default (decision 121). */}
+      <details className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg">
+        <summary className="cursor-pointer select-none text-sm font-medium text-white flex items-center gap-2">
+          <DynamicIcon name="Settings" className="w-4 h-4" />
+          Advanced settings
+        </summary>
+        <div className="mt-4 space-y-6">
+          {/* Recent Reasoning Tier Calls */}
+          {recentTierLogs.length > 0 && (
+            <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-2">
+              <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                <DynamicIcon name="History" className="w-4 h-4" />
+                Recent Tier Calls
+              </h4>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {recentTierLogs.map((log, i) => (
+                  <div
+                    key={`${log.timestamp}-${i}`}
+                    className="text-xs text-blue-300/60 font-mono"
+                  >
+                    {log.data?.describe || log.message}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+      </details>
 
       {/* Memory Size Slider */}
       <div className="space-y-2">

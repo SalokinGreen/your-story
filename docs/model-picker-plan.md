@@ -347,3 +347,21 @@ folded into the slice it belongs to:
   setup to `reasoningTierOverrides` (Default's three entries). The saved
   narration getters and setters keep their own tests (stored, synced, aliased,
   and no longer used).
+
+### 2026-10-23, slice 2
+
+- **`ModelSlotRow` takes a `customModels` prop** beyond the plan's three, so
+  the card passes the live list it already refreshes on `custom-models-changed`
+  and the row stays a pure view of it. It is exported (as is the card's only
+  other new symbol) so `tests/modelSlotRow.markup.test.tsx` can render it.
+- **The row re-reads itself** on `REASONING_CONFIG_CHANGED_EVENT` and
+  `SYNC_COMPLETED_EVENT` (a version counter), and `TurnCostPanel` now listens
+  for `SYNC_COMPLETED_EVENT` too; it already had the reasoning event.
+- **What a row shows** is the saved choice, else the shipped entry (tier 1 for
+  Default, tier 3 for Advanced), not `getEffectiveSlot`: a subscription model
+  this device cannot run stays visible with its badge, as the old tier row did.
+- **Removing a custom model** resets whichever slot named it (the old code
+  reset tiers and the narration voice).
+- **The "Advanced settings" `<details>` lands in this commit holding only the
+  "Recent Tier Calls" log**; the side-agent pickers join it in slice 3, which
+  is what keeps each commit compiling.

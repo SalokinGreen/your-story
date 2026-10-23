@@ -40,6 +40,7 @@ import {
 } from "@/app/misc/turnCostEstimate";
 import { LAYER_SETTINGS_CHANGED_EVENT } from "@/app/misc/layerSettings";
 import { REASONING_CONFIG_CHANGED_EVENT } from "@/app/misc/reasoningTiers";
+import { SYNC_COMPLETED_EVENT } from "@/app/misc/syncManager";
 import { getTierModelDisplayName } from "@/app/misc/reasoningTiers";
 
 interface TurnCostPanelProps {
@@ -84,6 +85,7 @@ export default function TurnCostPanel({
       LAYER_SETTINGS_CHANGED_EVENT,
       TURN_COST_INPUTS_CHANGED_EVENT,
       "custom-models-changed",
+      SYNC_COMPLETED_EVENT,
     ];
     events.forEach((e) => window.addEventListener(e, refreshEstimate));
     return () =>
