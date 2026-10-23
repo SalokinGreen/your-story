@@ -44,6 +44,7 @@ import { resolveSideCallModel } from "../misc/layerSettings";
 import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import type { MPBackend } from "../misc/multiplayer/types";
 import { useBackHandler } from "@/app/misc/useBackHandler";
+import { saveFile } from "@/app/misc/saveFile";
 
 interface MenuProps extends StoryData {
   storyDbId: string | null;
@@ -425,7 +426,7 @@ export default function MenuPage({
     }
   };
 
-  const handleExportStory = () => {
+  const handleExportStory = async () => {
     setExporting(true);
     try {
       const exportData = {
@@ -435,20 +436,11 @@ export default function MenuPage({
         data: storyData,
       };
 
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${storyData.story_name.replace(
-        /[^a-z0-9]/gi,
-        "_",
-      )}_${Date.now()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await saveFile(
+        `${storyData.story_name.replace(/[^a-z0-9]/gi, "_")}_${Date.now()}.json`,
+        JSON.stringify(exportData, null, 2),
+        "application/json",
+      );
 
       addNotification("Story exported successfully!", "success");
     } catch (error) {

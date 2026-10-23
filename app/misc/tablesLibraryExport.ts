@@ -6,6 +6,7 @@
  * notesLibraryExport.ts.
  */
 
+import { saveFile } from "./saveFile";
 import { LibraryTable } from "./localTablesLibraryManager";
 import { CustomTableEntry } from "./structs";
 
@@ -62,14 +63,13 @@ export function prepareTablesForExport(
 /**
  * Download library tables as a .tables file
  */
-export function downloadLibraryTables(
+export async function downloadLibraryTables(
   tables: LibraryTable[],
   filename?: string
-): void {
+): Promise<void> {
   const exportData = prepareTablesForExport(tables);
   const json = JSON.stringify(exportData, null, 2);
   const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
 
   const safeName =
     filename ||
@@ -81,13 +81,7 @@ export function downloadLibraryTables(
           .slice(0, 50)
       : `tables-library-${new Date().toISOString().slice(0, 10)}`);
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${safeName}.tables`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  await saveFile(`${safeName}.tables`, blob, "application/json");
 }
 
 // ============================================

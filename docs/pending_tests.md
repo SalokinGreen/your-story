@@ -10,6 +10,25 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+
+## 2026-10-23 — Downloads on the phone, and the AI Context height (claude/ai-context-phone)
+
+- **AI Context → the download (JSON) and TXT buttons, on the APK.** Expected:
+  Android's share sheet opens with a `context-gm-….json` / `.txt`, and
+  "Save to Files" or "Downloads" saves it. Failure looks like: nothing
+  happens (the old `<a download>` behaviour), or the sheet opens without a
+  file (the `url` fallback), or an error line in the Debug Logs.
+- **The same for Debug Logs → Export, the Story menu → Export, and the
+  Library's folder and notes exports.** Each opens the share sheet with its
+  file. Cancelling the sheet shows no error.
+- **AI Context and Debug Logs fill the screen on the phone.** The panel
+  reaches the bottom with only a small gap, scrolls inside itself, and its
+  up/down buttons work; rotating the phone refits it. Failure looks like an
+  empty band below the panel (the old fixed height), or the whole page
+  scrolling.
+- **Desktop app: Export still saves a file** (the anchor path is unchanged
+  there).
+
 ## 2026-10-23 — Whole-app themes
 
 Built from [`whole-app-themes-plan.md`](whole-app-themes-plan.md) on

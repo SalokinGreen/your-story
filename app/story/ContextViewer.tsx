@@ -14,6 +14,9 @@ import {
 } from "../misc/ai_staged";
 import { buildObserverWarningNote } from "../misc/observer";
 import { DynamicIcon } from "../components/DynamicIcon";
+import { saveFile } from "../misc/saveFile";
+import { useFitToViewport } from "../misc/useFitToViewport";
+import { logger } from "../misc/logger";
 import { getModelConfig } from "../misc/ai_prices";
 import { getImageSettings, isImageToolAvailable } from "../misc/imageSettings";
 import {
@@ -312,6 +315,8 @@ function TurnHistoryCard({ turn }: { turn: TurnSummary }) {
 }
 
 export default function ContextViewer({ storyData }: ContextViewerProps) {
+  const { ref: panelRef, height: panelHeight } =
+    useFitToViewport<HTMLDivElement>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [choicesMessages, setChoicesMessages] = useState<ChatMessage[]>([]);
   const [estimatedTokens, setEstimatedTokens] = useState(0);
@@ -553,28 +558,28 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     navigator.clipboard.writeText(text);
   };
 
-  const downloadAsJSON = () => {
+  const downloadAsJSON = async () => {
     const jsonData = JSON.stringify(messages, null, 2);
-    const blob = new Blob([jsonData], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `context-gm-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      await saveFile(
+        `context-gm-${Date.now()}.json`,
+        jsonData,
+        "application/json",
+      );
+    } catch (error) {
+      logger.error("Could not save the AI context", { error: String(error) });
+    }
   };
 
-  const downloadAsText = () => {
+  const downloadAsText = async () => {
     const textData = messages
       .map((msg) => `=== ${formatRole(msg.role)} ===\n\n${msg.content}\n\n`)
       .join("\n");
-    const blob = new Blob([textData], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `context-gm-${Date.now()}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      await saveFile(`context-gm-${Date.now()}.txt`, textData, "text/plain");
+    } catch (error) {
+      logger.error("Could not save the AI context", { error: String(error) });
+    }
   };
 
   // ============================================
@@ -696,7 +701,10 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     .reverse();
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] bg-ys-surface backdrop-blur-xl rounded-2xl border border-ys-border shadow-[0_4px_24px_rgba(0,0,0,0.3)] overflow-hidden">
+    <div
+      ref={panelRef}
+      style={panelHeight ? { height: panelHeight } : undefined}
+      className="flex flex-col h-[calc(100dvh-6.5rem)] bg-ys-surface backdrop-blur-xl rounded-2xl border border-ys-border shadow-[0_4px_24px_rgba(0,0,0,0.3)] overflow-hidden">
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-ys-border bg-ys-surface space-y-2">
         <div className="flex justify-between items-center">
