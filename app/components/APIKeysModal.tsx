@@ -118,8 +118,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("config")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "config"
-                ? "border-purple-400 text-purple-300"
-                : "border-transparent text-blue-300/50 hover:text-blue-200"
+                ? "border-ys-accent text-ys-accent"
+                : "border-transparent text-ys-muted hover:text-ys-text"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -131,8 +131,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("display")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "display"
-                ? "border-purple-400 text-purple-300"
-                : "border-transparent text-blue-300/50 hover:text-blue-200"
+                ? "border-ys-accent text-ys-accent"
+                : "border-transparent text-ys-muted hover:text-ys-text"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -144,8 +144,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("game")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "game"
-                ? "border-purple-400 text-purple-300"
-                : "border-transparent text-blue-300/50 hover:text-blue-200"
+                ? "border-ys-accent text-ys-accent"
+                : "border-transparent text-ys-muted hover:text-ys-text"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -157,8 +157,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("services")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "services"
-                ? "border-purple-400 text-purple-300"
-                : "border-transparent text-blue-300/50 hover:text-blue-200"
+                ? "border-ys-accent text-ys-accent"
+                : "border-transparent text-ys-muted hover:text-ys-text"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -170,8 +170,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("llm")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "llm"
-                ? "border-purple-400 text-purple-300"
-                : "border-transparent text-blue-300/50 hover:text-blue-200"
+                ? "border-ys-accent text-ys-accent"
+                : "border-transparent text-ys-muted hover:text-ys-text"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -183,8 +183,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("architecture")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "architecture"
-                ? "border-purple-400 text-purple-300"
-                : "border-transparent text-blue-300/50 hover:text-blue-200"
+                ? "border-ys-accent text-ys-accent"
+                : "border-transparent text-ys-muted hover:text-ys-text"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -196,8 +196,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("images")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "images"
-                ? "border-purple-400 text-purple-300"
-                : "border-transparent text-blue-300/50 hover:text-blue-200"
+                ? "border-ys-accent text-ys-accent"
+                : "border-transparent text-ys-muted hover:text-ys-text"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -209,8 +209,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("sync")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "sync"
-                ? "border-purple-400 text-purple-300"
-                : "border-transparent text-blue-300/50 hover:text-blue-200"
+                ? "border-ys-accent text-ys-accent"
+                : "border-transparent text-ys-muted hover:text-ys-text"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -226,7 +226,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <div className="flex items-center justify-center py-8">
               <DynamicIcon
                 name="Loader2"
-                className="w-6 h-6 text-purple-500 animate-spin"
+                className="w-6 h-6 text-ys-accent animate-spin"
               />
             </div>
           ) : activeTab === "config" ? (
@@ -243,25 +243,25 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
               <div className="space-y-3">
                 {/* OpenRouter */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">OR</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">OR</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         OpenRouter
                       </span>
                       {hasKey("openRouterKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://openrouter.ai/keys"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -274,12 +274,12 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                           setKey("openRouterKey", e.target.value)
                         }
                         placeholder="sk-or-..."
-                        className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                        className="flex-1 px-2 py-1 ys-input text-xs font-mono"
                       />
                       {hasKey("openRouterKey") && (
                         <button
                           onClick={disconnectOpenRouter}
-                          className="p-1 text-red-400 hover:bg-red-500/10 rounded-lg"
+                          className="p-1 text-ys-danger hover:bg-ys-danger/15 rounded-lg"
                           title="Clear key"
                         >
                           <DynamicIcon name="X" className="w-3.5 h-3.5" />
@@ -289,7 +289,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     <button
                       onClick={connectOpenRouter}
                       disabled={isConnectingOpenRouter}
-                      className="mt-1 text-xs text-purple-500 hover:text-purple-600 flex items-center gap-1"
+                      className="mt-1 text-xs text-ys-accent hover:underline flex items-center gap-1"
                     >
                       {isConnectingOpenRouter ? (
                         <>
@@ -312,8 +312,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       )}
                     </button>
                     {awaitingOpenRouterCode && (
-                      <div className="mt-2 p-2.5 bg-white/[0.03] border border-white/10 rounded-lg space-y-2">
-                        <p className="text-xs text-blue-200/70">
+                      <div className="mt-2 p-2.5 bg-ys-surface-2 border border-ys-border rounded-lg space-y-2">
+                        <p className="text-xs text-ys-muted">
                           Sign in on the OpenRouter page that just opened in
                           your browser, then paste the code it shows you here.
                         </p>
@@ -328,12 +328,12 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                             placeholder="Paste code"
                             autoComplete="off"
                             spellCheck={false}
-                            className="flex-1 min-w-0 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                            className="flex-1 min-w-0 px-2 py-1 ys-input text-xs font-mono"
                           />
                           <button
                             onClick={handleSubmitOpenRouterCode}
                             disabled={!openRouterCode.trim() || isConnectingOpenRouter}
-                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50"
+                            className="px-2.5 py-1 text-xs font-semibold rounded-lg ys-button ys-button--primary disabled:opacity-50"
                           >
                             Connect
                           </button>
@@ -342,7 +342,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                               setOpenRouterCode("");
                               cancelOpenRouterConnect();
                             }}
-                            className="px-2 py-1 text-xs text-blue-200/70 hover:text-white rounded-lg"
+                            className="px-2 py-1 text-xs text-ys-muted hover:text-ys-text rounded-lg"
                           >
                             Cancel
                           </button>
@@ -354,25 +354,25 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* DeepSeek */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">DS</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">DS</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         DeepSeek
                       </span>
                       {hasKey("deepseekKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://platform.deepseek.com/api_keys"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -382,32 +382,32 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.deepseekKey}
                       onChange={(e) => setKey("deepseekKey", e.target.value)}
                       placeholder="sk-..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                      className="w-full mt-1 px-2 py-1 ys-input text-xs font-mono"
                     />
                   </div>
                 </div>
 
                 {/* Google AI Studio */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-blue-500 to-green-500 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">G</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">G</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         Google AI Studio
                       </span>
                       {hasKey("googleKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://aistudio.google.com/apikey"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -417,32 +417,32 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.googleKey}
                       onChange={(e) => setKey("googleKey", e.target.value)}
                       placeholder="AIza..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                      className="w-full mt-1 px-2 py-1 ys-input text-xs font-mono"
                     />
                   </div>
                 </div>
 
                 {/* Mistral */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-orange-500 to-red-600 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">M</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">M</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         Mistral
                       </span>
                       {hasKey("mistralKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://console.mistral.ai/api-keys"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -452,9 +452,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.mistralKey}
                       onChange={(e) => setKey("mistralKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                      className="w-full mt-1 px-2 py-1 ys-input text-xs font-mono"
                     />
-                    <p className="text-xs text-blue-300/50 mt-1">
+                    <p className="text-xs text-ys-muted mt-1">
                       Used for Mistral models, OCR, and speech-to-text.
                     </p>
                   </div>
@@ -462,25 +462,25 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* DeepInfra */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">DI</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">DI</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         DeepInfra
                       </span>
                       {hasKey("deepinfraKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://deepinfra.com/dash/api_keys"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -490,9 +490,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.deepinfraKey}
                       onChange={(e) => setKey("deepinfraKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                      className="w-full mt-1 px-2 py-1 ys-input text-xs font-mono"
                     />
-                    <p className="text-xs text-blue-300/50 mt-1">
+                    <p className="text-xs text-ys-muted mt-1">
                       Used for image generation.
                     </p>
                   </div>
@@ -500,25 +500,25 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* Z.ai - GLM on the general pay-as-you-go API (decision 18) */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-sky-500 to-blue-700 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">Z</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">Z</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         Z.ai API key (pay-as-you-go, not the Coding Plan)
                       </span>
                       {hasKey("zaiKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://z.ai/manage-apikey/apikey-list"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -528,9 +528,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.zaiKey}
                       onChange={(e) => setKey("zaiKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                      className="w-full mt-1 px-2 py-1 ys-input text-xs font-mono"
                     />
-                    <p className="text-xs text-blue-300/50 mt-1">
+                    <p className="text-xs text-ys-muted mt-1">
                       Used for the GLM 5.3 (Z.ai) models, billed per token to
                       your Z.ai account. A GLM Coding Plan subscription does
                       not cover this: Z.ai limits it to its supported coding
@@ -541,25 +541,25 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* fal.ai - pictures made in play (decision 58) */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-fuchsia-500 to-pink-600 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">fal</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">fal</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         fal.ai
                       </span>
                       {hasKey("falKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://fal.ai/dashboard/keys"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -569,9 +569,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.falKey}
                       onChange={(e) => setKey("falKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                      className="w-full mt-1 px-2 py-1 ys-input text-xs font-mono"
                     />
-                    <p className="text-xs text-blue-300/50 mt-1">
+                    <p className="text-xs text-ys-muted mt-1">
                       Used for pictures in play (scenes, portraits, places).
                       The key stays on this device and is sent only to fal; it
                       is not synced to your other devices.
@@ -581,25 +581,25 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* Cartesia - TTS only */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">CA</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">CA</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         Cartesia
                       </span>
                       {hasKey("cartesiaKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://play.cartesia.ai/keys"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -609,9 +609,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.cartesiaKey}
                       onChange={(e) => setKey("cartesiaKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                      className="w-full mt-1 px-2 py-1 ys-input text-xs font-mono"
                     />
-                    <p className="text-xs text-blue-300/50 mt-1">
+                    <p className="text-xs text-ys-muted mt-1">
                       Used for low-latency Sonic-3.6 text-to-speech.
                     </p>
                   </div>
@@ -619,25 +619,25 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* ElevenLabs - TTS only */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-gray-700 to-gray-900 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">EL</span>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-ys-accent flex items-center justify-center">
+                    <span className="text-ys-on-accent text-xs font-bold">EL</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-ys-text">
                         ElevenLabs
                       </span>
                       {hasKey("elevenlabsKey") && (
                         <DynamicIcon
                           name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
+                          className="w-3.5 h-3.5 text-ys-success"
                         />
                       )}
                       <a
                         href="https://elevenlabs.io/app/settings/api-keys"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-purple-500 hover:underline ml-auto"
+                        className="text-xs text-ys-accent hover:underline ml-auto"
                       >
                         Get key →
                       </a>
@@ -647,9 +647,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.elevenlabsKey}
                       onChange={(e) => setKey("elevenlabsKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                      className="w-full mt-1 px-2 py-1 ys-input text-xs font-mono"
                     />
-                    <p className="text-xs text-blue-300/50 mt-1">
+                    <p className="text-xs text-ys-muted mt-1">
                       Used for premium Flash v2.5 text-to-speech.
                     </p>
                   </div>
@@ -657,10 +657,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
               </div>
 
               {/* Show/Hide Keys & Privacy Info */}
-              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+              <div className="flex items-center justify-between pt-3 border-t border-ys-border">
                 <button
                   onClick={() => setShowKeys(!showKeys)}
-                  className="flex items-center gap-2 text-xs text-blue-300/60 hover:text-blue-200 transition-colors"
+                  className="flex items-center gap-2 text-xs text-ys-muted hover:text-ys-text transition-colors"
                 >
                   <DynamicIcon
                     name={showKeys ? "EyeOff" : "Eye"}
@@ -668,7 +668,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   />
                   {showKeys ? "Hide" : "Show"}
                 </button>
-                <p className="text-xs text-blue-300/50 flex items-center gap-1">
+                <p className="text-xs text-ys-muted flex items-center gap-1">
                   <DynamicIcon name="Shield" className="w-3 h-3" />
                   Keys are never shared
                 </p>
@@ -677,17 +677,17 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
           ) : activeTab === "services" ? (
             <>
               {/* TTS Provider Info */}
-              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-400/20 -mt-2 mb-4">
+              <div className="p-3 bg-ys-accent/10 rounded-lg border border-ys-accent/20 -mt-2 mb-4">
                 <div className="flex items-center gap-2">
                   <DynamicIcon
                     name="Volume2"
-                    className="w-4 h-4 text-blue-300"
+                    className="w-4 h-4 text-ys-muted"
                   />
                   <div>
-                    <p className="text-sm font-medium text-white">
+                    <p className="text-sm font-medium text-ys-text">
                       Bring your own TTS provider
                     </p>
-                    <p className="text-xs text-blue-300/60">
+                    <p className="text-xs text-ys-muted">
                       Cartesia Sonic-3.6 or ElevenLabs Flash -
                       add the matching key in the Keys tab
                     </p>
@@ -697,7 +697,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
               {/* TTS Settings Section */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                <h3 className="text-sm font-medium text-ys-text flex items-center gap-2">
                   <DynamicIcon name="Settings" className="w-4 h-4" />
                   Voice Settings
                 </h3>
@@ -705,10 +705,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                 {/* Enable TTS Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-blue-100">
+                    <p className="text-sm text-ys-text">
                       Enable TTS
                     </p>
-                    <p className="text-xs text-blue-300/60">
+                    <p className="text-xs text-ys-muted">
                       Show audio controls for story narration
                     </p>
                   </div>
@@ -729,17 +729,17 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+                    <div className="w-11 h-6 bg-ys-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ys-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ys-accent" />
                   </label>
                 </div>
 
                 {/* Auto-Generate Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-blue-100">
+                    <p className="text-sm text-ys-text">
                       Auto-Generate Audio
                     </p>
-                    <p className="text-xs text-blue-300/60">
+                    <p className="text-xs text-ys-muted">
                       Automatically narrate new story content
                     </p>
                   </div>
@@ -762,13 +762,13 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+                    <div className="w-11 h-6 bg-ys-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ys-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ys-accent" />
                   </label>
                 </div>
 
                 {/* TTS Model Selector */}
                 <div>
-                  <label className="block text-sm text-blue-100 mb-2">
+                  <label className="block text-sm text-ys-text mb-2">
                     TTS Model
                   </label>
                   <select
@@ -790,7 +790,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }[newModel];
                       addNotification(`Switched to ${modelLabel}`, "success");
                     }}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 ys-input text-sm"
                   >
                     <option value="cartesia">
                       Cartesia Sonic-3.6 - Ultra Low Latency (Cartesia)
@@ -803,7 +803,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* Voice Selector - Dynamic based on model */}
                 <div>
-                  <label className="block text-sm text-blue-100 mb-2">
+                  <label className="block text-sm text-ys-text mb-2">
                     Voice
                   </label>
                   <select
@@ -818,7 +818,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         "success",
                       );
                     }}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 ys-input text-sm"
                   >
                     {ttsModel === "cartesia" ? (
                       <optgroup label="Sample Voices">
@@ -856,14 +856,14 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     ))}
                   </select>
                   {(ttsModel === "cartesia" || ttsModel === "elevenlabs") && (
-                    <p className="text-xs text-blue-300/50 mt-1">
+                    <p className="text-xs text-ys-muted mt-1">
                       Browse more voices at{" "}
                       {ttsModel === "cartesia" ? (
                         <a
                           href="https://play.cartesia.ai"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-purple-500 hover:underline"
+                          className="text-ys-accent hover:underline"
                         >
                           play.cartesia.ai
                         </a>
@@ -872,7 +872,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                           href="https://elevenlabs.io/app/voice-library"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-purple-500 hover:underline"
+                          className="text-ys-accent hover:underline"
                         >
                           elevenlabs.io/app/voice-library
                         </a>
@@ -891,7 +891,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* Volume Slider */}
                 <div>
-                  <label className="block text-sm text-blue-100 mb-2">
+                  <label className="block text-sm text-ys-text mb-2">
                     Volume: {Math.round(ttsVolume * 100)}%
                   </label>
                   <input
@@ -905,17 +905,17 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       setTtsVolume(value);
                       localStorage.setItem("ttsVolume", e.target.value);
                     }}
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    className="w-full h-2 bg-ys-surface-2 rounded-lg appearance-none cursor-pointer accent-ys-accent"
                   />
                 </div>
               </div>
 
               {/* Divider */}
-              <hr className="border-white/10" />
+              <hr className="border-ys-border" />
 
               {/* STT Settings Section */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                <h3 className="text-sm font-medium text-ys-text flex items-center gap-2">
                   <DynamicIcon name="Mic" className="w-4 h-4" />
                   Speech-to-Text
                 </h3>
@@ -923,10 +923,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                 {/* Enable STT Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-blue-100">
+                    <p className="text-sm text-ys-text">
                       Enable Speech Input
                     </p>
-                    <p className="text-xs text-blue-300/60">
+                    <p className="text-xs text-ys-muted">
                       Show microphone button for voice input (billed to your Mistral key)
                     </p>
                   </div>
@@ -951,7 +951,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+                    <div className="w-11 h-6 bg-ys-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ys-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ys-accent" />
                   </label>
                 </div>
               </div>
@@ -960,17 +960,17 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <>
               {/* Game Settings Tab */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                <h3 className="text-sm font-medium text-ys-text flex items-center gap-2">
                   <DynamicIcon name="Gamepad2" className="w-4 h-4" />
                   Game Settings
                 </h3>
 
                 {/* Default User Notes */}
                 <div>
-                  <label className="block text-sm text-blue-100 mb-2">
+                  <label className="block text-sm text-ys-text mb-2">
                     Default User Notes
                   </label>
-                  <p className="text-xs text-blue-300/60 mb-2">
+                  <p className="text-xs text-ys-muted mb-2">
                     These notes will be automatically added to every new
                     story&apos;s author notes. Use this to set persistent
                     preferences like writing style, content boundaries, or
@@ -983,10 +983,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       localStorage.setItem("defaultUserNotes", e.target.value);
                     }}
                     placeholder="e.g., Always write in first person. Include vivid sensory details. Keep dialogue natural and character-driven..."
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-[120px]"
+                    className="w-full px-3 py-2 ys-input text-sm resize-y min-h-[120px]"
                     rows={5}
                   />
-                  <p className="text-xs text-blue-300/50 mt-1">
+                  <p className="text-xs text-ys-muted mt-1">
                     {defaultUserNotes.length} characters
                   </p>
                 </div>
@@ -996,7 +996,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <>
               {/* Display Settings Tab */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                <h3 className="text-sm font-medium text-ys-text flex items-center gap-2">
                   <DynamicIcon name="Monitor" className="w-4 h-4" />
                   Display Settings
                 </h3>
@@ -1004,10 +1004,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                 {/* Show Hidden Messages Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-blue-100">
+                    <p className="text-sm text-ys-text">
                       Show Hidden Messages
                     </p>
-                    <p className="text-xs text-blue-300/60">
+                    <p className="text-xs text-ys-muted">
                       Reveal ||double pipe|| text (AI internal notes)
                     </p>
                   </div>
@@ -1032,12 +1032,12 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+                    <div className="w-11 h-6 bg-ys-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ys-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ys-accent" />
                   </label>
                 </div>
 
                 {/* Divider */}
-                <hr className="border-white/10" />
+                <hr className="border-ys-border" />
 
                 {/* Font Settings */}
                 <FontSettingsTab addNotification={addNotification} />

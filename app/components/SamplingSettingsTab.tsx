@@ -49,21 +49,21 @@ function SliderControl({
   return (
     <div className={`space-y-1 ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+        <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
           {label}
           {provider !== "both" && (
-            <span className="text-xs px-1.5 py-0.5 bg-blue-500/10 text-blue-300 border border-blue-400/20 rounded-md">
+            <span className="text-xs px-1.5 py-0.5 bg-ys-accent/10 text-ys-muted border border-ys-accent/20 rounded-md">
               {provider === "deepinfra" ? "DeepInfra only" : "Mistral only"}
             </span>
           )}
         </label>
-        <span className="text-sm text-purple-300 font-mono">
+        <span className="text-sm text-ys-accent font-mono">
           {value.toFixed(step < 1 ? 2 : 0)}
         </span>
       </div>
       <div className="flex items-center gap-2">
         {leftLabel && (
-          <span className="text-xs text-blue-300/50 whitespace-nowrap w-16">
+          <span className="text-xs text-ys-muted whitespace-nowrap w-16">
             {leftLabel}
           </span>
         )}
@@ -75,15 +75,15 @@ function SliderControl({
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
           disabled={disabled}
-          className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500 disabled:cursor-not-allowed"
+          className="flex-1 h-2 bg-ys-surface-2 rounded-lg appearance-none cursor-pointer accent-ys-accent disabled:cursor-not-allowed"
         />
         {rightLabel && (
-          <span className="text-xs text-blue-300/50 whitespace-nowrap w-16 text-right">
+          <span className="text-xs text-ys-muted whitespace-nowrap w-16 text-right">
             {rightLabel}
           </span>
         )}
       </div>
-      <p className="text-xs text-blue-300/50">{description}</p>
+      <p className="text-xs text-ys-muted">{description}</p>
     </div>
   );
 }
@@ -235,8 +235,8 @@ export default function SamplingSettingsTab({
   // and Google use their own defaults regardless of what's set here.
   if (!hasSamplingCapableKey) {
     return (
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg">
-        <div className="flex items-center gap-2 text-blue-300/60">
+      <div className="p-4 ys-card rounded-lg">
+        <div className="flex items-center gap-2 text-ys-muted">
           <DynamicIcon name="Info" className="w-4 h-4" />
           <p className="text-sm">
             Sampling settings apply to Mistral, DeepInfra and OpenRouter models.
@@ -251,25 +251,25 @@ export default function SamplingSettingsTab({
   return (
     <div className="space-y-6">
       {/* Current Preset Banner */}
-      <div className="bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg p-4 text-white">
+      <div className="bg-ys-accent/15 border border-ys-accent/30 rounded-lg p-4 text-ys-text">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-lg font-bold flex items-center gap-2">
               {currentPreset?.name || "Custom"}
               {currentPresetId === "custom" && (
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-ys-surface-2 px-2 py-0.5 rounded-full">
                   Modified
                 </span>
               )}
             </div>
-            <div className="text-sm text-white/70">
+            <div className="text-sm text-ys-muted">
               {currentPreset?.description || "Custom sampling settings"}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowPresetManager(!showPresetManager)}
-              className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
+              className="ys-button px-3 py-1.5 rounded-lg text-sm font-medium"
             >
               <DynamicIcon name="Settings2" className="w-4 h-4 inline mr-1" />
               Presets
@@ -280,8 +280,8 @@ export default function SamplingSettingsTab({
 
       {/* Preset Manager */}
       {showPresetManager && (
-        <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
-          <h4 className="text-sm font-medium text-white flex items-center gap-2">
+        <div className="p-4 ys-card rounded-lg space-y-4">
+          <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
             <DynamicIcon name="Layers" className="w-4 h-4" />
             Sampling Presets
           </h4>
@@ -293,17 +293,17 @@ export default function SamplingSettingsTab({
                 key={preset.id}
                 className={`relative p-3 rounded-lg border cursor-pointer transition-all ${
                   currentPresetId === preset.id
-                    ? "border-purple-400/50 bg-purple-500/10"
-                    : "border-white/10 hover:border-purple-400/40"
+                    ? "border-ys-accent/50 bg-ys-accent/10"
+                    : "border-ys-border hover:border-ys-accent/40"
                 }`}
                 onClick={() => applyPreset(preset)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">
+                    <p className="text-sm font-medium text-ys-text truncate">
                       {preset.name}
                     </p>
-                    <p className="text-xs text-blue-300/50 truncate">
+                    <p className="text-xs text-ys-muted truncate">
                       {preset.description}
                     </p>
                   </div>
@@ -314,7 +314,7 @@ export default function SamplingSettingsTab({
                           e.stopPropagation();
                           exportPreset(preset);
                         }}
-                        className="p-1 text-blue-400 hover:bg-blue-500/10 rounded-md"
+                        className="p-1 text-ys-muted hover:bg-ys-accent/10 rounded-md"
                         title="Copy to clipboard"
                       >
                         <DynamicIcon name="Copy" className="w-3 h-3" />
@@ -324,7 +324,7 @@ export default function SamplingSettingsTab({
                           e.stopPropagation();
                           deletePreset(preset.id);
                         }}
-                        className="p-1 text-red-400 hover:bg-red-500/10 rounded-md"
+                        className="p-1 text-ys-danger hover:bg-ys-danger/15 rounded-md"
                         title="Delete preset"
                       >
                         <DynamicIcon name="Trash2" className="w-3 h-3" />
@@ -333,7 +333,7 @@ export default function SamplingSettingsTab({
                   )}
                 </div>
                 {preset.authorName && !preset.isBuiltIn && (
-                  <p className="text-xs text-blue-300/40 mt-1">
+                  <p className="text-xs text-ys-muted mt-1">
                     by {preset.authorName}
                   </p>
                 )}
@@ -341,7 +341,7 @@ export default function SamplingSettingsTab({
                   <div className="absolute top-1 right-1">
                     <DynamicIcon
                       name="Check"
-                      className="w-4 h-4 text-purple-600"
+                      className="w-4 h-4 text-ys-accent"
                     />
                   </div>
                 )}
@@ -350,8 +350,8 @@ export default function SamplingSettingsTab({
           </div>
 
           {/* Save Current as Preset */}
-          <div className="pt-3 border-t border-white/10 space-y-2">
-            <p className="text-xs font-medium text-blue-300/60">
+          <div className="pt-3 border-t border-ys-border space-y-2">
+            <p className="text-xs font-medium text-ys-muted">
               Save Current Settings as Preset
             </p>
             <div className="flex gap-2">
@@ -360,12 +360,12 @@ export default function SamplingSettingsTab({
                 value={newPresetName}
                 onChange={(e) => setNewPresetName(e.target.value)}
                 placeholder="Preset name"
-                className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-blue-300/40"
+                className="flex-1 px-3 py-2 ys-input text-sm"
               />
               <button
                 onClick={saveAsPreset}
                 disabled={!newPresetName.trim()}
-                className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg text-sm font-medium shadow-md shadow-purple-950/40 transition-all disabled:opacity-50"
+                className="px-4 py-2 ys-button ys-button--primary rounded-lg text-sm font-medium disabled:opacity-50"
               >
                 Save
               </button>
@@ -375,25 +375,25 @@ export default function SamplingSettingsTab({
               value={newPresetDescription}
               onChange={(e) => setNewPresetDescription(e.target.value)}
               placeholder="Description (optional)"
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-blue-300/40"
+              className="w-full px-3 py-2 ys-input text-sm"
             />
           </div>
 
           {/* Import Preset */}
-          <div className="pt-3 border-t border-white/10">
+          <div className="pt-3 border-t border-ys-border">
             {showImportDialog ? (
               <div className="space-y-2">
                 <textarea
                   value={importJson}
                   onChange={(e) => setImportJson(e.target.value)}
                   placeholder="Paste preset JSON here..."
-                  className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm font-mono text-white resize-none"
+                  className="w-full h-24 px-3 py-2 ys-input text-sm font-mono resize-none"
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={handleImport}
                     disabled={!importJson.trim()}
-                    className="px-4 py-2 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-sm font-medium shadow-md shadow-emerald-950/40 transition-all disabled:opacity-50"
+                    className="px-4 py-2 ys-button bg-ys-success/15 border-ys-success text-ys-success rounded-lg text-sm font-medium disabled:opacity-50"
                   >
                     Import
                   </button>
@@ -402,7 +402,7 @@ export default function SamplingSettingsTab({
                       setShowImportDialog(false);
                       setImportJson("");
                     }}
-                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg text-sm font-medium transition-colors"
+                    className="ys-button px-4 py-2 rounded-lg text-sm font-medium"
                   >
                     Cancel
                   </button>
@@ -411,7 +411,7 @@ export default function SamplingSettingsTab({
             ) : (
               <button
                 onClick={() => setShowImportDialog(true)}
-                className="w-full py-2 border border-dashed border-white/15 hover:border-purple-400 rounded-lg text-sm text-blue-300/60 hover:text-purple-300 transition-colors"
+                className="w-full py-2 border border-dashed border-ys-border hover:border-ys-accent rounded-lg text-sm text-ys-muted hover:text-ys-accent transition-colors"
               >
                 <DynamicIcon name="Download" className="w-4 h-4 inline mr-1" />
                 Import Preset from JSON
@@ -451,7 +451,7 @@ export default function SamplingSettingsTab({
       {/* Advanced Settings Toggle */}
       <button
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200"
+        className="flex items-center gap-2 text-sm text-ys-accent hover:underline"
       >
         <DynamicIcon
           name={showAdvanced ? "ChevronUp" : "ChevronDown"}
@@ -462,8 +462,8 @@ export default function SamplingSettingsTab({
 
       {/* Advanced Settings */}
       {showAdvanced && (
-        <div className="space-y-4 p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg">
-          <h4 className="text-sm font-medium text-white flex items-center gap-2">
+        <div className="space-y-4 p-4 ys-card rounded-lg">
+          <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
             <DynamicIcon name="SlidersHorizontal" className="w-4 h-4" />
             Advanced Sampling
           </h4>
@@ -492,8 +492,8 @@ export default function SamplingSettingsTab({
             rightLabel="Penalize"
           />
 
-          <div className="pt-3 border-t border-white/10">
-            <p className="text-xs text-amber-300 mb-3 flex items-center gap-1">
+          <div className="pt-3 border-t border-ys-border">
+            <p className="text-xs text-ys-warning mb-3 flex items-center gap-1">
               <DynamicIcon name="AlertTriangle" className="w-3.5 h-3.5" />
               The following settings only work with DeepInfra and OpenRouter
               models
@@ -541,8 +541,8 @@ export default function SamplingSettingsTab({
       )}
 
       {/* Info Box */}
-      <div className="p-3 bg-blue-500/[0.06] border border-blue-400/20 rounded-lg">
-        <p className="text-xs text-blue-200/80 flex items-start gap-1.5">
+      <div className="p-3 bg-ys-accent/10 border border-ys-accent/20 rounded-lg">
+        <p className="text-xs text-ys-muted flex items-start gap-1.5">
           <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
             Sampling settings only affect the <strong>story stage</strong> of

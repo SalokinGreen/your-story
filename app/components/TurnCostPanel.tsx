@@ -116,8 +116,8 @@ export default function TurnCostPanel({
 
   if (!estimate) {
     return (
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg">
-        <div className="h-4 w-32 bg-white/10 rounded animate-pulse" />
+      <div className="p-4 ys-card rounded-lg">
+        <div className="h-4 w-32 bg-ys-surface-2 rounded animate-pulse" />
       </div>
     );
   }
@@ -129,14 +129,14 @@ export default function TurnCostPanel({
   );
 
   return (
-    <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
+    <div className="p-4 ys-card rounded-lg space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="text-sm font-medium text-white flex items-center gap-2">
+          <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
             <DynamicIcon name="Receipt" className="w-4 h-4" />
             Cost per turn
           </h4>
-          <p className="text-xs text-blue-300/60 mt-1">
+          <p className="text-xs text-ys-muted mt-1">
             What one round of play costs on your own API keys - the GM, the
             narration, the choices, and the background layers.
           </p>
@@ -144,42 +144,42 @@ export default function TurnCostPanel({
       </div>
 
       {/* Headline prediction */}
-      <div className="bg-linear-to-r from-purple-600/25 to-blue-600/25 border border-purple-400/20 rounded-lg p-3">
+      <div className="bg-ys-accent/15 border border-ys-accent/20 rounded-lg p-3">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-2xl font-bold text-white tabular-nums">
+          <span className="text-2xl font-bold text-ys-text tabular-nums">
             {formatUsd(estimate.expectedUsd)}
           </span>
-          <span className="text-xs text-blue-200/70">per turn, typically</span>
+          <span className="text-xs text-ys-muted">per turn, typically</span>
         </div>
-        <div className="text-xs text-blue-200/70 mt-1">
+        <div className="text-xs text-ys-muted mt-1">
           Range {formatUsd(estimate.lowUsd)} - {formatUsd(estimate.highUsd)}
           {perDollar !== null && (
-            <span className="text-blue-200/50">
+            <span className="text-ys-muted">
               {" "}
               &middot; about {perDollar.toLocaleString()} turns per $1
             </span>
           )}
         </div>
         <div className="grid grid-cols-2 gap-2 mt-3">
-          <div className="bg-black/20 rounded-md px-2.5 py-2">
-            <div className="text-[10px] uppercase tracking-wide text-blue-300/50">
+          <div className="bg-ys-surface-2 rounded-md px-2.5 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-ys-muted">
               You wait on
             </div>
-            <div className="text-sm font-semibold text-white tabular-nums">
+            <div className="text-sm font-semibold text-ys-text tabular-nums">
               {formatUsd(estimate.foregroundUsd)}
             </div>
           </div>
-          <div className="bg-black/20 rounded-md px-2.5 py-2">
-            <div className="text-[10px] uppercase tracking-wide text-blue-300/50">
+          <div className="bg-ys-surface-2 rounded-md px-2.5 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-ys-muted">
               Background layers
             </div>
-            <div className="text-sm font-semibold text-white tabular-nums">
+            <div className="text-sm font-semibold text-ys-text tabular-nums">
               {formatUsd(estimate.backgroundUsd)}
             </div>
           </div>
         </div>
         {predictedTier && (
-          <p className="text-[11px] text-blue-200/50 mt-2">
+          <p className="text-[11px] text-ys-muted mt-2">
             Assuming {slotLabel(predictedTier.tier)} (
             {getTierModelDisplayName(predictedTier.modelKey)}, effort{" "}
             {predictedTier.reasoningEffort}) for the GM
@@ -190,16 +190,16 @@ export default function TurnCostPanel({
 
       {/* Last turn's real spend */}
       {lastTurn && lastTurn.calls > 0 && (
-        <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+        <div className="bg-ys-surface-2 border border-ys-border rounded-lg p-3">
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
-            <span className="text-xs text-blue-300/60">
+            <span className="text-xs text-ys-muted">
               Last turn actually cost
             </span>
-            <span className="text-base font-semibold text-emerald-300 tabular-nums">
+            <span className="text-base font-semibold text-ys-success tabular-nums">
               {formatUsd(lastTurn.totalUsd)}
             </span>
           </div>
-          <div className="text-[11px] text-blue-300/50 mt-1">
+          <div className="text-[11px] text-ys-muted mt-1">
             {lastTurn.calls} API call{lastTurn.calls === 1 ? "" : "s"} &middot;{" "}
             {lastTurn.promptTokens.toLocaleString()} in /{" "}
             {lastTurn.completionTokens.toLocaleString()} out
@@ -225,22 +225,22 @@ export default function TurnCostPanel({
               <span
                 key={stage.stage}
                 title={`${stage.calls} call(s), ${stage.promptTokens.toLocaleString()} in / ${stage.completionTokens.toLocaleString()} out`}
-                className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-blue-200/70"
+                className="text-[10px] px-2 py-0.5 rounded-full bg-ys-surface-2 border border-ys-border text-ys-muted"
               >
                 {TURN_COST_STAGE_LABELS[stage.stage]}{" "}
-                <span className="text-white/80 tabular-nums">
+                <span className="text-ys-muted tabular-nums">
                   {formatUsd(stage.costUsd)}
                 </span>
               </span>
             ))}
           </div>
           {lastTurn.hasUnpricedCalls && (
-            <p className="text-[11px] text-amber-300/80 mt-2">
+            <p className="text-[11px] text-ys-warning mt-2">
               Some calls used models with no price data - the real total is
               higher.
             </p>
           )}
-          <p className="text-[11px] text-blue-300/40 mt-2">
+          <p className="text-[11px] text-ys-muted mt-2">
             Full per-call breakdown is in Debug Logs, under &ldquo;Turn
             cost&rdquo;.
           </p>
@@ -251,7 +251,7 @@ export default function TurnCostPanel({
       <div>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between text-xs text-blue-300/70 hover:text-blue-200 py-1"
+          className="w-full flex items-center justify-between text-xs text-ys-muted hover:text-ys-text py-1"
         >
           <span className="flex items-center gap-1.5">
             <DynamicIcon
@@ -260,7 +260,7 @@ export default function TurnCostPanel({
             />
             Where the money goes
           </span>
-          <span className="text-blue-300/40">
+          <span className="text-ys-muted">
             {estimate.lines.length} stages
           </span>
         </button>
@@ -272,33 +272,33 @@ export default function TurnCostPanel({
               .map((line) => (
                 <div
                   key={`${line.stage}-${line.label}`}
-                  className="bg-white/[0.03] border border-white/5 rounded-md px-2.5 py-2"
+                  className="bg-ys-surface-2 border border-ys-border rounded-md px-2.5 py-2"
                   title={line.note}
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs text-white truncate">
+                    <span className="text-xs text-ys-text truncate">
                       {line.label}
                     </span>
-                    <span className="text-xs text-blue-100 tabular-nums shrink-0">
+                    <span className="text-xs text-ys-text tabular-nums shrink-0">
                       {formatUsd(line.expectedUsd)}
                     </span>
                   </div>
                   {/* Relative-share bar: the point of this panel is spotting
                       which layer dominates, which a column of numbers hides. */}
-                  <div className="h-1 bg-white/5 rounded-full mt-1.5 overflow-hidden">
+                  <div className="h-1 bg-ys-surface-2 rounded-full mt-1.5 overflow-hidden">
                     <div
-                      className="h-full bg-linear-to-r from-purple-400 to-blue-400 rounded-full"
+                      className="h-full bg-ys-accent rounded-full"
                       style={{
                         width: `${Math.max(2, (line.expectedUsd / maxLineUsd) * 100)}%`,
                       }}
                     />
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[10px] text-blue-300/50">
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[10px] text-ys-muted">
                     <span className="truncate max-w-[45%]">
                       {line.modelName}
                     </span>
                     {line.reasoningEffort && (
-                      <span className="px-1.5 py-px rounded bg-white/5">
+                      <span className="px-1.5 py-px rounded bg-ys-surface-2">
                         {line.reasoningEffort}
                       </span>
                     )}
@@ -314,7 +314,7 @@ export default function TurnCostPanel({
                     {line.calibrated && (
                       <span
                         title="Sized from your own measured turns, not defaults"
-                        className="px-1.5 py-px rounded bg-emerald-500/15 text-emerald-300"
+                        className="px-1.5 py-px rounded bg-ys-success/15 text-ys-success"
                       >
                         measured
                       </span>
@@ -322,7 +322,7 @@ export default function TurnCostPanel({
                     {line.unpriced && (
                       <span
                         title="This model has no prices set, so it reads as free"
-                        className="px-1.5 py-px rounded bg-amber-500/15 text-amber-300"
+                        className="px-1.5 py-px rounded bg-ys-warning/15 text-ys-warning"
                       >
                         no price
                       </span>
@@ -330,7 +330,7 @@ export default function TurnCostPanel({
                     {line.onSubscription && (
                       <span
                         title="Runs through the claude CLI on your own Claude plan: no per-call cost, but it counts toward your plan's usage limits"
-                        className="px-1.5 py-px rounded bg-sky-500/15 text-sky-300"
+                        className="px-1.5 py-px rounded bg-ys-accent/15 text-ys-accent"
                       >
                         on your subscription
                       </span>
@@ -342,9 +342,9 @@ export default function TurnCostPanel({
         )}
       </div>
 
-      <div className="space-y-1 pt-1 border-t border-white/5">
+      <div className="space-y-1 pt-1 border-t border-ys-border">
         {estimate.assumptions.map((assumption) => (
-          <p key={assumption} className="text-[11px] text-blue-300/40">
+          <p key={assumption} className="text-[11px] text-ys-muted">
             {assumption}
           </p>
         ))}
@@ -354,7 +354,7 @@ export default function TurnCostPanel({
               resetTurnCostCalibration();
               refreshEstimate();
             }}
-            className="text-[11px] text-purple-300/70 hover:text-purple-200 hover:underline"
+            className="text-[11px] text-ys-accent hover:underline hover:underline"
           >
             Reset measurements
           </button>

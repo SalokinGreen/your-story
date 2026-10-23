@@ -19,6 +19,18 @@ const TOKENISED_TSX: string[] = [
   "app/components/ModelSelect.tsx",
   "app/components/NotificationContainer.tsx",
   "app/components/FontInitializer.tsx",
+  // slice 2: Settings
+  "app/components/APIKeysModal.tsx",
+  "app/components/AIConfigTab.tsx",
+  "app/components/FontSettingsTab.tsx",
+  "app/components/TurnCostPanel.tsx",
+  "app/components/SamplingSettingsTab.tsx",
+  "app/components/ArchitectureSettingsTab.tsx",
+  "app/components/SyncTab.tsx",
+  "app/components/ImageSettingsTab.tsx",
+  "app/components/ClaudeSubscriptionPanel.tsx",
+  "app/components/InfoTabs.tsx",
+  "app/components/CustomVoiceManager.tsx",
 ];
 
 /** Stylesheets: no hex colour outside the `:root` token block. */

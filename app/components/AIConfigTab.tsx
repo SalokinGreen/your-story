@@ -108,11 +108,11 @@ export function ModelSlotRow({
           : describeClaudeCliStatus(cliStatus);
 
   return (
-    <div className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-2">
+    <div className="p-3 bg-ys-surface-2 rounded-lg border border-ys-border space-y-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-medium text-white">{title}</span>
-          <span className="text-[10px] font-medium uppercase tracking-wide text-blue-300/50 truncate">
+          <span className="text-sm font-medium text-ys-text">{title}</span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-ys-muted truncate">
             {isSubscription ? "claude subscription" : config.provider}
           </span>
         </div>
@@ -120,7 +120,7 @@ export function ModelSlotRow({
           {!keyConfigured && (
             <span
               title="No API key configured for this provider"
-              className="flex items-center gap-1 text-[10px] text-amber-300"
+              className="flex items-center gap-1 text-[10px] text-ys-warning"
             >
               <DynamicIcon name="AlertTriangle" className="w-3 h-3" />
               No key
@@ -129,7 +129,7 @@ export function ModelSlotRow({
           {cliProblem && (
             <span
               title="This slot runs through the claude CLI on your Claude plan - see Claude subscription below"
-              className="flex items-center gap-1 text-[10px] text-amber-300"
+              className="flex items-center gap-1 text-[10px] text-ys-warning"
             >
               <DynamicIcon name="TriangleAlert" className="w-3 h-3" />
               {cliProblem}
@@ -141,7 +141,7 @@ export function ModelSlotRow({
                 setSlotOverride(slot, null);
                 setVersion((n) => n + 1);
               }}
-              className="text-[10px] text-purple-300 hover:text-purple-200 hover:underline"
+              className="text-[10px] text-ys-accent hover:underline hover:underline"
               title={`Reset ${title} to its default model`}
             >
               Reset
@@ -149,7 +149,7 @@ export function ModelSlotRow({
           )}
         </div>
       </div>
-      <p className="text-xs text-blue-300/60">{description}</p>
+      <p className="text-xs text-ys-muted">{description}</p>
       <div className="flex items-center gap-2">
         <ModelSelect
           value={shown.modelKey}
@@ -162,7 +162,7 @@ export function ModelSlotRow({
           }}
           customModels={customModels}
           requireToolCalling
-          className="flex-1 min-w-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white"
+          className="flex-1 min-w-0 text-xs ys-input px-2 py-1.5"
         />
         <select
           aria-label={`${title} effort`}
@@ -175,7 +175,7 @@ export function ModelSlotRow({
             });
             setVersion((n) => n + 1);
           }}
-          className="w-24 shrink-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white capitalize"
+          className="w-24 shrink-0 text-xs ys-input px-2 py-1.5 capitalize"
         >
           {REASONING_EFFORTS.map((effort) => (
             <option key={effort} value={effort}>
@@ -185,7 +185,7 @@ export function ModelSlotRow({
         </select>
       </div>
       {mix.length > 0 && (
-        <p className="text-xs text-amber-300/80">
+        <p className="text-xs text-ys-warning">
           Mixed:{" "}
           {mix
             .map(
@@ -492,7 +492,7 @@ export default function AIConfigTab() {
       <div className="flex items-center justify-center py-8">
         <DynamicIcon
           name="Loader2"
-          className="w-6 h-6 text-purple-500 animate-spin"
+          className="w-6 h-6 text-ys-accent animate-spin"
         />
       </div>
     );
@@ -505,8 +505,8 @@ export default function AIConfigTab() {
           number. */}
       <TurnCostPanel />
 
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+      <div className="p-4 ys-card rounded-lg space-y-3">
+        <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="Brain" className="w-4 h-4" />
           Models
         </h4>
@@ -524,7 +524,7 @@ export default function AIConfigTab() {
             customModels={customModels}
           />
         </div>
-        <p className="text-xs text-blue-300/60">
+        <p className="text-xs text-ys-muted">
           A slot whose model has no key can&rsquo;t run. Pick a model you have a
           key for. Add provider keys in the API Keys tab.
         </p>
@@ -533,20 +533,20 @@ export default function AIConfigTab() {
       <ClaudeSubscriptionPanel />
 
       {/* Custom Models */}
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
+      <div className="p-4 ys-card rounded-lg space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-white flex items-center gap-2">
+          <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
             <DynamicIcon name="Plus" className="w-4 h-4" />
             Custom Models
           </h4>
           <button
             onClick={() => setShowAddCustomModel((v) => !v)}
-            className="text-xs text-purple-300 hover:text-purple-200"
+            className="text-xs text-ys-accent hover:underline"
           >
             {showAddCustomModel ? "Cancel" : "+ Add model"}
           </button>
         </div>
-        <p className="text-xs text-blue-300/60">
+        <p className="text-xs text-ys-muted">
           Register any OpenRouter model ID to use it for Default or Advanced
           above, in addition to the built-in models. Requires an
           OpenRouter key in the API Keys tab.
@@ -557,19 +557,19 @@ export default function AIConfigTab() {
             {customModels.map((m) => (
               <div
                 key={m.id}
-                className="flex items-center justify-between gap-2 p-2 bg-white/5 rounded-lg border border-white/10"
+                className="flex items-center justify-between gap-2 p-2 bg-ys-surface-2 rounded-lg border border-ys-border"
               >
                 <div className="min-w-0">
-                  <div className="text-sm text-white truncate">
+                  <div className="text-sm text-ys-text truncate">
                     {m.name}
                   </div>
-                  <div className="text-xs text-blue-300/40 font-mono truncate">
+                  <div className="text-xs text-ys-muted font-mono truncate">
                     {m.modelId}
                   </div>
                 </div>
                 <button
                   onClick={() => handleRemoveCustomModel(m.id)}
-                  className="text-blue-300/50 hover:text-red-400 shrink-0"
+                  className="text-ys-muted hover:text-ys-danger shrink-0"
                   title="Remove custom model"
                 >
                   <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
@@ -580,23 +580,23 @@ export default function AIConfigTab() {
         )}
 
         {showAddCustomModel && (
-          <div className="space-y-2 p-3 bg-white/5 rounded-lg border border-white/10">
+          <div className="space-y-2 p-3 bg-ys-surface-2 rounded-lg border border-ys-border">
             <input
               type="text"
               value={newModelName}
               onChange={(e) => setNewModelName(e.target.value)}
               placeholder="Display name (e.g. Claude Opus)"
-              className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-2 py-1 ys-input text-sm"
             />
             <input
               type="text"
               value={newModelId}
               onChange={(e) => setNewModelId(e.target.value)}
               placeholder="OpenRouter model ID (e.g. anthropic/claude-opus-4.1)"
-              className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm font-mono text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-2 py-1 ys-input text-sm font-mono"
             />
             <div className="flex items-center gap-2">
-              <label className="text-xs text-blue-300/60 flex-1">
+              <label className="text-xs text-ys-muted flex-1">
                 Context size
                 <input
                   type="number"
@@ -606,10 +606,10 @@ export default function AIConfigTab() {
                   }
                   min="1000"
                   step="1000"
-                  className="w-full mt-0.5 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full mt-0.5 px-2 py-1 ys-input text-sm"
                 />
               </label>
-              <label className="text-xs text-blue-300/60 flex-1">
+              <label className="text-xs text-ys-muted flex-1">
                 Max output tokens
                 <input
                   type="number"
@@ -619,14 +619,14 @@ export default function AIConfigTab() {
                   }
                   min="500"
                   step="500"
-                  className="w-full mt-0.5 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full mt-0.5 px-2 py-1 ys-input text-sm"
                 />
               </label>
             </div>
             <button
               onClick={handleAddCustomModel}
               disabled={!newModelName.trim() || !newModelId.trim()}
-              className="w-full py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:from-white/10 disabled:to-white/10 disabled:cursor-not-allowed text-white text-sm rounded-lg shadow-md shadow-purple-950/40 transition-all"
+              className="w-full py-1.5 ys-button ys-button--primary disabled:opacity-40 text-sm rounded-lg"
             >
               Add model
             </button>
@@ -636,8 +636,8 @@ export default function AIConfigTab() {
 
       {/* Advanced settings: the side agents and the tier log. Closed by
           default (decision 121). */}
-      <details className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg">
-        <summary className="cursor-pointer select-none text-sm font-medium text-white flex items-center gap-2">
+      <details className="p-4 ys-card rounded-lg">
+        <summary className="cursor-pointer select-none text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="Settings" className="w-4 h-4" />
           Advanced settings
         </summary>
@@ -646,8 +646,8 @@ export default function AIConfigTab() {
 
           {/* Recent Reasoning Tier Calls */}
           {recentTierLogs.length > 0 && (
-            <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-2">
-              <h4 className="text-sm font-medium text-white flex items-center gap-2">
+            <div className="p-4 ys-card rounded-lg space-y-2">
+              <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
                 <DynamicIcon name="History" className="w-4 h-4" />
                 Recent Tier Calls
               </h4>
@@ -655,7 +655,7 @@ export default function AIConfigTab() {
                 {recentTierLogs.map((log, i) => (
                   <div
                     key={`${log.timestamp}-${i}`}
-                    className="text-xs text-blue-300/60 font-mono"
+                    className="text-xs text-ys-muted font-mono"
                   >
                     {log.data?.describe || log.message}
                   </div>
@@ -669,10 +669,10 @@ export default function AIConfigTab() {
       {/* Memory Size Slider */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-blue-200/80">
+          <label className="text-sm font-medium text-ys-muted">
             Memory Size
           </label>
-          <span className="text-sm text-purple-300 font-medium">
+          <span className="text-sm text-ys-accent font-medium">
             {isCustomContextMode
               ? customMaxContext > 0
                 ? `${(customMaxContext / 1000).toFixed(0)}K tokens`
@@ -681,11 +681,11 @@ export default function AIConfigTab() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-green-400 whitespace-nowrap">
+          <span className="text-xs text-ys-success whitespace-nowrap">
             💰 Cheap
           </span>
           <div className="flex-1 relative">
-            <div className="h-2 rounded-full bg-linear-to-r from-green-500 via-yellow-500 to-purple-600" />
+            <div className="h-2 rounded-full bg-linear-to-r from-ys-success via-ys-warning to-ys-accent" />
             <div className="absolute top-0 left-0 right-0 h-2 flex justify-between px-0">
               {[8000, 16000, 36000, 72000, 120000, 200000, -1].map((val) => (
                 <button
@@ -709,14 +709,14 @@ export default function AIConfigTab() {
                     (val !== -1 &&
                       !isCustomContextMode &&
                       customMaxContext === val)
-                      ? "bg-white border-white scale-125 shadow-lg"
-                      : "bg-white/10 border-white/30 hover:border-white hover:scale-110"
+                      ? "bg-ys-text border-ys-text scale-125 shadow-lg"
+                      : "bg-ys-bg border-ys-muted hover:border-ys-text hover:scale-110"
                   }`}
                   title={val === -1 ? "Custom" : `${(val / 1000).toFixed(0)}K`}
                 />
               ))}
             </div>
-            <div className="flex justify-between mt-3 text-[10px] text-blue-300/50">
+            <div className="flex justify-between mt-3 text-[10px] text-ys-muted">
               <span>8K</span>
               <span>16K</span>
               <span>36K</span>
@@ -726,7 +726,7 @@ export default function AIConfigTab() {
               <span>⚙️</span>
             </div>
           </div>
-          <span className="text-xs text-purple-300 whitespace-nowrap">
+          <span className="text-xs text-ys-accent whitespace-nowrap">
             🧠 Memory
           </span>
         </div>
@@ -748,12 +748,12 @@ export default function AIConfigTab() {
               min="1000"
               step="1000"
               placeholder="Enter tokens..."
-              className="w-32 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-32 px-2 py-1 ys-input text-sm text-center"
             />
-            <span className="text-xs text-blue-300/50">tokens</span>
+            <span className="text-xs text-ys-muted">tokens</span>
           </div>
         )}
-        <p className="text-xs text-blue-300/60">
+        <p className="text-xs text-ys-muted">
           Lower = cheaper & faster • Higher = better story memory
         </p>
       </div>
@@ -761,10 +761,10 @@ export default function AIConfigTab() {
       {/* Response Length Slider */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-blue-200/80">
+          <label className="text-sm font-medium text-ys-muted">
             Response Length
           </label>
-          <span className="text-sm text-purple-300 font-medium">
+          <span className="text-sm text-ys-accent font-medium">
             {isCustomOutputMode
               ? customMaxOutput > 0
                 ? `${(customMaxOutput / 1000).toFixed(0)}K tokens`
@@ -773,11 +773,11 @@ export default function AIConfigTab() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-green-400 whitespace-nowrap">
+          <span className="text-xs text-ys-success whitespace-nowrap">
             ⚡ Fast
           </span>
           <div className="flex-1 relative">
-            <div className="h-2 rounded-full bg-linear-to-r from-green-500 via-blue-500 to-purple-600" />
+            <div className="h-2 rounded-full bg-linear-to-r from-ys-success via-ys-warning to-ys-accent" />
             <div className="absolute top-0 left-0 right-0 h-2 flex justify-between px-0">
               {[1000, 2000, 4000, 8000, -1].map((val) => (
                 <button
@@ -801,14 +801,14 @@ export default function AIConfigTab() {
                     (val !== -1 &&
                       !isCustomOutputMode &&
                       customMaxOutput === val)
-                      ? "bg-white border-white scale-125 shadow-lg"
-                      : "bg-white/10 border-white/30 hover:border-white hover:scale-110"
+                      ? "bg-ys-text border-ys-text scale-125 shadow-lg"
+                      : "bg-ys-bg border-ys-muted hover:border-ys-text hover:scale-110"
                   }`}
                   title={val === -1 ? "Custom" : `${(val / 1000).toFixed(0)}K`}
                 />
               ))}
             </div>
-            <div className="flex justify-between mt-3 text-[10px] text-blue-300/50">
+            <div className="flex justify-between mt-3 text-[10px] text-ys-muted">
               <span>1K</span>
               <span>2K</span>
               <span>4K</span>
@@ -816,7 +816,7 @@ export default function AIConfigTab() {
               <span>⚙️</span>
             </div>
           </div>
-          <span className="text-xs text-purple-300 whitespace-nowrap">
+          <span className="text-xs text-ys-accent whitespace-nowrap">
             📝 Length
           </span>
         </div>
@@ -838,15 +838,15 @@ export default function AIConfigTab() {
               min="1000"
               step="500"
               placeholder="Enter tokens..."
-              className="w-32 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-32 px-2 py-1 ys-input text-sm text-center"
             />
-            <span className="text-xs text-blue-300/50">tokens</span>
+            <span className="text-xs text-ys-muted">tokens</span>
           </div>
         )}
-        <p className="text-xs text-blue-300/60">
+        <p className="text-xs text-ys-muted">
           Lower = faster responses • Higher = longer story passages
         </p>
-        <p className="text-xs text-amber-400/70 mt-1">
+        <p className="text-xs text-ys-warning mt-1">
           ⚠️ Minimum 1000 tokens recommended. Some providers count prefill
           against output limit.
         </p>
@@ -862,30 +862,30 @@ export default function AIConfigTab() {
       />
 
       {/* Tool Calling Settings */}
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+      <div className="p-4 ys-card rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="Wrench" className="w-4 h-4" />
           Tool Calling
         </h4>
 
         <div className="space-y-1">
-          <p className="text-sm text-blue-100">
+          <p className="text-sm text-ys-text">
             Tool calling is always enabled.
           </p>
-          <p className="text-xs text-blue-300/60">
+          <p className="text-xs text-ys-muted">
             The AI can modify stats, inventory, and story state.
           </p>
-          <p className="text-xs text-blue-300/60">
+          <p className="text-xs text-ys-muted">
             GM thinking display is always enabled.
           </p>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm text-blue-100">
+            <p className="text-sm text-ys-text">
               Max Tool Rounds
             </p>
-            <p className="text-xs text-blue-300/60">
+            <p className="text-xs text-ys-muted">
               Higher = more state changes but slower generation
             </p>
           </div>
@@ -900,11 +900,11 @@ export default function AIConfigTab() {
                 }
               }}
               disabled={maxToolLoops <= 1}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-blue-200 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-ys-surface-2 text-ys-muted hover:text-ys-text disabled:opacity-50 disabled:cursor-not-allowed"
             >
               -
             </button>
-            <span className="w-8 text-center font-medium text-white">
+            <span className="w-8 text-center font-medium text-ys-text">
               {maxToolLoops}
             </span>
             <button
@@ -917,7 +917,7 @@ export default function AIConfigTab() {
                 }
               }}
               disabled={maxToolLoops >= 50}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-blue-200 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-ys-surface-2 text-ys-muted hover:text-ys-text disabled:opacity-50 disabled:cursor-not-allowed"
             >
               +
             </button>
@@ -926,18 +926,18 @@ export default function AIConfigTab() {
       </div>
 
       {/* Semantic Search (Embeddings) Section */}
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+      <div className="p-4 ys-card rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="Search" className="w-4 h-4" />
           Semantic Search
         </h4>
 
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm text-blue-100">
+            <p className="text-sm text-ys-text">
               Enable Embeddings
             </p>
-            <p className="text-xs text-blue-300/60">
+            <p className="text-xs text-ys-muted">
               Use AI to find relevant lore and memories contextually
             </p>
           </div>
@@ -954,22 +954,22 @@ export default function AIConfigTab() {
               }}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+            <div className="w-11 h-6 bg-ys-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ys-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ys-accent" />
           </label>
         </div>
 
         {embeddingsEnabled && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm text-blue-100">
+              <label className="text-sm text-ys-text">
                 Similarity Threshold
               </label>
-              <span className="text-sm text-purple-300 font-medium">
+              <span className="text-sm text-ys-accent font-medium">
                 {embeddingThreshold.toFixed(2)}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-blue-300 whitespace-nowrap">
+              <span className="text-xs text-ys-muted whitespace-nowrap">
                 🌊 Relaxed
               </span>
               <input
@@ -985,21 +985,21 @@ export default function AIConfigTab() {
                     localStorage.setItem("embeddingThreshold", String(val));
                   }
                 }}
-                className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                className="flex-1 h-2 bg-ys-surface-2 rounded-lg appearance-none cursor-pointer accent-ys-accent"
               />
-              <span className="text-xs text-green-400 whitespace-nowrap">
+              <span className="text-xs text-ys-success whitespace-nowrap">
                 🎯 Precise
               </span>
             </div>
-            <p className="text-xs text-blue-300/60">
+            <p className="text-xs text-ys-muted">
               Lower = more results (broader matching) • Higher = fewer results
               (stricter matching)
             </p>
           </div>
         )}
 
-        <div className="p-2 bg-blue-500/[0.06] border border-blue-400/20 rounded-lg">
-          <p className="text-xs text-blue-200/80 flex items-start gap-1.5">
+        <div className="p-2 bg-ys-accent/10 border border-ys-accent/20 rounded-lg">
+          <p className="text-xs text-ys-muted flex items-start gap-1.5">
             <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>
               When enabled, uses Mistral embeddings to semantically search lore
@@ -1011,14 +1011,14 @@ export default function AIConfigTab() {
       </div>
 
       {/* Reply Length Section */}
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+      <div className="p-4 ys-card rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="AlignLeft" className="w-4 h-4" />
           Reply Length
         </h4>
 
         <div>
-          <p className="text-xs text-blue-300/60 mb-2">
+          <p className="text-xs text-ys-muted mb-2">
             How much prose the narrator writes per turn. Shorter keeps the
             roleplay snappy and back-and-forth; longer writes fuller scenes.
           </p>
@@ -1043,14 +1043,14 @@ export default function AIConfigTab() {
                   }}
                   className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg border text-sm transition-all ${
                     active
-                      ? "bg-linear-to-r from-purple-600 to-blue-600 border-transparent text-white shadow-md shadow-purple-950/40"
-                      : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40"
+                      ? "bg-ys-accent border-transparent text-ys-on-accent"
+                      : "bg-ys-surface-2 border-ys-border text-ys-muted hover:border-ys-accent/40"
                   }`}
                 >
                   <span className="font-medium">{opt.label}</span>
                   <span
                     className={`text-[10px] ${
-                      active ? "text-purple-100" : "text-blue-300/50"
+                      active ? "text-ys-accent" : "text-ys-muted"
                     }`}
                   >
                     {opt.hint}
@@ -1063,18 +1063,18 @@ export default function AIConfigTab() {
       </div>
 
       {/* Role Affirmation (Prefill) Section */}
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+      <div className="p-4 ys-card rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="MessageSquare" className="w-4 h-4" />
           Role Affirmation
         </h4>
 
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm text-blue-100">
+            <p className="text-sm text-ys-text">
               Enable Prefill Messages
             </p>
-            <p className="text-xs text-blue-300/60">
+            <p className="text-xs text-ys-muted">
               Prime AI to follow output format by adding commitment messages
             </p>
           </div>
@@ -1091,12 +1091,12 @@ export default function AIConfigTab() {
               }}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+            <div className="w-11 h-6 bg-ys-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ys-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ys-accent" />
           </label>
         </div>
 
-        <div className="p-2 bg-purple-500/[0.06] border border-purple-400/20 rounded-lg">
-          <p className="text-xs text-purple-200/80 flex items-start gap-1.5">
+        <div className="p-2 bg-ys-accent/10 border border-ys-accent/20 rounded-lg">
+          <p className="text-xs text-ys-accent flex items-start gap-1.5">
             <DynamicIcon
               name="Sparkles"
               className="w-3.5 h-3.5 mt-0.5 shrink-0"
@@ -1112,18 +1112,18 @@ export default function AIConfigTab() {
       </div>
 
       {/* De-AI-ify Prose Section */}
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+      <div className="p-4 ys-card rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="Wand2" className="w-4 h-4" />
           De-AI-ify Prose
         </h4>
 
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm text-blue-100">
+            <p className="text-sm text-ys-text">
               Swap Out AI Vocabulary Tics
             </p>
-            <p className="text-xs text-blue-300/60">
+            <p className="text-xs text-ys-muted">
               Randomly replaces words the AI overuses (ozone, palpable,
               tapestry, testament, ...) with plainer synonyms
             </p>
@@ -1141,12 +1141,12 @@ export default function AIConfigTab() {
               }}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+            <div className="w-11 h-6 bg-ys-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ys-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ys-accent" />
           </label>
         </div>
 
-        <div className="p-2 bg-purple-500/[0.06] border border-purple-400/20 rounded-lg">
-          <p className="text-xs text-purple-200/80 flex items-start gap-1.5">
+        <div className="p-2 bg-ys-accent/10 border border-ys-accent/20 rounded-lg">
+          <p className="text-xs text-ys-accent flex items-start gap-1.5">
             <DynamicIcon
               name="Sparkles"
               className="w-3.5 h-3.5 mt-0.5 shrink-0"

@@ -388,3 +388,47 @@ string.
   picker swatches live in FontSettingsTab.tsx, which is not listed until slice
   2, so no region exemption exists yet; slice 2 records how.
 - `FontInitializer.tsx` and `layout.tsx` are on the ratchet list too.
+
+### Slice 2 — 2026-10-23
+
+**Dependency inventory.** The Settings screen is `APIKeysModal` (in
+`FullScreenView`, converted in slice 1), which renders `AIConfigTab`,
+`ArchitectureSettingsTab`, `ImageSettingsTab`, `CustomVoiceManager`,
+`FontSettingsTab` and `SyncTab`; `AIConfigTab` renders `SamplingSettingsTab`,
+`ModelSelect` (slice 1), `TurnCostPanel` and `SideAgentPickers` (exported from
+`ArchitectureSettingsTab`). `ModelSlotRow` is defined inside `AIConfigTab`, not
+a separate file. Not in the plan's list and converted here because the Voice
+tab renders it: `CustomVoiceManager.tsx` (it still had `dark:` pairs on
+grays). `InfoTabs` and `ClaudeSubscriptionPanel` are rendered from the landing
+page and `AIConfigTab` respectively. No data module supplies colours to these
+screens (`ratchet` passes with no inline colour).
+
+**Judgment calls.**
+- *Picker swatches need no exemption.* They take their colours from
+  `THEME_PRESETS` through `style={{ backgroundColor: themeOption.background }}`
+  (a property, not a literal), so `FontSettingsTab.tsx` is listed outright.
+- *Provider tiles* in the API keys tab (each had its own brand gradient) are
+  one `bg-ys-accent` tile with `text-ys-on-accent` initials; the initials
+  already name the provider. `InfoTabs`' per-card `gradient` field is gone for
+  the same reason.
+- *Toggle switches* (eight copies of the same long class string): off track
+  `bg-ys-border`, knob `after:bg-ys-bg`, on track `peer-checked:bg-ys-accent`.
+  The old knob was white on a translucent-white track, which would vanish on
+  Paper White.
+- *Gradient primary buttons* became `ys-button ys-button--primary` (sizes kept);
+  the emerald "apply" button in Sampling is `ys-button` with `ys-success` fill,
+  border and text; selected pills are `bg-ys-accent text-ys-on-accent`.
+- *Inputs* (22 of them) are `ys-input`; `p-4` panels are `ys-card`, and panels
+  nested in a card use `bg-ys-surface-2`.
+- *Context-size and speed sliders in AIConfigTab:* the green-yellow-purple bar
+  is `from-ys-success via-ys-warning to-ys-accent` (the speed bar's old
+  green-blue-purple now uses the same); the stop dots are `bg-ys-text` when
+  selected and `bg-ys-bg` with a muted border otherwise (both were the same
+  colour after the first mapping pass).
+- *Mechanical pass.* A script mapped the class tokens (blue-100 to text,
+  other blue/white-alpha text to muted, purple/violet to accent, red/green/
+  amber to the ys meaning tokens); everything it could not (gradients, hover
+  pairs that became no-ops, the knobs, nested surfaces, selected states) was
+  hand-fixed and read through.
+- Tests: no markup test needed changing. The suite grew by the 11 ratchet
+  entries.

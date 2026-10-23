@@ -163,7 +163,7 @@ function Toggle({
         onChange={(e) => onChange(e.target.checked)}
         className="sr-only peer"
       />
-      <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+      <div className="w-11 h-6 bg-ys-border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ys-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ys-accent" />
     </label>
   );
 }
@@ -199,25 +199,25 @@ function StageOverrideCard({
   };
 
   return (
-    <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
+    <div className="p-4 ys-card rounded-lg space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <DynamicIcon name={icon} className="w-4 h-4 text-purple-300 shrink-0" />
-          <h4 className="text-sm font-medium text-white truncate">{title}</h4>
+          <DynamicIcon name={icon} className="w-4 h-4 text-ys-accent shrink-0" />
+          <h4 className="text-sm font-medium text-ys-text truncate">{title}</h4>
         </div>
         <Toggle
           checked={pinned}
           onChange={(checked) => onChange(checked ? effective : null)}
         />
       </div>
-      <p className="text-xs text-blue-300/60">{description}</p>
+      <p className="text-xs text-ys-muted">{description}</p>
       {pinned ? (
         <div className="flex items-center gap-2">
           <ModelSelect
             value={effective.modelKey}
             onChange={(modelKey) => onChange({ ...effective, modelKey })}
             customModels={customModels}
-            className="flex-1 min-w-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white"
+            className="flex-1 min-w-0 text-xs ys-input px-2 py-1.5"
           />
           <select
             value={effective.reasoningEffort}
@@ -227,7 +227,7 @@ function StageOverrideCard({
                 reasoningEffort: e.target.value as ReasoningEffort,
               })
             }
-            className="w-24 shrink-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white capitalize"
+            className="w-24 shrink-0 text-xs ys-input px-2 py-1.5 capitalize"
           >
             {REASONING_EFFORTS.map((effort) => (
               <option key={effort} value={effort}>
@@ -237,7 +237,7 @@ function StageOverrideCard({
           </select>
         </div>
       ) : (
-        <p className="text-xs text-blue-300/40 italic">
+        <p className="text-xs text-ys-muted italic">
           {offNote ??
             `Off - runs on ${SIDE_AGENT_DEFAULT_MODEL_KEY}, effort ${SIDE_AGENT_DEFAULT_EFFORT}.`}
         </p>
@@ -350,14 +350,14 @@ export function SideAgentPickers({
           onChange={handleStoryProgressObserverModelChange}
           customModels={customModels}
         />
-        <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-2">
+        <div className="p-4 ys-card rounded-lg space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-white">Check-in interval</span>
-            <span className="text-purple-300 font-medium text-xs">
+            <span className="text-sm text-ys-text">Check-in interval</span>
+            <span className="text-ys-accent font-medium text-xs">
               Every {storyProgressCheckInterval} turns
             </span>
           </div>
-          <p className="text-xs text-blue-300/60">
+          <p className="text-xs text-ys-muted">
             How many accepted turns pass between check-ins.
           </p>
           <input
@@ -369,7 +369,7 @@ export function SideAgentPickers({
             onChange={(e) =>
               handleStoryProgressCheckIntervalChange(parseInt(e.target.value, 10))
             }
-            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            className="w-full h-2 bg-ys-surface-2 rounded-lg appearance-none cursor-pointer accent-ys-accent"
           />
         </div>
       </div>
@@ -430,11 +430,11 @@ export default function ArchitectureSettingsTab() {
 
       {/* Architecture Overview */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+        <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
           <DynamicIcon name="Layers" className="w-4 h-4" />
           The Five-Layer Architecture
         </h4>
-        <p className="text-xs text-blue-300/60">
+        <p className="text-xs text-ys-muted">
           The GM is an AI that narrates and proposes tool calls; a
           deterministic engine executes them. Everything below is that
           engine&rsquo;s five layers - tap one to read what it does.
@@ -445,7 +445,7 @@ export default function ArchitectureSettingsTab() {
             return (
               <div
                 key={layer.title}
-                className="bg-white/5 rounded-lg border border-white/10 overflow-hidden"
+                className="bg-ys-surface-2 rounded-lg border border-ys-border overflow-hidden"
               >
                 <button
                   type="button"
@@ -453,16 +453,16 @@ export default function ArchitectureSettingsTab() {
                   className="w-full flex items-center justify-between gap-2 p-3 text-left"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-purple-300/70 bg-purple-500/15 px-1.5 py-0.5 rounded">
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-ys-accent bg-ys-accent/15 px-1.5 py-0.5 rounded">
                       {layer.badge}
                     </span>
-                    <span className="text-sm text-white truncate">
+                    <span className="text-sm text-ys-text truncate">
                       {layer.title}
                     </span>
                     {layer.aiDriven && (
                       <span
                         title="Uses its own AI call(s), configurable under AI > Advanced settings"
-                        className="shrink-0 text-[10px] text-blue-300/60 flex items-center gap-1"
+                        className="shrink-0 text-[10px] text-ys-muted flex items-center gap-1"
                       >
                         <DynamicIcon name="Sparkles" className="w-3 h-3" />
                         AI
@@ -471,17 +471,17 @@ export default function ArchitectureSettingsTab() {
                   </div>
                   <DynamicIcon
                     name={isOpen ? "ChevronUp" : "ChevronDown"}
-                    className="w-4 h-4 text-blue-300/50 shrink-0"
+                    className="w-4 h-4 text-ys-muted shrink-0"
                   />
                 </button>
                 {isOpen && (
                   <div className="px-3 pb-3 space-y-1.5">
-                    <p className="text-xs text-blue-200/80">{layer.summary}</p>
-                    <p className="text-[10px] text-blue-300/40 font-mono">
+                    <p className="text-xs text-ys-muted">{layer.summary}</p>
+                    <p className="text-[10px] text-ys-muted font-mono">
                       {layer.files}
                     </p>
                     {layer.aiDriven && (
-                      <p className="text-xs text-blue-300/60">
+                      <p className="text-xs text-ys-muted">
                         Its model is set in AI &rarr; Advanced settings.
                       </p>
                     )}
@@ -495,22 +495,22 @@ export default function ArchitectureSettingsTab() {
 
       {/* Observer Checks (the Observer's model is picked under AI > Advanced settings) */}
       <div className="space-y-3">
-        <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
+        <div className="p-4 ys-card rounded-lg space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-white flex items-center gap-2">
+            <h4 className="text-sm font-medium text-ys-text flex items-center gap-2">
               <DynamicIcon name="ListChecks" className="w-4 h-4" />
               Observer Checks
             </h4>
             {anyObserverOverride && (
               <button
                 onClick={handleResetObserverSettings}
-                className="text-xs text-purple-300 hover:text-purple-200"
+                className="text-xs text-ys-accent hover:underline"
               >
                 Reset all to defaults
               </button>
             )}
           </div>
-          <p className="text-xs text-blue-300/60">
+          <p className="text-xs text-ys-muted">
             Per-check controls: turn a check off entirely, decide whether a
             &ldquo;major&rdquo; instance of it is allowed to reset the turn
             and force a retry, and how readily it flags something in the
@@ -523,10 +523,10 @@ export default function ArchitectureSettingsTab() {
               return (
                 <div
                   key={type}
-                  className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-2"
+                  className="p-3 bg-ys-surface-2 rounded-lg border border-ys-border space-y-2"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-white">{info.label}</span>
+                    <span className="text-sm text-ys-text">{info.label}</span>
                     <Toggle
                       checked={settings.enabled}
                       onChange={(enabled) =>
@@ -534,12 +534,12 @@ export default function ArchitectureSettingsTab() {
                       }
                     />
                   </div>
-                  <p className="text-xs text-blue-300/60">
+                  <p className="text-xs text-ys-muted">
                     {info.description}
                   </p>
                   {settings.enabled && (
                     <>
-                      <label className="flex items-center justify-between gap-2 text-xs text-blue-200/80">
+                      <label className="flex items-center justify-between gap-2 text-xs text-ys-muted">
                         <span>Allow this check to reset the turn</span>
                         <input
                           type="checkbox"
@@ -549,15 +549,15 @@ export default function ArchitectureSettingsTab() {
                               triggersReset: e.target.checked,
                             })
                           }
-                          className="accent-purple-500 w-4 h-4"
+                          className="accent-ys-accent w-4 h-4"
                         />
                       </label>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-blue-200/80">
+                          <span className="text-ys-muted">
                             Sensitivity
                           </span>
-                          <span className="text-purple-300 font-medium">
+                          <span className="text-ys-accent font-medium">
                             {settings.sensitivity} -{" "}
                             {sensitivityLabel(settings.sensitivity)}
                           </span>
@@ -573,10 +573,10 @@ export default function ArchitectureSettingsTab() {
                               sensitivity: parseInt(e.target.value, 10),
                             })
                           }
-                          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                          className="w-full h-2 bg-ys-surface-2 rounded-lg appearance-none cursor-pointer accent-ys-accent"
                         />
                         {!info.llmBacked && (
-                          <p className="text-[10px] text-blue-300/40">
+                          <p className="text-[10px] text-ys-muted">
                             Scales the overage multiplier - higher fires on a
                             smaller overage.
                           </p>

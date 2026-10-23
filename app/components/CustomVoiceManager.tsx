@@ -67,7 +67,7 @@ export default function CustomVoiceManager({
 
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+      <label className="block text-sm font-semibold text-ys-muted mb-2">
         Custom Voices
       </label>
       <div className="space-y-2">
@@ -78,11 +78,11 @@ export default function CustomVoiceManager({
             value={newVoiceInput}
             onChange={(e) => setNewVoiceInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addCustomVoice()}
-            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="flex-1 px-4 py-2 ys-input"
           />
           <button
             onClick={addCustomVoice}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            className="ys-button ys-button--primary px-4 py-2 rounded-lg font-medium"
           >
             Add
           </button>
@@ -92,14 +92,14 @@ export default function CustomVoiceManager({
             {customVoices.map((voiceId) => (
               <div
                 key={voiceId}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
+                className="flex items-center justify-between p-3 bg-ys-surface rounded-lg"
               >
-                <span className="font-mono text-sm text-gray-900 dark:text-white">
+                <span className="font-mono text-sm text-ys-text">
                   {voiceId}
                 </span>
                 <button
                   onClick={() => removeCustomVoice(voiceId)}
-                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium text-sm"
+                  className="text-ys-danger hover:text-ys-danger font-medium text-sm"
                 >
                   Remove
                 </button>
@@ -107,7 +107,7 @@ export default function CustomVoiceManager({
             ))}
           </div>
         )}
-        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
+        <p className="text-xs text-ys-muted mt-2 flex items-center gap-1">
           <DynamicIcon name="Lightbulb" className="w-3 h-3" /> Add custom voice
           IDs. {VOICE_ID_HINTS[ttsModel] ?? VOICE_ID_HINTS.elevenlabs}
         </p>

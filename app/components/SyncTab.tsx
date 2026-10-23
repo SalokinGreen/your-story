@@ -164,16 +164,16 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
   if (!configured) {
     return (
       <div className="space-y-6">
-        <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-blue-200/80">
+        <div className="p-4 ys-card rounded-lg space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-ys-muted">
             <DynamicIcon name="CloudOff" className="w-4 h-4" />
             Sync isn&apos;t set up for this build
           </div>
-          <p className="text-xs text-blue-300/60">
+          <p className="text-xs text-ys-muted">
             This app has no account system - cross-device sync talks to a
             small, separately-hosted sync API instead. Deploy{" "}
-            <code className="text-purple-300">sync-worker/</code> and set{" "}
-            <code className="text-purple-300">
+            <code className="text-ys-accent">sync-worker/</code> and set{" "}
+            <code className="text-ys-accent">
               NEXT_PUBLIC_SYNC_API_URL
             </code>{" "}
             to enable this tab.
@@ -185,12 +185,12 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
-        <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+      <div className="p-4 ys-card rounded-lg space-y-3">
+        <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
           <DynamicIcon name="Key" className="w-4 h-4" />
           Sync Key
         </label>
-        <p className="text-xs text-blue-300/60">
+        <p className="text-xs text-ys-muted">
           Whoever has this key can read and overwrite this data - there are
           no accounts or passwords, just this key. Keep it private, and enter
           the same key on each device you want synced.
@@ -203,11 +203,11 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
                 type={revealed ? "text" : "password"}
                 readOnly
                 value={syncKey}
-                className="flex-1 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+                className="flex-1 px-2 py-1.5 ys-input text-xs font-mono"
               />
               <button
                 onClick={() => setRevealed((r) => !r)}
-                className="p-1.5 text-blue-300/60 hover:text-blue-200 rounded-lg"
+                className="p-1.5 text-ys-muted hover:text-ys-text rounded-lg"
                 title={revealed ? "Hide" : "Reveal"}
               >
                 <DynamicIcon
@@ -217,7 +217,7 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
               </button>
               <button
                 onClick={handleCopy}
-                className="p-1.5 text-blue-300/60 hover:text-blue-200 rounded-lg"
+                className="p-1.5 text-ys-muted hover:text-ys-text rounded-lg"
                 title="Copy"
               >
                 <DynamicIcon name="Copy" className="w-4 h-4" />
@@ -226,20 +226,20 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleGenerate}
-                className="text-xs text-purple-500 hover:text-purple-600"
+                className="text-xs text-ys-accent hover:underline"
               >
                 Generate new key
               </button>
               <button
                 onClick={() => setPendingConfirm("forget")}
-                className="text-xs text-red-400 hover:text-red-300"
+                className="text-xs text-ys-danger hover:text-ys-danger"
               >
                 Remove from this device
               </button>
             </div>
             {pendingConfirm && (
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
-                <p className="text-xs text-amber-200/90">
+              <div className="p-3 bg-ys-warning/15 border border-ys-warning/15 rounded-lg space-y-2">
+                <p className="text-xs text-ys-warning">
                   {pendingConfirm === "regenerate"
                     ? "Generate a new sync key? Any other device still using the current key will stop syncing until you re-link it with the new key."
                     : "Remove the sync key from this device? Your local data stays put, but this device will stop syncing until you link a key again."}
@@ -251,7 +251,7 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
                         ? performGenerate
                         : performForget
                     }
-                    className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white text-xs font-medium rounded-lg"
+                    className="ys-button ys-button--danger px-3 py-1.5 text-xs font-medium rounded-lg"
                   >
                     {pendingConfirm === "regenerate"
                       ? "Generate new key"
@@ -259,7 +259,7 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
                   </button>
                   <button
                     onClick={() => setPendingConfirm(null)}
-                    className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white text-xs font-medium rounded-lg"
+                    className="ys-button px-3 py-1.5 text-xs font-medium rounded-lg"
                   >
                     Cancel
                   </button>
@@ -270,14 +270,14 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
         ) : (
           <button
             onClick={handleGenerate}
-            className="px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 text-white text-sm font-medium rounded-lg"
+            className="px-3 py-1.5 ys-button ys-button--primary text-sm font-medium rounded-lg"
           >
             Generate Sync Key
           </button>
         )}
 
-        <div className="pt-2 border-t border-white/10 space-y-2">
-          <label className="text-xs font-medium text-blue-200/80">
+        <div className="pt-2 border-t border-ys-border space-y-2">
+          <label className="text-xs font-medium text-ys-muted">
             Link another device
           </label>
           <div className="flex items-center gap-1">
@@ -286,12 +286,12 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
               value={linkInput}
               onChange={(e) => setLinkInput(e.target.value)}
               placeholder="Paste a sync key from another device..."
-              className="flex-1 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
+              className="flex-1 px-2 py-1.5 ys-input text-xs font-mono"
             />
             <button
               onClick={handleLink}
               disabled={!linkInput.trim()}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/15 disabled:opacity-40 text-white text-xs font-medium rounded-lg whitespace-nowrap"
+              className="ys-button px-3 py-1.5 disabled:opacity-40 text-xs font-medium rounded-lg whitespace-nowrap"
             >
               Link
             </button>
@@ -299,16 +299,16 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
         </div>
       </div>
 
-      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
+      <div className="p-4 ys-card rounded-lg space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
+          <label className="text-sm font-medium text-ys-muted flex items-center gap-2">
             <DynamicIcon name="RefreshCw" className="w-4 h-4" />
             Sync Now
           </label>
           <button
             onClick={handleSyncNow}
             disabled={!syncKey || syncing}
-            className="px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 disabled:opacity-40 text-white text-xs font-medium rounded-lg flex items-center gap-1.5"
+            className="px-3 py-1.5 ys-button ys-button--primary disabled:opacity-40 text-xs font-medium rounded-lg flex items-center gap-1.5"
           >
             {syncing ? (
               <>
@@ -321,7 +321,7 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
           </button>
         </div>
 
-        <p className="text-xs text-blue-300/60">
+        <p className="text-xs text-ys-muted">
           Sync only runs when you tap this button. Changes from different
           devices merge together item by item - creating a story on your
           phone and a different one on your laptop keeps both. Only an edit
@@ -336,16 +336,16 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
             return (
               <div
                 key={bucket}
-                className="flex items-center justify-between text-xs px-2 py-1.5 bg-white/5 rounded-md"
+                className="flex items-center justify-between text-xs px-2 py-1.5 bg-ys-surface-2 rounded-md"
               >
-                <span className="text-blue-200/80">
+                <span className="text-ys-muted">
                   {BUCKET_LABELS[bucket]}
                 </span>
                 <span
                   className={`flex items-center gap-1 ${
                     result?.action === "error"
-                      ? "text-red-400"
-                      : "text-blue-300/60"
+                      ? "text-ys-danger"
+                      : "text-ys-muted"
                   }`}
                 >
                   {result && (
