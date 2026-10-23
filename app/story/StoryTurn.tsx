@@ -326,7 +326,14 @@ export function TurnWorkLine({
   const summary = summarizeTurnWork(blocks);
   const live = streaming ? (summary.live ?? "Thinking…") : undefined;
   if (summary.isEmpty && !live && !reasoningTier) {
-    return trailing ? <div className="text-xs text-ys-muted">{trailing}</div> : null;
+    // No work line to sit at the end of: a lone "…" above the prose reads as
+    // a glitch, and touch players open the row by tapping the turn anyway.
+    // The toggle stays for keyboard users, shown once it has focus.
+    return trailing ? (
+      <div className="sr-only focus-within:not-sr-only flex text-xs text-ys-muted">
+        {trailing}
+      </div>
+    ) : null;
   }
 
   const text = formatTurnWork(summary);

@@ -430,7 +430,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
                         ? "Preparing choices..."
                         : "Writing the story..."
                     : ooc
-                      ? "Talk to the GM, out of character…"
+                      ? "Talk to the GM…"
                       : couchPlayers.length > 1 && activeSpeaker
                         ? `What does ${activeSpeaker.name} do?`
                         : "What do you do?"
