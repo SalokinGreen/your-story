@@ -18,8 +18,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-      <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+    <section className="bg-ys-surface rounded-xl border border-ys-border p-6">
+      <h2 className="text-xl font-semibold text-ys-text mb-3 flex items-center gap-2">
         <DynamicIcon name={icon} className={`w-5 h-5 ${iconClassName}`} />
         {title}
       </h2>
@@ -39,11 +39,11 @@ function Point({
     <div className="flex items-start gap-3">
       <DynamicIcon
         name="Check"
-        className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
+        className="w-5 h-5 text-ys-success shrink-0 mt-0.5"
       />
       <div>
-        <h3 className="font-medium text-white">{title}</h3>
-        <p className="text-sm text-blue-200/60">{children}</p>
+        <h3 className="font-medium text-ys-text">{title}</h3>
+        <p className="text-sm text-ys-muted">{children}</p>
       </div>
     </div>
   );
@@ -52,7 +52,7 @@ function Point({
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2">
-      <span className="text-blue-400 shrink-0">•</span>
+      <span className="text-ys-accent shrink-0">•</span>
       <span className="flex-1 min-w-0">{children}</span>
     </li>
   );
@@ -63,7 +63,7 @@ function Summary({ children }: { children: React.ReactNode }) {
     <li className="flex items-start gap-2">
       <DynamicIcon
         name="Check"
-        className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
+        className="w-4 h-4 text-ys-success shrink-0 mt-0.5"
       />
       <span className="flex-1 min-w-0">{children}</span>
     </li>
@@ -75,28 +75,28 @@ export default function PrivacyPolicy() {
   useRouteBack(() => router.back());
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+    <div className="min-h-screen bg-[image:var(--ys-gradient)]">
       <main className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-blue-200/60 hover:text-blue-200 transition-colors mb-4"
+            className="flex items-center gap-2 text-ys-muted hover:text-ys-text transition-colors mb-4"
           >
             <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
             Back
           </button>
-          <h1 className="text-3xl font-bold text-white mb-2">Privacy Policy</h1>
-          <p className="text-blue-200/40 text-sm">
+          <h1 className="text-3xl font-bold text-ys-text mb-2">Privacy Policy</h1>
+          <p className="text-ys-muted text-sm">
             Last updated: October 20, 2026
           </p>
         </div>
 
         {/* Content */}
-        <div className="space-y-8 text-blue-200/80">
+        <div className="space-y-8 text-ys-text">
           <Section
             icon="Shield"
-            iconClassName="text-blue-400"
+            iconClassName="text-ys-accent"
             title="Your Privacy Matters"
           >
             <p className="leading-relaxed">
@@ -109,7 +109,7 @@ export default function PrivacyPolicy() {
 
           <Section
             icon="BookOpen"
-            iconClassName="text-purple-400"
+            iconClassName="text-ys-accent"
             title="Your Stories Stay on Your Device"
           >
             <div className="space-y-4">
@@ -134,7 +134,7 @@ export default function PrivacyPolicy() {
             </div>
           </Section>
 
-          <Section icon="Bot" iconClassName="text-cyan-400" title="AI Processing">
+          <Section icon="Bot" iconClassName="text-ys-accent" title="AI Processing">
             <div className="space-y-4">
               <p className="leading-relaxed">
                 To write each turn, the app sends the AI provider you chose
@@ -145,13 +145,13 @@ export default function PrivacyPolicy() {
               </p>
               <ul className="space-y-2 text-sm">
                 <Bullet>
-                  <strong className="text-white">Story generation</strong> -
+                  <strong className="text-ys-text">Story generation</strong> -
                   DeepSeek, OpenRouter, Google, Mistral or DeepInfra, whichever
                   serves the model you picked. OpenRouter passes requests on to
                   the company hosting that model.
                 </Bullet>
                 <Bullet>
-                  <strong className="text-white">Optional features</strong>,
+                  <strong className="text-ys-text">Optional features</strong>,
                   only when you use them - voice narration goes to Cartesia or
                   ElevenLabs, voice input and PDF import go to Mistral, and
                   image generation goes to OpenRouter or DeepInfra.
@@ -163,12 +163,12 @@ export default function PrivacyPolicy() {
                   settings there, so check their terms.
                 </Bullet>
                 <Bullet>
-                  <strong className="text-white">
+                  <strong className="text-ys-text">
                     We do not train AI on your stories.
                   </strong>
                 </Bullet>
               </ul>
-              <p className="text-sm text-blue-200/60">
+              <p className="text-sm text-ys-muted">
                 In the desktop and mobile apps, these requests go straight from
                 your device to the provider. In the browser version they pass
                 through a small relay on our web server, because a browser
@@ -181,7 +181,7 @@ export default function PrivacyPolicy() {
             </div>
           </Section>
 
-          <Section icon="Key" iconClassName="text-amber-400" title="Your API Keys">
+          <Section icon="Key" iconClassName="text-ys-warning" title="Your API Keys">
             <ul className="space-y-2 text-sm">
               <Bullet>
                 Your keys are saved only on your device, in the app&apos;s
@@ -200,7 +200,7 @@ export default function PrivacyPolicy() {
 
           <Section
             icon="RefreshCw"
-            iconClassName="text-green-400"
+            iconClassName="text-ys-success"
             title="Sync Between Devices (Optional)"
           >
             <div className="space-y-4">
@@ -229,7 +229,7 @@ export default function PrivacyPolicy() {
 
           <Section
             icon="Users"
-            iconClassName="text-pink-400"
+            iconClassName="text-ys-accent"
             title="Playing Online"
           >
             <ul className="space-y-2 text-sm">
@@ -245,7 +245,7 @@ export default function PrivacyPolicy() {
                 addresses. That&apos;s how direct connections work.
               </Bullet>
               <Bullet>
-                <strong className="text-white">
+                <strong className="text-ys-text">
                   The host&apos;s device sends the whole story to everyone in
                   the room
                 </strong>
@@ -257,7 +257,7 @@ export default function PrivacyPolicy() {
 
           <Section
             icon="EyeOff"
-            iconClassName="text-amber-400"
+            iconClassName="text-ys-warning"
             title="No Tracking"
           >
             <div className="space-y-3 text-sm">
@@ -267,14 +267,14 @@ export default function PrivacyPolicy() {
                 dice are bundled with the app, so just opening it doesn&apos;t
                 contact anyone.
               </p>
-              <p className="text-blue-200/60">
+              <p className="text-ys-muted">
                 Links to other sites, such as Ko-fi, open those sites under
                 their own policies.
               </p>
             </div>
           </Section>
 
-          <Section icon="Lock" iconClassName="text-green-400" title="Security">
+          <Section icon="Lock" iconClassName="text-ys-success" title="Security">
             <p className="text-sm leading-relaxed">
               Connections to AI providers, the relay and the sync server use
               HTTPS, and online play uses the encryption built into WebRTC.
@@ -286,7 +286,7 @@ export default function PrivacyPolicy() {
 
           <Section
             icon="MessageCircle"
-            iconClassName="text-blue-400"
+            iconClassName="text-ys-accent"
             title="Questions?"
           >
             <p className="text-sm leading-relaxed">
@@ -296,7 +296,7 @@ export default function PrivacyPolicy() {
                 href={ISSUES_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-300 underline hover:text-blue-200"
+                className="text-ys-muted underline hover:text-ys-text"
               >
                 our GitHub
               </a>
@@ -306,9 +306,9 @@ export default function PrivacyPolicy() {
           </Section>
 
           {/* Summary Box */}
-          <section className="bg-green-500/10 rounded-xl border border-green-500/30 p-6">
-            <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Sparkles" className="w-5 h-5 text-green-400" />
+          <section className="bg-ys-success/10 rounded-xl border border-ys-success/30 p-6">
+            <h2 className="text-lg font-semibold text-ys-text mb-3 flex items-center gap-2">
+              <DynamicIcon name="Sparkles" className="w-5 h-5 text-ys-success" />
               TL;DR
             </h2>
             <ul className="space-y-2 text-sm">
@@ -336,7 +336,7 @@ export default function PrivacyPolicy() {
         <div className="mt-8 text-center">
           <button
             onClick={() => router.push("/")}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="px-6 py-2 bg-ys-accent text-ys-on-accent font-medium rounded-lg transition-colors hover:opacity-90"
           >
             Back to Home
           </button>

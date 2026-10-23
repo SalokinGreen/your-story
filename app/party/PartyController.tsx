@@ -14,6 +14,13 @@ import {
   type PartyRequestView,
   type PlayerView,
 } from "../misc/party/protocol";
+import { DEFAULT_JOIN_COLOR } from "../misc/multiplayer/palette";
+import {
+  DEFAULT_THEME_ID,
+  THEME_PRESETS,
+  applyThemeVars,
+  findThemePreset,
+} from "../story/themeTokens";
 
 const PROFILE_STORAGE_KEY = "yourStoryPartyProfile";
 
@@ -62,17 +69,86 @@ function useNow(active: boolean): number {
   return now;
 }
 
-const card = "rounded-2xl border border-white/10 bg-white/[0.04] p-4";
+const card = "rounded-2xl border border-ys-border bg-ys-surface p-4";
 const primaryButton =
-  "w-full min-h-12 rounded-xl bg-blue-500 px-5 py-3 text-base font-semibold text-white active:bg-blue-600 disabled:opacity-40";
+  "w-full min-h-12 rounded-xl bg-ys-accent px-5 py-3 text-base font-semibold text-ys-on-accent active:opacity-90 disabled:opacity-40";
 const secondaryButton =
-  "min-h-11 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base text-blue-100 active:bg-white/10 disabled:opacity-40";
+  "min-h-11 rounded-xl border border-ys-border bg-ys-surface px-4 py-2 text-base text-ys-text active:bg-ys-surface-2 disabled:opacity-40";
+
+// This phone's own colour theme (decision 140): the same key and presets as
+// the app's Settings, written to this device's localStorage only. A phone
+// opened from the QR code is its own origin, so it does not share the
+// desktop's choice.
+const THEME_KEY = "storyTheme";
+const themeListeners = new Set<() => void>();
+
+function subscribeTheme(cb: () => void): () => void {
+  themeListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    themeListeners.delete(cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function readThemeId(): string {
+  try {
+    return findThemePreset(localStorage.getItem(THEME_KEY)).id;
+  } catch {
+    return DEFAULT_THEME_ID;
+  }
+}
+
+function ThemePicker() {
+  const themeId = useSyncExternalStore(subscribeTheme, readThemeId, () => DEFAULT_THEME_ID);
+  const pick = (id: string) => {
+    try {
+      localStorage.setItem(THEME_KEY, id);
+    } catch {
+      // Private mode: the theme applies for this visit only.
+    }
+    applyThemeVars(findThemePreset(id));
+    themeListeners.forEach((cb) => cb());
+  };
+  return (
+    <details className="mt-auto pt-4 text-sm text-ys-muted">
+      <summary className="cursor-pointer select-none py-2">Theme</summary>
+      <div className="grid grid-cols-4 gap-2 pb-2">
+        {THEME_PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            onClick={() => pick(preset.id)}
+            aria-pressed={themeId === preset.id}
+            title={preset.name}
+            className={`rounded-lg p-1 ${
+              themeId === preset.id
+                ? "ring-2 ring-ys-accent ring-offset-2 ring-offset-ys-bg"
+                : "ring-1 ring-ys-border"
+            }`}
+          >
+            <span
+              className="flex aspect-square items-center justify-center rounded-md border border-ys-border text-xs font-medium"
+              style={{ backgroundColor: preset.background, color: preset.text }}
+            >
+              Aa
+            </span>
+            <span className="mt-1 block truncate text-center text-[10px] text-ys-muted">
+              {preset.name}
+            </span>
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-dvh bg-[#0d1829] text-white">
+    <main className="min-h-dvh bg-ys-bg text-ys-text">
       <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))]">
         {children}
+        <ThemePicker />
       </div>
     </main>
   );
@@ -88,7 +164,7 @@ function ToastBanner({ text }: { text: string }) {
   return (
     <div
       role="status"
-      className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-xl border border-amber-300/30 bg-amber-950/95 px-4 py-3 text-sm text-amber-100 shadow-lg"
+      className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-xl border border-ys-warning/40 bg-ys-surface px-4 py-3 text-sm text-ys-warning shadow-lg"
     >
       {text}
     </div>
@@ -104,7 +180,7 @@ export default function PartyController() {
     return (
       <Shell>
         <h1 className="mt-10 text-2xl font-semibold">Your Story</h1>
-        <p className="text-blue-200/80">
+        <p className="text-ys-text">
           Scan the QR code on the table&apos;s screen to join. It opens this page with your link.
         </p>
       </Shell>
@@ -115,7 +191,7 @@ export default function PartyController() {
     return (
       <Shell>
         <h1 className="mt-10 text-2xl font-semibold">Disconnected</h1>
-        <div className={`${card} space-y-3 text-blue-100/90`}>
+        <div className={`${card} space-y-3 text-ys-text`}>
           <p>
             {socket.kickedReason?.includes("removed")
               ? "You were removed from the table."
@@ -133,7 +209,7 @@ export default function PartyController() {
     return (
       <Shell>
         <h1 className="mt-10 text-2xl font-semibold">Can&apos;t reach the table</h1>
-        <div className={`${card} space-y-3 text-blue-100/90`}>
+        <div className={`${card} space-y-3 text-ys-text`}>
           <p>Check that this phone is on the same Wi-Fi as the computer running Your Story.</p>
           <p>
             If the table was closed and opened again, its link has changed: scan the QR code on the
@@ -151,7 +227,7 @@ export default function PartyController() {
     return (
       <Shell>
         <h1 className="mt-10 text-2xl font-semibold">Your Story</h1>
-        <p className="text-blue-200/80">
+        <p className="text-ys-text">
           {state === "reconnecting" ? "Reconnecting to the table…" : "Joining the table…"}
         </p>
       </Shell>
@@ -161,7 +237,7 @@ export default function PartyController() {
   return (
     <Shell>
       {state !== "open" && (
-        <div role="status" className="rounded-xl bg-amber-500/15 px-4 py-2 text-sm text-amber-100">
+        <div role="status" className="rounded-xl bg-ys-warning/15 px-4 py-2 text-sm text-ys-warning">
           Reconnecting to the table…
         </div>
       )}
@@ -177,7 +253,7 @@ function JoinForm({ socket, view }: { socket: PartySocket; view: PlayerView }) {
   const join = view.join;
   const [profile] = useState<Profile | null>(() => loadProfile());
   const [name, setName] = useState(profile?.name ?? "");
-  const [color, setColor] = useState(profile?.color ?? join?.palette[0] ?? "#22c55e");
+  const [color, setColor] = useState(profile?.color ?? join?.palette[0] ?? DEFAULT_JOIN_COLOR);
   const [archetype, setArchetype] = useState(profile?.archetype ?? "");
 
   if (!join) return null;
@@ -199,7 +275,7 @@ function JoinForm({ socket, view }: { socket: PartySocket; view: PlayerView }) {
   return (
     <>
       <header className="mt-6">
-        <p className="text-sm text-blue-200/60">You&apos;re joining</p>
+        <p className="text-sm text-ys-muted">You&apos;re joining</p>
         <h1 className="text-2xl font-semibold">{view.storyName || "the table"}</h1>
       </header>
 
@@ -227,20 +303,20 @@ function JoinForm({ socket, view }: { socket: PartySocket; view: PlayerView }) {
           {join.openSeats.length > 0 ? "Or join as someone new" : "Who are you?"}
         </h2>
         <label className="block space-y-1">
-          <span className="text-sm text-blue-200/70">Your name</span>
+          <span className="text-sm text-ys-muted">Your name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={PARTY_MAX_NAME_CHARS}
             autoComplete="off"
-            className="w-full min-h-12 rounded-xl border border-white/15 bg-white/5 px-4 text-base text-white"
+            className="w-full min-h-12 rounded-xl border border-ys-border bg-ys-surface px-4 text-base text-ys-text"
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
             }}
           />
         </label>
         <div className="space-y-1">
-          <span className="text-sm text-blue-200/70">Your colour</span>
+          <span className="text-sm text-ys-muted">Your colour</span>
           <div className="flex flex-wrap gap-3">
             {join.palette.map((c) => (
               <button
@@ -249,24 +325,24 @@ function JoinForm({ socket, view }: { socket: PartySocket; view: PlayerView }) {
                 aria-label={`Colour ${c}`}
                 aria-pressed={color === c}
                 onClick={() => setColor(c)}
-                className={`h-11 w-11 rounded-full border-2 ${color === c ? "border-white" : "border-transparent"}`}
+                className={`h-11 w-11 rounded-full border-2 ${color === c ? "border-ys-text" : "border-transparent"}`}
                 style={{ backgroundColor: c }}
               />
             ))}
           </div>
         </div>
         <label className="block space-y-1">
-          <span className="text-sm text-blue-200/70">How do you like to play? (optional)</span>
+          <span className="text-sm text-ys-muted">How do you like to play? (optional)</span>
           <select
             value={archetype}
             onChange={(e) => setArchetype(e.target.value)}
-            className="w-full min-h-12 rounded-xl border border-white/15 bg-white/5 px-3 text-base text-white"
+            className="w-full min-h-12 rounded-xl border border-ys-border bg-ys-surface px-3 text-base text-ys-text"
           >
-            <option value="" className="text-black">
+            <option value="" className="text-ys-text">
               No preference
             </option>
             {join.archetypes.map((a) => (
-              <option key={a.id} value={a.id} className="text-black">
+              <option key={a.id} value={a.id} className="text-ys-text">
                 {a.label}
               </option>
             ))}
@@ -305,7 +381,7 @@ function Seated({ socket, view }: { socket: PartySocket; view: PlayerView }) {
         />
         <div className="min-w-0">
           <h1 className="truncate text-xl font-semibold">{me.name}</h1>
-          <p className="truncate text-sm text-blue-200/60">{view.storyName}</p>
+          <p className="truncate text-sm text-ys-muted">{view.storyName}</p>
         </div>
       </header>
 
@@ -319,7 +395,7 @@ function Seated({ socket, view }: { socket: PartySocket; view: PlayerView }) {
             <li
               key={seat.id}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm ${
-                seat.id === view.spotlightHolderId ? "border-white/60 bg-white/15" : "border-white/10 bg-white/5"
+                seat.id === view.spotlightHolderId ? "border-ys-accent bg-ys-surface-2" : "border-ys-border bg-ys-surface"
               } ${seat.connected ? "" : "opacity-50"}`}
             >
               <span
@@ -328,7 +404,7 @@ function Seated({ socket, view }: { socket: PartySocket; view: PlayerView }) {
                 aria-hidden="true"
               />
               {seat.name}
-              {seat.id === view.spotlightHolderId && <span className="text-amber-200">· spotlight</span>}
+              {seat.id === view.spotlightHolderId && <span className="text-ys-warning">· spotlight</span>}
             </li>
           ))}
         </ul>
@@ -358,7 +434,7 @@ function Seated({ socket, view }: { socket: PartySocket; view: PlayerView }) {
       <section className={`${card} space-y-3`}>
         <h2 className="text-base font-semibold">Waiting to go</h2>
         {view.queue.length === 0 ? (
-          <p className="text-sm text-blue-200/60">Nothing yet. Lines from everyone appear here.</p>
+          <p className="text-sm text-ys-muted">Nothing yet. Lines from everyone appear here.</p>
         ) : (
           <ul className="space-y-1.5">
             {view.queue.map((line) => (
@@ -366,7 +442,7 @@ function Seated({ socket, view }: { socket: PartySocket; view: PlayerView }) {
                 <span className="font-semibold" style={{ color: line.color }}>
                   {line.name}
                 </span>{" "}
-                <span className="break-words text-blue-100/90">{line.text}</span>
+                <span className="break-words text-ys-text">{line.text}</span>
               </li>
             ))}
           </ul>
@@ -384,7 +460,7 @@ function Seated({ socket, view }: { socket: PartySocket; view: PlayerView }) {
       {view.narration && (
         <details open className={card}>
           <summary className="cursor-pointer text-base font-semibold">The story</summary>
-          <p className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap text-[15px] leading-relaxed text-blue-50/90">
+          <p className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap text-[15px] leading-relaxed text-ys-text">
             {view.narration}
           </p>
         </details>
@@ -393,7 +469,7 @@ function Seated({ socket, view }: { socket: PartySocket; view: PlayerView }) {
       {view.sheet && (
         <details className={card}>
           <summary className="cursor-pointer text-base font-semibold">{view.sheet.title}</summary>
-          <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-blue-50/90">
+          <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-ys-text">
             {view.sheet.content}
           </p>
         </details>
@@ -429,15 +505,15 @@ function SpotlightButton({
     const circumference = 2 * Math.PI * radius;
     const fraction = Math.min(1, lockedMs / Math.max(1, cooldownMs));
     return (
-      <div className="flex min-h-14 items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4">
+      <div className="flex min-h-14 items-center gap-3 rounded-xl border border-ys-border bg-ys-surface px-4">
         <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
-          <circle cx="22" cy="22" r={radius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="4" />
+          <circle cx="22" cy="22" r={radius} fill="none" className="stroke-ys-border" strokeWidth="4" />
           <circle
             cx="22"
             cy="22"
             r={radius}
             fill="none"
-            stroke="#f59e0b"
+            className="stroke-ys-warning"
             strokeWidth="4"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -445,7 +521,7 @@ function SpotlightButton({
             transform="rotate(-90 22 22)"
           />
         </svg>
-        <p className="text-sm text-blue-100">
+        <p className="text-sm text-ys-text">
           You were interrupted. You can take it back in {Math.ceil(lockedMs / 1000)} s.
         </p>
       </div>
@@ -479,14 +555,14 @@ function Composer({
   return (
     <section className={`${card} space-y-3`}>
       <label className="block space-y-1">
-        <span className="text-sm text-blue-200/70">{hint}</span>
+        <span className="text-sm text-ys-muted">{hint}</span>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={!enabled}
           rows={3}
           maxLength={PARTY_MAX_LINE_CHARS}
-          className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-base text-white disabled:opacity-40"
+          className="w-full rounded-xl border border-ys-border bg-ys-surface px-4 py-3 text-base text-ys-text disabled:opacity-40"
         />
       </label>
       <button type="button" className={primaryButton} disabled={!enabled || !text.trim()} onClick={add}>
@@ -494,7 +570,7 @@ function Composer({
       </button>
       {choices.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm text-blue-200/70">Or pick a suggestion</p>
+          <p className="text-sm text-ys-muted">Or pick a suggestion</p>
           <div className="flex flex-col gap-2">
             {choices.map((choice) => (
               <button
@@ -539,21 +615,21 @@ function RollCard({
 }) {
   const [value, setValue] = useState("");
   return (
-    <section className={`${card} space-y-3 border-amber-300/40`} aria-label="The GM asks you to roll">
+    <section className={`${card} space-y-3 border-ys-warning/40`} aria-label="The GM asks you to roll">
       <h2 className="text-lg font-semibold">{request.title}</h2>
-      {request.description && <p className="text-[15px] text-blue-100/90">{request.description}</p>}
+      {request.description && <p className="text-[15px] text-ys-text">{request.description}</p>}
       {request.formula && (
-        <p className="font-mono text-sm text-amber-200">Roll {request.formula}</p>
+        <p className="font-mono text-sm text-ys-warning">Roll {request.formula}</p>
       )}
       <label className="block space-y-1">
-        <span className="text-sm text-blue-200/70">What did you roll?</span>
+        <span className="text-sm text-ys-muted">What did you roll?</span>
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           maxLength={200}
           inputMode="text"
           autoComplete="off"
-          className="w-full min-h-12 rounded-xl border border-white/15 bg-white/5 px-4 text-base text-white"
+          className="w-full min-h-12 rounded-xl border border-ys-border bg-ys-surface px-4 text-base text-ys-text"
         />
       </label>
       <button
@@ -591,7 +667,7 @@ function QuestionCard({
   const complete = answers.every((a) => a.skipped || a.selectedLabel || a.customText?.trim());
 
   return (
-    <section className={`${card} space-y-5 border-amber-300/40`} aria-label="The GM asks you a question">
+    <section className={`${card} space-y-5 border-ys-warning/40`} aria-label="The GM asks you a question">
       {request.questions.map((q, i) => (
         <div key={i} className="space-y-2">
           <h2 className="text-lg font-semibold">{q.question}</h2>
@@ -603,12 +679,12 @@ function QuestionCard({
                   key={option.label}
                   type="button"
                   aria-pressed={picked}
-                  className={`${secondaryButton} text-left ${picked ? "border-blue-400 bg-blue-500/20" : ""}`}
+                  className={`${secondaryButton} text-left ${picked ? "border-ys-accent bg-ys-accent/20" : ""}`}
                   onClick={() => set(i, { selectedLabel: option.label, skipped: false })}
                 >
                   <span className="block font-semibold">{option.label}</span>
                   {option.description && (
-                    <span className="block text-sm text-blue-200/70">{option.description}</span>
+                    <span className="block text-sm text-ys-muted">{option.description}</span>
                   )}
                 </button>
               );
@@ -620,12 +696,12 @@ function QuestionCard({
               placeholder="Or answer in your own words"
               maxLength={PARTY_MAX_LINE_CHARS}
               onChange={(e) => set(i, { customText: e.target.value, skipped: false })}
-              className="w-full min-h-12 rounded-xl border border-white/15 bg-white/5 px-4 text-base text-white"
+              className="w-full min-h-12 rounded-xl border border-ys-border bg-ys-surface px-4 text-base text-ys-text"
             />
           )}
           <button
             type="button"
-            className="text-sm text-blue-200/60 underline"
+            className="text-sm text-ys-muted underline"
             onClick={() => set(i, { skipped: true })}
           >
             {answers[i].skipped ? "Skipped" : "Skip this one"}

@@ -584,3 +584,76 @@ notes picker, and the Designer with a draft open. Likeliest to read wrong in
 Paper White: the `/15` danger and warning tints on `bg-ys-surface`, the
 `bg-ys-surface/80` Library header over the gradient, and the Designer's
 message bubble (`bg-ys-accent/25` on the gradient).
+
+### Slice 5 — 2026-10-23
+
+**Dependency inventory.** Beyond the plan's list, a grep of every `.tsx` under
+`app/` that was neither listed nor exempt found these, all converted and put on
+the ratchet: `LastPlayedStories`, `LocalStoryList` and `LocalAdventureList`
+(the home page's lists, which still carried `dark:` pairs), `STTButton`,
+`LandingAuthSection`, `StaticIcon` (one `bg-gray-400`). Clean already and now
+listed: `DynamicIcon`, `InlineScript`, `NativeBackButton`, `app/party/page.tsx`,
+`APIKeysContext`, `NotificationContext` (each checked with the detector, not
+assumed). `ProfilePickerModal`, `LibraryPickerModal` and `IconPicker` were done
+in slices 3 and 4. `ClockCategorySelector` is imported nowhere, converted anyway
+so the ratchet can close.
+
+**Converted (slice 5):** `PDFImporter`, `pdf-import/ExtractionPreview`,
+`pdf-import/NotePreviewCard` (its `prose-invert` removed), `GuidedStoryStart`,
+`ClockCategorySelector`, `MassLoreImageGenerator`, `IconAttribution`,
+`SiteHeader`, `app/page.tsx`, `app/terms/page.tsx`, `app/privacy/page.tsx`,
+`PartyController`, plus the six extras above.
+
+**Exempt list (the sweep), with reasons** (in the ratchet's `EXEMPT`):
+`app/misc/multiplayer/palette.ts` (player colours), `app/misc/diceColors.ts`
+(dice materials), `app/components/GameIcon.tsx` (matches the icon library's SVG
+fills), `app/dev/dice-spike/page.tsx` (throwaway spike), `app/misc/folderColors.ts`,
+`app/misc/folderLibraryExport.ts` and `app/misc/localFolderManager.ts` (the
+default `#9333ea` folder colour is stored data, not chrome),
+`app/story/themeTokens.ts` and `app/misc/themeBootstrap.ts` (they define the
+themes). No other `.tsx` or `.ts` file under `app/` holds a colour.
+
+**Judgment calls.**
+- *Method.* The slice 2-4 script again (now with `dark:` pairs resolved to the
+  dark value before mapping, hover-aware meaning fills, and pale blue text
+  mapped to text/muted instead of accent), then gradients by a second script
+  (strong accent stops: `bg-ys-accent text-ys-on-accent hover:opacity-90`; green,
+  red and amber: the `/15` tint with a `/40` border and meaning-coloured text;
+  dark or faint stops: `bg-ys-surface`, hover `bg-ys-surface-2`; stray
+  `shadow-*-950` glows dropped), then every diff read and fixed by hand.
+- *Page frame.* Home, Terms and Privacy are `bg-[image:var(--ys-gradient)]`.
+  `SiteHeader` takes the gradient too (so it is opaque, not the old 95%
+  translucent navy; the blur stays and is now invisible), and its gradient logo
+  text is `text-ys-accent`; the home title likewise.
+- *`GuidedStoryStart`'s player palette* was a hand-copied list of eight hex
+  colours; it now is `PLAYER_PALETTE` from `palette.ts` (same values). Its
+  progress-dot rail colour and the ring/border offsets that were `#0d1829` are
+  `var(--ys-border)` / `ys-surface`.
+- *`ClockCategorySelector`* (inline style colours): the wheel items read
+  `var(--ys-*)` and `color-mix`; the glows are two module constants.
+- *`PartyController`*: classes on the tokens, the cooldown ring's SVG stroke
+  through `stroke-ys-border` / `stroke-ys-warning` classes (not attributes), the
+  default join colour from `DEFAULT_JOIN_COLOR`. The player colours (`seat.color`,
+  `me.color`, the swatch buttons) stay inline data. Redaction is untouched.
+- *The party theme picker* (decision 140) is a collapsed `<details>` labelled
+  "Theme" at the foot of the page's `Shell` (so it shows in every state:
+  join form, lobby, seated), with the `THEME_PRESETS` swatches (preset background
+  and text through `style`, bordered, the selected one ringed). It writes the
+  phone's own `localStorage.storyTheme` and calls `applyThemeVars`; its selection is a
+  `useSyncExternalStore` over that key so there is no setState-in-effect and no
+  hydration mismatch. It imports `themeTokens.ts` (pure, no story bundle). The
+  layout's bootstrap script and `FontInitializer` already apply the saved theme
+  on load, which is why no extra mount code exists.
+- *Ratchet.* The "every .tsx is listed or exempt" case is un-skipped and passes.
+  A second case widens the sweep to `.ts`: no `.ts` file under `app/` may hold a
+  colour unless exempt (it ran clean after the exemptions above, so the cost was
+  zero). The suite is 2,790 passed, 0 skipped (2,764 and one skipped before).
+- Lint: unchanged per file against the HEAD copies (`PartyController` 0 -> 0).
+
+**Not verified here (the preview was not run, by instruction).** Each screen in
+Ink and Paper White: home, Terms, Privacy, the PDF importer through a preview, the
+freeform start wizard, the pickers, the party page at phone width (picker
+persisting across a reload). The party picker on a real phone over the LAN origin
+needs a device. Likeliest to read wrong in Paper White: the `/15` tints on
+`bg-ys-surface` in the PDF importer, the SiteHeader's opaque gradient, and
+`GuidedStoryStart`'s accent-tinted panels.

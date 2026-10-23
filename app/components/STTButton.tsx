@@ -279,15 +279,15 @@ export default function STTButton({
 
   const getButtonStyle = () => {
     if (disabled || !isSupported) {
-      return "bg-white/5 text-blue-300/40 cursor-not-allowed";
+      return "bg-ys-surface text-ys-muted cursor-not-allowed";
     }
     switch (state) {
       case "recording":
-        return "bg-linear-to-r from-red-600 to-rose-600 text-white shadow-md shadow-red-950/40 animate-pulse";
+        return "shadow-md animate-pulse bg-ys-danger/15 text-ys-danger border border-ys-danger/40";
       case "processing":
-        return "bg-linear-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-950/40 cursor-wait";
+        return "shadow-md cursor-wait bg-ys-warning/15 text-ys-warning border border-ys-warning/40";
       default:
-        return "bg-blue-500/10 hover:bg-blue-500/20 border border-blue-400/20 text-blue-300";
+        return "bg-ys-accent/10 hover:bg-ys-accent/20 border border-ys-accent/20 text-ys-muted";
     }
   };
 
@@ -334,8 +334,8 @@ export default function STTButton({
       {/* Recording indicator */}
       {state === "recording" && (
         <span className="absolute -top-1 -right-1 flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-ys-danger/15 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-ys-danger/15"></span>
         </span>
       )}
     </div>

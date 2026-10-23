@@ -35,30 +35,30 @@ const KIND_STYLES: Record<
   lore: {
     label: "Lore",
     icon: "BookOpen",
-    chip: "bg-blue-500/15 text-blue-200 ring-1 ring-blue-400/25",
-    accent: "text-blue-300",
-    ring: "hover:border-blue-400/30",
+    chip: "bg-ys-accent/15 text-ys-text ring-1 ring-ys-accent/25",
+    accent: "text-ys-muted",
+    ring: "hover:border-ys-accent/30",
   },
   mechanics: {
     label: "Mechanics",
     icon: "Dices",
-    chip: "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/25",
-    accent: "text-amber-300",
-    ring: "hover:border-amber-400/30",
+    chip: "bg-ys-warning/15 text-ys-warning ring-1 ring-ys-warning/25",
+    accent: "text-ys-warning",
+    ring: "hover:border-ys-warning/30",
   },
   character_sheet: {
     label: "Character Sheet",
     icon: "UserRound",
-    chip: "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/25",
-    accent: "text-emerald-300",
-    ring: "hover:border-emerald-400/30",
+    chip: "bg-ys-success/15 text-ys-success ring-1 ring-ys-success/25",
+    accent: "text-ys-success",
+    ring: "hover:border-ys-success/30",
   },
   table: {
     label: "Table",
     icon: "Table",
-    chip: "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25",
-    accent: "text-purple-300",
-    ring: "hover:border-purple-400/30",
+    chip: "bg-ys-accent/15 text-ys-accent ring-1 ring-ys-accent/25",
+    accent: "text-ys-accent",
+    ring: "hover:border-ys-accent/30",
   },
 };
 
@@ -95,7 +95,7 @@ function ChipRow({
   if (items.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <span className="text-blue-300/40">
+      <span className="text-ys-muted">
         <DynamicIcon name={icon} className="w-3 h-3" />
       </span>
       {items.map((item, i) => (
@@ -138,10 +138,10 @@ export default function NotePreviewCard({
 
   return (
     <div
-      className={`rounded-xl border bg-white/[0.03] transition-colors ${style.ring} ${
+      className={`rounded-xl border bg-ys-surface transition-colors ${style.ring} ${
         note.streaming
-          ? "border-purple-400/30 shadow-[0_0_0_1px_rgba(168,85,247,0.12)]"
-          : "border-white/10"
+          ? "border-ys-accent/30 shadow-[0_0_0_1px_rgba(168,85,247,0.12)]"
+          : "border-ys-border"
       }`}
     >
       <button
@@ -156,19 +156,19 @@ export default function NotePreviewCard({
 
         <span className="flex-1 min-w-0">
           <span className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-white text-sm [overflow-wrap:anywhere]">
+            <span className="font-semibold text-ys-text text-sm [overflow-wrap:anywhere]">
               {note.title || (
-                <span className="text-blue-300/50 italic">Writing…</span>
+                <span className="text-ys-muted italic">Writing…</span>
               )}
             </span>
             {note.secrtet && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] leading-none bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/25 flex items-center gap-1">
+              <span className="px-1.5 py-0.5 rounded text-[10px] leading-none bg-ys-accent/15 text-ys-accent ring-1 ring-ys-accent/25 flex items-center gap-1">
                 <DynamicIcon name="EyeOff" className="w-2.5 h-2.5" />
                 Secret
               </span>
             )}
             {note.folder && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] leading-none bg-white/5 text-blue-200/70 flex items-center gap-1">
+              <span className="px-1.5 py-0.5 rounded text-[10px] leading-none bg-ys-surface text-ys-text flex items-center gap-1">
                 <DynamicIcon name="Folder" className="w-2.5 h-2.5" />
                 {note.folder}
               </span>
@@ -176,12 +176,12 @@ export default function NotePreviewCard({
           </span>
 
           {!expanded && (
-            <span className="block text-xs text-blue-200/60 mt-1 line-clamp-2">
+            <span className="block text-xs text-ys-muted mt-1 line-clamp-2">
               {teaser || (
-                <span className="italic text-blue-300/40">No content yet</span>
+                <span className="italic text-ys-muted">No content yet</span>
               )}
               {note.streaming && (
-                <span className="inline-block w-1.5 h-3 ml-0.5 -mb-0.5 bg-purple-300/80 animate-pulse rounded-[1px]" />
+                <span className="inline-block w-1.5 h-3 ml-0.5 -mb-0.5 bg-ys-accent/80 animate-pulse rounded-[1px]" />
               )}
             </span>
           )}
@@ -191,7 +191,7 @@ export default function NotePreviewCard({
           <span className={`text-[10px] font-medium ${style.accent}`}>
             {style.label}
           </span>
-          <span className="text-blue-300/40">
+          <span className="text-ys-muted">
             <DynamicIcon
               name={expanded ? "ChevronUp" : "ChevronDown"}
               className="w-4 h-4"
@@ -206,13 +206,13 @@ export default function NotePreviewCard({
               string, either of which is wider than a phone screen. Wrap what
               can be wrapped and scroll the rest inside the card, so the card
               never widens the page around it. */}
-          <div className="rounded-lg bg-black/20 p-3 overflow-x-auto [overflow-wrap:anywhere] prose prose-sm prose-invert max-w-none text-blue-50/85 prose-headings:text-white prose-strong:text-white prose-a:text-purple-300 prose-table:text-xs">
+          <div className="rounded-lg bg-ys-surface p-3 overflow-x-auto [overflow-wrap:anywhere] prose prose-sm max-w-none text-ys-text prose-headings:text-ys-text prose-strong:text-ys-text prose-a:text-ys-accent prose-table:text-xs">
             {note.content ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {note.content}
               </ReactMarkdown>
             ) : (
-              <p className="italic text-blue-300/40">No content yet</p>
+              <p className="italic text-ys-muted">No content yet</p>
             )}
           </div>
 
@@ -221,27 +221,27 @@ export default function NotePreviewCard({
               <ChipRow
                 icon="KeyRound"
                 items={note.keys ?? []}
-                className="bg-purple-500/10 text-purple-200/80"
+                className="bg-ys-accent/10 text-ys-accent/80"
               />
               <ChipRow
                 icon="Tag"
                 items={note.tags ?? []}
-                className="bg-white/5 text-blue-200/70"
+                className="bg-ys-surface text-ys-text"
               />
               <ChipRow
                 icon="Repeat"
                 items={note.aliases ?? []}
-                className="bg-white/5 text-blue-200/70"
+                className="bg-ys-surface text-ys-text"
               />
               <ChipRow
                 icon="Users"
                 items={note.relatedCharacters ?? []}
-                className="bg-emerald-500/10 text-emerald-200/80"
+                className="bg-ys-success/10 text-ys-success/80"
               />
               <ChipRow
                 icon="MapPin"
                 items={note.relatedLocations ?? []}
-                className="bg-sky-500/10 text-sky-200/80"
+                className="bg-ys-accent/10 text-ys-text"
               />
             </div>
           )}

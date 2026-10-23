@@ -42,12 +42,12 @@ export default function LastPlayedStories() {
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-3 max-w-2xl mx-auto">
-        <h2 className="text-sm font-medium text-blue-200/40 uppercase tracking-wider">
+        <h2 className="text-sm font-medium text-ys-muted uppercase tracking-wider">
           Continue Playing
         </h2>
         <button
           onClick={() => router.push("/library")}
-          className="text-xs text-blue-300/60 hover:text-white transition-colors"
+          className="text-xs text-ys-muted hover:text-ys-text transition-colors"
         >
           View All
         </button>
@@ -59,22 +59,22 @@ export default function LastPlayedStories() {
             <button
               key={story.id}
               onClick={() => router.push(`/story?storyId=${story.id}`)}
-              className="w-full flex items-center gap-3 p-3 bg-blue-950/40 hover:bg-blue-900/50 border border-blue-800/30 hover:border-purple-500/40 rounded-xl transition-all text-left"
+              className="w-full flex items-center gap-3 p-3 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border hover:border-ys-accent/40 rounded-xl transition-all text-left"
             >
-              <div className="w-9 h-9 shrink-0 rounded-full bg-purple-600/20 flex items-center justify-center">
-                <DynamicIcon name="BookOpen" className="w-4 h-4 text-purple-300" />
+              <div className="w-9 h-9 shrink-0 rounded-full bg-ys-accent/20 flex items-center justify-center">
+                <DynamicIcon name="BookOpen" className="w-4 h-4 text-ys-accent" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-white truncate">
+                <span className="block text-sm font-semibold text-ys-text truncate">
                   {story.title}
                 </span>
-                <span className="block text-xs text-blue-300/50">
+                <span className="block text-xs text-ys-muted">
                   {getRelativeTime(story.updatedAt)} · Ch. {chapter + 1}
                 </span>
               </div>
               <DynamicIcon
                 name="ChevronRight"
-                className="w-4 h-4 text-blue-300/40 shrink-0"
+                className="w-4 h-4 text-ys-muted shrink-0"
               />
             </button>
           );

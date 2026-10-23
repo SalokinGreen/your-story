@@ -233,21 +233,21 @@ export default function MassLoreImageGenerator({
   }
 
   return (
-    <div className="border border-purple-400/20 rounded-xl bg-purple-500/[0.06] backdrop-blur-md">
+    <div className="border border-ys-accent/20 rounded-xl bg-ys-accent/[0.06] backdrop-blur-md">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-purple-500/10 transition-colors rounded-xl"
+        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-ys-accent/10 transition-colors rounded-xl"
       >
         <div className="flex items-center gap-2">
-          <DynamicIcon name="Sparkles" className="w-5 h-5 text-purple-400" />
-          <span className="font-medium text-white">Mass Image Generation</span>
-          <span className="px-2 py-0.5 bg-purple-500/15 text-purple-300 rounded-lg text-xs">
+          <DynamicIcon name="Sparkles" className="w-5 h-5 text-ys-accent" />
+          <span className="font-medium text-ys-text">Mass Image Generation</span>
+          <span className="px-2 py-0.5 bg-ys-accent/15 text-ys-accent rounded-lg text-xs">
             {count} lore without images
           </span>
         </div>
         <DynamicIcon
           name={isOpen ? "ChevronUp" : "ChevronDown"}
-          className="w-5 h-5 text-purple-300"
+          className="w-5 h-5 text-ys-accent"
         />
       </button>
 
@@ -256,7 +256,7 @@ export default function MassLoreImageGenerator({
           {/* Settings */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-blue-200">Provider:</label>
+              <label className="text-sm text-ys-text">Provider:</label>
               <select
                 value={imageProvider}
                 onChange={(e) =>
@@ -265,7 +265,7 @@ export default function MassLoreImageGenerator({
                   )
                 }
                 disabled={isGenerating}
-                className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+                className="px-2 py-1 bg-ys-surface border border-ys-border rounded-lg text-ys-text text-sm"
               >
                 <option value="deepinfra">DeepInfra</option>
                 <option value="openrouter">OpenRouter</option>
@@ -273,12 +273,12 @@ export default function MassLoreImageGenerator({
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-sm text-blue-200">Model:</label>
+              <label className="text-sm text-ys-text">Model:</label>
               <select
                 value={imageModel}
                 onChange={(e) => handleModelChange(e.target.value)}
                 disabled={isGenerating}
-                className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
+                className="px-2 py-1 bg-ys-surface border border-ys-border rounded-lg text-ys-text text-sm"
               >
                 {Object.entries(
                   imageProvider === "deepinfra"
@@ -294,20 +294,20 @@ export default function MassLoreImageGenerator({
           </div>
 
           {/* Cost Estimate */}
-          <div className="p-3 bg-white/[0.03] backdrop-blur-md rounded-lg border border-white/10">
+          <div className="p-3 bg-ys-surface backdrop-blur-md rounded-lg border border-ys-border">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-blue-200">Estimated Cost:</span>
-              <span className="font-medium text-white">
+              <span className="text-ys-text">Estimated Cost:</span>
+              <span className="font-medium text-ys-text">
                 {totalCost === 0 ? (
-                  <span className="text-green-400">FREE</span>
+                  <span className="text-ys-success">FREE</span>
                 ) : (
-                  <span className="text-green-400">
+                  <span className="text-ys-success">
                     ~${totalCost.toFixed(2)} via your API key
                   </span>
                 )}
               </span>
             </div>
-            <p className="text-xs text-blue-300/60 mt-1">
+            <p className="text-xs text-ys-muted mt-1">
               {count} images × {costInfo.display} per image
             </p>
           </div>
@@ -316,16 +316,16 @@ export default function MassLoreImageGenerator({
           {isGenerating && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-blue-200">
+                <span className="text-ys-text">
                   Generating: {currentLoreTitle}
                 </span>
-                <span className="text-white">
+                <span className="text-ys-text">
                   {progress.current}/{progress.total}
                 </span>
               </div>
-              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-ys-surface-2 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-linear-to-r from-purple-500 to-blue-500 transition-all duration-300"
+                  className="h-full transition-all duration-300 bg-ys-accent text-ys-on-accent"
                   style={{
                     width: `${(progress.current / progress.total) * 100}%`,
                   }}
@@ -338,7 +338,7 @@ export default function MassLoreImageGenerator({
           <button
             onClick={generateAll}
             disabled={isGenerating || count === 0}
-            className="w-full px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 text-white font-medium rounded-lg flex items-center justify-center gap-2 shadow-md shadow-purple-950/40 transition-all"
+            className="w-full px-4 py-2 disabled:opacity-50 font-medium rounded-lg flex items-center justify-center gap-2 shadow-md transition-all bg-ys-accent text-ys-on-accent hover:opacity-90"
           >
             <DynamicIcon
               name={isGenerating ? "Loader2" : "Sparkles"}
@@ -349,7 +349,7 @@ export default function MassLoreImageGenerator({
               : `Generate ${count} Images`}
           </button>
 
-          <p className="text-xs text-blue-300/50 text-center">
+          <p className="text-xs text-ys-muted text-center">
             Images are generated using AI based on each lore entry&apos;s title
             and content.
           </p>

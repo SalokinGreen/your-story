@@ -14,7 +14,7 @@ export default function LandingAuthSection() {
     <div className="flex flex-wrap justify-center gap-3 mb-6">
       <button
         onClick={() => router.push("/library")}
-        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 text-sm"
+        className="px-5 py-2 bg-ys-accent text-ys-on-accent font-medium rounded-lg transition-colors flex items-center gap-2 text-sm hover:opacity-90"
       >
         <StaticIcon name="Library" className="w-4 h-4" /> Library
       </button>

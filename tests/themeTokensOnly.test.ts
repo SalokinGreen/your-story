@@ -93,6 +93,31 @@ const TOKENISED_TSX: string[] = [
   "app/components/ExportFolderModal.tsx",
   "app/components/JoinGameModal.tsx",
   "app/components/HostGameModal.tsx",
+  // slice 5: everything else, the page frame and the party phone page
+  "app/components/PDFImporter.tsx",
+  "app/components/pdf-import/ExtractionPreview.tsx",
+  "app/components/pdf-import/NotePreviewCard.tsx",
+  "app/components/GuidedStoryStart.tsx",
+  "app/components/ClockCategorySelector.tsx",
+  "app/components/MassLoreImageGenerator.tsx",
+  "app/components/IconAttribution.tsx",
+  "app/components/SiteHeader.tsx",
+  "app/page.tsx",
+  "app/terms/page.tsx",
+  "app/privacy/page.tsx",
+  "app/party/PartyController.tsx",
+  "app/components/LastPlayedStories.tsx",
+  "app/components/LocalAdventureList.tsx",
+  "app/components/LocalStoryList.tsx",
+  "app/components/STTButton.tsx",
+  "app/components/LandingAuthSection.tsx",
+  "app/components/StaticIcon.tsx",
+  "app/components/DynamicIcon.tsx",
+  "app/components/InlineScript.tsx",
+  "app/components/NativeBackButton.tsx",
+  "app/misc/APIKeysContext.tsx",
+  "app/misc/NotificationContext.tsx",
+  "app/party/page.tsx",
 ];
 
 /** Stylesheets: no hex colour outside the `:root` token block. */
@@ -111,6 +136,16 @@ const EXEMPT: Record<string, string> = {
   "app/misc/diceColors.ts": "dice material colours are a fixed palette",
   "app/components/GameIcon.tsx":
     "rewrites the icon library's SVG fills to currentColor; its literals are what it matches, not colours it paints",
+  "app/dev/dice-spike/page.tsx":
+    "a throwaway spike page for the dice tray, not a screen a player reaches",
+  "app/misc/folderColors.ts": "folder colours are player data with fixed defaults",
+  "app/misc/folderLibraryExport.ts":
+    "the fallback folder colour written into an export, data not chrome",
+  "app/misc/localFolderManager.ts":
+    "the default folder colour stored with a new folder, data not chrome",
+  "app/story/themeTokens.ts": "defines the theme presets: its colours are the themes",
+  "app/misc/themeBootstrap.ts":
+    "the serialised copy of the theme presets that runs before paint",
 };
 
 const FAMILIES =
@@ -219,12 +254,12 @@ function read(path: string): string {
   return readFileSync(join(ROOT, path), "utf-8");
 }
 
-function walk(dir: string, out: string[] = []): string[] {
+function walk(dir: string, withTs = false, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (name === "node_modules" || name === ".next") continue;
-    if (statSync(full).isDirectory()) walk(full, out);
-    else if (full.endsWith(".tsx")) {
+    if (statSync(full).isDirectory()) walk(full, withTs, out);
+    else if (full.endsWith(".tsx") || (withTs && full.endsWith(".ts"))) {
       out.push(relative(ROOT, full).split("\\").join("/"));
     }
   }
@@ -319,12 +354,22 @@ describe("the tokenised files", () => {
     }
   });
 
-  // Un-skip in slice 5, when every screen is listed: a new .tsx file under
-  // app/ must then choose, by joining the list or the exempt list.
-  it.skip("every .tsx file under app/ is listed or exempt", () => {
+  // A new .tsx file under app/ must choose, by joining the list or the
+  // exempt list.
+  it("every .tsx file under app/ is listed or exempt", () => {
     const unlisted = walk(join(ROOT, "app")).filter(
       (f) => !TOKENISED_TSX.includes(f) && !(f in EXEMPT),
     );
     expect(unlisted).toEqual([]);
+  });
+
+  // Logic files can build class names and inline colours too (a helper that
+  // returns "bg-red-500", a style object). They are checked wholesale: none
+  // may hold a hard-coded colour unless it is exempt with a reason.
+  it("no .ts file under app/ holds a hard-coded colour unless exempt", () => {
+    const offenders = walk(join(ROOT, "app"), true)
+      .filter((f) => f.endsWith(".ts") && !(f in EXEMPT))
+      .flatMap((f) => colourProblems(read(f)).map((p) => `${f}: ${p}`));
+    expect(offenders).toEqual([]);
   });
 });
