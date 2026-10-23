@@ -18,7 +18,7 @@ export default function PartyModeEditor({
   onlineRoomOpen: boolean;
 }) {
   return (
-    <div className="p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 space-y-5">
+    <div className="p-4 bg-ys-surface backdrop-blur-md rounded-xl border border-ys-border space-y-5">
       <PartyLobby
         party={party}
         blocked={
@@ -28,9 +28,9 @@ export default function PartyModeEditor({
         }
       />
       <label className="block">
-        <span className="flex items-center justify-between text-sm text-blue-100">
+        <span className="flex items-center justify-between text-sm text-ys-text">
           <span>Spotlight cooldown</span>
-          <span className="font-mono text-white">{Math.round(party.cooldownMs / 1000)} s</span>
+          <span className="font-mono text-ys-text">{Math.round(party.cooldownMs / 1000)} s</span>
         </span>
         <input
           type="range"
@@ -41,7 +41,7 @@ export default function PartyModeEditor({
           onChange={(e) => party.setCooldownMs(Number(e.target.value) * 1000)}
           className="mt-2 w-full"
         />
-        <span className="block mt-1 text-xs text-blue-200/50">
+        <span className="block mt-1 text-xs text-ys-muted">
           When someone takes the spotlight from another player, that player can&apos;t take it back
           for this long. Couch co-op keeps its own 4 seconds.
         </span>

@@ -34,15 +34,15 @@ function MeterBar({ meter }: { meter: Meter }) {
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="text-blue-100 font-medium truncate">{meter.name}</span>
-        <span className="text-blue-200/70 tabular-nums shrink-0">
+        <span className="text-ys-text font-medium truncate">{meter.name}</span>
+        <span className="text-ys-muted tabular-nums shrink-0">
           {meter.value}/{meter.max}
           {capLowered ? ` (cap ${meter.cap})` : ""}
           {floorRaised ? ` (floor ${meter.floor})` : ""}
         </span>
       </div>
       <div
-        className="relative h-2.5 mt-1 rounded-full bg-white/10 overflow-hidden"
+        className="relative h-2.5 mt-1 rounded-full bg-ys-surface-2 overflow-hidden"
         role="meter"
         aria-label={meter.name}
         aria-valuemin={meter.min}
@@ -52,31 +52,31 @@ function MeterBar({ meter }: { meter: Meter }) {
         {/* The part above the current cap can't be reached: dimmed and hatched. */}
         {capLowered && (
           <div
-            className="absolute inset-y-0 right-0 bg-black/50"
+            className="absolute inset-y-0 right-0 bg-ys-bg"
             style={{ width: `${100 - capAt}%` }}
           />
         )}
         {floorRaised && (
           <div
-            className="absolute inset-y-0 left-0 bg-black/50"
+            className="absolute inset-y-0 left-0 bg-ys-bg"
             style={{ width: `${floorAt}%` }}
           />
         )}
         <div
-          className="absolute inset-y-0 left-0 rounded-full bg-linear-to-r from-purple-500 to-blue-400"
+          className="absolute inset-y-0 left-0 rounded-full bg-ys-accent"
           style={{ width: `${fill}%` }}
         />
         {(meter.thresholds ?? []).map((t) => (
           <div
             key={`${t.at}:${t.label}`}
-            className="absolute inset-y-0 w-px bg-white/40"
+            className="absolute inset-y-0 w-px bg-ys-surface-2"
             style={{ left: `${pct(t.at, meter.min, meter.max)}%` }}
             title={`${t.label} at ${t.at}`}
           />
         ))}
       </div>
       {threshold && (
-        <p className="text-[11px] text-amber-200/80 mt-0.5">
+        <p className="text-[11px] text-ys-text/80 mt-0.5">
           {threshold.label}
         </p>
       )}
@@ -90,11 +90,11 @@ function TrackBoxes({ track }: { track: ProgressTrack }) {
     <div>
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span
-          className={`font-medium truncate ${dim ? "text-blue-200/50" : "text-blue-100"}`}
+          className={`font-medium truncate ${dim ? "text-ys-muted" : "text-ys-text"}`}
         >
           {track.name}
         </span>
-        <span className="text-blue-200/60 shrink-0 capitalize">
+        <span className="text-ys-muted shrink-0 capitalize">
           {track.rank} {track.kind}
           {dim ? ` · ${track.status}` : ""}
         </span>
@@ -114,8 +114,8 @@ function TrackBoxes({ track }: { track: ProgressTrack }) {
               key={box}
               className={`flex-1 h-4 rounded-sm border grid grid-cols-4 gap-px p-px ${
                 ticks === TICKS_PER_BOX
-                  ? "border-purple-300/60 bg-purple-500/40"
-                  : "border-white/15 bg-white/5"
+                  ? "border-ys-accent/60 bg-ys-accent/40"
+                  : "border-ys-border bg-ys-surface"
               }`}
             >
               {Array.from({ length: TICKS_PER_BOX }, (_, tick) => (
@@ -123,7 +123,7 @@ function TrackBoxes({ track }: { track: ProgressTrack }) {
                   key={tick}
                   className={
                     tick < ticks && ticks < TICKS_PER_BOX
-                      ? "bg-purple-300/80 rounded-[1px]"
+                      ? "bg-ys-accent/80 rounded-[1px]"
                       : ""
                   }
                 />
@@ -140,7 +140,7 @@ function ChallengeLine({ challenge }: { challenge: SceneChallenge }) {
   if (challenge.mode === "tally") {
     const tally = challenge.tally ?? 0;
     return (
-      <p className="text-xs text-blue-100">
+      <p className="text-xs text-ys-text">
         Round {Math.min((challenge.recorded ?? 0) + 1, challenge.rounds)} of{" "}
         {challenge.rounds} · tally {tally > 0 ? `+${tally}` : tally}
       </p>
@@ -150,7 +150,7 @@ function ChallengeLine({ challenge }: { challenge: SceneChallenge }) {
     challenge.requiredSuccesses ?? Math.floor(challenge.rounds / 2) + 1;
   const lose = challenge.maxFailures ?? Math.floor(challenge.rounds / 2) + 1;
   return (
-    <p className="text-xs text-blue-100">
+    <p className="text-xs text-ys-text">
       {challenge.currentSuccesses} of {need} successes ·{" "}
       {challenge.currentFailures} of {lose} failures
     </p>
@@ -189,7 +189,7 @@ export default function MetersPanel({
 
   return (
     <section
-      className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-3 sm:p-4 shadow-[0_4px_24px_rgba(0,0,0,0.3)]"
+      className="bg-ys-surface backdrop-blur-xl rounded-2xl border border-ys-border p-3 sm:p-4 shadow-[0_4px_24px_rgba(0,0,0,0.3)]"
       aria-label="Meters and tracks"
     >
       <button
@@ -197,21 +197,21 @@ export default function MetersPanel({
         className="w-full flex items-center justify-between gap-2 text-left"
         aria-expanded={open}
       >
-        <span className="flex items-center gap-2 text-sm font-bold text-white">
-          <DynamicIcon name="Gauge" className="w-4 h-4 text-purple-300" />
+        <span className="flex items-center gap-2 text-sm font-bold text-ys-text">
+          <DynamicIcon name="Gauge" className="w-4 h-4 text-ys-accent" />
           Meters and tracks
         </span>
         <DynamicIcon
           name={open ? "ChevronUp" : "ChevronDown"}
-          className="w-4 h-4 text-blue-300/60"
+          className="w-4 h-4 text-ys-muted"
         />
       </button>
 
       {open && (
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           {challenge && (
-            <div className="sm:col-span-2 rounded-xl border border-amber-300/20 bg-amber-500/5 px-3 py-2">
-              <p className="text-xs font-semibold text-amber-200">
+            <div className="sm:col-span-2 rounded-xl border border-ys-warning/20 bg-ys-warning/5 px-3 py-2">
+              <p className="text-xs font-semibold text-ys-text">
                 {challenge.name}
               </p>
               <ChallengeLine challenge={challenge} />
@@ -219,7 +219,7 @@ export default function MetersPanel({
           )}
           {owners.map((owner) => (
             <div key={owner} className="space-y-2.5 min-w-0">
-              <h3 className="text-[11px] uppercase tracking-wide text-white/40">
+              <h3 className="text-[11px] uppercase tracking-wide text-ys-muted">
                 {owner === "world" ? "World" : owner}
               </h3>
               {visibleMeters

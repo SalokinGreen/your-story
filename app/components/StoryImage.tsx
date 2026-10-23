@@ -223,7 +223,7 @@ export default function StoryImage({
             <div
               role="dialog"
               aria-modal="true"
-              className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/90 p-2"
+              className="fixed inset-0 z-[1000] flex flex-col items-center justify-center ys-modal-backdrop p-2"
               style={{
                 paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
               }}
@@ -238,7 +238,7 @@ export default function StoryImage({
               <button
                 type="button"
                 aria-label="Close picture"
-                className="absolute top-3 right-3 p-2 rounded-full bg-white/10 text-white hover:bg-white/20"
+                className="absolute top-3 right-3 p-2 rounded-full bg-ys-surface-2 text-ys-text hover:bg-ys-surface-2"
                 onClick={() => setOpen(false)}
               >
                 <DynamicIcon name="X" className="w-5 h-5" />
@@ -246,7 +246,7 @@ export default function StoryImage({
               {/* The cost, the model and Regenerate live here, not under the
                 picture in the feed. */}
               <div
-                className="shrink-0 w-full max-w-[68ch] px-2 pt-2 flex items-center justify-between gap-2 text-xs text-white/60"
+                className="shrink-0 w-full max-w-[68ch] px-2 pt-2 flex items-center justify-between gap-2 text-xs text-ys-muted"
                 onClick={(e) => e.stopPropagation()}
               >
                 <span>{cost ? `${cost} · ${image.model}` : image.model}</span>
@@ -257,7 +257,7 @@ export default function StoryImage({
                       setOpen(false);
                       onRegenerate();
                     }}
-                    className="px-2 py-1 rounded border border-white/20 hover:bg-white/10 text-white/80 hover:text-white"
+                    className="px-2 py-1 rounded border border-ys-border hover:bg-ys-surface-2 text-ys-muted hover:text-ys-text"
                     title="Paint this one again (costs again)"
                   >
                     Regenerate
@@ -299,7 +299,7 @@ export default function StoryImage({
         <button
           type="button"
           onClick={onRegenerate}
-          className="shrink-0 px-2 py-1 rounded-lg border border-ys-border hover:text-ys-text text-ys-text"
+          className="shrink-0 px-2 py-1 rounded-lg border border-ys-border hover:text-ys-text text-ys-muted"
         >
           {view.status === "missing" ? "Regenerate" : "Retry"}
         </button>

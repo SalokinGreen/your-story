@@ -32,21 +32,21 @@ const ATTITUDE_OPTIONS: {
   icon: string;
   color: string;
 }[] = [
-  { value: "hostile", label: "Hostile", icon: "Swords", color: "text-red-400" },
+  { value: "hostile", label: "Hostile", icon: "Swords", color: "text-ys-danger" },
   {
     value: "unfriendly",
     label: "Unfriendly",
     icon: "Frown",
-    color: "text-orange-400",
+    color: "text-ys-warning",
   },
-  { value: "neutral", label: "Neutral", icon: "Minus", color: "text-gray-400" },
+  { value: "neutral", label: "Neutral", icon: "Minus", color: "text-ys-muted" },
   {
     value: "friendly",
     label: "Friendly",
     icon: "Smile",
-    color: "text-green-400",
+    color: "text-ys-success",
   },
-  { value: "allied", label: "Allied", icon: "Shield", color: "text-blue-400" },
+  { value: "allied", label: "Allied", icon: "Shield", color: "text-ys-accent" },
 ];
 
 export default function NPCEditor({
@@ -117,13 +117,13 @@ export default function NPCEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-          <DynamicIcon name="Users" className="w-6 h-6 text-pink-400" /> NPCs (
+        <h4 className="text-lg font-bold text-ys-text mb-3 flex items-center gap-2">
+          <DynamicIcon name="Users" className="w-6 h-6 text-ys-accent" /> NPCs (
           {localNPCs.length})
         </h4>
         <button
           onClick={addNPC}
-          className="px-3 py-1.5 bg-linear-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white text-sm font-medium rounded-lg shadow-md shadow-pink-950/40 transition-all flex items-center gap-1"
+          className="px-3 py-1.5 bg-ys-accent text-ys-on-accent text-sm font-medium rounded-lg shadow-md shadow-ys-accent/40 transition-all flex items-center gap-1"
         >
           <DynamicIcon name="Plus" className="w-4 h-4" />
           Add Character
@@ -135,19 +135,19 @@ export default function NPCEditor({
           editingId === npc.id ? (
             <div
               key={npc.id}
-              className="p-4 bg-white/[0.04] backdrop-blur-xl border border-pink-400/30 rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.1)] space-y-4"
+              className="p-4 bg-ys-surface backdrop-blur-xl border border-ys-accent/30 rounded-2xl shadow-[0_0_20px_color-mix(in_srgb,var(--ys-accent)_10%,transparent)] space-y-4"
             >
               {/* Name and Icon */}
               <div className="flex gap-3">
                 <div className="shrink-0">
                   <button
                     onClick={() => setShowIconPicker(!showIconPicker)}
-                    className="w-14 h-14 rounded-xl bg-pink-500/10 border border-pink-400/20 flex items-center justify-center hover:bg-pink-500/20 transition-colors"
+                    className="w-14 h-14 rounded-xl bg-ys-accent/10 border border-ys-accent/20 flex items-center justify-center hover:bg-ys-accent/20 transition-colors"
                     title="Change icon"
                   >
                     <DynamicIcon
                       name={editNPC.symbol || "User"}
-                      className="w-8 h-8 text-pink-300"
+                      className="w-8 h-8 text-ys-accent"
                     />
                   </button>
                   {showIconPicker && (
@@ -170,7 +170,7 @@ export default function NPCEditor({
                       setEditNPC({ ...editNPC, name: e.target.value })
                     }
                     placeholder="Character Name"
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-semibold text-lg focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                    className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text font-semibold text-lg focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   />
                   <input
                     type="text"
@@ -179,7 +179,7 @@ export default function NPCEditor({
                       setEditNPC({ ...editNPC, role: e.target.value })
                     }
                     placeholder="Role (e.g., Tavern Owner, Quest Giver, Rival)"
-                    className="w-full px-3 py-2 mt-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                    className="w-full px-3 py-2 mt-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text text-sm focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   />
                 </div>
               </div>
@@ -187,7 +187,7 @@ export default function NPCEditor({
               {/* Status and Attitude */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-pink-200 mb-1">
+                  <label className="block text-sm font-semibold text-ys-text mb-1">
                     Status
                   </label>
                   <select
@@ -198,7 +198,7 @@ export default function NPCEditor({
                         status: e.target.value as NPCStatus,
                       })
                     }
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                    className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   >
                     {STATUS_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -208,7 +208,7 @@ export default function NPCEditor({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-pink-200 mb-1">
+                  <label className="block text-sm font-semibold text-ys-text mb-1">
                     Attitude
                   </label>
                   <select
@@ -219,7 +219,7 @@ export default function NPCEditor({
                         attitude: e.target.value as NPCAttitude,
                       })
                     }
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                    className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                   >
                     {ATTITUDE_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -232,9 +232,9 @@ export default function NPCEditor({
 
               {/* Relationship (custom text) */}
               <div>
-                <label className="block text-sm font-semibold text-pink-200 mb-1">
+                <label className="block text-sm font-semibold text-ys-text mb-1">
                   Relationship{" "}
-                  <span className="font-normal text-pink-300/60">
+                  <span className="font-normal text-ys-accent/60">
                     (your connection to them)
                   </span>
                 </label>
@@ -245,13 +245,13 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, relationship: e.target.value })
                   }
                   placeholder='e.g., "Trusted mentor", "Bitter rival", "Old friend from academy"'
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                 />
               </div>
 
               {/* Faction */}
               <div>
-                <label className="block text-sm font-semibold text-pink-200 mb-1">
+                <label className="block text-sm font-semibold text-ys-text mb-1">
                   Faction
                 </label>
                 <input
@@ -261,13 +261,13 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, faction: e.target.value })
                   }
                   placeholder="Organization, guild, or group affiliation"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-semibold text-pink-200 mb-1">
+                <label className="block text-sm font-semibold text-ys-text mb-1">
                   Description
                 </label>
                 <textarea
@@ -276,13 +276,13 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, description: e.target.value })
                   }
                   placeholder="Physical appearance, personality, motivations..."
-                  className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                  className="w-full h-24 px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text resize-none focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                 />
               </div>
 
               {/* Last Seen */}
               <div>
-                <label className="block text-sm font-semibold text-pink-200 mb-1">
+                <label className="block text-sm font-semibold text-ys-text mb-1">
                   Last Seen
                 </label>
                 <input
@@ -292,13 +292,13 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, lastSeen: e.target.value })
                   }
                   placeholder="Location or circumstance"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                  className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                 />
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-semibold text-pink-200 mb-1">
+                <label className="block text-sm font-semibold text-ys-text mb-1">
                   Your Notes
                 </label>
                 <textarea
@@ -307,7 +307,7 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, notes: e.target.value })
                   }
                   placeholder="Personal notes about this character..."
-                  className="w-full h-20 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
+                  className="w-full h-20 px-3 py-2 bg-ys-surface border border-ys-border rounded-lg text-ys-text resize-none focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 transition-colors"
                 />
               </div>
 
@@ -316,14 +316,14 @@ export default function NPCEditor({
                 <button
                   onClick={saveEdit}
                   disabled={!editNPC.name}
-                  className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all flex items-center gap-1"
+                  className="px-4 py-2 bg-ys-success/15 disabled:text-ys-muted text-ys-success rounded-lg transition-all flex items-center gap-1 border border-ys-success/40"
                 >
                   <DynamicIcon name="Save" className="w-4 h-4" />
                   Save
                 </button>
                 <button
                   onClick={cancelEdit}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
+                  className="px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text rounded-lg transition-all"
                 >
                   Cancel
                 </button>
@@ -332,25 +332,25 @@ export default function NPCEditor({
           ) : (
             <div
               key={npc.id}
-              className="flex items-start gap-3 p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 hover:border-pink-400/20 hover:bg-white/[0.05] transition-colors"
+              className="flex items-start gap-3 p-4 bg-ys-surface backdrop-blur-md rounded-xl border border-ys-border hover:border-ys-accent/20 hover:bg-ys-surface-2 transition-colors"
             >
               <div className="shrink-0">
                 <StoredPortrait
                   imageId={npc.portraitImageId}
                   alt={npc.name}
-                  className="w-12 h-12 rounded-lg object-cover border border-pink-400/20"
+                  className="w-12 h-12 rounded-lg object-cover border border-ys-accent/20"
                 >
                   {npc.custom_symbol_url ? (
                     <img
                       src={npc.custom_symbol_url}
                       alt={npc.name}
-                      className="w-12 h-12 rounded-lg object-cover border border-pink-400/20"
+                      className="w-12 h-12 rounded-lg object-cover border border-ys-accent/20"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-pink-500/10 border border-pink-400/20 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-lg bg-ys-accent/10 border border-ys-accent/20 flex items-center justify-center">
                       <DynamicIcon
                         name={npc.symbol || "User"}
-                        className="w-6 h-6 text-pink-400"
+                        className="w-6 h-6 text-ys-accent"
                       />
                     </div>
                   )}
@@ -358,14 +358,14 @@ export default function NPCEditor({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="font-bold text-white">{npc.name}</span>
+                  <span className="font-bold text-ys-text">{npc.name}</span>
                   {/* Attitude badge */}
                   {npc.attitude && (
                     <span
                       className={`text-xs px-1.5 py-0.5 rounded ${
                         ATTITUDE_OPTIONS.find((a) => a.value === npc.attitude)
-                          ?.color || "text-gray-400"
-                      } bg-white/5`}
+                          ?.color || "text-ys-muted"
+                      } bg-ys-surface`}
                     >
                       {
                         ATTITUDE_OPTIONS.find((a) => a.value === npc.attitude)
@@ -378,10 +378,10 @@ export default function NPCEditor({
                     <span
                       className={`text-xs px-1.5 py-0.5 rounded ${
                         npc.status === "dead"
-                          ? "text-gray-400 bg-gray-500/20"
+                          ? "text-ys-muted bg-ys-surface-2"
                           : npc.status === "missing"
-                            ? "text-yellow-400 bg-yellow-500/20"
-                            : "text-purple-400 bg-purple-500/20"
+                            ? "text-ys-warning bg-ys-warning/20"
+                            : "text-ys-accent bg-ys-accent/20"
                       }`}
                     >
                       {
@@ -392,15 +392,15 @@ export default function NPCEditor({
                   )}
                 </div>
                 {npc.role && (
-                  <p className="text-xs text-pink-300/60 mb-1">{npc.role}</p>
+                  <p className="text-xs text-ys-accent/60 mb-1">{npc.role}</p>
                 )}
                 {npc.relationship && (
-                  <p className="text-sm text-pink-200/80 italic">
+                  <p className="text-sm text-ys-text/80 italic">
                     "{npc.relationship}"
                   </p>
                 )}
                 {npc.faction && (
-                  <p className="text-xs text-indigo-300/60 mt-1">
+                  <p className="text-xs text-ys-accent/60 mt-1">
                     <DynamicIcon name="Flag" className="w-3 h-3 inline mr-1" />
                     {npc.faction}
                   </p>
@@ -409,14 +409,14 @@ export default function NPCEditor({
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => startEdit(npc)}
-                  className="px-3 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg transition-colors"
+                  className="px-3 py-1 bg-ys-accent/10 hover:bg-ys-accent/20 text-ys-text border border-ys-accent/20 rounded-lg transition-colors"
                   title="Edit"
                 >
                   <DynamicIcon name="Edit" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => removeNPC(npc.id)}
-                  className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg transition-colors"
+                  className="px-3 py-1 bg-ys-danger/10 hover:bg-ys-danger/20 text-ys-danger border border-ys-danger/20 rounded-lg transition-colors"
                   title="Remove"
                 >
                   <DynamicIcon name="Trash2" className="w-4 h-4" />
@@ -427,12 +427,12 @@ export default function NPCEditor({
         )}
 
         {localNPCs.length === 0 && (
-          <div className="p-8 text-center rounded-2xl bg-white/[0.02] border-2 border-dashed border-pink-400/20">
+          <div className="p-8 text-center rounded-2xl bg-ys-surface border-2 border-dashed border-ys-accent/20">
             <DynamicIcon
               name="Users"
-              className="w-12 h-12 text-pink-400/30 mx-auto mb-3"
+              className="w-12 h-12 text-ys-accent/30 mx-auto mb-3"
             />
-            <p className="text-sm text-pink-300/50">
+            <p className="text-sm text-ys-accent/50">
               No characters tracked yet. Add NPCs you encounter to keep track of
               relationships and story connections.
             </p>

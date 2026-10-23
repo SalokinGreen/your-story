@@ -16,22 +16,22 @@ export default function SyncIndicator({
   const config = {
     synced: {
       icon: "CloudCheck" as const,
-      color: "text-green-400",
+      color: "text-ys-success",
       title: "Synced with cloud",
     },
     pending: {
       icon: "CloudUpload" as const,
-      color: "text-blue-400 animate-pulse",
+      color: "text-ys-accent animate-pulse",
       title: "Syncing...",
     },
     conflict: {
       icon: "AlertTriangle" as const,
-      color: "text-amber-400",
+      color: "text-ys-warning",
       title: "Sync conflict",
     },
     "local-only": {
       icon: "HardDrive" as const,
-      color: "text-gray-400",
+      color: "text-ys-muted",
       title: "Local only",
     },
   };

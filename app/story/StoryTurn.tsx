@@ -81,7 +81,7 @@ export function TimelineEntryPill({ block }: { block: TimelineBlock }) {
           <DynamicIcon
             name={block.success === false ? "X" : "Check"}
             className={`w-3.5 h-3.5 shrink-0 ${
-              block.success === false ? "text-red-400" : "text-green-500"
+              block.success === false ? "text-ys-danger" : "text-ys-success"
             }`}
           />
         ) : (

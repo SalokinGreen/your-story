@@ -21,6 +21,10 @@ import {
 import { findMentionedNpcIds } from "../misc/noteMentions";
 import { useNetSession } from "../misc/multiplayer/useNetSession";
 import type { MPBackend } from "../misc/multiplayer/types";
+import {
+  DEFAULT_HOST_COLOR,
+  DEFAULT_JOIN_COLOR,
+} from "../misc/multiplayer/palette";
 import type { FloorSnapshot, TurnStatus } from "../misc/multiplayer/session";
 import type { TTSRelayHandle } from "../components/TTSControls";
 import {
@@ -791,7 +795,7 @@ function StoryPageContent() {
   const [profilePickerOpen, setProfilePickerOpen] = useState(false);
   const [profilePickerConnecting, setProfilePickerConnecting] = useState(false);
   const pendingJoinNameRef = useRef("Player");
-  const pendingJoinColorRef = useRef("#22c55e");
+  const pendingJoinColorRef = useRef(DEFAULT_JOIN_COLOR);
 
   // Networked P2P multiplayer (internet, not couch co-op - see
   // app/misc/multiplayer/session.ts). Host role runs generation locally as
@@ -1569,7 +1573,7 @@ function StoryPageContent() {
     if (hostName && !autoHostAttemptedRef.current && !netSession) {
       autoHostAttemptedRef.current = true;
       const backend = parseBackend(searchParams.get("hostBackend"));
-      const color = searchParams.get("hostColor") || "#a855f7";
+      const color = searchParams.get("hostColor") || DEFAULT_HOST_COLOR;
       router.replace(`/story?storyId=${storyId}`);
       createNetRoom(backend, hostName, color)
         .then(() => {
@@ -1596,7 +1600,7 @@ function StoryPageContent() {
         searchParams.get("joinBackend") || searchParams.get("provider"),
       );
       const name = searchParams.get("joinName") || "Player";
-      const color = searchParams.get("joinColor") || "#22c55e";
+      const color = searchParams.get("joinColor") || DEFAULT_JOIN_COLOR;
       pendingJoinNameRef.current = name;
       pendingJoinColorRef.current = color;
       router.replace(`/story?storyId=${storyId}`);
@@ -4771,13 +4775,13 @@ function StoryPageContent() {
   if (loadingStory) {
     return (
       <div
-        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950"
+        className="min-h-dvh bg-ys-bg"
         style={fullHeightStyle}
       >
         <div className="flex items-center justify-center min-h-dvh">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-400 border-t-transparent mx-auto"></div>
-            <p className="mt-4 text-sm text-blue-200/60">Loading story...</p>
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-ys-accent border-t-transparent mx-auto"></div>
+            <p className="mt-4 text-sm text-ys-muted">Loading story...</p>
           </div>
         </div>
       </div>
@@ -4787,19 +4791,19 @@ function StoryPageContent() {
   if (!storyData) {
     return (
       <div
-        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950"
+        className="min-h-dvh bg-ys-bg"
         style={fullHeightStyle}
       >
         <div className="flex items-center justify-center min-h-dvh">
-          <div className="text-center bg-white/[0.04] backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+          <div className="text-center bg-ys-surface backdrop-blur-xl rounded-2xl p-6 border border-ys-border">
             <DynamicIcon
               name="FileQuestion"
-              className="w-12 h-12 text-blue-200/30 mx-auto mb-3"
+              className="w-12 h-12 text-ys-muted mx-auto mb-3"
             />
-            <p className="text-blue-200/60 mb-4">Story not found</p>
+            <p className="text-ys-muted mb-4">Story not found</p>
             <button
               onClick={() => router.push("/library")}
-              className="px-4 py-2 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg shadow-md shadow-purple-950/40 transition-all"
+              className="px-4 py-2 bg-ys-accent text-ys-on-accent font-medium rounded-lg shadow-md shadow-ys-accent/40 transition-all"
             >
               Browse Adventures
             </button>
@@ -4818,25 +4822,25 @@ function StoryPageContent() {
 
     return (
       <div
-        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950"
+        className="min-h-dvh bg-ys-bg"
         style={fullHeightStyle}
       >
         <div className="py-6 px-4">
           <div className="w-full px-2 sm:max-w-3xl mx-auto">
             {/* Header */}
             <div className="text-center mb-6">
-              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+              <h1 className="text-2xl sm:text-3xl font-bold text-ys-text mb-2">
                 {storyData.story_name}
               </h1>
-              <p className="text-sm text-blue-200/60">
+              <p className="text-sm text-ys-muted">
                 Choose your character to begin
               </p>
             </div>
 
             {/* Preset Selection */}
-            <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 mb-4">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <DynamicIcon name="Users" className="w-5 h-5 text-blue-400" />
+            <div className="bg-ys-surface backdrop-blur-xl rounded-2xl border border-ys-border p-4 mb-4">
+              <h2 className="text-lg font-semibold text-ys-text mb-4 flex items-center gap-2">
+                <DynamicIcon name="Users" className="w-5 h-5 text-ys-accent" />
                 Select Character
               </h2>
 
@@ -4847,32 +4851,32 @@ function StoryPageContent() {
                     onClick={() => handlePresetSelect(preset)}
                     className={`rounded-xl p-4 text-left transition-all border backdrop-blur-md ${
                       preset.id === "custom"
-                        ? "bg-purple-500/[0.06] border-purple-400/20 hover:border-purple-400/40"
-                        : "bg-white/[0.03] border-white/10 hover:border-white/20"
+                        ? "bg-ys-accent/[0.06] border-ys-accent/20 hover:border-ys-accent/40"
+                        : "bg-ys-surface border-ys-border hover:border-ys-border"
                     }`}
                   >
                     <div className="flex items-start gap-3 mb-2">
                       <div
                         className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                           preset.id === "custom"
-                            ? "bg-purple-500/20"
-                            : "bg-blue-500/20"
+                            ? "bg-ys-accent/20"
+                            : "bg-ys-accent/20"
                         }`}
                       >
                         <DynamicIcon
                           name={preset.icon}
                           className={`w-5 h-5 ${
                             preset.id === "custom"
-                              ? "text-purple-400"
-                              : "text-blue-400"
+                              ? "text-ys-accent"
+                              : "text-ys-accent"
                           }`}
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-white text-sm">
+                        <h3 className="font-semibold text-ys-text text-sm">
                           {preset.name}
                         </h3>
-                        <p className="text-xs text-blue-200/40 line-clamp-2">
+                        <p className="text-xs text-ys-muted line-clamp-2">
                           {preset.description}
                         </p>
                       </div>
@@ -4885,7 +4889,7 @@ function StoryPageContent() {
             {/* Back Button */}
             <button
               onClick={() => router.push("/library")}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-blue-200 text-sm font-medium rounded-lg border border-white/10 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 text-ys-text text-sm font-medium rounded-lg border border-ys-border transition-colors flex items-center gap-2"
             >
               <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
               Back to Library
@@ -4928,7 +4932,7 @@ function StoryPageContent() {
       className={`relative flex flex-col min-h-dvh py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20 ${
         currentState === StoryState.STORY
           ? "bg-ys-bg text-ys-text"
-          : "bg-linear-to-br from-gray-900 via-blue-950 to-purple-950"
+          : "bg-ys-bg"
       }`}
       style={fullHeightStyle}
     >
@@ -4937,9 +4941,9 @@ function StoryPageContent() {
           and Goal pages keep the backdrop they were designed for. */}
       {currentState !== StoryState.STORY && (
         <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-          <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-700/20 blur-[100px]" />
-          <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-blue-700/15 blur-[110px]" />
-          <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full bg-indigo-600/10 blur-[100px]" />
+          <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-ys-accent/20 blur-[100px]" />
+          <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-ys-accent/15 blur-[110px]" />
+          <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full bg-ys-accent/10 blur-[100px]" />
         </div>
       )}
       <main className="flex flex-1 min-h-0 gap-2 sm:gap-4 w-full px-0 sm:px-2 sm:max-w-4xl mx-auto flex-col">
@@ -5056,30 +5060,30 @@ function StoryPageContent() {
             rather than being silently stranded. */}
         {netSession?.role === "guest" && hostDisconnected && (
           <div className="fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pointer-events-none">
-            <div className="pointer-events-auto w-full max-w-md rounded-2xl bg-[#0d1829]/95 backdrop-blur-xl border border-amber-400/30 shadow-2xl shadow-black/50 p-4 flex items-center gap-3">
+            <div className="pointer-events-auto w-full max-w-md rounded-2xl bg-ys-surface/95 backdrop-blur-xl border border-ys-warning/30 shadow-2xl p-4 flex items-center gap-3">
               <DynamicIcon
                 name="WifiOff"
-                className="w-5 h-5 text-amber-300 shrink-0"
+                className="w-5 h-5 text-ys-warning shrink-0"
               />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white">
+                <p className="text-sm font-semibold text-ys-text">
                   Lost connection to the host
                 </p>
-                <p className="text-xs text-blue-200/60">
+                <p className="text-xs text-ys-muted">
                   Reconnect to the same room, or leave to play on your own.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleGuestReconnect}
-                className="shrink-0 px-3 py-2 text-sm font-semibold rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition-all"
+                className="shrink-0 px-3 py-2 text-sm font-semibold rounded-xl bg-ys-accent text-ys-on-accent transition-all"
               >
                 Reconnect
               </button>
               <button
                 type="button"
                 onClick={() => leaveNetRoom()}
-                className="shrink-0 px-3 py-2 text-sm font-semibold rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 transition-colors"
+                className="shrink-0 px-3 py-2 text-sm font-semibold rounded-xl bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text transition-colors"
               >
                 Leave
               </button>
@@ -5317,8 +5321,8 @@ export default function StoryPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
+        <div className="min-h-dvh bg-ys-bg flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ys-accent"></div>
         </div>
       }
     >

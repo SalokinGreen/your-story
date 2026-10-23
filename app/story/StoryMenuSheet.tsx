@@ -103,7 +103,7 @@ export function StoryMenuSheet({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 bg-black/50 animate-fade-in"
+        className="fixed inset-0 z-50 ys-modal-backdrop animate-fade-in"
         onClick={onClose}
         aria-hidden="true"
       />

@@ -432,3 +432,91 @@ screens (`ratchet` passes with no inline colour).
   hand-fixed and read through.
 - Tests: no markup test needed changing. The suite grew by the 11 ratchet
   entries.
+
+### Slice 3 — 2026-10-23
+
+**Dependency inventory.** The story's sub-pages render through more than the
+plan's list. Converted here, and listed on the ratchet: `DynamicIcon` (clean),
+`StoryImage`, `LoreImageGenerator` (the note editor's picture block),
+`IconPicker` (the NPC editor; it was slice 5's), `SyncIndicator`,
+`NetStatusBadge`, `ChapterNav`, `CombatDisplay`, `DiceThrowModal`,
+`ManualRollModal`, `AskQuestionModal`, `PlayerBubbles`, `OOCChatPanel`,
+`TurnLobbyOverlay`, `PartyLobby`, `PartyTableStrip`, `TTSControls`,
+`SyncConflictModal` and `ProfilePickerModal` (the story page's picker; it was
+slice 5's), plus `StoryTurn`, `StoryHeader`, `StoryMenuSheet` and
+`NPCReactionToast` in `app/story/` (listed; each held one or two leftovers).
+**Not converted, still dark-only inside these screens:** `LibraryPickerModal`
+and `PDFImporter` (opened from the note editor; slices 4 and 5) and
+`pdf-import/NotePreviewCard` (still has a `prose-invert`; slice 5).
+`ClockCategorySelector` is imported nowhere.
+
+**`noteMentions` colours (decided first).** Note types are categories, so the
+fourteen hues collapse to three groups on the tokens: what the player knows
+(`character_sheet`, `npc`, `item`, `location`, `faction`, `event`, `lore`,
+`table`, `all`) is `ys-accent`; the GM's own material (`gm_notes`, `gm_plan`,
+`mechanics`, `dm_instructions`, `story_instructions`, `summary_instructions`)
+is `ys-muted` on `ys-surface-2`; secrets are `ys-warning`. Each type still has
+its own icon and label, which is what told them apart. `lore.tsx`'s
+`TYPE_CONFIG`, `noteMentions.ts` and the NPC mention colour (accent) agree;
+`tests/noteMentions.test.ts` follows (one new case for the three groups).
+`gm_plan` keeps falling through to the lore colour in mentions, as before.
+
+**Judgment calls.**
+- *Method.* The same as slice 2: a script mapped the class tokens (neutral
+  surfaces and borders to the tokens, brand hues to accent, red/green/amber to
+  the meaning tokens, 100/200-shade text to `ys-text`, low-alpha blue text to
+  muted, `dark:` pairs dropped), then every file's diff was read and the
+  things it cannot know were fixed by hand.
+- *Gradients.* A coloured gradient button is `bg-ys-accent` with
+  `text-ys-on-accent`; a green or red one is the tinted `/15` fill with a
+  `border-ys-*/40` (the glow shadow is gone); a gradient with an alpha keeps
+  it. Image scrims (`from-black/..`) become `from-ys-bg/..`. The story page's
+  loading and error frames are `bg-ys-bg` (the `--ys-gradient` surfaces are
+  home, Library and the Designer, slice 4/5).
+- *Toggles* in `menu.tsx` use slice 2's pattern (track `bg-ys-border`, knob
+  `after:bg-ys-bg`, on `peer-checked:bg-ys-accent`; the party-link toggle is
+  `ys-success`).
+- *Shadows.* `shadow-black/..` and the other neutral shadow colours are
+  dropped (Tailwind's default shadow is already black); hued glows
+  (`rgba(168,85,247,..)` and the like) are `color-mix` on the accent or
+  meaning token. A plain black `rgba(0,0,0,.x)` drop shadow in an arbitrary
+  `shadow-[..]` or `boxShadow` is left: black is the colour of a shadow on
+  every theme, and the ratchet does not read it as a theme colour.
+- *Player colours.* The text on a player's colour (`couch` pills, the speaker
+  tabs, the roll and question labels, the mic bubbles) is a fixed white,
+  `PLAYER_TEXT_COLOR`; with the host and join defaults, the grey fallback and
+  the QR code's black and white it now lives in `app/misc/multiplayer/palette.ts`
+  (already exempt as the player palette). `page.tsx`, `LoreEditor`,
+  `PartyLobby`, `PlayerBubbles`, `story.tsx` and the two roll modals import it.
+  The QR code's quiet zone stays white through an inline style. The active
+  bubble's ring is `ys-text` through `color-mix`.
+- *Context and Log viewers.* Roles: system muted on surface, user text on
+  surface, GM accent on a faint accent fill, tool text on `ys-surface-2` with
+  an `accent/40` border (a new `getRoleBorderColor`, since two border colours
+  cannot share one element). Log types: error danger, warning warning,
+  ai_request accent, ai_response success, action text, state_change text at
+  70%, the rest muted. The uppercase label names the type either way. The
+  panels in the AI Context that had their own hue (cyan, teal, blue, purple,
+  indigo) are all accent now, each with its heading and icon; amber, orange
+  and rose became warning, warning and danger.
+- *NPC status and attitude* (`npcs.tsx`) keep their meaning colours (alive and
+  friendly success, hostile danger, missing and unfriendly warning); dead,
+  departed and neutral are muted; unknown and allied are accent.
+- *`GameIcon.tsx` is exempt*, with the reason in the ratchet's list: it
+  rewrites the icon library's SVG `fill="#fff"` and `fill="black"` to
+  `currentColor`, so its literals are what it matches, not colours it paints.
+- *`ConfirmDialog`'s `confirmButtonClass`* strings in `menu.tsx` are tokens
+  too, though the dialog ignores them (slice 1 note).
+- *Ratchet.* 43 files added. No test needed a markup change; the suite
+  grew by the 43 entries (2,703 to 2,747 passed, one skipped as before) and
+  one `noteMentions` case.
+- *Scrollbars.* Neither `scrollbar-thumb-*` use survives (`lore.tsx`,
+  `npcs.tsx`); nor does any `prose-invert` in these files.
+
+**Not verified here (the preview was not run, by instruction).** Each screen
+in Ink and Paper White: Notes, NPCs, Goals, every Story Editor section, AI
+Context with a stored turn, the Logs, combat, the dice tray, and the party
+lobby's QR code. The places most likely to read wrong in Paper White: the
+tinted `/15` action buttons, the accent-tinted panels in the AI Context, and
+the image lightbox (its backdrop is the theme's `ys-modal-backdrop`, dark text
+on a mid-grey in Paper White).

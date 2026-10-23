@@ -10,6 +10,7 @@ import type { CouchPlayer } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
 import STTButton from "./STTButton";
 import { useBackHandler } from "../misc/useBackHandler";
+import { PLAYER_TEXT_COLOR } from "../misc/multiplayer/palette";
 
 interface AskQuestionModalProps {
   // The pending question batch, or null when nothing is being asked
@@ -102,21 +103,26 @@ export default function AskQuestionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-ys-surface border border-ys-border rounded-2xl w-full max-w-sm shadow-2xl shadow-black/50 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center ys-modal-backdrop p-4">
+      <div className="bg-ys-surface border border-ys-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="px-5 pt-5 pb-4 bg-ys-text/5 text-center">
-          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-ys-text text-ys-bg flex items-center justify-center shadow-lg shadow-black/30">
+          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-ys-text text-ys-bg flex items-center justify-center shadow-lg">
             <DynamicIcon name="HelpCircle" className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-bold text-ys-text">{question.question}</h3>
           {question.target_player_name && (
             <span
               className={`inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                matchedPlayer ? "text-white" : "bg-ys-text text-ys-bg"
+                matchedPlayer ? "" : "bg-ys-text text-ys-bg"
               }`}
               style={
-                matchedPlayer ? { backgroundColor: matchedPlayer.color } : undefined
+                matchedPlayer
+                  ? {
+                      backgroundColor: matchedPlayer.color,
+                      color: PLAYER_TEXT_COLOR,
+                    }
+                  : undefined
               }
             >
               <DynamicIcon name="User" className="w-3 h-3" />

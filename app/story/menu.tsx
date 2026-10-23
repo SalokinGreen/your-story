@@ -94,7 +94,7 @@ export type MenuNavTarget = "LORE" | "NPCS" | "GOALS" | "LOGS" | "CONTEXT";
 const ROW =
   "focus-ring w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-ys-text text-left hover:bg-ys-bg disabled:text-ys-muted disabled:hover:bg-transparent transition-colors";
 const DANGER_ROW =
-  "focus-ring w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-red-500 text-left hover:bg-red-500/10 disabled:text-ys-muted disabled:hover:bg-transparent transition-colors";
+  "focus-ring w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-ys-danger text-left hover:bg-ys-danger/10 disabled:text-ys-muted disabled:hover:bg-transparent transition-colors";
 const SECTION_LABEL =
   "px-3 pt-5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ys-muted";
 
@@ -255,10 +255,10 @@ export default function MenuPage({
     tab: { id: MenuTab; label: string; icon: string };
   }) => (
     <div className="flex items-center gap-2.5 mb-4 sm:mb-5">
-      <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
-        <DynamicIcon name={tab.icon} className="w-4 h-4 text-purple-300" />
+      <span className="p-1.5 rounded-lg bg-ys-accent/10 ring-1 ring-ys-accent/20">
+        <DynamicIcon name={tab.icon} className="w-4 h-4 text-ys-accent" />
       </span>
-      <h4 className="text-base sm:text-lg font-bold text-white">
+      <h4 className="text-base sm:text-lg font-bold text-ys-text">
         {tab.label}
       </h4>
     </div>
@@ -481,7 +481,7 @@ export default function MenuPage({
         "Are you sure you want to leave? Make sure your progress is saved!",
       icon: "AlertTriangle",
       confirmText: "Leave",
-      confirmButtonClass: "bg-gray-600 hover:bg-gray-700",
+      confirmButtonClass: "bg-ys-surface-2 hover:bg-ys-surface-2",
       onConfirm: () => {
         setConfirmDialog({ ...confirmDialog, isOpen: false });
         router.push("/library");
@@ -556,7 +556,7 @@ export default function MenuPage({
             />
             <span className="flex-1 min-w-0 truncate">OOC Chat</span>
             {oocUnread > 0 && (
-              <span className="min-w-5 h-5 px-1 flex items-center justify-center rounded-full bg-ys-accent text-ys-bg text-[11px] font-bold shrink-0">
+              <span className="min-w-5 h-5 px-1 flex items-center justify-center rounded-full bg-ys-accent text-ys-on-accent text-[11px] font-bold shrink-0">
                 {oocUnread > 9 ? "9+" : oocUnread}
               </span>
             )}
@@ -772,7 +772,7 @@ export default function MenuPage({
               message: "All progress will be lost. Are you sure?",
               icon: "RefreshCw",
               confirmText: "Restart",
-              confirmButtonClass: "bg-orange-600 hover:bg-orange-700",
+              confirmButtonClass: "bg-ys-warning/15 hover:bg-ys-warning/25",
               onConfirm: async () => {
                 setConfirmDialog({ ...confirmDialog, isOpen: false });
                 if (!storyDbId) return;
@@ -850,7 +850,7 @@ export default function MenuPage({
               message: "This action cannot be undone.",
               icon: "AlertTriangle",
               confirmText: "Delete",
-              confirmButtonClass: "bg-red-600 hover:bg-red-700",
+              confirmButtonClass: "bg-ys-danger/15 hover:bg-ys-danger/25",
               onConfirm: async () => {
                 setConfirmDialog({ ...confirmDialog, isOpen: false });
                 if (!storyDbId) return;
@@ -875,7 +875,7 @@ export default function MenuPage({
           className={DANGER_ROW}
         >
           {deleting ? (
-            <div className="animate-spin rounded-full h-4 w-4 shrink-0 border-2 border-red-500 border-t-transparent" />
+            <div className="animate-spin rounded-full h-4 w-4 shrink-0 border-2 border-ys-danger border-t-transparent" />
           ) : (
             <DynamicIcon name="Trash2" className="w-4 h-4 shrink-0" />
           )}
@@ -900,8 +900,8 @@ export default function MenuPage({
                   onClick={() => scrollToSection(tab.id)}
                   className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                     activeTab === tab.id
-                      ? "bg-linear-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-950/40"
-                      : "text-blue-200 hover:bg-white/5"
+                      ? "bg-ys-accent text-ys-on-accent shadow-lg shadow-ys-accent/40"
+                      : "text-ys-text hover:bg-ys-surface-2"
                   }`}
                 >
                   <DynamicIcon
@@ -940,13 +940,13 @@ export default function MenuPage({
                   );
                   setShowSettings(false);
                 }}
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 text-sm sm:text-base font-semibold rounded-xl transition-all"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text text-sm sm:text-base font-semibold rounded-xl transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveSettings}
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-sm sm:text-base font-semibold rounded-xl transition-all shadow-lg shadow-purple-950/40 hover:shadow-purple-500/25 flex items-center justify-center gap-1"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-ys-accent text-ys-on-accent text-sm sm:text-base font-semibold rounded-xl transition-all shadow-lg shadow-ys-accent/40 hover:shadow-ys-accent/25 flex items-center justify-center gap-1"
               >
                 <DynamicIcon name="Save" className="w-4 h-4" />
                 <span className="hidden sm:inline">Save All Changes</span>
@@ -967,7 +967,7 @@ export default function MenuPage({
                   }}
                   data-section-id="basic"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                 >
                   <SectionHeading tab={getSection("basic")} />
                   <BasicSettings
@@ -982,21 +982,21 @@ export default function MenuPage({
                       }
                     />
               {/* Player Notes - Collapsible */}
-              <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+              <div className="bg-ys-surface backdrop-blur-xl rounded-2xl border border-ys-border overflow-hidden">
                 <button
                   onClick={() => setEditingNotes(!editingNotes)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-between p-3 hover:bg-ys-surface-2 transition-colors"
                 >
-                  <span className="text-sm font-medium text-white flex items-center gap-2">
+                  <span className="text-sm font-medium text-ys-text flex items-center gap-2">
                     <DynamicIcon
                       name="StickyNote"
-                      className="w-4 h-4 text-yellow-400"
+                      className="w-4 h-4 text-ys-warning"
                     />
                     Player Notes
                   </span>
                   <DynamicIcon
                     name={editingNotes ? "ChevronUp" : "ChevronDown"}
-                    className="w-4 h-4 text-blue-300/60"
+                    className="w-4 h-4 text-ys-muted"
                   />
                 </button>
 
@@ -1006,7 +1006,7 @@ export default function MenuPage({
                       value={playerNotes}
                       onChange={(e) => setPlayerNotes(e.target.value)}
                       placeholder="Write your notes, strategies, or thoughts..."
-                      className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none"
+                      className="w-full h-24 px-3 py-2 bg-ys-surface border border-ys-border rounded-xl text-ys-text text-sm placeholder-ys-muted focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40 resize-none"
                     />
                     <div className="flex gap-2 justify-end">
                       <button
@@ -1014,13 +1014,13 @@ export default function MenuPage({
                           setPlayerNotes(storyData.player_notes || "");
                           setEditingNotes(false);
                         }}
-                        className="px-3 py-1.5 text-xs bg-white/5 text-blue-200 rounded-lg hover:bg-white/10 border border-white/10"
+                        className="px-3 py-1.5 text-xs bg-ys-surface text-ys-text rounded-lg hover:bg-ys-surface-2 border border-ys-border"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleSaveNotes}
-                        className="px-3 py-1.5 text-xs bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40"
+                        className="px-3 py-1.5 text-xs bg-ys-accent text-ys-on-accent rounded-lg shadow-md shadow-ys-accent/40"
                       >
                         Save
                       </button>
@@ -1030,7 +1030,7 @@ export default function MenuPage({
 
                 {!editingNotes && playerNotes && (
                   <div className="px-3 pb-3">
-                    <p className="text-xs text-blue-200/70 whitespace-pre-wrap line-clamp-2">
+                    <p className="text-xs text-ys-muted whitespace-pre-wrap line-clamp-2">
                       {playerNotes}
                     </p>
                   </div>
@@ -1045,21 +1045,21 @@ export default function MenuPage({
                   }}
                   data-section-id="hotseat"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                 >
                   <SectionHeading tab={getSection("hotseat")} />
-                  <p className="text-xs text-blue-200/50 -mt-3 mb-4">
+                  <p className="text-xs text-ys-muted -mt-3 mb-4">
                     Pass one device around the table - the GM collects each
                     player&apos;s action before generating.
                   </p>
                   <div className="space-y-5">
-                  <div className="p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
+                  <div className="p-4 bg-ys-surface backdrop-blur-md rounded-xl border border-ys-border">
                     <div className="flex items-center justify-between">
                       <div>
-                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                        <label className="block text-sm font-semibold text-ys-text mb-1">
                           Enable Multiplayer (Hot-seat)
                         </label>
-                        <p className="text-xs text-blue-200/60">
+                        <p className="text-xs text-ys-muted">
                           Collect multiple player actions (as "&gt; Name:
                           action") before generating.
                         </p>
@@ -1079,13 +1079,13 @@ export default function MenuPage({
                           }
                           className="sr-only peer"
                         />
-                        <div className="w-14 h-7 bg-white/10 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-white/20 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-500 peer-checked:to-pink-500 peer-checked:shadow-[0_0_12px_rgba(168,85,247,0.5)]"></div>
+                        <div className="w-14 h-7 bg-ys-border peer-focus:ring-4 peer-focus:ring-ys-accent/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-linear-to-r peer-checked:shadow-[0_0_12px_color-mix(in_srgb,var(--ys-accent)_50%,transparent)]"></div>
                       </label>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    <label className="block text-sm font-semibold text-ys-text mb-2">
                       Play Mode
                     </label>
                     <select
@@ -1095,26 +1095,26 @@ export default function MenuPage({
                           e.target.value as "host" | "any" | "timer",
                         )
                       }
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40"
+                      className="w-full px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40"
                     >
                       <option value="host">Generate on host command</option>
                       <option value="any">Generate on any command</option>
                       <option value="timer">Generate after timer</option>
                     </select>
-                    <p className="text-xs text-blue-200/60">
+                    <p className="text-xs text-ys-muted">
                       Timer starts after the first queued input.
                     </p>
                   </div>
 
                   {(multiplayerMode === "host" ||
                     multiplayerMode === "timer") && (
-                    <div className="p-4 bg-white/[0.02] backdrop-blur-md rounded-xl border border-white/10 space-y-2">
+                    <div className="p-4 bg-ys-surface backdrop-blur-md rounded-xl border border-ys-border space-y-2">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <label className="block text-sm font-semibold text-blue-200">
+                          <label className="block text-sm font-semibold text-ys-text">
                             Host
                           </label>
-                          <p className="text-xs text-blue-200/60 break-all">
+                          <p className="text-xs text-ys-muted break-all">
                             {multiplayerHostUserId.trim()
                               ? multiplayerHostUserId.trim()
                               : "Not set"}
@@ -1125,13 +1125,13 @@ export default function MenuPage({
                           onClick={() => {
                             setMultiplayerHostUserId(localPlayerId);
                           }}
-                          className="px-3 py-2 text-xs font-semibold rounded-lg transition-all border bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border-purple-400/20"
+                          className="px-3 py-2 text-xs font-semibold rounded-lg transition-all border bg-ys-accent/10 hover:bg-ys-accent/20 text-ys-text border-ys-accent/20"
                           title="Set the host to this device"
                         >
                           Set me as host
                         </button>
                       </div>
-                      <p className="text-xs text-blue-200/60">
+                      <p className="text-xs text-ys-muted">
                         Only the host can generate/clear in host and timer
                         modes.
                       </p>
@@ -1140,7 +1140,7 @@ export default function MenuPage({
 
                   {multiplayerMode === "timer" && (
                     <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-blue-200 mb-2">
+                      <label className="block text-sm font-semibold text-ys-text mb-2">
                         Timer (minutes)
                       </label>
                       <input
@@ -1152,12 +1152,12 @@ export default function MenuPage({
                             parseInt(e.target.value) || 1,
                           )
                         }
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40"
+                        className="w-full px-4 py-3 bg-ys-surface border border-ys-border rounded-xl text-ys-text focus:outline-none focus:ring-2 focus:ring-ys-accent/40 focus:border-ys-accent/40"
                       />
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-white/5">
+                  <div className="pt-2 border-t border-ys-border">
                     <CouchPlayersEditor
                       players={storyData.multiplayer?.couchPlayers || []}
                       onUpdate={(couchPlayers) =>
@@ -1184,10 +1184,10 @@ export default function MenuPage({
                   }}
                   data-section-id="online"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                 >
                   <SectionHeading tab={getSection("online")} />
-                  <p className="text-xs text-blue-200/50 -mt-3 mb-4">
+                  <p className="text-xs text-ys-muted -mt-3 mb-4">
                     Peer-to-peer over the internet - no server, no account.
                     Host creates a room and shares the code; everyone else
                     joins with it.
@@ -1210,10 +1210,10 @@ export default function MenuPage({
                     }}
                     data-section-id="party"
                     style={{ scrollSnapAlign: "start" }}
-                    className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                    className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                   >
                     <SectionHeading tab={getSection("party")} />
-                    <p className="text-xs text-blue-200/50 -mt-3 mb-4">
+                    <p className="text-xs text-ys-muted -mt-3 mb-4">
                       This desktop is the table and everyone plays from their
                       own phone, over your home Wi-Fi. No account and no
                       internet needed.
@@ -1228,7 +1228,7 @@ export default function MenuPage({
                   }}
                   data-section-id="goals"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                 >
                   <SectionHeading tab={getSection("goals")} />
                   <GoalEditor
@@ -1243,7 +1243,7 @@ export default function MenuPage({
                   }}
                   data-section-id="lore"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                 >
                   <SectionHeading tab={getSection("lore")} />
                   <LoreEditor
@@ -1259,7 +1259,7 @@ export default function MenuPage({
                   }}
                   data-section-id="npcs"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                 >
                   <SectionHeading tab={getSection("npcs")} />
                   <NPCEditor
@@ -1274,7 +1274,7 @@ export default function MenuPage({
                   }}
                   data-section-id="threads"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                 >
                   <SectionHeading tab={getSection("threads")} />
                   <ThreadsEditor
@@ -1289,18 +1289,18 @@ export default function MenuPage({
                   }}
                   data-section-id="mythic"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-ys-border"
                 >
                   <SectionHeading tab={getSection("mythic")} />
                   <div className="space-y-6">
                   {/* Enable/Disable Advanced RPG Tools */}
-                  <div className="p-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
+                  <div className="p-6 bg-ys-surface backdrop-blur-md rounded-xl border border-ys-border">
                     <div className="flex items-center justify-between">
                       <div>
-                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                        <label className="block text-sm font-semibold text-ys-text mb-1">
                           Enable Advanced RPG Tools
                         </label>
-                        <p className="text-xs text-blue-200/60">
+                        <p className="text-xs text-ys-muted">
                           Use AGMT Game Master Emulator for dynamic story
                           generation
                         </p>
@@ -1330,7 +1330,7 @@ export default function MenuPage({
                           }}
                           className="sr-only peer"
                         />
-                        <div className="w-14 h-7 bg-white/10 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-white/20 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-500 peer-checked:to-pink-500 peer-checked:shadow-[0_0_12px_rgba(168,85,247,0.5)]"></div>
+                        <div className="w-14 h-7 bg-ys-border peer-focus:ring-4 peer-focus:ring-ys-accent/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-ys-border after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-ys-bg after:border-ys-border after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-linear-to-r peer-checked:shadow-[0_0_12px_color-mix(in_srgb,var(--ys-accent)_50%,transparent)]"></div>
                       </label>
                     </div>
                   </div>
@@ -1338,8 +1338,8 @@ export default function MenuPage({
                   {storyData.agmtState && (
                     <>
                       {/* Chaos Factor */}
-                      <div className="p-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
-                        <label className="block text-sm font-semibold text-blue-200 mb-3">
+                      <div className="p-6 bg-ys-surface backdrop-blur-md rounded-xl border border-ys-border">
+                        <label className="block text-sm font-semibold text-ys-text mb-3">
                           Chaos Factor: {storyData.agmtState.chaosFactor}
                         </label>
                         <input
@@ -1355,9 +1355,9 @@ export default function MenuPage({
                               },
                             });
                           }}
-                          className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer accent-purple-500"
+                          className="w-full h-2 bg-ys-surface-2 rounded-full appearance-none cursor-pointer accent-ys-accent"
                         />
-                        <p className="text-sm text-blue-200/60 mt-2">
+                        <p className="text-sm text-ys-muted mt-2">
                           {storyData.agmtState.chaosFactor <= 3 &&
                             "Very Ordered - Things go as expected"}
                           {storyData.agmtState.chaosFactor > 3 &&
@@ -1372,8 +1372,8 @@ export default function MenuPage({
                       </div>
 
                       {/* Scene Count */}
-                      <div className="p-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
-                        <label className="block text-sm font-semibold text-blue-200 mb-3">
+                      <div className="p-6 bg-ys-surface backdrop-blur-md rounded-xl border border-ys-border">
+                        <label className="block text-sm font-semibold text-ys-text mb-3">
                           Scene Count: {storyData.agmtState.sceneCount}
                         </label>
                         <div className="flex gap-2">
@@ -1389,7 +1389,7 @@ export default function MenuPage({
                                 },
                               });
                             }}
-                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-colors"
+                            className="px-4 py-2 bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text rounded-lg transition-colors"
                           >
                             -1
                           </button>
@@ -1403,7 +1403,7 @@ export default function MenuPage({
                                 },
                               });
                             }}
-                            className="px-4 py-2 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all"
+                            className="px-4 py-2 bg-ys-accent text-ys-on-accent rounded-lg shadow-md shadow-ys-accent/40 transition-all"
                           >
                             +1 Scene
                           </button>
@@ -1416,7 +1416,7 @@ export default function MenuPage({
                                 },
                               });
                             }}
-                            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-400/20 text-red-300 rounded-lg transition-colors"
+                            className="px-4 py-2 bg-ys-danger/10 hover:bg-ys-danger/20 border border-ys-danger/20 text-ys-danger rounded-lg transition-colors"
                           >
                             Reset
                           </button>
@@ -1425,8 +1425,8 @@ export default function MenuPage({
 
                       {/* Performance Tracking */}
                       {storyData.agmtState && (
-                        <div className="p-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
-                          <h4 className="text-sm font-semibold text-blue-200 mb-4 flex items-center gap-2">
+                        <div className="p-6 bg-ys-surface backdrop-blur-md rounded-xl border border-ys-border">
+                          <h4 className="text-sm font-semibold text-ys-text mb-4 flex items-center gap-2">
                             <DynamicIcon
                               name="TrendingUp"
                               className="w-4 h-4"
@@ -1437,16 +1437,16 @@ export default function MenuPage({
                           {/* Current Streak */}
                           <div className="mb-4">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-blue-200/60">
+                              <span className="text-xs text-ys-muted">
                                 Current Streak
                               </span>
                               <span
                                 className={`text-sm font-bold ${
                                   storyData.agmtState.currentStreak > 0
-                                    ? "text-green-400"
+                                    ? "text-ys-success"
                                     : storyData.agmtState.currentStreak < 0
-                                      ? "text-red-400"
-                                      : "text-gray-400"
+                                      ? "text-ys-danger"
+                                      : "text-ys-muted"
                                 }`}
                               >
                                 {storyData.agmtState.currentStreak > 0 && "+"}
@@ -1455,12 +1455,12 @@ export default function MenuPage({
                                   3 && " ??"}
                               </span>
                             </div>
-                            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-2 bg-ys-surface-2 rounded-full overflow-hidden">
                               <div
                                 className={`h-full transition-all ${
                                   storyData.agmtState.currentStreak > 0
-                                    ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                                    : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                                    ? "bg-ys-success shadow-[0_0_8px_color-mix(in_srgb,var(--ys-success)_60%,transparent)]"
+                                    : "bg-ys-danger shadow-[0_0_8px_color-mix(in_srgb,var(--ys-danger)_60%,transparent)]"
                                 }`}
                                 style={{
                                   width: `${Math.min(
@@ -1477,7 +1477,7 @@ export default function MenuPage({
                           {/* Recent Performance */}
                           {storyData.agmtState.skillCheckHistory.length > 0 && (
                             <div>
-                              <span className="text-xs text-blue-200/60 block mb-2">
+                              <span className="text-xs text-ys-muted block mb-2">
                                 Last{" "}
                                 {storyData.agmtState.skillCheckHistory.length}{" "}
                                 Checks
@@ -1490,8 +1490,8 @@ export default function MenuPage({
                                       key={i}
                                       className={`w-4 h-4 rounded-sm ${
                                         check.success
-                                          ? "bg-green-500"
-                                          : "bg-red-500"
+                                          ? "bg-ys-success"
+                                          : "bg-ys-danger"
                                       }`}
                                       title={`${check.skill}: ${
                                         check.success ? "Success" : "Failure"
@@ -1502,7 +1502,7 @@ export default function MenuPage({
                                   ))}
                               </div>
                               <div className="flex justify-between mt-2 text-xs">
-                                <span className="text-green-400">
+                                <span className="text-ys-success">
                                   {
                                     storyData.agmtState.skillCheckHistory.filter(
                                       (c) => c.success,
@@ -1510,7 +1510,7 @@ export default function MenuPage({
                                   }{" "}
                                   wins
                                 </span>
-                                <span className="text-red-400">
+                                <span className="text-ys-danger">
                                   {
                                     storyData.agmtState.skillCheckHistory.filter(
                                       (c) => !c.success,
@@ -1523,7 +1523,7 @@ export default function MenuPage({
                           )}
 
                           {/* Next Adjustment Info */}
-                          <div className="mt-4 pt-4 border-t border-white/10 text-xs text-blue-300/50">
+                          <div className="mt-4 pt-4 border-t border-ys-border text-xs text-ys-muted">
                             {storyData.agmtState.sceneCount -
                               storyData.agmtState.lastChaosAdjustment <
                             2 ? (
@@ -1573,7 +1573,7 @@ export default function MenuPage({
                   />
                   {/* Pictures made in play: this story's art style, the space
                       they take, and Clear (docs/image-generation-design.md §6) */}
-                  <h4 className="text-sm font-semibold text-blue-200 mt-8 mb-3 flex items-center gap-2">
+                  <h4 className="text-sm font-semibold text-ys-text mt-8 mb-3 flex items-center gap-2">
                     <DynamicIcon name="Image" className="w-4 h-4" />
                     Pictures
                   </h4>
@@ -1585,7 +1585,7 @@ export default function MenuPage({
                       onUpdateStoryData={onUpdateStoryData}
                     />
                   ) : (
-                    <p className="text-sm text-blue-200/60">
+                    <p className="text-sm text-ys-muted">
                       Save the story first to set its pictures.
                     </p>
                   )}
@@ -1607,19 +1607,19 @@ export default function MenuPage({
 
       {/* Save Copy Modal */}
       {showSaveCopyModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-60 p-4">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl border border-white/10 w-full max-w-md shadow-2xl shadow-black/50">
-            <div className="p-4 border-b border-white/10">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <DynamicIcon name="Copy" className="w-5 h-5 text-emerald-400" />
+        <div className="fixed inset-0 ys-modal-backdrop flex items-center justify-center z-60 p-4">
+          <div className="bg-ys-surface/95 backdrop-blur-2xl rounded-2xl border border-ys-border w-full max-w-md shadow-2xl">
+            <div className="p-4 border-b border-ys-border">
+              <h3 className="text-lg font-semibold text-ys-text flex items-center gap-2">
+                <DynamicIcon name="Copy" className="w-5 h-5 text-ys-success" />
                 Save Copy
               </h3>
-              <p className="text-sm text-blue-300/60 mt-1">
+              <p className="text-sm text-ys-muted mt-1">
                 Create a save point you can return to later
               </p>
             </div>
             <div className="p-4">
-              <label className="block text-sm font-medium text-blue-200 mb-2">
+              <label className="block text-sm font-medium text-ys-text mb-2">
                 Save Name
               </label>
               <input
@@ -1627,7 +1627,7 @@ export default function MenuPage({
                 value={saveCopyName}
                 onChange={(e) => setSaveCopyName(e.target.value)}
                 placeholder="Enter a name for this save..."
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40"
+                className="w-full px-3 py-2 bg-ys-surface border border-ys-border rounded-xl text-ys-text placeholder-ys-muted focus:outline-none focus:ring-2 focus:ring-ys-success/40 focus:border-ys-success/40"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && saveCopyName.trim()) {
@@ -1647,25 +1647,25 @@ export default function MenuPage({
                     onChange={(e) => setJumpToNewSave(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-10 h-6 bg-white/5 border border-white/10 rounded-full peer-checked:bg-emerald-500/80 peer-checked:shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all"></div>
-                  <div className="absolute left-1 top-1 w-4 h-4 bg-blue-300/60 rounded-full peer-checked:translate-x-4 peer-checked:bg-white transition-all"></div>
+                  <div className="w-10 h-6 bg-ys-border border border-ys-border rounded-full peer-checked:bg-ys-success peer-checked:shadow-[0_0_10px_color-mix(in_srgb,var(--ys-success)_50%,transparent)] transition-all"></div>
+                  <div className="absolute left-1 top-1 w-4 h-4 bg-ys-muted rounded-full peer-checked:translate-x-4 peer-checked:bg-ys-bg transition-all"></div>
                 </div>
-                <span className="text-sm text-blue-200 group-hover:text-white transition-colors">
+                <span className="text-sm text-ys-muted group-hover:text-ys-text transition-colors">
                   Jump to new save after creating
                 </span>
               </label>
             </div>
-            <div className="p-4 border-t border-white/10 flex justify-end gap-3">
+            <div className="p-4 border-t border-ys-border flex justify-end gap-3">
               <button
                 onClick={() => setShowSaveCopyModal(false)}
-                className="px-4 py-2 text-blue-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                className="px-4 py-2 text-ys-muted hover:text-ys-text hover:bg-ys-surface-2 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveCopyConfirm}
                 disabled={!saveCopyName.trim()}
-                className="px-4 py-2 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-white/5 disabled:to-white/5 disabled:text-emerald-300/30 text-white font-medium rounded-lg transition-all shadow-md shadow-emerald-950/40 disabled:shadow-none flex items-center gap-2"
+                className="px-4 py-2 bg-ys-success/15 border border-ys-success/40 disabled:bg-ys-surface disabled:border-ys-border disabled:text-ys-muted text-ys-success font-medium rounded-lg transition-all flex items-center gap-2"
               >
                 <DynamicIcon name="Save" className="w-4 h-4" />
                 Save Copy
