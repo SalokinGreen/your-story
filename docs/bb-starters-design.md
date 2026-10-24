@@ -1,7 +1,7 @@
 # Blood & Bone E5: two campaign starters, Grave Watcher and a haunted hotel
 
 Status: **design, waiting for the author's approval.** Nothing is built.
-Decisions 163–170 (the interview of 2026-10-24). The expansion roadmap is
+Decisions 163–171 (the interview of 2026-10-24, and the author's note on the first draft). The expansion roadmap is
 `docs/bb-expansion-design.md` §6 (E5: "Starters, built on everything above").
 This document replaces that row's "three or four new ones in different cities"
 with the two the author asked for.
@@ -24,7 +24,7 @@ The interview settled the rest:
 | Rules | Blood & Bone, Masquerade off (163) | Blood & Bone (the Masquerade stays, but local and leaky; §4.2) |
 | Who you play | Any Kind or a human Watcher, from a roster (164) | The family who inherit the hotel; human by default, any Kind allowed (168) |
 | Inspiration | The author's own idea | The premise and tone of Netflix's *Haunted Hotel* (165); nothing of its names, characters or rules (decision 3) |
-| Tone | B&B's own: weird, dangerous, lonely, warm in town | Comedy-horror (167): funny and warm, real scares and real stakes |
+| Tone | Slice of life (171): a small-town life sim with quick, warm talk; the yard is real but in the background | Comedy-horror (167): funny and warm, real scares and real stakes |
 | Length | A campaign (166) | A campaign (166) |
 | Where | America, its own world: a valley town by the graveyard (169) | America, its own small town (169) |
 | Era | Today, analogue: radios, logbooks, bad signal (170) | Today |
@@ -135,26 +135,86 @@ who joins later. Couch co-op and party mode: each player picks one in session
 zero (the GM offers them with `ask_question`, `target_player_name`), and the
 GM writes each as that player's "Character: <name>" sheet.
 
-### 3.5 What play is
+### 3.5 What play is: a small-town life, with a graveyard at the end of the road (decision 171)
 
-A season on the Watch, in nights. A night is: the check-in on the radio, a
-call (something is moving in a section; a tower has gone quiet; a funeral
-procession arrives after dark), going down into the yard, and coming back up
-the ladder before dawn. The days are town: the diner, the people, the
-romance, the grudges, sleep. The campaign beneath the nights:
+The author, after reading the first draft: "Grave Watcher has to be a bit
+more slice of life, life sim, Gilmore Girls vibe." So the town is the show
+and the Watch is the job. Most of a session is life in Hollins Ferry: the
+diner, the people, who is seeing whom, who is not speaking to whom, the
+town meeting that runs two hours over a parking space, the festival that
+needs a volunteer, a mother and a grown daughter who are each other's best
+friend and worst critic, the coffee. The talk is quick, warm and funny, and
+everyone knows everyone's business. The yard is real and dangerous, but it
+is the weather of the place, not the plot of every scene.
 
-- **The campaign note** gives the GM the season's arc for its seven-beat plan:
-  a working growing somewhere in the Long Acre, the tower that went quiet last
-  year, and who in town profits from a restless yard.
+**The rhythm.** The season runs on the **town calendar**, not on monster
+nights:
+
+- **A day** is town: errands, a shift somewhere (most Watchers have a second
+  job; the Watch pays badly), lunch at the diner, a favour someone asks, a
+  date, an argument, a town meeting. The GM plays the town as a cast of
+  regulars with running bits.
+- **A night** is a watch: the radio check-ins (most of what comes over the
+  net is gossip, jokes, music requests and someone's dog), a quiet logbook
+  entry, and now and then a call that means going down the ladder. Most
+  nights nothing comes up out of the ground, and the conversation on the
+  radio *is* the scene.
+- **The calendar**: one town event every week or two, which the campaign is
+  built around: the Founders' Day pancake breakfast, the Lantern Walk through
+  the yard's old section, the dance marathon, the Halloween committee (a
+  sore subject in a town like this), the first snow, the winter carnival,
+  the spring cleanup of the graves. Each event is a social scene first and,
+  sometimes, a trouble in the yard second.
+
+**What the dice are for.** The B&B moves cover both halves. *Compel*, *Gather
+Information* and *Secure an Advantage* do most of the work in town (winning
+the argument at the town meeting, finding out who sent the anonymous pie,
+getting the booth at the diner), and Connections are the heart of the
+character: the Running-it note tells the GM to give every Watcher a life in
+town worth losing, to bring their Connections into scenes often, and to let
+a Connection rise or fall from a good conversation. Stress comes from the
+yard *and* from life (a fight with your mother counts). *Face Danger* and
+the Skirmish moves are for the nights that go wrong.
+
+**The campaign underneath** is slow and mostly in the background: a working
+growing somewhere in the Long Acre, the tower that went quiet last year, and
+who in town profits from a restless yard. It surfaces through town life (the
+funeral director's new car; the Founders' Day speech that mentions the Old
+Lot; the dog that won't walk past the diner's back door) more than through
+the radio.
+
+- **The campaign note** gives the GM the season for its seven-beat plan, laid
+  over the calendar: each beat names the town events it falls between.
+- **The town is the biggest part of the material**: about **sixteen
+  regulars** with a running bit each (the diner's owner, who refuses to put
+  Wi-Fi in; the town selectman, who runs every meeting like a war; the
+  dispatcher, who knows everything first; the funeral director; the
+  sheriff; the hardware store's two feuding brothers; the dance teacher; the
+  town's one Vampire, who runs the night shift at the pharmacy; the
+  ghost who still sings at the chapel; the Board's inspector, who comes up
+  from the county and is, unfortunately, charming), a map of the town's
+  places, and a calendar note.
 - **Tables** (the starter's own; the Europe-flavoured E1 tables are left out,
-  §5): Calls on the radio (d20), What stirs in the yard (d20), Sections and
-  graves (d20 + a d66 of inscriptions), Town faces (d20), Town happenings
-  (d20), Weather and the fog (d20).
-- **NPCs**: about ten in town (the diner's owner, the sheriff, the funeral
-  director, the dispatcher, the Board's inspector, a grave-robber) plus the
-  roster.
-- **Shared tracks**: "Get through the season" (a long track the campaign
-  marks), and one for the arc's working.
+  §5): Town today (d20: what is happening on Main Street), Who's at the diner
+  (d20), Gossip going round (d20), The radio net tonight (d20, mostly not
+  monsters), Calls on the radio (d20, the ones that are), What stirs in the
+  yard (d20), Sections and graves (d20 + a d66 of inscriptions), Weather and
+  the fog (d20).
+- **Unrest climbs slowly**: it starts at 1 and moves with the campaign, not
+  with every night, so a session can be all town and still be the game.
+- **Shared tracks**: "Get through the season" (a long track the calendar
+  marks), and one for the arc's working. Each Watcher's Vow is personal and
+  usually about someone in town.
+
+**Another sample, a day.**
+
+> Marisol has put the coffee in front of you before you've sat down, which
+> means she wants something. "Two things," she says. "One: Founders' Day.
+> Walt has signed you up for the pie table, don't look at me, I said you'd
+> hate it. Two." She lowers her voice. "The new guy at the funeral home paid
+> cash for the Hendricks place. *Cash.* Who has cash?" Behind her, Walt
+> Pruitt is taping a sign to the door that says TOWN MEETING TONIGHT and,
+> underneath, smaller, PARKING.
 
 ## 4. The hotel (working title *The Last Resort*)
 
@@ -245,7 +305,7 @@ setting.
 
 | | notes | tokens (estimate) |
 |---|---|---|
-| Grave Watcher: Running it, campaign, 4 places, the net, roster, 6 tables, 2 secrets, ~10 NPCs, 8 presets | ~17 | ~16,000 |
+| Grave Watcher: Running it, campaign, the calendar, the yard, the tower, the town and its places, the net, roster, 8 tables, 2 secrets, ~16 town NPCs, 8 presets | ~20 | ~19,000 |
 | The hotel: Running it, campaign, hotel, town, residents, family, 5 tables, 2 secrets, ~12 NPCs, 5 presets | ~14 | ~13,000 |
 
 Every note under the 2,500-token read cap; each Running-it note plus the core
