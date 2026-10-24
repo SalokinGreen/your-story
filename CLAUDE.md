@@ -717,6 +717,21 @@ report's §11.3. The ones that shape play:
   islands, the Alps and the Black Forest) and the three continent notes, and
   deepens the original six in `europe.ts` in place (ids unchanged). `buildHollowHour` copies the Rules pack, the cross-Europe
   notes and London (`HOLLOW_HOUR_CITY`) only.
+  **E5 adds two campaign starters in their own American worlds** (decisions
+  163–173, `docs/bb-starters-design.md`; `starters/grave-watcher/`,
+  `starters/last-resort/`): *Grave Watcher*, a slice-of-life season on a
+  graveyard watchtower and in the valley town below it, with the Masquerade
+  off (Taint per Watcher, made by the GM with `manage_meter create`; Unrest
+  for the world), eight pre-made Watchers as presets, 25 town regulars, 35
+  visitors and a d100 of people; and *The Last Resort*, comedy-horror, a
+  family inheriting a haunted hotel (Vacancy for Heat), five relatives as
+  presets. Each copies the Rules notes but the twelve E1 table families
+  (`ownWorldRulesNotes`, `starters/shared.ts`), brings its own tables, and
+  rereads the core in its "— Running it" note. A story's
+  `systemState.setting` ("grave-watch", "last-resort"; unset means Europe by
+  Night) comes from the starter's template and is kept by the Designer's
+  draft; only a Europe by Night story is given the cross-Europe notes on
+  load. `tests/systems.starters.test.ts` holds both starters.
   `tests/systems.bloodAndBone.test.ts` holds the token budgets and runs the
   core's recipes against the engine.
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9

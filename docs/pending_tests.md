@@ -10,6 +10,31 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Blood & Bone campaign starters (E5, decisions 163–173)
+
+Checked in the browser preview: both starters are on the Library home; Play
+shows the roster (eight Watchers) and the family (five relatives); a picked
+Watcher's sheet becomes the story's character sheet; the story is saved with
+its setting, its own meter (Unrest at 1, Vacancy at 3), its NPCs (25, 16)
+and no Europe by Night note, and a reload adds none. Needs a real model:
+
+- **Grave Watcher's first session.** Play, pick Dee Harjo, Quick setup.
+  Expected: session zero writes a Campaign Plan from "Grave Watcher — The
+  season", creates Dee's Taint meter with `manage_meter create` (0-6), and
+  after the setup card the first scene is the radio and the green light, then
+  a day in Hollins Ferry: the Lamplight, Marisol, regulars by name. Failure
+  looks like: the GM creating the "Blood & Bone character" set and talking
+  about Exposure, Heat or the Masquerade (it missed the Running-it reread), or
+  a scene with no town in it at all (the slice-of-life tone did not land).
+- **The town tables.** In town, ask "who's at the diner?". Expected: the GM
+  rolls "Who's at the Lamplight" (formula_roll 1d20) or "People you might
+  meet" (1d100) and the Names table, instead of inventing.
+- **Solo fills the team.** Expected: the GM puts the unpicked Watchers on the
+  radio by tower and call sign.
+- **The Last Resort's first week.** Play, pick Dara Alder. Expected: Mr.
+  Pell at the desk, the will, the basement warning; Vacancy (not Heat) moves
+  with refunds and bookings; the tone is funny with real danger.
+
 ## 2026-10-24 — Blood & Bone new Kinds and Powers (E4, decisions 160–161)
 
 Needs a real model:

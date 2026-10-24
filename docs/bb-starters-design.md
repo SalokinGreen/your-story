@@ -388,3 +388,22 @@ author in the reading copy before merge (decision 157).
 - No art; pictures in play can paint them.
 - The hotel's name, the yard's name and the town's are working titles: the
   author can rename them in review.
+
+## Decisions made during implementation (2026-10-24)
+
+- **Status: approved ("Go", decision 173) and built** on `claude/bb-starters`.
+- **The setting lives only in `storyTemplate.systemState.setting`**, not on
+  `BuiltinAdventure`: the template is spread into the new story, so no new
+  field was needed there. The Designer's draft keeps it (`designer_executor.ts`).
+- **Tower Nine** is the players' tower: a roster Watcher picked by a player
+  crews it this season, and Towers One to Eight hold the rest of the roster as
+  NPCs on the radio. Tower Six "went quiet last year" and is now held by the
+  Revenant Emmett Roake, who took over the post.
+- **Human player characters are Hunters** (Blood & Bone has no human Kind):
+  the hotel's family and the human Watchers are Hunters by Kind, with the
+  Pragmatist, Zealot or Penitent Archetype.
+- **The hotel's buyer** was renamed Corbin & Vane Hospitality so its name
+  does not echo Grave Watcher's Walt Pruitt.
+- **Size, as built**: Grave Watcher about 20,000 tokens of its own notes
+  (16 world notes and tables, the roster, the regulars, two visitor notes,
+  five town tables), The Last Resort about 10,000 (14 notes and the family).
