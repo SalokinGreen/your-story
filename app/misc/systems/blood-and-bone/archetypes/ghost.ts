@@ -26,12 +26,12 @@ The third Archetype of the Ghost, beside the two in B&B — Ghost. Everything in
 ## Seeker Powers
 
 **THE UNQUIET RECORD**
-1. Your death is the one memory the Fading cannot take.
+1. Your death is the one memory the Fading cannot take, and the Fading's penalty never applies to a roll about your death.
 2. When you Gather Information about the circumstances of your death or the people who were there, add +2.
 3. Once per session, relive a moment of your death and put one question to the GM, who answers it fully and truthfully. Confronting the manner of your death counts as a Stress trigger, and it applies.
 
 **THE PATIENT DEAD**
-1. You do not tire. You can watch a place unseen for nights on end, noting who comes and goes.
+1. You do not tire. You can watch a place unseen for nights on end, noting who comes and goes. When you Secure an Advantage by watching a place, add +1.
 2. When you Gather Information by watching a place, add +2.
 3. Once per session, declare that you were there that night. The GM tells you what you saw. Raise your Stress by 1.
 
@@ -39,12 +39,12 @@ The third Archetype of the Ghost, beside the two in B&B — Ghost. Everything in
 Any Ghost may take these.
 
 **THE BORROWED HOUR**
-1. You can slip into a sleeping, unconscious or willing mortal and ride along, seeing and hearing what they do.
+1. You can slip into a sleeping, unconscious or willing mortal and ride along, seeing and hearing what they do. When you Gather Information through a host's senses, add +1.
 2. You can speak through such a host in their own voice. Add +1 to Compel through them.
-3. You can take full control of a host for a scene. Raise your Stress by 2. The host remembers nothing, and if anyone witnesses something strange, Exposure +1.
+3. You can take full control of a host for a scene. Raise your Stress by 2. While in control, add +1 to Face Danger with the host's body. The host remembers nothing, and if anyone witnesses something strange, Exposure +1.
 
 **THE ECHO**
-1. You hear the sounds of the last hour in any place you stand: footsteps, voices, a door.
+1. You hear the sounds of the last hour in any place you stand: footsteps, voices, a door. When you Secure an Advantage using what you heard (a guard's round, a door's creak), add +1.
 2. When you Gather Information by listening to a place's echoes, add +2.
 3. Once per night, replay a moment from a place's past so loudly that everyone present hears it. Mortals must Face Danger to stay. Raise your Stress by 1.
 

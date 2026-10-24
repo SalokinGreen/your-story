@@ -31,7 +31,7 @@ The third Archetype of the Witch/Warlock, beside the two in B&B — Witch/Warloc
 3. Once per session, take a Power from a practitioner you have bested or robbed and use it for the night. Add 3 marks to your Ledger. The one you took it from will come for it.
 
 **THE CLEAN BREAK**
-1. Compulsion, curses and demands laid on you by your old source or tradition do not hold on their own: you always get a roll to resist.
+1. Compulsion, curses and demands laid on you by your old source or tradition do not hold on their own: you always get a roll to resist, and you add +1 to it.
 2. You can cut a person, place or object loose from a ward, curse or binding with a touch. Add 1 mark to your Ledger.
 3. Once per session, sever a pact or bond someone in the scene is held by. Add 2 marks to your Ledger and raise your Stress by 1. Whatever held them knows who cut it.
 
@@ -39,14 +39,14 @@ The third Archetype of the Witch/Warlock, beside the two in B&B — Witch/Warloc
 Any Witch/Warlock may take these.
 
 **THE CANDLE**
-1. Light a candle for someone you hold a keepsake of: you see whether they are alive, hurt or afraid.
+1. Light a candle for someone you hold a keepsake of: you see whether they are alive, hurt or afraid. When you Undertake a Journey toward them, add +1.
 2. When you Gather Information on that person through the flame, add +2.
-3. Speak through the flame to them, anywhere in the city. They hear you and no one else does. Add 1 mark to your Ledger.
+3. Speak through the flame to them, anywhere in the city. They hear you and no one else does; add +1 to Compel them this way. Add 1 mark to your Ledger.
 
 **THE DREAMWALK**
-1. You can enter the dream of a sleeper you have touched and watch it without being noticed.
-2. You can speak to them in the dream. Roll +Heart to Compel, and they remember it as a dream.
-3. You can plant a dream that returns every night until its meaning is heeded. Add 2 marks to your Ledger. The sleeper may wake changed.
+1. You can enter the dream of a sleeper you have touched and watch it without being noticed. When you Gather Information from their dream, add +1.
+2. You can speak to them in the dream. Roll +Heart to Compel and add +1; they remember it as a dream.
+3. You can plant a dream that returns every night until its meaning is heeded, and you add +1 to Compel the sleeper while it lasts. Add 2 marks to your Ledger. The sleeper may wake changed.
 
 ## Running the Apostate
 - Ask at creation what they walked out on, and who is still angry. That is the Apostate's Doomed or Indebted burden, and the owner on a Sate the Beast miss.

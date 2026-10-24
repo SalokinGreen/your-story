@@ -24,7 +24,7 @@ The third Archetype of the Vampire, beside the two in B&B — Vampire. Everythin
 ## Courtier Powers
 
 **THE OPEN HOUSE**
-1. You keep one place others come to: a salon, a club, a back room. A willing donor is always among its guests, unless the fiction has closed the house.
+1. You keep one place others come to: a salon, a club, a back room. A willing donor is always among its guests, unless the fiction has closed the house. When you Sate the Beast on that donor, add +1.
 2. While you host, no guest raises a hand against another under your roof without Facing Danger first. Add +1 to Compel anyone in your house.
 3. Once per session, call a truce in a room you host: nobody in it may attack until someone breaks it. If your truce is broken, Exposure +1 for you; you did not keep your house.
 
@@ -37,12 +37,12 @@ The third Archetype of the Vampire, beside the two in B&B — Vampire. Everythin
 Any Vampire may take these.
 
 **A STANDING INVITATION**
-1. Once a mortal household has invited you in by name, you may cross its threshold at any hour, even if the host is asleep.
-2. An invitation you hold does not lapse when its giver dies; it passes to whoever keeps the house.
-3. You may cross a threshold whose heirs refuse you, once per session, if an old invitation still stands. Raise your Stress by 1; you are not welcome, and everyone inside knows it.
+1. Once a mortal household has invited you in by name, you may cross its threshold at any hour, even if the host is asleep. When you Slip Away into such a household, add +1.
+2. An invitation you hold does not lapse when its giver dies; it passes to whoever keeps the house. When you Compel that keeper by naming the invitation, add +1.
+3. You may cross a threshold whose heirs refuse you, once per session, if an old invitation still stands. Raise your Stress by 1; you are not welcome, and everyone inside knows it. Your first Face Danger inside is at +1.
 
 **AN EYE FOR THE HUNGRY**
-1. At a glance you can tell who in a room wants something from you, and roughly what.
+1. At a glance you can tell who in a room wants something from you, and roughly what. When you Compel someone with what they want, add +1.
 2. When you Gather Information about someone's wants, debts or fears, add +2.
 3. Once per session, ask who in the room means you harm. The GM answers truthfully, even if the answer is "no one yet".`,
 };

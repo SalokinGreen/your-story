@@ -25,13 +25,13 @@ The third Archetype of the Wendigo, beside the two in B&B — Wendigo. Everythin
 ## Shepherd Powers
 
 **THE GOOD SHEPHERD**
-1. You can take in a stray, someone with nowhere else to go, without a roll. They join the flock.
+1. You can take in a stray, someone with nowhere else to go, without a roll. They join the flock, and when you Face Danger or Slip Away to protect them, add +1.
 2. When you Compel a member of your flock, add +2.
 3. Once per session, the flock closes around you: a household or crowd hides you from pursuit and lies for you. Slip Away is an automatic strong hit where your flock lives. The flock Connection drops a rank.
 
 **THE PORTION**
 1. Once a night, take a small piece from a sleeping flock member. Roll Sate the Beast with Shadow; any hit sets the Slipping Mask to 0, but a strong hit decreases Stress by only 1. They wake unwell and remember nothing.
-2. A member taken from this way sickens slowly. If you keep it up, the flock notices within a few sessions; the GM says when.
+2. A member taken from this way sickens slowly. When you Face Danger to keep the sickness from being traced to you, add +1. If you keep it up, the flock notices within a few sessions; the GM says when.
 3. Once per session, take a portion from the whole flock at once: decrease Stress by 2, no roll. The flock Connection drops a rank and Exposure +1.
 
 ## More Kind Powers
@@ -45,5 +45,5 @@ Any Wendigo may take these.
 **THE KIND STRANGER**
 1. Mortals who are cold, lost or alone are drawn to trust you. When you Compel one, add +1.
 2. When you offer warmth or shelter and then Gather Information, add +2.
-3. Once per session, a stranger you have sheltered vouches for you to others, at once and to anyone. They become a Weak Connection and are in danger because of it.`,
+3. Once per session, a stranger you have sheltered vouches for you to others, at once and to anyone, and you add +1 to Compel or Gather Information with anyone they vouch to that scene. They become a Weak Connection and are in danger because of it.`,
 };

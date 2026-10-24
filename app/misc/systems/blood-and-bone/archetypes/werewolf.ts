@@ -37,9 +37,9 @@ The third Archetype of the Werewolf, beside the two in B&B — Werewolf. Everyth
 Any Werewolf may take these.
 
 **ANIMAL KIN**
-1. Dogs, wolves and strays do not bark at you or attack, and answer what you ask of them by what they do.
+1. Dogs, wolves and strays do not bark at you or attack, and answer what you ask of them by what they do. When you Slip Away or Secure an Advantage with their help (a distraction, a trail), add +1.
 2. When you Gather Information through animals, add +2.
-3. Command every dog nearby for a scene. Raise your Stress by 1.
+3. Command every dog nearby for a scene; their help counts as Aid Another adding +2 to your roll. Raise your Stress by 1.
 
 **HOLD THE DOOR**
 1. When you hold a doorway, stair or alley against anyone, add +1 to Face Danger.

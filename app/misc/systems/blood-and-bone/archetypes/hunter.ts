@@ -32,7 +32,7 @@ The third Archetype of the Hunter, beside the two in B&B — Hunter. Everything 
 
 **THE SCARRED WITNESS**
 1. You know the look of guilt from the inside. When you Gather Information about someone hiding a wrong they did, add +1.
-2. You can tell whether a person in front of you is carrying a killing. The GM answers truthfully.
+2. You can tell whether a person in front of you is carrying a killing. The GM answers truthfully, and when you Compel them about it, add +1.
 3. When a monster, a faction or another hunter demands a price from someone under your protection, you may stand in as the price. Once per session. Raise your Stress by 2 and take Indebted.
 
 ## More Kind Powers
@@ -44,7 +44,7 @@ Any Hunter may take these.
 3. Once per session, the GM tells you where the next incident in a pattern you have uncovered will happen, or has just happened. Stress +1: you see it the way the killer does.
 
 **THE CIVILIAN COVER**
-1. You hold a plausible job, papers and an alibi that survive a casual check.
+1. You hold a plausible job, papers and an alibi that survive a casual check without a roll; when the check is pushed, add +1 to Face Danger to hold your cover.
 2. When you Compel officials or Slip Away from authorities using your cover, add +2.
 3. Once per session, make a lethal scene read as an accident or an ordinary crime: Clean Up with an automatic strong hit. Raise your Stress by 1.
 

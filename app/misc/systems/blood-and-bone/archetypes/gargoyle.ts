@@ -26,11 +26,11 @@ The third Archetype of the Gargoyle, beside the two in B&B — Gargoyle. Everyth
 
 **THE ROAD-WORN**
 1. When you Undertake a Journey by night, add +1.
-2. At each dawn on a journey you find a place to pass the day. Stone Slumber there is not found by anyone who is not already following you.
+2. At each dawn on a journey you find a place to pass the day. Stone Slumber there is not found by anyone who is not already following you, and when you Slip Away from pursuers at dawn, add +1.
 3. Once per session, count one leg of a journey as already travelled. Raise your Stress by 1.
 
 **THE WAYMARK**
-1. You can leave a sign on stone that other Gargoyles can read: who passed, how long ago, whether it was safe.
+1. You can leave a sign on stone that other Gargoyles can read: who passed, how long ago, whether it was safe. When you Gather Information from such a sign, add +1.
 2. Up to two places you have marked count as claimed for Territorial Sense's first two abilities. Moving a mark takes a night.
 3. Once per session, when in danger within a night's flight of a mark of yours, you are suddenly there: no roll. Raise your Stress by 1.
 
@@ -38,12 +38,12 @@ The third Archetype of the Gargoyle, beside the two in B&B — Gargoyle. Everyth
 Any Gargoyle may take these.
 
 **THE LISTENING STONE**
-1. Pressed against a wall, you hear what is said in the rooms it touches.
+1. Pressed against a wall, you hear what is said in the rooms it touches. When you Gather Information that way, a hit also tells you who is speaking and where they stand.
 2. When you Gather Information by listening through stone, add +2.
-3. You hear a whole building at once, every voice and every footstep. Raise your Stress by 1 each time.
+3. You hear a whole building at once, every voice and every footstep, and when you Slip Away or Face Danger inside it, you know where everyone is: add +1. Raise your Stress by 1 each time.
 
 **THE LAST HOUR**
-1. You know to the minute how long until dawn, wherever you are.
+1. You know to the minute how long until dawn, wherever you are. When you Secure an Advantage by timing a move around sunrise, add +1.
 2. When you Slip Away toward cover before sunrise, add +1.
 3. Once per session, delay Stone Slumber by one scene. The next sunrise raises your Stress by 2, and you cannot choose where you are caught.`,
 };
