@@ -7,6 +7,8 @@
  *   before the slice: 1,397 tokens (one line per note, all 38 pack notes + 2)
  *   compact list alone (still 38 notes): 1,314
  *   after the slice (compact list and the starter: 33 pack notes, London only): 1,304
+ *   with the twelve table families and the TABLES line's "roll it rather than
+ *   inventing" hint added after the playtest (45 pack notes): 1,385
  */
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { getEncoding } from "js-tiktoken";
@@ -160,7 +162,7 @@ describe("the compact note list", () => {
     const tokens = enc.encode(liveBlock(starterStory())).length;
     expect(tokens).toBeLessThan(LIVE_BEFORE);
     // Pinned loosely: a growing pack must not bring back a line per note.
-    expect(tokens).toBeLessThan(1350);
+    expect(tokens).toBeLessThan(1450);
   });
 });
 

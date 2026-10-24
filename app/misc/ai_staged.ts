@@ -1822,7 +1822,7 @@ export function buildGMStagePrompt({
     (l) => !isBuiltinCreationPrompts(l),
   );
   if (rollableTables.length > 0) {
-    loreSection += `\n## 🎲 TABLES (use read_notes to view, then roll the die the note names with formula_roll and read off the result)\n`;
+    loreSection += `\n## 🎲 TABLES (use read_notes to view, then roll the die the note names with formula_roll and read off the result. When one of these covers what you need, such as a name, a face, a place or a rumour, roll it rather than inventing the answer or calling generate_name)\n`;
     loreSection += renderNoteTitleList(rollableTables, "tables");
     loreSection += "\n";
   }
