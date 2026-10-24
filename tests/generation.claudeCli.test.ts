@@ -228,7 +228,9 @@ describe("the first round of a fresh story (a miss and its retry)", () => {
     expect(runs[2].prompt).toMatch(/\[Tool result · calculate · cli\w+_0\]\n\S/);
   });
 
-  it("does not retry a tool-less round later in the turn, even one that claims its tools are down", async () => {
+  // Decision 178 (the 2026-10-24 playtest): a later round that claims its
+  // tools are down is retried once too; the retry is never retried.
+  it("retries a later round that claims its tools are down, once", async () => {
     let round = 0;
     fakeCli.respond = () => {
       round++;
@@ -240,7 +242,7 @@ describe("the first round of a fresh story (a miss and its retry)", () => {
     const result = await generateStoryTurn(createStory(), "I attack the goblin", OPTIONS, {});
 
     expect(result.success).toBe(true);
-    expect(structuredRuns()).toHaveLength(2);
+    expect(structuredRuns()).toHaveLength(3);
   });
 
   it("does not retry an ordinary tool-less first reply", async () => {

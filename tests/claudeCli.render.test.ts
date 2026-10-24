@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildRoundSchema,
   claimsToolsUnavailable,
+  claimsToolsUnavailableLater,
   mapEffort,
   readStructuredAnswer,
   renderCliPrompt,
@@ -335,6 +336,7 @@ describe("claimsToolsUnavailable", () => {
     "I can't use my tools in this conversation.",
     "I'm unable to call any tools right now.",
     "The tools seem to be unresponsive.",
+    'Every attempt came back with a "No such tool available" error, so none of it exists.',
   ])("recognises a claim that the tools are down: %s", (text) => {
     expect(claimsToolsUnavailable(text)).toBe(true);
   });
@@ -377,7 +379,33 @@ describe("claimsToolsUnavailable", () => {
     expect(claimsToolsUnavailable(text)).toBe(false);
   });
 
+  it("does not take everyday fiction about tools for the CLI's error", () => {
+    expect(claimsToolsUnavailable("You pat your pockets: no such tool. The lock stays shut.")).toBe(false);
+    expect(claimsToolsUnavailable("There is no such tool in the shed.")).toBe(false);
+  });
   it("still reads a claim made after the thinking", () => {
     expect(claimsToolsUnavailable("<thinking>Plan: set up the sheet.</thinking>(OOC: my tools aren't responding.)")).toBe(true);
+  });
+});
+
+// A round later in the turn may be the story itself: only the CLI's error
+// wording or an OOC aside counts there (engine review of decision 178).
+describe("claimsToolsUnavailableLater", () => {
+  it.each([
+    '(Setup is stalled. Every attempt came back with a "No such tool available" error.)',
+    "The plan could not be saved: No such tool available.",
+    "(OOC: my dice and note tools aren't responding.)",
+  ])("recognises: %s", (text) => {
+    expect(claimsToolsUnavailableLater(text)).toBe(true);
+  });
+
+  it.each([
+    "You pat your pockets: no such tool. The lock stays shut.",
+    "Without light you can't use the tools on the bench.",
+    "You can't reach the tools from here.",
+    `Mara shrugs. "I don't have any tools, love."`,
+    "The tools aren't working in this cold.",
+  ])("leaves story prose alone: %s", (text) => {
+    expect(claimsToolsUnavailableLater(text)).toBe(false);
   });
 });

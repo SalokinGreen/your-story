@@ -5301,7 +5301,9 @@ function executeCreateTimer(
     description: params.description,
     totalTicks: params.ticks,
     currentTicks: params.ticks,
-    autoAdvance: params.auto_advance !== false,
+    // Nothing ticks a timer yet (status report §6.1), so a new one is
+    // manual unless asked otherwise; the result line says so either way.
+    autoAdvance: params.auto_advance === true,
     status: "active",
     visibility: params.visibility || "visible",
     createdAt: Date.now(),
@@ -5330,7 +5332,7 @@ function executeCreateTimer(
     } as GMCreateTimerResult,
     contextForStory: `[Timer Created: "${timer.name}" - ${
       timer.currentTicks
-    } ticks${timer.autoAdvance ? " (auto)" : " (manual)"}${visibilityNote}${
+    } ticks (advance it yourself: nothing ticks it on its own)${visibilityNote}${
       timer.description ? ` - ${timer.description}` : ""
     }]`,
   };
@@ -6129,7 +6131,7 @@ async function executeManageTrack(
         const { outcome, match } = resolveAgainstChallengeDice(boxes, faces[0], faces[1]);
         const word = outcome === "strong_hit" ? "STRONG HIT" : outcome === "weak_hit" ? "WEAK HIT" : "MISS";
         let ctx = `[Progress roll: ${existing.kind} "${existing.name}", ${boxes} boxes vs ${faces[0]} and ${faces[1]} → ${word}]`;
-        if (match) ctx += `\n[MATCH: both challenge dice show ${faces[0]}. Something unexpected enters: a complication on a hit, a turn for the worse on a miss.]`;
+        if (match) ctx += `\n${matchNote(faces[0], outcome)}`;
         ctx += `\n[The track stays active until you set its status.]`;
         // Like action_roll, success carries the engine's verdict (a miss is a
         // failed check, not a failed call).
@@ -6215,6 +6217,22 @@ function executeEndSession(
   };
 }
 
+/**
+ * What a match (both challenge dice the same) means, by outcome, as the
+ * Blood & Bone core states it: a matched strong hit is something memorable
+ * going right, a matched miss is a worse price. The playtest of 2026-10-24
+ * found the old one-size line ("a complication on a hit") telling the GM the
+ * opposite of the rules on a strong hit (decision 178). With both dice the
+ * same, a score beats both or neither, so a match is never a weak hit.
+ */
+function matchNote(face: number, outcome: "strong_hit" | "weak_hit" | "miss"): string {
+  const meaning =
+    outcome === "miss"
+      ? "A matched miss: roll the miss table twice, or apply one result at double severity."
+      : "A matched strong hit: something memorable goes right, beyond what was asked.";
+  return `[MATCH: both challenge dice show ${face}. ${meaning}]`;
+}
+
 async function executeActionRoll(
   toolCallId: string,
   params: ActionRollParams,
@@ -6294,7 +6312,7 @@ async function executeActionRoll(
     ctx += `\n[Only +${ACTION_ADDS_CAP} of the ${adds} adds claimed applies.]`;
   }
   if (match) {
-    ctx += `\n[MATCH: both challenge dice show ${challengeDice[0]}. Something unexpected enters the scene: a complication on a hit, a turn for the worse on a miss.]`;
+    ctx += `\n${matchNote(challengeDice[0], outcome)}`;
   }
   ctx += `\n[Reason: ${params.reason}]`;
   if (params.stakes) {
