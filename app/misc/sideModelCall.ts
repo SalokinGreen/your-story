@@ -28,7 +28,12 @@ import { logger } from "./logger";
 import { providerFetch } from "./providerFetch";
 import { GenerateSuccess } from "./providerCall";
 import { DEFAULT_REASONING_EFFORT } from "./reasoningTiers";
-import { recordSideCall, SideCallCostContext, TurnCostStage } from "./turnCost";
+import {
+  recordSideCall,
+  recordUnansweredSideCall,
+  SideCallCostContext,
+  TurnCostStage,
+} from "./turnCost";
 import { getCustomModelIfUUID } from "./user_settings";
 
 /**
@@ -138,7 +143,19 @@ export async function callSideModel(
       request.abortSignal,
     );
   } catch (error) {
-    if (isAbortError(error)) throw error;
+    if (isAbortError(error)) {
+      // Sent and cancelled before it answered: the provider may have billed
+      // for it, so the turn's ledger says so rather than showing it as free.
+      if (request.stage) {
+        recordUnansweredSideCall(
+          request.stage,
+          request.label,
+          request.model,
+          request,
+        );
+      }
+      throw error;
+    }
     const failure = {
       ok: false as const,
       error: error instanceof Error ? error.message : String(error),
@@ -171,6 +188,17 @@ export async function callSideModel(
   try {
     data = (await response.json()) as GenerateSuccess;
   } catch (error) {
+    // The answer arrived (or was cut off) but cannot be read: billable all
+    // the same, and its usage is lost, so the cost is unknown.
+    if (request.stage) {
+      recordUnansweredSideCall(
+        request.stage,
+        request.label,
+        request.model,
+        request,
+        isAbortError(error) ? "cancelled" : "unreadable answer",
+      );
+    }
     if (isAbortError(error)) throw error;
     const failure = {
       ok: false as const,

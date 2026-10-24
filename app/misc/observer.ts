@@ -4,27 +4,36 @@
  *
  * checkNarrationConsistency (consistencyCheck.ts) is diagnostic-only: it runs
  * after narration has already streamed to the player and just records a
- * warning. This module is the active counterpart - it reviews a completed GM
- * turn for violations of rules the GM was already given, and a "major" flag
- * can trigger generateStoryTurn (generation.ts) to call
- * rewriteFlaggedNarration below: the GM is shown the exact narration it
- * wrote and the specific reason it was flagged, and rewrites just the prose
- * - dice rolls/tool calls/state changes are left untouched, since every
- * major-eligible check here is a complaint about the narration text alone.
- * Only if that rewrite call itself fails does generateStoryTurn fall back to
- * rolling StoryData back to its pre-turn snapshot and forcing a completely
- * fresh, blind attempt. Same fail-open posture as the M2 roll-invariant gate
- * (reasoningTiers.ts/generation.ts): never block play indefinitely.
+ * warning. This module is the judge counterpart - it reviews a completed GM
+ * turn for violations of rules the GM was already given.
+ *
+ * BY DEFAULT IT ONLY FLAGS (decision 187, docs/judge-layer-design.md). Nothing
+ * here rewrites or rerolls a turn on its own: only the outcome-mismatch judge
+ * is on, and its finding is a flag in the turn's details. A player can switch
+ * each judge on in Settings, and the three that judge the prose
+ * (REWRITABLE_FLAG_TYPES) can be allowed to rewrite it automatically - which
+ * changes text the player may already have read. When that is on, a "major"
+ * flag can make generateStoryTurn (generation.ts) call rewriteFlaggedNarration
+ * below: the GM is shown the exact narration it wrote and the specific reason
+ * it was flagged, and rewrites just the prose - dice rolls/tool calls/state
+ * changes are left untouched, since every rewritable complaint is about the
+ * narration text alone. The rewrite is checked before it replaces anything
+ * (validateRewriteResponse); if it fails, or is rejected, the turn is KEPT with
+ * its flag. It is never answered by rolling StoryData back and rerolling the
+ * dice. (The one full-turn retry left is tier_escalation_missed's, at a
+ * heavier tier, reachable only by a config that sets its triggersReset
+ * directly; Settings does not offer it.)
  *
  * Three things scope every check below:
  * - Deferral (plausibleResetFlagTypes): whether the player WAITS on any of
  *   this is decided per-turn, before a single call is made, from free
- *   deterministic signals - the word count, which comparisons resolved, which
- *   tools ran, what tier the turn used. A turn where none of them could
+ *   deterministic signals - the word count, which tier the turn used and
+ *   whether the engine ruled on a check. A turn where none of them could
  *   produce a reset-eligible flag hands control straight back to the player
- *   and gets judged in generateStoryTurn's background wave instead, which can
- *   still rewrite (just not roll the turn back). See that function's comment
- *   for why player_agency is deliberately not on the list.
+ *   and gets judged in generateStoryTurn's background wave instead. With the
+ *   default settings no turn is ever plausible, so no turn ever waits. See
+ *   that function's comment for why player_agency is deliberately not on the
+ *   list.
  * - Suspension (observerSuspensionReason): session zero - a brand-new story
  *   up to and including the turn that calls start_game - is never judged.
  *   Setup turns legitimately run long and legitimately propose character
@@ -35,69 +44,57 @@
  *   it checkPlayerAgencyViolation was guessing at the single distinction its
  *   whole verdict rests on.
  *
- * Five checks, two severities:
+ * Five checks (six flag types):
  *
- * Major (can trigger generateStoryTurn's rewrite-or-reset correction):
+ * Can be allowed to rewrite (REWRITABLE_FLAG_TYPES):
  * - checkResponseLength: the word-count trip itself is deterministic and
  *   free - catches a single turn blowing way past the Reply Length setting's
- *   ceiling. pacingFeedback.ts already nudges based on a trailing 3-turn
- *   average; this catches one egregious turn on the spot instead of waiting
- *   for the average to drift. But "too long" isn't automatically a mistake -
- *   a session-zero opening dump, a big reveal, or a pivotal climax can
- *   legitimately need the room - so a trip doesn't flag on its own: it's
- *   followed by an LLM justification pass (same fail-open/API-error posture
- *   as the checks below) that reads the turn in context and decides whether
- *   the overage was earned. Only an unjustified overage becomes a flag.
+ *   ceiling. But "too long" isn't automatically a mistake - a session-zero
+ *   opening dump, a big reveal, or a pivotal climax can legitimately need the
+ *   room - so a trip doesn't flag on its own: it's followed by an LLM
+ *   justification pass (a real call, so this check is not free) that reads the
+ *   turn in context and decides whether the overage was earned. Only an
+ *   unjustified overage becomes a flag; a judge that could not answer is
+ *   "unknown" and says nothing.
  * - checkPlayerAgencyViolation: an LLM call that judges whether the GM took a
  *   decision away from the player (new meaningful dialogue, a significant
  *   choice, a decided feeling, a new action past the declared one). Narrating
  *   the character carrying out the declared action, in second person, is
  *   fine (decision 185).
  * - checkOutcomeMismatch: an LLM call that judges whether the finished
- *   narration contradicts the mechanical results (SUCCESS/FAILURE) of the
- *   rolls/checks made this turn. The roll results are ground truth - this
- *   is the same "LLM proposes, deterministic engine disposes" thesis the
- *   whole app is built on, just checked directly for the first time. It
- *   judges EVERY comparison the turn resolved, together, because a single
- *   comparison is not the verdict in a system that builds one outcome out
- *   of several (Starforged's action score vs. two challenge dice: beat
- *   both = strong hit, beat one = weak hit, beat neither = miss). Judging
- *   only the last one made a weak hit indistinguishable from a narration
- *   that reversed a failed roll. A turn whose comparisons came out MIXED
- *   is also capped at "minor" severity, so a partial-success outcome can
- *   never burn the turn's one rewrite on a false positive (see
- *   checkOutcomeMismatch).
+ *   narration contradicts the outcomes the engine decided this turn. The
+ *   results are ground truth - the same "LLM proposes, deterministic engine
+ *   disposes" thesis the whole app is built on, just checked directly. It is
+ *   handed typed verdicts only (extractOutcomeVerdicts: action_roll and
+ *   progress_roll tiers, recorded challenge results, and a calculate only when
+ *   it held a comparison), each on its own line.
  *
- * Minor by default (log-only, surfaced as a warning - see below on how that
- * default can be changed):
+ * Flag only by type (FLAG_ONLY_FLAG_TYPES; a rewrite cannot call a tool):
  * - checkToolUsageGaps: an LLM call that judges whether the turn invented an
  *   uncertain outcome instead of consulting fate_question/roll_table, or
  *   narrated a scene transition without calling increment_scene.
+ * - checkTierEscalation: whether the turn's own stakes warranted a higher
+ *   reasoning tier. Never rewritten either; see the note above on its retry.
  *
  * All LLM-backed checks go through callSideModel() (sideModelCall.ts), the
  * same as reflection.ts's callReflectionApi - non-streaming, caller-supplied
- * model, fails open (no flag) on any API error. Regex can't reliably judge any of
- * these; they need actual reading comprehension. checkResponseLength's
- * justification pass is the one exception to "fails open (no flag)": failing
- * open there means falling back to the deterministic flag its word-count
- * trip already produced, since that's what shipped before the judge existed
- * - an infra failure never gets to invent a NEW reset that wouldn't have
- * happened otherwise, but it also doesn't get to erase one that would have.
+ * model, fails open (no flag) on any API error. A cancelled call is the
+ * exception: its AbortError (the player's Stop) passes through every judge
+ * (isAbortError) instead of being read as "nothing to say". Regex can't
+ * reliably judge any of these; they need actual reading comprehension.
  *
- * Configuration (backend only - no settings UI exists yet, but the plumbing
- * is here for one to read/write later, the same way replyLength etc. flow
- * from localStorage through GenerationOptions): each of the five
- * ObserverFlagTypes has its own independent { enabled, triggersReset,
- * sensitivity } (see ObserverCheckSettings). `enabled` skips the check
- * entirely; `triggersReset` gates whether a "major" instance of that type
- * is ever allowed to reset (independent of the type's own severity logic);
- * `sensitivity` (0-10, default 5) scales how readily each check fires - the
- * overage multiplier for checkResponseLength, a strictness instruction for
- * every LLM-backed check, and (for the two tool-usage-gap checks
- * specifically, which have no severity gradient of their own) whether a hit
- * is reported as "minor" or "major" in the first place.
- * DEFAULT_OBSERVER_SETTINGS reproduces exactly what shipped before this
- * config existed.
+ * Configuration: each of the six ObserverFlagTypes has its own independent
+ * { enabled, triggersReset, sensitivity } (see ObserverCheckSettings).
+ * `enabled` skips the check entirely; `triggersReset` gates whether a "major"
+ * instance of that type is ever allowed to correct the turn (Settings shows
+ * the pair as Off / Flag / Rewrite automatically); `sensitivity` (0-10)
+ * scales how readily each check fires - the overage multiplier for
+ * checkResponseLength, a strictness instruction for every LLM-backed check,
+ * and (for the two tool-usage-gap checks specifically, which have no severity
+ * gradient of their own) whether a hit is reported as "minor" or "major" in
+ * the first place. DEFAULT_OBSERVER_SETTINGS is the flag-only table of
+ * decision 187, frozen; a stored config that predates it is replaced once
+ * (layerSettings.ts, OBSERVER_SETTINGS_VERSION).
  */
 
 import {
@@ -109,7 +106,9 @@ import {
 import { ReplyLength, getLengthGuidance } from "./ai_staged";
 import { ChatMessage } from "./chatMessage";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
-import { parseTaggedContent } from "./turnTimeline";
+import { parseTaggedContent, extractVisibleText } from "./turnTimeline";
+import { deAiifyText } from "./deAiify";
+import { logger } from "./logger";
 import { SideCallCostContext } from "./turnCost";
 import { callSideModel, ProviderKeys } from "./sideModelCall";
 import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
@@ -117,12 +116,11 @@ import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
 // ============================================================
 // PER-FLAG-TYPE CONFIGURATION
 // ============================================================
-// Backend for a future settings UI (not built yet - this just needs to
-// exist and be threaded through so a UI can read/write it later, the same
-// way replyLength/storytellerMode/etc. already flow from localStorage
-// through GenerationOptions). Each of the five ObserverFlagTypes gets its
-// own independent { enabled, triggersReset, sensitivity } - "which flags
-// call for a reset, and how sensitive each one is."
+// Read and written by Settings (ArchitectureSettingsTab.tsx, through
+// layerSettings.ts) and threaded through GenerationOptions. Each
+// ObserverFlagType gets its own independent { enabled, triggersReset,
+// sensitivity } - "which judges run, which may correct the turn, and how
+// sensitive each one is."
 
 export interface ObserverCheckSettings {
   /** Skip this check entirely (no API call for LLM-backed checks). */
@@ -155,35 +153,127 @@ export interface ObserverCheckSettings {
 
 export type ObserverSettings = Record<ObserverFlagType, ObserverCheckSettings>;
 
-const DEFAULT_CHECK_SETTINGS: ObserverCheckSettings = {
-  enabled: true,
-  triggersReset: true,
-  sensitivity: 5,
-};
+/**
+ * The stored-settings version the current defaults belong to (decision 187).
+ * Before it, every judge was on and three could rewrite or reroll a turn by
+ * default; a config saved then would keep that behaviour for good, because a
+ * stored config overrides the defaults. layerSettings.ts replaces a stored
+ * config that lacks this version, once, and keeps the player's choices after.
+ */
+export const OBSERVER_SETTINGS_VERSION = 2;
+
+function frozenCheckSettings(
+  enabled: boolean,
+  sensitivity: number,
+): Readonly<ObserverCheckSettings> {
+  return Object.freeze({ enabled, triggersReset: false, sensitivity });
+}
 
 /**
- * Current shipped behavior, reproduced exactly as the default config:
- * response_length/player_agency/outcome_narration_mismatch can reset (as
- * they always could), the two tool-usage-gap checks stay log-only (as they
- * always were) unless a future UI cranks their sensitivity up.
+ * Decision 187: flag only, no rewrites. Nothing rewrites or rerolls a turn on
+ * its own by default; only the outcome-mismatch judge stays on, as a flag in
+ * the turn's details (its input is typed verdicts now, see
+ * extractOutcomeVerdicts). The other five judges are off, and Settings can turn
+ * each back on. With every `triggersReset` false, canObserverTriggerReset is
+ * false: no blocking judge, no reset, no background rewrite and no speculative
+ * shortening.
+ *
+ * Frozen, and every reader gets a copy (settingsFor, layerSettings.ts): the
+ * first edit in Settings used to assign into this very object, so the
+ * "defaults" changed for the rest of the session and Reset handed the changed
+ * ones back (Codex review finding 9).
  */
-export const DEFAULT_OBSERVER_SETTINGS: ObserverSettings = {
-  response_length: { ...DEFAULT_CHECK_SETTINGS },
-  player_agency: { ...DEFAULT_CHECK_SETTINGS },
-  outcome_narration_mismatch: { ...DEFAULT_CHECK_SETTINGS },
-  missing_oracle_or_table: { ...DEFAULT_CHECK_SETTINGS, triggersReset: false },
-  missing_scene_increment: { ...DEFAULT_CHECK_SETTINGS, triggersReset: false },
-  tier_escalation_missed: { ...DEFAULT_CHECK_SETTINGS },
-};
+export const DEFAULT_OBSERVER_SETTINGS: Readonly<ObserverSettings> =
+  Object.freeze({
+    response_length: frozenCheckSettings(false, 5),
+    player_agency: frozenCheckSettings(false, 3),
+    outcome_narration_mismatch: frozenCheckSettings(true, 2),
+    missing_oracle_or_table: frozenCheckSettings(false, 5),
+    missing_scene_increment: frozenCheckSettings(false, 5),
+    tier_escalation_missed: frozenCheckSettings(false, 5),
+  });
 
-/** Settings for one flag type, falling back to its default for any field a partial/future config omits. */
+/**
+ * What a check function runs with when it is called directly with no settings:
+ * on, at balanced sensitivity. Whether a check runs at all is decided by the
+ * app's configuration (DEFAULT_OBSERVER_SETTINGS, the player's stored choices)
+ * before a check is called - runObserver passes settingsFor(...) to every one -
+ * so a function's own fallback is "do the check you were asked to do", not
+ * "consult the app's defaults a second time".
+ */
+const CHECK_RUNS_BALANCED: Readonly<ObserverCheckSettings> = Object.freeze({
+  enabled: true,
+  triggersReset: false,
+  sensitivity: 5,
+});
+
+/** A fresh, mutable copy of the defaults - what every reader of them gets. */
+export function cloneDefaultObserverSettings(): ObserverSettings {
+  const copy = {} as ObserverSettings;
+  for (const type of Object.keys(
+    DEFAULT_OBSERVER_SETTINGS,
+  ) as ObserverFlagType[]) {
+    copy[type] = { ...DEFAULT_OBSERVER_SETTINGS[type] };
+  }
+  return copy;
+}
+
+/**
+ * Judges whose finding is about a tool that did not run, not about the words.
+ * A rewrite cannot call increment_scene or consult an oracle, so these are
+ * flag-only by type (Codex finding 4): the prose is never rewritten for them
+ * and they are never recorded as "corrected". Their "reset" toggle is gone
+ * from Settings, and settingsFor reports them as unable to reset whatever a
+ * stored config says.
+ */
+export const FLAG_ONLY_FLAG_TYPES: ReadonlySet<ObserverFlagType> = new Set([
+  "missing_oracle_or_table",
+  "missing_scene_increment",
+]);
+
+/**
+ * The flag types whose correction is a rewrite of the prose: the complaint is
+ * about the text and a new text can answer it. tier_escalation_missed is not
+ * one (its only fix was a heavier-tier retry; a prose rewrite adds no
+ * brainpower), and neither are the two tool-usage gaps.
+ */
+export const REWRITABLE_FLAG_TYPES: ReadonlySet<ObserverFlagType> = new Set([
+  "response_length",
+  "player_agency",
+  "outcome_narration_mismatch",
+]);
+
+/** What Settings shows per judge: off, a flag in the turn's details, or an automatic rewrite. */
+export type ObserverMode = "off" | "flag" | "rewrite";
+
+export function observerModeOf(settings: ObserverCheckSettings): ObserverMode {
+  if (!settings.enabled) return "off";
+  return settings.triggersReset ? "rewrite" : "flag";
+}
+
+export function observerModePatch(
+  mode: ObserverMode,
+): Partial<ObserverCheckSettings> {
+  if (mode === "off") return { enabled: false, triggersReset: false };
+  return { enabled: true, triggersReset: mode === "rewrite" };
+}
+
+/**
+ * Settings for one flag type, falling back to its default for any field a
+ * partial/future config omits. Always a copy, so a caller can never write
+ * through to DEFAULT_OBSERVER_SETTINGS; a flag-only type reads as unable to
+ * reset whatever was stored.
+ */
 export function settingsFor(
   settings: ObserverSettings | undefined,
   type: ObserverFlagType,
 ): ObserverCheckSettings {
-  const defaults = DEFAULT_OBSERVER_SETTINGS[type];
-  const override = settings?.[type];
-  return override ? { ...defaults, ...override } : defaults;
+  const merged: ObserverCheckSettings = {
+    ...DEFAULT_OBSERVER_SETTINGS[type],
+    ...settings?.[type],
+  };
+  if (FLAG_ONLY_FLAG_TYPES.has(type)) merged.triggersReset = false;
+  return merged;
 }
 
 /**
@@ -238,8 +328,9 @@ export function canObserverTriggerReset(
 export function plausibleResetFlagTypes(params: {
   narration: string;
   replyLength?: ReplyLength;
-  /** This turn's tool results - reused for both the outcome-comparison and tool-usage-gap preconditions. */
+  /** This turn's typed outcome verdicts (extractOutcomeVerdicts). */
   rollResults?: RollOutcomeForCheck[];
+  /** Kept for callers; the tool-usage gaps are flag-only now and no longer gate on it. */
   toolNames?: string[];
   tierUsed?: number;
   /**
@@ -252,7 +343,7 @@ export function plausibleResetFlagTypes(params: {
   highStakes?: boolean;
   settings?: ObserverSettings;
 }): ObserverFlagType[] {
-  const { narration, rollResults = [], toolNames = [], tierUsed } = params;
+  const { narration, rollResults = [], tierUsed } = params;
   if (!narration.trim()) return [];
 
   const types: ObserverFlagType[] = [];
@@ -274,42 +365,19 @@ export function plausibleResetFlagTypes(params: {
     types.push("response_length");
   }
 
-  // checkOutcomeMismatch returns null without a call when no comparison
-  // resolved this turn, and caps itself at "minor" (never reset-eligible)
-  // when the comparisons came out mixed - both are decided from the booleans
-  // alone, so both can be decided here too.
-  if (canReset("outcome_narration_mismatch")) {
-    const relevant = rollResults.filter((r) =>
-      OUTCOME_CHECK_TOOL_NAMES.has(r.toolName),
-    );
-    const mixed =
-      relevant.length > 1 &&
-      relevant.some((r) => r.success) &&
-      relevant.some((r) => !r.success);
-    if (relevant.length > 0 && !mixed) {
-      types.push("outcome_narration_mismatch");
-    }
+  // checkOutcomeMismatch returns null without a call when the engine made no
+  // ruling this turn (extractOutcomeVerdicts), which is decided from the
+  // typed verdicts alone, so it can be decided here too.
+  if (
+    canReset("outcome_narration_mismatch") &&
+    rollResults.some((r) => OUTCOME_CHECK_TOOL_NAMES.has(r.toolName))
+  ) {
+    types.push("outcome_narration_mismatch");
   }
 
-  // The two tool-usage gaps only report "major" past the sensitivity
-  // threshold, and are skipped entirely for a turn that already did the thing
-  // they ask about.
-  if (
-    canReset("missing_oracle_or_table") &&
-    settingsFor(params.settings, "missing_oracle_or_table").sensitivity >=
-      TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD &&
-    !toolNames.some((name) => ORACLE_OR_TABLE_TOOL_NAMES.has(name))
-  ) {
-    types.push("missing_oracle_or_table");
-  }
-  if (
-    canReset("missing_scene_increment") &&
-    settingsFor(params.settings, "missing_scene_increment").sensitivity >=
-      TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD &&
-    !toolNames.includes("increment_scene")
-  ) {
-    types.push("missing_scene_increment");
-  }
+  // The two tool-usage gaps (missing_oracle_or_table, missing_scene_increment)
+  // are flag-only by type: nothing a rewrite does fixes a tool that did not
+  // run, so they can never reset (settingsFor) and never make a player wait.
 
   // Two conditions, and the second is the interesting one.
   //
@@ -690,7 +758,7 @@ export function observerSuspensionReason(params: {
 export function prospectiveLengthFlag(
   narration: string,
   replyLength: ReplyLength = "medium",
-  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.response_length,
+  settings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
 ): ObserverFlag | null {
   if (!settings.enabled) return null;
 
@@ -714,7 +782,7 @@ export async function checkResponseLength(
   playerChoice: string = "",
   replyLength: ReplyLength = "medium",
   apiOptions?: ObserverApiOptions,
-  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.response_length,
+  settings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
   characterContext?: ObserverCharacterContext,
   gmStoryContext?: string,
 ): Promise<ObserverFlag | null> {
@@ -725,11 +793,12 @@ export async function checkResponseLength(
   const words = countNarrationWords(narration);
 
   // Give the GM a chance to justify the overage before treating it as a
-  // mistake. If there's no apiOptions to call the judge with, or the judge
-  // call itself fails, fall back to the pre-existing mechanical-only
-  // behavior (flag it) rather than silently dropping a check that used to
-  // always fire - the judge can only ever reduce resets, never add new ones
-  // beyond what shipped before it existed.
+  // mistake. With no apiOptions there is no judge to ask, and the word count
+  // stands alone. When the judge was asked and could not answer (the call
+  // failed, or its JSON would not parse) the answer is UNKNOWN, and an
+  // unknown is no flag: it used to keep the major length flag, and a failed
+  // rewrite after it rolled the whole turn back and re-rolled its dice because
+  // the prose was long (finding 8).
   if (apiOptions) {
     const judgment = await callLengthJustificationApi(
       narration,
@@ -742,7 +811,7 @@ export async function checkResponseLength(
       characterContext,
       gmStoryContext,
     );
-    if (judgment?.justified) return null;
+    if (!judgment || judgment.justified) return null;
   }
 
   return flag;
@@ -800,6 +869,8 @@ export interface RewriteNarrationParams {
    * an empty/omitted list produces exactly the prompt it always did.
    */
   alsoFixIfPresent?: ObserverFlagType[];
+  /** Swap the AI vocabulary tics in the result, like the story stage does (default on). */
+  deAiifyWords?: boolean;
   apiOptions: ObserverApiOptions;
 }
 
@@ -845,14 +916,20 @@ const ALSO_FIX_CLAUSES: Partial<Record<ObserverFlagType, string>> = {
  * different story. The standalone prompt survives as the fallback for
  * callers with no conversation to give.
  *
- * Returns null (fail open) on any API error or empty response - the caller
- * falls back to the old full-turn reset rather than silently keeping
- * flagged content.
+ * Returns null (and the caller keeps the turn, with its flag) on any API
+ * error, and when the reply fails validateRewriteResponse (cut off, tool
+ * calls, a refusal, empty, or unchanged), and for any flag type that is not a
+ * prose complaint (REWRITABLE_FLAG_TYPES). It used to fall back to a full-turn
+ * reset, which could reroll the dice because a rewrite call failed. A Stop
+ * (AbortError) is thrown, not swallowed.
  */
 export async function rewriteFlaggedNarration(
   params: RewriteNarrationParams,
 ): Promise<string | null> {
   const { narration, playerChoice, gmStoryContext, flag, apiOptions } = params;
+  // A missing tool call or a too-low tier is not something words can fix, and
+  // a rewrite must never be recorded as having fixed one (finding 4).
+  if (!REWRITABLE_FLAG_TYPES.has(flag.type)) return null;
   const replyLength = params.replyLength || "medium";
   const storytellerMode = params.storytellerMode || "narrator";
   const { paragraphs } = getLengthGuidance(replyLength);
@@ -946,11 +1023,66 @@ ${rewriteRules}`;
     });
     if (!result.ok) return null;
 
-    const content = (result.data.content || "").trim();
-    return content || null;
-  } catch {
+    // A successful HTTP answer is not yet a rewritten narration (finding 5).
+    const checked = validateRewriteResponse(result.data, narration);
+    if (!checked.ok) {
+      logger.action("Observer rewrite rejected, keeping the original", {
+        reason: checked.reason,
+        type: flag.type,
+      });
+      return null;
+    }
+    return params.deAiifyWords === false
+      ? checked.text
+      : deAiifyText(checked.text);
+  } catch (error) {
+    // A cancelled turn is the caller's decision, not a judge failure (finding 8).
+    if (isAbortError(error)) throw error;
     return null;
   }
+}
+
+// A reply that talks ABOUT the rewrite instead of being it. The rewrite prompt
+// says "output only the corrected narration", and a model that refuses, or
+// introduces its work, is not writing narration.
+const REWRITE_META_OPENERS =
+  /^\s*(?:i(?:'m| am)?\s+(?:sorry|unable|not able)|i\s+(?:can(?:no|')t|won't|will not)|sorry[,.!]|as an ai\b|here(?:'s| is| are)\s+(?:the |a |your )?(?:rewritten|revised|corrected|updated|fixed|new)\b|sure[,!.]|certainly[,!.]|of course[,!.]|(?:the )?(?:rewritten|revised|corrected) (?:narration|version|text)\b|note:)/i;
+
+export type RewriteValidation =
+  | { ok: true; text: string }
+  | { ok: false; reason: string };
+
+/**
+ * Whether a rewrite call's answer may replace the narration the player read.
+ * Rejected, and the original kept, when the reply was cut off at the token
+ * limit, carries tool calls, is a refusal or an introduction rather than
+ * prose, is empty once the normal narration cleanup (extractVisibleText, the
+ * same strip the story stage uses) has run, or is the original unchanged - a
+ * "fix" that fixed nothing is not evidence that the flag was addressed.
+ */
+export function validateRewriteResponse(
+  data: { content?: string; toolCalls?: unknown[]; finishReason?: string },
+  original: string,
+): RewriteValidation {
+  if (data.finishReason === "length") {
+    return { ok: false, reason: "the reply was cut off at the token limit" };
+  }
+  if (Array.isArray(data.toolCalls) && data.toolCalls.length > 0) {
+    return { ok: false, reason: "the reply carried tool calls" };
+  }
+  const text = extractVisibleText(data.content || "");
+  if (!text) return { ok: false, reason: "the reply was empty after cleanup" };
+  if (REWRITE_META_OPENERS.test(text)) {
+    return { ok: false, reason: "the reply was a refusal or an introduction" };
+  }
+  if (normalizeProse(text) === normalizeProse(original)) {
+    return { ok: false, reason: "the reply was the original text unchanged" };
+  }
+  return { ok: true, text };
+}
+
+function normalizeProse(text: string): string {
+  return text.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 interface LengthJustificationResult {
@@ -1031,7 +1163,9 @@ Respond with ONLY a JSON object, no other text:
     if (!content) return null;
 
     return extractLengthJustificationJson(content);
-  } catch {
+  } catch (error) {
+    // A cancelled turn is the caller's decision, not a judge failure (finding 8).
+    if (isAbortError(error)) throw error;
     return null;
   }
 }
@@ -1046,6 +1180,20 @@ export interface ObserverApiOptions
   reasoningEffort?: string;
 }
 
+/**
+ * True for the AbortError callSideModel re-throws when the player stops the
+ * turn. Every judge's catch used to swallow it as an ordinary failure, so a
+ * Stop was read as "the judge had nothing to say" and the turn carried on to a
+ * commit or a retry (Codex finding 8). A cancelled call passes through.
+ */
+export function isAbortError(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
 /** Strips a ```json ... ``` fence if present and parses the first {...} block. */
 function extractJsonObject(content: string): Record<string, unknown> | null {
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -1056,7 +1204,9 @@ function extractJsonObject(content: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(braceMatch[0]);
     return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
+  } catch (error) {
+    // A cancelled turn is the caller's decision, not a judge failure (finding 8).
+    if (isAbortError(error)) throw error;
     return null;
   }
 }
@@ -1143,7 +1293,9 @@ Respond with ONLY a JSON object, no other text:
     if (!content) return null;
 
     return extractAgencyCheckJson(content);
-  } catch {
+  } catch (error) {
+    // A cancelled turn is the caller's decision, not a judge failure (finding 8).
+    if (isAbortError(error)) throw error;
     return null;
   }
 }
@@ -1152,7 +1304,7 @@ export async function checkPlayerAgencyViolation(
   playerChoice: string,
   narration: string,
   apiOptions: ObserverApiOptions,
-  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.player_agency,
+  settings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
   characterContext?: ObserverCharacterContext,
 ): Promise<ObserverFlag | null> {
   if (!settings.enabled || !narration.trim()) return null;
@@ -1177,30 +1329,137 @@ export async function checkPlayerAgencyViolation(
   };
 }
 
-// Tool calls whose outer `success` is a genuine pass/fail verdict worth
-// checking narration against.
+// ============================================================
+// TYPED OUTCOME VERDICTS (the outcome judge's input)
+// ============================================================
+// The outcome judge used to be handed every `calculate` result, labelled
+// SUCCESS or FAILURE from the executor's outer `success` flag. That flag is
+// only "the call went through" for a plain sum (`success: true`, so a
+// remaining-gold calculation arrived as a SUCCESS) and "the call errored" for
+// an evaluation failure (`success: false`, so it arrived as a FAILURE). Neither
+// is a ruling the narration could contradict (Codex review finding 6).
 //
-// Deliberately NOT the dice tools: formula_roll/opposed_formula/npc_roll
-// report what the dice showed and never judge it, so their `success` is just
-// "the dice were thrown" and comparing narration to it would flag every
-// legitimately-failed roll. The verdict is `calculate`'s comparison
-// (TRUE/FALSE) and record_challenge_result's outcome. fate_question stays
-// excluded too - its answer is a four-way oracle response (Yes/No/
-// Exceptional), not a SUCCESS/FAILURE check.
+// So the judge is given only real adjudications, each with the outcome tier the
+// engine decided:
+// - action_roll and a manage_track progress_roll: strong hit / weak hit / miss;
+// - record_challenge_result: the outcome the GM recorded (the engine accepted it);
+// - calculate: only when its expression held a comparison (`>=`, `<`, ...) and
+//   evaluated, as success (TRUE) or failure (FALSE) - never a plain sum, never
+//   an evaluation error.
+// The dice tools (formula_roll and the rest) report what the dice showed and
+// never judge it, and fate_question is a four-way oracle answer; neither is a
+// verdict.
+
+export type OutcomeTier =
+  | "strong_hit"
+  | "weak_hit"
+  | "miss"
+  | "success"
+  | "failure";
+
+export const OUTCOME_TIER_LABELS: Record<OutcomeTier, string> = {
+  strong_hit: "STRONG HIT (full success)",
+  weak_hit: "WEAK HIT (partial success: the goal is reached at a cost, with a complication, or only partway)",
+  miss: "MISS (failure)",
+  success: "SUCCESS (the comparison was TRUE)",
+  failure: "FAILURE (the comparison was FALSE)",
+};
+
+/** One adjudication the engine made this turn, as the outcome judge receives it. */
+export interface OutcomeVerdict {
+  /** The tool call's id: one line per check, so two checks are never merged. */
+  checkId: string;
+  /** action_roll | progress_roll | record_challenge_result | calculate. */
+  toolName: string;
+  tier: OutcomeTier;
+  /** What the GM was shown for that call (the numbers behind the tier). */
+  contextForStory: string;
+}
+
+/** The shape of a tool result the extractor reads (a subset of GMToolResult). */
+export interface ToolResultForOutcome {
+  toolName: string;
+  toolCallId: string;
+  success: boolean;
+  result?: unknown;
+  contextForStory: string;
+}
+
+const OUTCOME_TIERS: ReadonlySet<string> = new Set([
+  "strong_hit",
+  "weak_hit",
+  "miss",
+  "success",
+  "failure",
+]);
+
+/** The tool names that can produce a verdict (after progress_roll is told apart). */
 const OUTCOME_CHECK_TOOL_NAMES = new Set([
   "calculate",
   "record_challenge_result",
-  // action_roll's engine-decided verdict: a miss narrated as a success is a mismatch.
   "action_roll",
-  // manage_track's progress_roll (see rollAwareToolName, gmExecutor.ts); a miss is a failure.
   "progress_roll",
 ]);
 
-export interface RollOutcomeForCheck {
-  toolName: string;
-  success: boolean;
-  contextForStory: string;
+/** Turns a turn's tool results into the verdicts the outcome judge may see. */
+export function extractOutcomeVerdicts(
+  results: ReadonlyArray<ToolResultForOutcome>,
+): OutcomeVerdict[] {
+  const verdicts: OutcomeVerdict[] = [];
+  for (const r of results) {
+    // An engine error is never a ruling, whatever its outer flag says.
+    if (r.contextForStory?.trimStart().startsWith("[ERROR")) continue;
+    const res = r.result as
+      | {
+          type?: string;
+          action?: string;
+          outcome?: string;
+          comparison?: { isTrue?: boolean };
+        }
+      | undefined;
+    if (!res) continue;
+
+    let tier: OutcomeTier | null = null;
+    let toolName = r.toolName;
+    if (r.toolName === "action_roll" && res.type === "action_roll") {
+      if (res.outcome && OUTCOME_TIERS.has(res.outcome)) {
+        tier = res.outcome as OutcomeTier;
+      }
+    } else if (
+      r.toolName === "manage_track" &&
+      res.type === "manage_track" &&
+      res.action === "progress_roll"
+    ) {
+      if (res.outcome && OUTCOME_TIERS.has(res.outcome)) {
+        tier = res.outcome as OutcomeTier;
+        toolName = "progress_roll";
+      }
+    } else if (
+      r.toolName === "record_challenge_result" &&
+      res.type === "record_challenge_result"
+    ) {
+      if (res.outcome && OUTCOME_TIERS.has(res.outcome)) {
+        tier = res.outcome as OutcomeTier;
+      }
+    } else if (r.toolName === "calculate" && res.type === "calculate") {
+      // Only a comparison is a verdict; a sum has no `comparison`.
+      if (typeof res.comparison?.isTrue === "boolean") {
+        tier = res.comparison.isTrue ? "success" : "failure";
+      }
+    }
+    if (!tier) continue;
+    verdicts.push({
+      checkId: r.toolCallId,
+      toolName,
+      tier,
+      contextForStory: r.contextForStory,
+    });
+  }
+  return verdicts;
 }
+
+/** What the page-side callers pass the Observer: typed verdicts, nothing else. */
+export type RollOutcomeForCheck = OutcomeVerdict;
 
 interface OutcomeMismatchResult {
   mismatch: boolean;
@@ -1218,43 +1477,40 @@ function extractOutcomeMismatchJson(content: string): OutcomeMismatchResult | nu
 
 async function callOutcomeMismatchApi(
   narration: string,
-  rolls: RollOutcomeForCheck[],
-  mixedVerdict: boolean,
+  verdicts: OutcomeVerdict[],
   apiOptions: ObserverApiOptions,
   sensitivity: number,
   playerChoice: string,
   characterContext?: ObserverCharacterContext,
   narrationThoughts?: string,
 ): Promise<OutcomeMismatchResult | null> {
-  const system = `You are a strict reviewer for a tabletop-style interactive fiction game. One or more dice rolls/checks were just mechanically resolved this turn, with the specific results shown below - those results are ground truth and cannot be overridden by narration. Your only job is to check whether the GM's narration agrees with them.
+  const system = `You are a strict reviewer for a tabletop-style interactive fiction game. One or more checks were just mechanically resolved this turn, with the outcome the engine decided for each - those outcomes are ground truth and cannot be overridden by narration. Your only job is to check whether the GM's narration agrees with them.
 
-JUDGE ALL THE RESULTS TOGETHER, NEVER ONE IN ISOLATION, AND EXPECT MIXED ONES. Many systems build a single outcome out of more than one comparison. For example, a roll may be checked against two separate challenge dice, where beating both is a full success, beating only one is a PARTIAL SUCCESS (a "weak hit" - the character gets what they wanted, but at a cost, with a complication, or only partway) and beating neither is a failure. A turn like that legitimately shows one TRUE and one FALSE. That is not the GM contradicting itself and it is not a failed roll - it is a partial success, and narration describing one is CORRECT.
+EACH NUMBERED RESULT IS ITS OWN RULING. Judge each one against the part of the narration it governs; one result that the narration honours never excuses another that it reverses. The outcome tiers mean:
+- STRONG HIT / SUCCESS: the character gets what they wanted.
+- WEAK HIT: a PARTIAL success - the character gets what they wanted, but at a cost, with a complication, or only partway. Narration describing one is CORRECT; do not mistake it for a failure or for a full success.
+- MISS / FAILURE: the character does not get what they wanted (the failure may carry a cost or a consequence).
+A SUCCESS or FAILURE that comes from a bare comparison (TRUE / FALSE) may be one part of a check that this adventure's rules build out of several comparisons (an action score against two challenge dice, say). When the rules below say how comparisons combine, judge the combined outcome rather than a single FALSE on its own.
 
-So: work out what the results TAKEN TOGETHER support under this adventure's rules, then compare the narration to that. Only flag a DIRECT REVERSAL - the results collectively support failure but the narration describes clear, unqualified success, or they collectively support success but the narration describes clear failure. A narration that adds partial success, complications, or a costly/Pyrrhic outcome on top of what the results support is NOT a contradiction. Neither is narration that lands on an intermediate outcome tier this adventure's rules actually define.
+Only flag a DIRECT REVERSAL - a result that supports failure while the narration describes clear, unqualified success of the same thing, or a result that supports success while the narration describes clear failure of it. Narration that adds a complication or a cost on top of what a result supports is NOT a contradiction. Neither is narration that lands on an intermediate outcome tier this adventure's rules define.
 
 ${sensitivityInstruction(sensitivity)}
 
 Respond with ONLY a JSON object, no other text:
-{"mismatch": true|false, "reason": "<one sentence, empty string if no mismatch>"}`;
+{"mismatch": true|false, "reason": "<one sentence naming which numbered result is reversed, empty string if no mismatch>"}`;
 
-  const resultLines = rolls
+  const resultLines = verdicts
     .map(
-      (roll, i) =>
-        `${rolls.length > 1 ? `${i + 1}. ` : ""}${
-          roll.success ? "SUCCESS" : "FAILURE"
-        } (${roll.toolName})\n${roll.contextForStory}`,
+      (v, i) =>
+        `${i + 1}. ${OUTCOME_TIER_LABELS[v.tier]} (${v.toolName})\n${v.contextForStory}`,
     )
     .join("\n\n");
 
-  const mixedNote = mixedVerdict
-    ? `\n\nNOTE: these comparisons did NOT all come out the same way - some passed and some failed. Under many systems that combination is a partial success/weak hit rather than a failure. Establish what this adventure's rules make of a mixed result before judging the narration against it.`
-    : "";
-
   const user = `Player's declared action:\n"""\n${
     playerChoice.trim() || "(none - opening scene)"
-  }\n"""${formatMechanicsBlock(characterContext)}\n\nMechanical result${
-    rolls.length > 1 ? "s" : ""
-  } this turn, in the order they were resolved (ground truth):\n${resultLines}${mixedNote}\n\nGM's narration:\n"""\n${narration.trim()}\n"""${formatJudgeReasoningBlock(
+  }\n"""${formatMechanicsBlock(characterContext)}\n\nResult${
+    verdicts.length > 1 ? "s" : ""
+  } this turn, in the order they were resolved (ground truth):\n${resultLines}\n\nGM's narration:\n"""\n${narration.trim()}\n"""${formatJudgeReasoningBlock(
     narrationThoughts,
   )}`;
 
@@ -1280,67 +1536,51 @@ Respond with ONLY a JSON object, no other text:
     if (!content) return null;
 
     return extractOutcomeMismatchJson(content);
-  } catch {
+  } catch (error) {
+    // A cancelled turn is the caller's decision, not a judge failure (finding 8).
+    if (isAbortError(error)) throw error;
     return null;
   }
 }
 
 /**
- * Checks whether the finished narration contradicts the mechanical results of
- * the rolls/checks made this turn.
+ * Checks whether the finished narration contradicts the engine's rulings from
+ * this turn (see extractOutcomeVerdicts for what counts as one).
  *
- * EVERY relevant comparison this turn is judged, together. It used to be only
- * the last one, on the reasoning that earlier rolls in a multi-round turn were
- * already resolved by intermediate context - but that assumes one comparison
- * IS the verdict, which is false for any system that composes an outcome from
- * several. Starforged is the case that broke it: an action score is checked
- * against two challenge dice, and beating exactly one is a "weak hit" - a
- * partial success. Handing the judge only the second comparison ("7 >= 9 →
- * FALSE") described a plain failed roll, so a correctly-narrated weak hit was
- * indistinguishable from narration reversing a failure, and got flagged every
- * time the losing comparison happened to go last.
+ * Every verdict is judged on its own line. There used to be a turn-wide cap
+ * that made every mismatch "minor" whenever the turn's comparisons came out
+ * mixed - written for Starforged-style outcomes built from several
+ * comparisons, where one TRUE and one FALSE is a weak hit. It also meant one
+ * successful attack excused a completely reversed escape, and a single engine
+ * weak hit (`success: true`) never got the protection at all (finding 6). The
+ * verdicts now carry the tier the engine decided (weak hit is a tier, not a
+ * mix of booleans), and a bare-comparison group is explained to the judge by
+ * the adventure's own rules note instead of being capped after the fact.
  *
- * "major" severity: unlike the tool-usage gaps below, a roll's result being
- * ground truth the model can't override is the core "LLM proposes,
- * deterministic engine disposes" thesis this whole app is built on, not a soft
- * best-practice.
- *
- * ...with one floor. When the turn's comparisons came out MIXED (at least one
- * pass and at least one fail), the flag is capped at "minor" - still logged,
- * still surfaced to the player, still fed back to the GM by
- * buildObserverWarningNote next turn, but never able to trigger a reset. A
- * mixed set of comparisons is the exact shape of a legitimate partial success,
- * so it's where this check is likeliest to be wrong, and being wrong here is
- * expensive: it spends the turn's one rewrite (MAX_OBSERVER_RESETS) pushing
- * correct prose into agreement with a verdict the GM never actually reached.
- * Deterministic and free - it reads the booleans, not the narration - so it
- * holds even if the judge above is talked out of the rules.
+ * Severity is "major" so a player who opts into automatic rewriting gets one;
+ * by default the flag only appears in the turn's details (decision 187). The
+ * roll results are ground truth the model can't override - the same "LLM
+ * proposes, deterministic engine disposes" thesis the whole app is built on.
  */
 export async function checkOutcomeMismatch(
   narration: string,
-  rollResults: RollOutcomeForCheck[],
+  verdicts: OutcomeVerdict[],
   apiOptions: ObserverApiOptions,
-  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch,
+  settings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
   playerChoice: string = "",
   characterContext?: ObserverCharacterContext,
   narrationThoughts?: string,
 ): Promise<ObserverFlag | null> {
   if (!settings.enabled || !narration.trim()) return null;
 
-  const relevantRolls = rollResults.filter((r) =>
-    OUTCOME_CHECK_TOOL_NAMES.has(r.toolName),
+  const relevant = verdicts.filter(
+    (v) => OUTCOME_CHECK_TOOL_NAMES.has(v.toolName) && Boolean(v.tier),
   );
-  if (relevantRolls.length === 0) return null;
-
-  const mixedVerdict =
-    relevantRolls.length > 1 &&
-    relevantRolls.some((r) => r.success) &&
-    relevantRolls.some((r) => !r.success);
+  if (relevant.length === 0) return null;
 
   const result = await callOutcomeMismatchApi(
     narration,
-    relevantRolls,
-    mixedVerdict,
+    relevant,
     apiOptions,
     settings.sensitivity,
     playerChoice,
@@ -1349,25 +1589,18 @@ export async function checkOutcomeMismatch(
   );
   if (!result || !result.mismatch) return null;
 
-  const outcomeLabel = mixedVerdict
-    ? "MIXED - some comparisons passed, some failed"
-    : relevantRolls[relevantRolls.length - 1].success
-      ? "SUCCESS"
-      : "FAILURE";
+  const outcomeLabel = relevant
+    .map((v) => OUTCOME_TIER_LABELS[v.tier].split(" (")[0])
+    .join(", ");
   const reason =
     result.reason ||
     `The mechanical result was ${outcomeLabel}, but the narration says otherwise.`;
 
   return {
     type: "outcome_narration_mismatch",
-    // See the mixed-verdict floor above: advisory-only when the comparisons
-    // themselves were mixed, since that's the shape of a legitimate partial
-    // success and a false positive there costs the turn its only rewrite.
-    severity: mixedVerdict ? "minor" : "major",
+    severity: "major",
     detail: reason,
-    correctivePrompt: mixedVerdict
-      ? `The observer thought this turn's narration didn't line up with what its checks resolved to (${outcomeLabel}): ${reason} Note the checks came out mixed, which under many systems is a partial success rather than a failure - if that's what this adventure's rules say, your narration may well have been right. Keep the roll results as ground truth either way.`
-      : `Your previous attempt at this turn was reset because the narration didn't match the mechanical result of this turn's checks (${outcomeLabel}): ${reason} Rewrite the narration so it agrees with what the rolls actually determined - the roll results are ground truth and narration cannot override them.`,
+    correctivePrompt: `Your previous attempt at this turn was reset because the narration didn't match the mechanical result of this turn's checks (${outcomeLabel}): ${reason} Rewrite the narration so it agrees with what the rolls actually determined - the roll results are ground truth and narration cannot override them.`,
   };
 }
 
@@ -1451,7 +1684,9 @@ Given the GM's narration below, judge only the question(s) above. Respond with O
     if (!content) return null;
 
     return extractToolUsageJson(content);
-  } catch {
+  } catch (error) {
+    // A cancelled turn is the caller's decision, not a judge failure (finding 8).
+    if (isAbortError(error)) throw error;
     return null;
   }
 }
@@ -1474,8 +1709,8 @@ export async function checkToolUsageGaps(
   narration: string,
   toolNames: string[],
   apiOptions: ObserverApiOptions,
-  oracleSettings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.missing_oracle_or_table,
-  sceneSettings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.missing_scene_increment,
+  oracleSettings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
+  sceneSettings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
   characterContext?: ObserverCharacterContext,
 ): Promise<ObserverFlag[]> {
   if (!narration.trim()) return [];
@@ -1598,7 +1833,9 @@ Respond with ONLY a JSON object, no other text:
     if (!content) return null;
 
     return extractTierEscalationJson(content);
-  } catch {
+  } catch (error) {
+    // A cancelled turn is the caller's decision, not a judge failure (finding 8).
+    if (isAbortError(error)) throw error;
     return null;
   }
 }
@@ -1609,19 +1846,20 @@ Respond with ONLY a JSON object, no other text:
  * turn needed more "brainpower" and self-escalate via set_reasoning_tier
  * (reasoningTiers.ts), when nothing else (combat, declared stakes, the
  * deterministic classifier) caught it either. Skipped once the turn is
- * already at TOP_TIER - there's nowhere higher to escalate to. Unlike every
- * other check here, this is never advisory-only in practice: a miss can't be
+ * already at TOP_TIER - there's nowhere higher to escalate to. A miss can't be
  * fixed by rewriting the narration (the turn already ran at an insufficient
- * tier), so generateStoryTurn (generation.ts) special-cases this flag type to
- * skip the rewrite-first step and go straight to a full rollback + forced
- * tier escalation before retrying.
+ * tier), so this flag is never rewritten. It is off by default (decision 187)
+ * and Settings offers it as Off / Flag only; generateStoryTurn still has the
+ * heavier-tier full-turn retry for a config that sets its triggersReset
+ * directly, and refuses it on a path that cannot re-run the tools
+ * (GenerationOptions.allowMechanicalRetry).
  */
 export async function checkTierEscalation(
   narration: string,
   playerChoice: string,
   tierUsed: number,
   apiOptions: ObserverApiOptions,
-  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.tier_escalation_missed,
+  settings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
 ): Promise<ObserverFlag | null> {
   if (!settings.enabled || !narration.trim()) return null;
   if (tierUsed >= TOP_TIER) return null;
@@ -1914,4 +2152,39 @@ export function reconcileGmThinkingAfterRewrite(
   const inner = [lastReasoning, marker].filter(Boolean).join("\n\n");
   stripped[lastIdx] = `<thinking>\n${inner}\n</thinking>\n\n${rewritten}`;
   return stripped;
+}
+
+// ============================================================
+// WHAT THE JUDGES COST (for the Settings cost line)
+// ============================================================
+
+/**
+ * How many AI calls the enabled judges can add to a turn, from the settings
+ * alone. `always` is calls made on essentially every turn (player agency, the
+ * tier judge, the shared tool-usage call); `sometimes` is calls made only when
+ * the turn gives them something to judge (the length judge past its ceiling,
+ * the outcome judge on a turn with an engine ruling). The oracle and
+ * scene-increment judges share one call, so they count once. A rewrite is
+ * extra and only when a judge is set to rewrite.
+ */
+export function countJudgeCalls(settings: ObserverSettings): {
+  always: number;
+  sometimes: number;
+  rewrites: boolean;
+} {
+  const on = (type: ObserverFlagType) => settingsFor(settings, type).enabled;
+  const always =
+    (on("player_agency") ? 1 : 0) +
+    (on("tier_escalation_missed") ? 1 : 0) +
+    (on("missing_oracle_or_table") || on("missing_scene_increment") ? 1 : 0);
+  const sometimes =
+    (on("response_length") ? 1 : 0) +
+    (on("outcome_narration_mismatch") ? 1 : 0);
+  const rewrites = (
+    ["response_length", "player_agency", "outcome_narration_mismatch"] as const
+  ).some((type) => {
+    const s = settingsFor(settings, type);
+    return s.enabled && s.triggersReset;
+  });
+  return { always, sometimes, rewrites };
 }

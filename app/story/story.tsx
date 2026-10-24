@@ -105,6 +105,10 @@ interface StoryProps {
   onDismissInterrupted?: () => void;
   canRetry?: boolean;
   onUndo?: () => void;
+  // Puts the GM's original draft back on one turn the Observer revised, not
+  // only the latest: a revision can land on an earlier turn, and the toast
+  // that offers the way back has to point at something usable.
+  onUndoRevision?: (partIndex: number) => void;
   canUndo?: boolean;
   onStop?: () => void;
   onEdit?: (rawText: string, partIndex: number) => void;
@@ -604,6 +608,7 @@ export default function Story({
   onDismissInterrupted,
   canRetry,
   onUndo,
+  onUndoRevision,
   canUndo,
   onStop,
   onEdit,
@@ -681,9 +686,11 @@ export default function Story({
   }, []);
 
   // Set when the Observer rewrote the latest turn and the GM's original draft
-  // is still stored on the part (ScenePart.observerRewriteOriginal). No button
-  // of its own - it just relabels Undo, which peels the revision off first
-  // (see page.tsx's handleUndo) before undoing the turn itself.
+  // is still stored on the part (ScenePart.observerRewriteOriginal). On the
+  // latest turn there is no button of its own - it just relabels Undo, which
+  // peels the revision off first (see page.tsx's handleUndo) before undoing
+  // the turn itself. An earlier revised turn gets "Undo revision" through
+  // onUndoRevision (see renderTurnActions).
   const observerRewriteOriginal = React.useMemo(() => {
     const parts = storyData?.scene?.parts || [];
     const last = parts[parts.length - 1];
@@ -1029,15 +1036,29 @@ export default function Story({
       setActionsFor(null);
       fn();
     };
+    // The revision this turn carries, if any: the latest turn's is already
+    // known; an earlier turn's is read from its own part.
+    const turnPart = storyData.scene.parts[partIndex];
+    const revision = isLatest
+      ? observerRewriteOriginal
+      : turnPart && !turnPart.user
+        ? turnPart.observerRewriteOriginal
+        : undefined;
     return (
       <TurnActions
         disabled={busy}
         onRetry={isLatest && canRetry && onRetry ? closeThen(onRetry) : undefined}
-        onUndo={isLatest && canUndo && onUndo ? closeThen(onUndo) : undefined}
-        undoLabel={observerRewriteOriginal ? "Undo revision" : "Undo"}
+        onUndo={
+          isLatest && canUndo && onUndo
+            ? closeThen(onUndo)
+            : !isLatest && revision && onUndoRevision
+              ? closeThen(() => onUndoRevision(partIndex))
+              : undefined
+        }
+        undoLabel={revision ? "Undo revision" : "Undo"}
         undoTitle={
-          observerRewriteOriginal
-            ? `The Observer revised this response (${observerRewriteOriginal.flag.detail}) - undo puts the GM's original back`
+          revision
+            ? `The ${revision.flag.type.replace(/_/g, " ")} check revised this response (${revision.flag.detail}) - undo puts the GM's original back`
             : "Undo last action"
         }
         onEdit={onEdit && !busy ? () => startEditing(partIndex) : undefined}

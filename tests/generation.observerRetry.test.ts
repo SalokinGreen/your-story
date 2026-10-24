@@ -12,7 +12,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
-import { DEFAULT_OBSERVER_SETTINGS } from "@/app/misc/observer";
+import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
 import type { ResolvedTier } from "@/app/misc/reasoningTiers";
 import type { StoryData } from "@/app/misc/structs";
 
@@ -71,7 +71,7 @@ const baseOptions: GenerationOptions = {
   skipChoices: true,
   replyLength: "medium",
   openRouterKey: "openrouter-test-key",
-  observerSettings: DEFAULT_OBSERVER_SETTINGS,
+  observerSettings: LEGACY_OBSERVER_SETTINGS,
 };
 
 function storage(entries: Record<string, string>) {

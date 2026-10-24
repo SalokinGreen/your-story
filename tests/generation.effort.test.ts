@@ -20,6 +20,7 @@ import { NARRATION_MODEL_KEY, isReasoningEffort } from "@/app/misc/reasoningTier
 import { SIDE_AGENT_DEFAULT_MODEL_KEY } from "@/app/misc/layerSettings";
 import { createMockGMFetch, sseStreamResponse } from "./helpers/mockGMFetch";
 import type { StoryData } from "@/app/misc/structs";
+import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
 
 const NARRATION = "The lock clicks open. The corridor beyond is dark.";
 /** Well past the "medium" band's ceiling, so the Observer's length check trips. */
@@ -321,6 +322,8 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
   });
 
   describe("the Observer's rewrite and the choices re-run after it", () => {
+    // The rewrite only runs for a player who allowed it (decision 187).
+    const REWRITING_OBSERVER = { observerSettings: LEGACY_OBSERVER_SETTINGS, skipChoices: false };
     const respond = (call: Call) => {
       if (isRewrite(call)) return REWRITTEN;
       if (isLengthJudge(call)) return judgeVerdict(false);
@@ -329,7 +332,7 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
 
     it("take Default's model and effort when the Observer is unpinned", async () => {
       stubBrowserStorage(defaultSlotStorage("GLM 5.3", "high"));
-      const calls = await runTurn({ gmRound: LONG_NARRATION, respond });
+      const calls = await runTurn({ gmRound: LONG_NARRATION, respond, extra: REWRITING_OBSERVER });
 
       const rewrites = calls.filter(isRewrite);
       expect(rewrites).toHaveLength(1);
@@ -342,17 +345,18 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
       expect(effortsOf(judges)).toEqual(["none"]);
       expect(judges[0].body.model).toBe(SIDE_AGENT_DEFAULT_MODEL_KEY);
 
-      // The re-derived choices are the narrator's call too.
+      // The turn's own choices and the ones re-derived after the rewrite are
+      // both the narrator's call.
       const choices = calls.filter(isChoices);
-      expect(choices).toHaveLength(1);
-      expect(choices[0].body.model).toBe(NARRATION_MODEL_KEY);
-      expect(choices[0].body.reasoningEffort).toBe("high");
+      expect(choices).toHaveLength(2);
+      expect(choices[1].body.model).toBe(NARRATION_MODEL_KEY);
+      expect(choices[1].body.reasoningEffort).toBe("high");
     });
 
     it("take none when no narration effort was chosen", async () => {
-      const calls = await runTurn({ gmRound: LONG_NARRATION, respond });
+      const calls = await runTurn({ gmRound: LONG_NARRATION, respond, extra: REWRITING_OBSERVER });
       expect(calls.filter(isRewrite).map((c) => c.body.reasoningEffort)).toEqual(["none"]);
-      expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["none"]);
+      expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["none", "none"]);
     });
 
     it("keep a pinned Observer's own model and effort for the rewrite, but not for the choices", async () => {
@@ -360,14 +364,14 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
         ...defaultSlotStorage("GLM 5.3", "high"),
         observerModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.5", reasoningEffort: "low" }),
       });
-      const calls = await runTurn({ gmRound: LONG_NARRATION, respond, extra: { mistralKey: "mistral-key" } });
+      const calls = await runTurn({ gmRound: LONG_NARRATION, respond, extra: { ...REWRITING_OBSERVER, mistralKey: "mistral-key" } });
 
       const rewrites = calls.filter(isRewrite);
       expect(rewrites).toHaveLength(1);
       expect(rewrites[0].body.model).toBe("Mistral Medium 3.5");
       expect(rewrites[0].body.reasoningEffort).toBe("low");
       // The choices re-run is the narrator's, pin or no pin.
-      expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["high"]);
+      expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["high", "high"]);
     });
   });
 });

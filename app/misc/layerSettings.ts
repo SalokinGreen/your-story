@@ -28,8 +28,10 @@ import type { ProviderKeys } from "./sideModelCall";
 import {
   ObserverSettings,
   ObserverCheckSettings,
-  DEFAULT_OBSERVER_SETTINGS,
+  OBSERVER_SETTINGS_VERSION,
+  cloneDefaultObserverSettings,
 } from "./observer";
+import { logger } from "./logger";
 import { ObserverFlagType } from "./structs";
 import { DEFAULT_STORY_PROGRESS_CHECK_INTERVAL } from "./storyProgressObserver";
 
@@ -320,23 +322,52 @@ export function resolveObserverRewriteModel(
 
 const OBSERVER_CHECK_SETTINGS_KEY = "observerCheckSettings";
 
+/**
+ * The stored shape: the per-type settings plus the version of the defaults
+ * they were saved against (OBSERVER_SETTINGS_VERSION). It lives inside the
+ * synced value, so it travels with the settings to the player's other
+ * devices; a build that predates it reads only the per-type keys.
+ */
+type StoredObserverSettings = Partial<
+  Record<ObserverFlagType, Partial<ObserverCheckSettings>>
+> & { observerSettingsVersion?: number };
+
+/**
+ * The player's Observer settings, as a fresh copy every call.
+ *
+ * A stored config overrides the defaults, so a config saved before the
+ * flag-only defaults (decision 187) would keep "every judge on, three of them
+ * rewriting" for good. A stored config without the current version is
+ * therefore replaced by the new defaults, once, with a Debug Logs line, and
+ * the version is stored so that everything the player chooses afterwards is
+ * kept. It used to return DEFAULT_OBSERVER_SETTINGS itself when nothing was
+ * stored, and setObserverCheckSetting wrote into that object: the first edit
+ * changed the defaults for the rest of the session (Codex finding 9).
+ */
 export function getObserverSettings(): ObserverSettings {
-  if (typeof window === "undefined") return DEFAULT_OBSERVER_SETTINGS;
+  if (typeof window === "undefined") return cloneDefaultObserverSettings();
   try {
     const raw = localStorage.getItem(OBSERVER_CHECK_SETTINGS_KEY);
-    if (!raw) return DEFAULT_OBSERVER_SETTINGS;
-    const stored = JSON.parse(raw) as Partial<
-      Record<ObserverFlagType, Partial<ObserverCheckSettings>>
-    >;
-    const merged = {} as ObserverSettings;
-    for (const type of Object.keys(
-      DEFAULT_OBSERVER_SETTINGS,
-    ) as ObserverFlagType[]) {
-      merged[type] = { ...DEFAULT_OBSERVER_SETTINGS[type], ...stored[type] };
+    if (!raw) return cloneDefaultObserverSettings();
+    const stored = JSON.parse(raw) as StoredObserverSettings;
+    if (stored.observerSettingsVersion !== OBSERVER_SETTINGS_VERSION) {
+      logger.action(
+        "Observer settings reset to the flag-only defaults (one time, settings version 2)",
+        { hadVersion: stored.observerSettingsVersion ?? null },
+      );
+      localStorage.setItem(
+        OBSERVER_CHECK_SETTINGS_KEY,
+        JSON.stringify({ observerSettingsVersion: OBSERVER_SETTINGS_VERSION }),
+      );
+      return cloneDefaultObserverSettings();
+    }
+    const merged = cloneDefaultObserverSettings();
+    for (const type of Object.keys(merged) as ObserverFlagType[]) {
+      merged[type] = { ...merged[type], ...stored[type] };
     }
     return merged;
   } catch {
-    return DEFAULT_OBSERVER_SETTINGS;
+    return cloneDefaultObserverSettings();
   }
 }
 
@@ -347,7 +378,13 @@ export function setObserverCheckSetting(
   if (typeof window === "undefined") return;
   const current = getObserverSettings();
   current[type] = { ...current[type], ...patch };
-  localStorage.setItem(OBSERVER_CHECK_SETTINGS_KEY, JSON.stringify(current));
+  localStorage.setItem(
+    OBSERVER_CHECK_SETTINGS_KEY,
+    JSON.stringify({
+      ...current,
+      observerSettingsVersion: OBSERVER_SETTINGS_VERSION,
+    }),
+  );
   notifyChanged();
 }
 

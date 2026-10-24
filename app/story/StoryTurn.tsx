@@ -15,6 +15,7 @@ import {
   buildSavedTimeline,
   narrationCameFromGMStage,
   extractVisibleText,
+  redactForPlayer,
 } from "../misc/turnTimeline";
 import { getToolProgressLabel } from "../misc/gmToolLabels";
 import {
@@ -65,7 +66,13 @@ export function TimelineEntryPill({ block }: { block: TimelineBlock }) {
       : block.isReasoning
         ? "Thought"
         : "Thinking";
-  const detail = isTool ? block.contextForStory : block.content;
+  // The player's view of a note the GM read or reasoned about: a hidden or
+  // secret note's text shows as "(hidden note)" (turnTimeline.ts redactForPlayer).
+  const detail = isTool
+    ? block.contextForStory
+    : block.content
+      ? redactForPlayer(block.content)
+      : block.content;
   const canExpand = !!detail;
 
   return (

@@ -345,6 +345,14 @@ export interface RecordAICallParams {
    * must pass the id it captured when it was scheduled.
    */
   costTurnId?: string;
+  /**
+   * The call was sent but never answered (the player stopped the turn, or the
+   * answer could not be read), so what it cost is unknown and probably not
+   * zero. It is recorded as an entry with no tokens, flagged unpriced, so the
+   * turn's total reads as a floor instead of a figure that implies the call
+   * was free (judge-layer design 3.11).
+   */
+  costUnknown?: boolean;
 }
 
 /**
@@ -384,7 +392,9 @@ export function recordAICall(params: RecordAICallParams): void {
         params.cachedTokens || 0,
       ),
       providerReportedUsd: params.providerReportedUsd,
-      unpriced: price.unpriced && params.providerReportedUsd === undefined,
+      unpriced:
+        params.costUnknown === true ||
+        (price.unpriced && params.providerReportedUsd === undefined),
       at: Date.now(),
     };
     turn.entries.push(entry);
@@ -440,6 +450,28 @@ export function recordSideCall(
     cacheWriteTokens: usage.cacheWriteTokens,
     providerReportedUsd: data?.meta?.estimatedCost,
     costTurnId: context?.costTurnId,
+  });
+}
+
+/**
+ * Records a call that was sent and never answered (see
+ * RecordAICallParams.costUnknown). Never throws, like recordAICall.
+ */
+export function recordUnansweredSideCall(
+  stage: TurnCostStage,
+  label: string,
+  modelKey: string,
+  context?: SideCallCostContext,
+  why: string = "cancelled",
+): void {
+  recordAICall({
+    stage,
+    label: `${label} (${why}, cost unknown)`,
+    modelKey,
+    promptTokens: 0,
+    completionTokens: 0,
+    costTurnId: context?.costTurnId,
+    costUnknown: true,
   });
 }
 

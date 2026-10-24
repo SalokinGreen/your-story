@@ -23,8 +23,16 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
-import { DEFAULT_OBSERVER_SETTINGS } from "@/app/misc/observer";
+import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import {
+  applyBackgroundFlags,
+  applyBackgroundRewrite,
+  backgroundRewriteTarget,
+  type BackgroundRewritePatch,
+} from "@/app/misc/backgroundPatch";
 import type { ObserverFlag, StoryData } from "@/app/misc/structs";
+
+const PART_ID = "part-under-test";
 
 /** Comfortably inside the "medium" band's ceiling, so the word count never trips. */
 const SHORT_NARRATION = "The lock clicks open. The corridor beyond is dark.";
@@ -84,7 +92,9 @@ const baseOptions: GenerationOptions = {
   enableTools: true,
   skipChoices: true,
   replyLength: "medium",
-  observerSettings: DEFAULT_OBSERVER_SETTINGS,
+  observerSettings: LEGACY_OBSERVER_SETTINGS,
+  // The id the page gives the turn's part: a late result is applied by id.
+  scenePartId: PART_ID,
 };
 
 interface ObserverCall {
@@ -160,7 +170,7 @@ async function flushBackground(): Promise<void> {
 /**
  * Stands in for page.tsx, which publishes the assistant part into
  * scene.parts as narration streams. generateStoryTurnOnce never does this
- * itself, and the background pass patches the part by index - so without it
+ * itself, and a late result is applied to the part by id - so without it
  * these tests would exercise the headless shape (nothing to patch) rather
  * than the one the app actually runs.
  */
@@ -177,6 +187,7 @@ function scenePartPublisher(storyData: StoryData) {
       user: false,
       role: "assistant",
       choices: [],
+      id: PART_ID,
     });
   };
 }
@@ -291,7 +302,7 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const storyData = createTestStory();
-    const rewrites: Array<{ flag: ObserverFlag; text: string; index: number }> = [];
+    const rewrites: BackgroundRewritePatch[] = [];
     let completedContent: string | undefined;
 
     await generateStoryTurn(storyData, "I pick the lock", baseOptions, {
@@ -299,18 +310,8 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
       onComplete: (result) => {
         completedContent = result.content;
       },
-      onBackgroundObserverRewrite: (
-        _flags,
-        triggeringFlag,
-        rewrittenNarration,
-        _original,
-        partIndex,
-      ) => {
-        rewrites.push({
-          flag: triggeringFlag,
-          text: rewrittenNarration,
-          index: partIndex,
-        });
+      onBackgroundObserverRewrite: (patch) => {
+        rewrites.push(patch);
       },
     });
 
@@ -324,13 +325,20 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
     expect(observerCalls.filter(isRewrite)).toHaveLength(1);
     expect(rewrites).toHaveLength(1);
     expect(rewrites[0].flag.type).toBe("player_agency");
-    expect(rewrites[0].text).toBe(REWRITTEN);
-    expect(rewrites[0].index).toBe(storyData.scene.parts.length - 1);
+    expect(rewrites[0].narration).toBe(REWRITTEN);
+    // It names the part by id; generateStoryTurn wrote nothing into the story.
+    expect(rewrites[0].partId).toBe(PART_ID);
+    expect(storyData.scene.parts[storyData.scene.parts.length - 1].content).toBe(
+      SHORT_NARRATION,
+    );
 
-    // ...and the corrected text is what's actually saved, with the discarded
-    // draft kept for the player's "Undo revision" and the flag recorded so the
-    // next turn's prompt still tells the GM a correction was needed.
-    const part = storyData.scene.parts[rewrites[0].index];
+    // The page applies the patch to the CURRENT story: the corrected text is
+    // what's saved, with the discarded draft kept for the player's "Undo
+    // revision" and the flag recorded so the next turn's prompt still tells
+    // the GM a correction was needed.
+    expect(backgroundRewriteTarget(storyData, rewrites[0])).toBe("newest");
+    const patched = applyBackgroundRewrite(storyData, rewrites[0]);
+    const part = patched.scene.parts[patched.scene.parts.length - 1];
     expect(part.content).toBe(REWRITTEN);
     expect(part.observerRewriteOriginal?.content).toBe(SHORT_NARRATION);
     expect(part.correctedObserverFlags?.[0]?.type).toBe("player_agency");
@@ -350,21 +358,28 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
 
     const storyData = createTestStory();
     const rewrites: string[] = [];
-    const advisory: ObserverFlag[][] = [];
+    const advisory: Array<{ flags: ObserverFlag[]; partId: string }> = [];
 
     await generateStoryTurn(storyData, "I pick the lock", baseOptions, {
       onStoryContent: scenePartPublisher(storyData),
-      onBackgroundObserverRewrite: (_f, _t, text) => rewrites.push(text),
-      onBackgroundObserverFlags: (flags) => advisory.push(flags),
+      onBackgroundObserverRewrite: (patch) => rewrites.push(patch.narration),
+      onBackgroundObserverFlags: (flags, partId) =>
+        advisory.push({ flags, partId }),
     });
 
     await flushBackground();
 
     expect(rewrites).toHaveLength(0);
     expect(advisory).toHaveLength(1);
-    expect(advisory[0][0].type).toBe("player_agency");
+    expect(advisory[0].flags[0].type).toBe("player_agency");
+    expect(advisory[0].partId).toBe(PART_ID);
 
-    const part = storyData.scene.parts[storyData.scene.parts.length - 1];
+    const patched = applyBackgroundFlags(
+      storyData,
+      advisory[0].partId,
+      advisory[0].flags,
+    );
+    const part = patched.scene.parts[patched.scene.parts.length - 1];
     expect(part.content).toBe(SHORT_NARRATION);
     expect(part.observerFlags?.[0]?.type).toBe("player_agency");
   });
@@ -391,13 +406,14 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
 
     const storyData = createTestStory();
     const backgroundRewrites: string[] = [];
-    const advisory: ObserverFlag[][] = [];
+    const advisory: Array<{ flags: ObserverFlag[]; partId: string }> = [];
 
     await generateStoryTurn(storyData, "I pick the lock", baseOptions, {
       onStoryContent: scenePartPublisher(storyData),
-      onBackgroundObserverRewrite: (_f, _t, text) =>
-        backgroundRewrites.push(text),
-      onBackgroundObserverFlags: (flags) => advisory.push(flags),
+      onBackgroundObserverRewrite: (patch) =>
+        backgroundRewrites.push(patch.narration),
+      onBackgroundObserverFlags: (flags, partId) =>
+        advisory.push({ flags, partId }),
     });
 
     await flushBackground();
@@ -405,9 +421,14 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
     expect(observerCalls.filter(isRewrite)).toHaveLength(0);
     expect(backgroundRewrites).toHaveLength(0);
     expect(advisory).toHaveLength(1);
-    expect(advisory[0][0].type).toBe("tier_escalation_missed");
+    expect(advisory[0].flags[0].type).toBe("tier_escalation_missed");
 
-    const part = storyData.scene.parts[storyData.scene.parts.length - 1];
+    const patched = applyBackgroundFlags(
+      storyData,
+      advisory[0].partId,
+      advisory[0].flags,
+    );
+    const part = patched.scene.parts[patched.scene.parts.length - 1];
     expect(part.content).toBe(SHORT_NARRATION);
     expect(part.observerFlags?.[0]?.type).toBe("tier_escalation_missed");
   });

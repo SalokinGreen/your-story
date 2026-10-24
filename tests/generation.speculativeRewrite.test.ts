@@ -31,7 +31,7 @@ import {
   sseStreamResponse,
   type ScriptedGMRound,
 } from "./helpers/mockGMFetch";
-import { DEFAULT_OBSERVER_SETTINGS } from "@/app/misc/observer";
+import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
 import type { StoryData } from "@/app/misc/structs";
 
 /** Well past the "medium" band's 85-word high, times the default 2x overage multiplier. */
@@ -90,7 +90,7 @@ const baseOptions: GenerationOptions = {
   enableTools: true,
   skipChoices: true,
   replyLength: "medium",
-  observerSettings: DEFAULT_OBSERVER_SETTINGS,
+  observerSettings: LEGACY_OBSERVER_SETTINGS,
 };
 
 interface ObserverCall {

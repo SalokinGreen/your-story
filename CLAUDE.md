@@ -1202,10 +1202,60 @@ Observer; `pacingFeedback.ts`); **(4) memory** (`MemoryEntry` with
 timestamp, scene index, entity ids and importance, written by the Memory
 Keeper, periodic `reflection.ts` synthesis, compaction — semantic reranking
 is dead, §6.9); **(5) adjudication** (`checkNarrationConsistency()` in
-`consistencyCheck.ts`; the Observer in `observer.ts`, whose major findings
-can trigger a rewrite or a reset of the GM's turn; and the M2 roll-invariant
-gate that forces a re-prompt if a gated scene
-ends with no roll). Read `docs/architecture-frontier.md` before proposing new
+`consistencyCheck.ts`, free and diagnostic only: Debug Logs and the turn's
+details, no toast, and a name only counts in its own clause; the Observer in
+`observer.ts`, **flag only by default** (decisions 187–189, below); and the
+M2 roll-invariant gate that forces a re-prompt if a gated scene
+ends with no roll).
+
+**The Observer flags; it does not rewrite or reroll unless a player says so**
+(decisions 187–189, `docs/judge-layer-design.md`, Codex's review in
+`docs/research/codex-judge-layer-review-2026-10-24.md`).
+`DEFAULT_OBSERVER_SETTINGS` (frozen; every reader gets a copy, `settingsFor`,
+`cloneDefaultObserverSettings`) has only `outcome_narration_mismatch` on, at
+sensitivity 2, and **no `triggersReset` anywhere**, so
+`canObserverTriggerReset` is false: no blocking judge, no speculative
+shortened rewrite, no background rewrite. A stored config without
+`observerSettingsVersion: 2` (`OBSERVER_SETTINGS_VERSION`) is replaced by the
+defaults once, with a Debug Logs line (`getObserverSettings`,
+`layerSettings.ts`); a player's later choices are kept. Settings shows each
+judge as Off / Flag, and for the three prose judges (`REWRITABLE_FLAG_TYPES`:
+length, agency, outcome) "Rewrite automatically", which changes text the
+player may have read. `missing_oracle_or_table` and `missing_scene_increment`
+are flag-only by type (`FLAG_ONLY_FLAG_TYPES`; `settingsFor` reports them
+unable to reset), and `rewriteFlaggedNarration` returns null for them and for
+`tier_escalation_missed`: a missing tool is never "corrected" by words.
+Where a player does opt in: a rewrite is checked before it replaces anything
+(`validateRewriteResponse`: not truncated, no tool calls, not a refusal or an
+introduction, non-empty after `extractVisibleText`, not the original
+unchanged); a failed or rejected rewrite **keeps the turn with its flag** and
+never rolls back or rerolls the dice; the only full-turn retry left is
+`tier_escalation_missed`'s heavier-tier one, reachable only by settings that
+set its `triggersReset` directly (Settings no longer offers it) and refused on
+the reword path (`GenerationOptions.allowMechanicalRetry: false`, so a
+saved conversation's mechanics never run twice). The outcome judge is given
+typed verdicts only (`extractOutcomeVerdicts`: `action_roll` and
+`progress_roll` tiers, `record_challenge_result`, and a `calculate` only when
+it held a comparison and evaluated), each on its own numbered line; the
+turn-wide "mixed results are advisory" cap is gone. A length-judge call that
+fails or can't be parsed is "unknown", not a flag, and a Stop (`AbortError`)
+passes through every judge. **A late result from the background wave is a
+patch, never a captured whole-story object** (`backgroundPatch.ts`): a
+rewrite names its part by id and the hash of the text the judge read
+(`applyBackgroundRewrite`, dropped if either changed), flags go to a part by
+id, and memory, director and progress changes arrive as a
+`BackgroundLayersDelta`; the page applies them to the current story through
+the picture queue's `applyStoryPatch` host (`buildPatchHost`). `regenerateChoicesFor`
+makes no call when Suggested Choices are off. The page's turn lock is
+`turnInFlight` (`app/story/turnLock.ts`), held by `generateTrackedTurn` until
+`generateStoryTurn` returns, so no stage callback releases it, and read-aloud
+waits for the outer `onComplete` only when a judge may rewrite. Every side call
+is on the cost ledger: one cancelled before it answered (or unreadable) is an
+entry flagged cost-unknown (`recordUnansweredSideCall`). The player's view of
+a note the GM read shows "(hidden note)" for hidden and secret text
+(`redactForPlayer`, `turnTimeline.ts`); the full text stays in the Debug Logs
+and the context viewer. "Undo revision" is attached to each revised turn
+(`onUndoRevision`, `restoreObserverOriginal(partIndex)`). Read `docs/architecture-frontier.md` before proposing new
 work in any of these layers — it tracks what was tried and reverted, and why.
 
 ## BYOK, no accounts, local storage, native shells
@@ -1398,8 +1448,9 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 195 files and 3,032 tests (2026-10-24, after Blood & Bone
-  E1; the counts were run). Earlier: 193 files and 3,000 tests (2026-10-24, after session
+- `tests/` — Vitest, 203 files and 3,228 tests (2026-10-24, after the judge
+  layer; the counts were run). Earlier: 195 files and 3,032 tests (after Blood &
+  Bone E1), 193 files and 3,000 tests (2026-10-24, after session
   zero detail; the test count is from the implementation log in
   `docs/session-zero-detail-design.md`, not a run), 189 files and 2,933 tests (2026-10-23, after session
   zero), largely against `app/misc/`.

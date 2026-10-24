@@ -46,6 +46,7 @@ import {
   CAMPAIGN_SPINE_PRESETS,
 } from "@/app/misc/campaignPlan";
 import { findBestMatch } from "@/app/misc/fuzzyMatch";
+import { isHiddenFromPlayerNote } from "@/app/misc/noteVisibility";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 
 const VISIBILITY_RESTRICTION: Record<string, number> = {
@@ -1709,11 +1710,18 @@ export function executeTools(
             ? `Found ${results.length} match${
                 results.length === 1 ? "" : "es"
               }:\n${results
-                .map((r) =>
-                  r.lineNum > 0
-                    ? `• "${r.title}" (L${r.lineNum}): ${r.excerpt}`
-                    : `• "${r.title}": ${r.excerpt}`
-                )
+                .map((r) => {
+                  // A hidden or secret note's excerpt is wrapped in the same
+                  // markers read_notes uses, so the player's view of this
+                  // result can blank it (turnTimeline.ts redactForPlayer).
+                  const note = storyData.lore.find((l) => l.title === r.title);
+                  const excerpt = isHiddenFromPlayerNote(note)
+                    ? `[[HIDDEN_LORE:${r.title}]]${r.excerpt}[[/HIDDEN_LORE]]`
+                    : r.excerpt;
+                  return r.lineNum > 0
+                    ? `• "${r.title}" (L${r.lineNum}): ${excerpt}`
+                    : `• "${r.title}": ${excerpt}`;
+                })
                 .join("\n")}`
             : `No matches found for "${args.query}"`;
 

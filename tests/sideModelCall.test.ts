@@ -22,6 +22,7 @@ vi.mock("@/app/misc/platformFetch", () => ({
 
 import { callSideModel, pickProviderKeys } from "@/app/misc/sideModelCall";
 import { logger } from "@/app/misc/logger";
+import { beginTurnCost, getTurnCostReport } from "@/app/misc/turnCost";
 
 const ALL_KEYS = {
   openRouterKey: "or-key",
@@ -167,6 +168,79 @@ describe("callSideModel - web build", () => {
       }),
     ).rejects.toMatchObject({ name: "AbortError" });
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("callSideModel - the turn's cost ledger (judge-layer design 3.11)", () => {
+  it("records a call cancelled before it answered as cost-unknown, never as free", async () => {
+    const turnId = beginTurnCost();
+    global.fetch = vi.fn(async () => {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }) as unknown as typeof fetch;
+
+    await expect(
+      callSideModel({
+        stage: "observer_rewrite",
+        label: "Narration rewrite",
+        model: MISTRAL_MODEL,
+        messages: MESSAGES,
+        keys: ALL_KEYS,
+        costTurnId: turnId,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+
+    const report = getTurnCostReport(turnId)!;
+    expect(report.calls).toBe(1);
+    expect(report.entries[0].label).toContain("cancelled, cost unknown");
+    expect(report.entries[0].stage).toBe("observer_rewrite");
+    expect(report.entries[0].promptTokens).toBe(0);
+    // The total reads as a floor ("some calls had no price"), not as a figure
+    // that implies the call cost nothing.
+    expect(report.hasUnpricedCalls).toBe(true);
+  });
+
+  it("records an answer it could not read as cost-unknown too", async () => {
+    const turnId = beginTurnCost();
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("Unexpected end of JSON input");
+      },
+    })) as unknown as typeof fetch;
+    vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    const result = await callSideModel({
+      stage: "observer",
+      label: "player_agency judge",
+      model: MISTRAL_MODEL,
+      messages: MESSAGES,
+      keys: ALL_KEYS,
+      costTurnId: turnId,
+    });
+
+    expect(result.ok).toBe(false);
+    const report = getTurnCostReport(turnId)!;
+    expect(report.entries[0].label).toContain("unreadable answer, cost unknown");
+    expect(report.hasUnpricedCalls).toBe(true);
+  });
+
+  it("records nothing for a call outside a turn (no stage)", async () => {
+    const turnId = beginTurnCost();
+    global.fetch = vi.fn(async () => {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }) as unknown as typeof fetch;
+
+    await expect(
+      callSideModel({
+        label: "Game Designer",
+        model: MISTRAL_MODEL,
+        messages: MESSAGES,
+        keys: ALL_KEYS,
+        costTurnId: turnId,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(getTurnCostReport(turnId)!.calls).toBe(0);
   });
 });
 

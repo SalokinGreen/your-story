@@ -30,9 +30,20 @@ import {
   settingsFor,
   plausibleResetFlagTypes,
   DEFAULT_OBSERVER_SETTINGS,
+  FLAG_ONLY_FLAG_TYPES,
+  canObserverTriggerReset,
+  cloneDefaultObserverSettings,
+  countJudgeCalls,
+  extractOutcomeVerdicts,
+  observerModeOf,
+  observerModePatch,
+  validateRewriteResponse,
   ObserverCheckSettings,
   ObserverSettings,
+  OutcomeTier,
+  OutcomeVerdict,
 } from "../app/misc/observer";
+import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
 import type {
   ObserverFlag,
   GMConversationMessage,
@@ -43,6 +54,26 @@ import { TOP_TIER } from "../app/misc/reasoningTiers";
 
 function checkSettings(overrides: Partial<ObserverCheckSettings> = {}): ObserverCheckSettings {
   return { enabled: true, triggersReset: true, sensitivity: 5, ...overrides };
+}
+
+let verdictCounter = 0;
+/** One engine ruling, typed the way extractOutcomeVerdicts hands it to the judge. */
+function verdict(
+  toolName: string,
+  tier: OutcomeTier,
+  contextForStory: string,
+): OutcomeVerdict {
+  verdictCounter += 1;
+  return { checkId: `check-${verdictCounter}`, toolName, tier, contextForStory };
+}
+
+/**
+ * runObserver with every judge on and allowed to rewrite - what the defaults
+ * were before decision 187. The suites below exercise the judges themselves;
+ * the defaults have their own describe block.
+ */
+function runAllJudges(params: Parameters<typeof runObserver>[0]) {
+  return runObserver({ settings: LEGACY_OBSERVER_SETTINGS, ...params });
 }
 
 describe("checkResponseLength", () => {
@@ -248,12 +279,17 @@ describe("plausibleResetFlagTypes", () => {
   function observerSettings(
     overrides: Partial<ObserverSettings> = {},
   ): ObserverSettings {
-    return { ...DEFAULT_OBSERVER_SETTINGS, ...overrides };
+    return { ...LEGACY_OBSERVER_SETTINGS, ...overrides };
   }
+
+  // The turn-level questions below are asked of a config where the judges can
+  // reset (the old defaults); under the new defaults nothing is plausible.
+  const plausible = (params: Parameters<typeof plausibleResetFlagTypes>[0]) =>
+    plausibleResetFlagTypes({ settings: LEGACY_OBSERVER_SETTINGS, ...params });
 
   it("returns nothing for an ordinary turn - short, no comparisons, top tier", () => {
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         narration: SHORT,
         replyLength: "medium",
         rollResults: [],
@@ -264,7 +300,7 @@ describe("plausibleResetFlagTypes", () => {
   });
 
   it("returns nothing for empty narration", () => {
-    expect(plausibleResetFlagTypes({ narration: "   " })).toEqual([]);
+    expect(plausible({ narration: "   " })).toEqual([]);
   });
 
   it("makes no API call", () => {
@@ -272,10 +308,10 @@ describe("plausibleResetFlagTypes", () => {
     const originalFetch = global.fetch;
     global.fetch = fetchMock as unknown as typeof fetch;
     try {
-      plausibleResetFlagTypes({
+      plausible({
         narration: LONG,
         rollResults: [
-          { toolName: "calculate", success: true, contextForStory: "17 >= 15" },
+          verdict("calculate", "success", "17 >= 15"),
         ],
         tierUsed: 0,
       });
@@ -287,10 +323,10 @@ describe("plausibleResetFlagTypes", () => {
 
   it("flags response_length exactly when the free word count trips", () => {
     expect(
-      plausibleResetFlagTypes({ narration: LONG, replyLength: "medium" }),
+      plausible({ narration: LONG, replyLength: "medium" }),
     ).toContain("response_length");
     expect(
-      plausibleResetFlagTypes({ narration: SHORT, replyLength: "medium" }),
+      plausible({ narration: SHORT, replyLength: "medium" }),
     ).not.toContain("response_length");
   });
 
@@ -298,7 +334,7 @@ describe("plausibleResetFlagTypes", () => {
     // Deliberate: listing it would make every turn "plausible" and restore the
     // always-block behavior this gate exists to end.
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         narration: "You decide to run, heart hammering, and you shout for help.",
         replyLength: "medium",
       }),
@@ -309,46 +345,46 @@ describe("plausibleResetFlagTypes", () => {
     // Dice tools report what the dice showed and never judge it, so their
     // success is not a verdict - only calculate/record_challenge_result are.
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         narration: SHORT,
         rollResults: [
-          { toolName: "formula_roll", success: true, contextForStory: "3d6 = 11" },
+          verdict("formula_roll", "success", "3d6 = 11"),
         ],
       }),
     ).not.toContain("outcome_narration_mismatch");
 
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         narration: SHORT,
         rollResults: [
-          { toolName: "calculate", success: false, contextForStory: "11 >= 15" },
+          verdict("calculate", "failure", "11 >= 15"),
         ],
       }),
     ).toContain("outcome_narration_mismatch");
   });
 
-  it("does not flag outcome_narration_mismatch for a mixed set of comparisons", () => {
-    // checkOutcomeMismatch caps a mixed verdict at "minor" (it's the shape of
-    // a legitimate partial success), so it can never reset and never blocks.
+  it("still flags outcome_narration_mismatch for a mixed set of results - each is judged on its own", () => {
+    // The old turn-wide cap (mixed results are always advisory) is gone:
+    // one honoured roll must not excuse a reversed second one.
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         narration: SHORT,
         rollResults: [
-          { toolName: "calculate", success: true, contextForStory: "7 >= 4" },
-          { toolName: "calculate", success: false, contextForStory: "7 >= 9" },
+          verdict("action_roll", "strong_hit", "attack"),
+          verdict("action_roll", "miss", "escape"),
         ],
       }),
-    ).not.toContain("outcome_narration_mismatch");
+    ).toContain("outcome_narration_mismatch");
   });
 
   it("flags tier_escalation_missed only below the top tier AND with real stakes on the table", () => {
     expect(
-      plausibleResetFlagTypes({ narration: SHORT, tierUsed: 0, highStakes: true }),
+      plausible({ narration: SHORT, tierUsed: 0, highStakes: true }),
     ).toContain("tier_escalation_missed");
 
     // Nowhere to escalate to.
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         narration: SHORT,
         tierUsed: TOP_TIER,
         highStakes: true,
@@ -359,10 +395,10 @@ describe("plausibleResetFlagTypes", () => {
     // precondition, not a signal - without stakes this stays deferred, or the
     // observer would go straight back to blocking every turn.
     expect(
-      plausibleResetFlagTypes({ narration: SHORT, tierUsed: 0 }),
+      plausible({ narration: SHORT, tierUsed: 0 }),
     ).not.toContain("tier_escalation_missed");
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         narration: SHORT,
         tierUsed: 0,
         highStakes: false,
@@ -371,11 +407,11 @@ describe("plausibleResetFlagTypes", () => {
 
     // Caller didn't say which tier ran - checkTierEscalation is skipped too.
     expect(
-      plausibleResetFlagTypes({ narration: SHORT, highStakes: true }),
+      plausible({ narration: SHORT, highStakes: true }),
     ).not.toContain("tier_escalation_missed");
   });
 
-  it("flags a tool-usage gap only once its sensitivity makes it reset-eligible", () => {
+  it("never lists a tool-usage gap - they are flag-only by type (finding 4)", () => {
     const base = {
       narration: SHORT,
       replyLength: "medium" as const,
@@ -383,36 +419,18 @@ describe("plausibleResetFlagTypes", () => {
       toolNames: [],
     };
 
-    // Default sensitivity 5: these two report "minor" and can never reset.
-    expect(plausibleResetFlagTypes(base)).toEqual([]);
-
+    // Even at the sensitivity that used to make them "major" and with a
+    // stored config that allows a reset, a missing tool is never something
+    // the player waits on: a rewrite cannot call a tool.
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         ...base,
         settings: observerSettings({
-          missing_oracle_or_table: {
-            enabled: true,
-            triggersReset: true,
-            sensitivity: 9,
-          },
+          missing_oracle_or_table: { enabled: true, triggersReset: true, sensitivity: 9 },
+          missing_scene_increment: { enabled: true, triggersReset: true, sensitivity: 9 },
         }),
       }),
-    ).toContain("missing_oracle_or_table");
-
-    // ...and not when the turn already consulted the oracle.
-    expect(
-      plausibleResetFlagTypes({
-        ...base,
-        toolNames: ["roll_table"],
-        settings: observerSettings({
-          missing_oracle_or_table: {
-            enabled: true,
-            triggersReset: true,
-            sensitivity: 9,
-          },
-        }),
-      }),
-    ).not.toContain("missing_oracle_or_table");
+    ).toEqual([]);
   });
 
   it("respects enabled and triggersReset per type", () => {
@@ -423,7 +441,7 @@ describe("plausibleResetFlagTypes", () => {
     };
 
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         ...turn,
         settings: observerSettings({
           response_length: { enabled: false, triggersReset: true, sensitivity: 5 },
@@ -432,7 +450,7 @@ describe("plausibleResetFlagTypes", () => {
     ).not.toContain("response_length");
 
     expect(
-      plausibleResetFlagTypes({
+      plausible({
         ...turn,
         highStakes: true,
         settings: observerSettings({
@@ -513,7 +531,7 @@ describe("checkResponseLength with a justification judge", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("fails open to the mechanical flag when the judge API call errors", async () => {
+  it("treats a judge call that errors as unknown - no flag (finding 8)", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -523,11 +541,12 @@ describe("checkResponseLength with a justification judge", () => {
       token: "tok",
     });
 
-    expect(flag).not.toBeNull();
-    expect(flag?.type).toBe("response_length");
+    // It used to keep the major length flag here, and a failed rewrite after
+    // it rolled the turn back and re-rolled its dice because the prose was long.
+    expect(flag).toBeNull();
   });
 
-  it("fails open to the mechanical flag when the judge response isn't ok", async () => {
+  it("treats a judge response that isn't ok as unknown - no flag", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -537,10 +556,10 @@ describe("checkResponseLength with a justification judge", () => {
       token: "tok",
     });
 
-    expect(flag).not.toBeNull();
+    expect(flag).toBeNull();
   });
 
-  it("fails open to the mechanical flag when the judge's JSON can't be parsed", async () => {
+  it("treats a judge whose JSON can't be parsed as unknown - no flag", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ content: "not json at all" }),
@@ -553,7 +572,24 @@ describe("checkResponseLength with a justification judge", () => {
       token: "tok",
     });
 
-    expect(flag).not.toBeNull();
+    expect(flag).toBeNull();
+  });
+
+  it("lets a Stop through instead of reading it as a failed judge (finding 8)", async () => {
+    const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
+    global.fetch = vi.fn().mockRejectedValue(abort) as unknown as typeof fetch;
+
+    await expect(
+      checkResponseLength(Array(400).fill("word").join(" "), "", "medium", {
+        model: "test-model",
+        token: "tok",
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("still keeps the word-count flag when there is no judge to ask", async () => {
+    const flag = await checkResponseLength(Array(400).fill("word").join(" "), "", "medium");
+    expect(flag?.type).toBe("response_length");
   });
 
   it("passes the player's declared action to the judge for context", async () => {
@@ -722,13 +758,22 @@ describe("checkOutcomeMismatch", () => {
     vi.restoreAllMocks();
   });
 
+  function mockMismatch(mismatch: boolean, reason = "") {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: JSON.stringify({ mismatch, reason }) }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  }
+
   it("returns null for empty narration without calling the API", async () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const flag = await checkOutcomeMismatch(
       "",
-      [{ toolName: "formula_roll", success: false, contextForStory: "FAILURE" }],
+      [verdict("action_roll", "miss", "MISS")],
       { model: "test-model", token: "tok" },
     );
 
@@ -755,7 +800,7 @@ describe("checkOutcomeMismatch", () => {
 
     const flag = await checkOutcomeMismatch(
       "You leap the gap easily.",
-      [{ toolName: "formula_roll", success: false, contextForStory: "FAILURE" }],
+      [verdict("action_roll", "miss", "MISS")],
       { model: "test-model", token: "tok" },
       checkSettings({ enabled: false }),
     );
@@ -765,22 +810,18 @@ describe("checkOutcomeMismatch", () => {
   });
 
   it("ignores the dice tools - they report numbers, they don't judge", async () => {
-    // formula_roll/opposed_formula/npc_roll always come back success=true now
-    // (the dice were thrown), so checking narration against that would flag
-    // every legitimately-failed roll. The verdict lives on calculate.
+    // formula_roll/opposed_formula/npc_roll report what the dice showed and
+    // never judge it, so checking narration against them would flag every
+    // legitimately-failed roll. The verdict lives on the engine's rulings.
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const flag = await checkOutcomeMismatch(
       "You leap the gap easily.",
       [
-        { toolName: "formula_roll", success: true, contextForStory: "[Roll: 8]" },
-        { toolName: "npc_roll", success: true, contextForStory: "[NPC Roll: 4]" },
-        {
-          toolName: "opposed_formula",
-          success: true,
-          contextForStory: "[Player: 8] [Guard: 19]",
-        },
+        verdict("formula_roll", "success", "[Roll: 8]"),
+        verdict("npc_roll", "success", "[NPC Roll: 4]"),
+        verdict("opposed_formula", "success", "[Player: 8] [Guard: 19]"),
       ],
       { model: "test-model", token: "tok" },
     );
@@ -789,62 +830,27 @@ describe("checkOutcomeMismatch", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("ignores fate_question results (not a SUCCESS/FAILURE check)", async () => {
-    const fetchMock = vi.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    const flag = await checkOutcomeMismatch(
-      "The omens are unclear.",
-      [{ toolName: "fate_question", success: true, contextForStory: "Answer: No" }],
-      { model: "test-model", token: "tok" },
-    );
-
-    expect(flag).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("flags a mismatch when the model finds narration contradicts a FAILURE", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({
-          mismatch: true,
-          reason: "The roll failed but the narration describes a clean success.",
-        }),
-      }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
+  it("flags a mismatch when the model finds narration contradicts a MISS", async () => {
+    mockMismatch(true, "The roll missed but the narration describes a clean success.");
 
     const flag = await checkOutcomeMismatch(
       "You leap the gap easily and land without a scratch.",
-      [
-        {
-          toolName: "calculate",
-          success: false,
-          contextForStory: "[Athletics check: 8 >= 15 -> **FALSE**]",
-        },
-      ],
+      [verdict("action_roll", "miss", "[Athletics: 4 vs 6, 9]")],
       { model: "test-model", token: "tok" },
     );
 
-    expect(flag).not.toBeNull();
     expect(flag?.type).toBe("outcome_narration_mismatch");
     expect(flag?.severity).toBe("major");
     expect(flag?.correctivePrompt).toContain("ground truth");
+    expect(flag?.correctivePrompt).toContain("MISS");
   });
 
   it("returns null when the model finds no mismatch", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({ mismatch: false, reason: "" }),
-      }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    mockMismatch(false);
 
     const flag = await checkOutcomeMismatch(
       "You stumble and fall short of the ledge.",
-      [{ toolName: "calculate", success: false, contextForStory: "**FALSE**" }],
+      [verdict("calculate", "failure", "**FALSE**")],
       { model: "test-model", token: "tok" },
     );
 
@@ -852,159 +858,79 @@ describe("checkOutcomeMismatch", () => {
   });
 
   it("checks a recorded challenge outcome too", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({ mismatch: false, reason: "" }),
-      }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    const fetchMock = mockMismatch(false);
 
     await checkOutcomeMismatch(
       "You slip, and the ledge crumbles under your boot.",
-      [
-        {
-          toolName: "record_challenge_result",
-          success: false,
-          contextForStory: "[Challenge Check FAILURE: Vault over the gap]",
-        },
-      ],
+      [verdict("record_challenge_result", "miss", "[Challenge Check MISS: Vault over the gap]")],
       { model: "test-model", token: "tok" },
     );
 
     expect(fetchMock).toHaveBeenCalled();
   });
 
-  it("shows the judge every relevant comparison, not just the last one", async () => {
-    // The whole verdict, not one slice of it: a system that composes an
-    // outcome from several comparisons (Starforged's action score vs. two
-    // challenge dice) has no single comparison that IS the result.
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({ mismatch: false, reason: "" }),
-      }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
+  it("shows the judge every ruling on its own numbered line, with its tier", async () => {
+    const fetchMock = mockMismatch(false);
 
     await checkOutcomeMismatch(
-      "You succeed on the second attempt.",
+      "You land the blow, but the guard slips away.",
       [
-        { toolName: "calculate", success: false, contextForStory: "first: FALSE" },
-        { toolName: "calculate", success: true, contextForStory: "second: TRUE" },
+        verdict("action_roll", "strong_hit", "attack: strong"),
+        verdict("action_roll", "miss", "escape: miss"),
       ],
       { model: "test-model", token: "tok" },
     );
 
     const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
-    const userMessage = sentBody.messages[1].content;
-    expect(userMessage).toContain("first: FALSE");
-    expect(userMessage).toContain("second: TRUE");
-    expect(userMessage).toContain("FAILURE");
-    expect(userMessage).toContain("SUCCESS");
+    const userMessage = sentBody.messages[1].content as string;
+    expect(userMessage).toContain("1. STRONG HIT");
+    expect(userMessage).toContain("attack: strong");
+    expect(userMessage).toContain("2. MISS");
+    expect(userMessage).toContain("escape: miss");
+    // Each ruling is its own; one honoured result does not excuse another.
+    expect(sentBody.messages[0].content).toContain("EACH NUMBERED RESULT IS ITS OWN RULING");
   });
 
-  it("caps a mixed-verdict mismatch at minor so a weak hit can never trigger a reset", async () => {
-    // The Starforged weak hit that started this: action score beats one
-    // challenge die but not the other. Even if the judge still calls it a
-    // mismatch, a mixed set of comparisons is the shape of a legitimate
-    // partial success, so it stays advisory and keeps the turn's one rewrite.
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({
-          mismatch: true,
-          reason: "The second comparison failed but the narration reads as a success.",
-        }),
-      }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
+  it("does not cap a reversed second roll at minor because the first one succeeded", async () => {
+    // The old turn-wide cap: one success + one failure made every mismatch
+    // advisory, so a completely reversed escape was waved through whenever the
+    // attack hit (Codex finding 6).
+    mockMismatch(true, "Result 2 was a miss but the narration has the escape succeed cleanly.");
 
     const flag = await checkOutcomeMismatch(
-      "You clear the gap, but your pack tears open and the rations scatter below.",
+      "You cut him down and slip out the back door without a sound.",
       [
-        {
-          toolName: "calculate",
-          success: true,
-          contextForStory: "[Action vs Challenge Die 1: 7 >= 5 -> **TRUE**]",
-        },
-        {
-          toolName: "calculate",
-          success: false,
-          contextForStory: "[Action vs Challenge Die 2: 7 >= 9 -> **FALSE**]",
-        },
-      ],
-      { model: "test-model", token: "tok" },
-    );
-
-    expect(flag).not.toBeNull();
-    expect(flag?.severity).toBe("minor");
-    expect(flag?.detail).toContain("narration reads as a success");
-    // Advisory wording - it must not claim the turn was reset.
-    expect(flag?.correctivePrompt).not.toContain("was reset");
-    expect(flag?.correctivePrompt).toContain("partial success");
-  });
-
-  it("tells the judge outright when the comparisons came out mixed", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({ mismatch: false, reason: "" }),
-      }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await checkOutcomeMismatch(
-      "You get through, but the alarm trips.",
-      [
-        { toolName: "calculate", success: true, contextForStory: "die 1: TRUE" },
-        { toolName: "calculate", success: false, contextForStory: "die 2: FALSE" },
-      ],
-      { model: "test-model", token: "tok" },
-    );
-
-    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(sentBody.messages[1].content).toContain("did NOT all come out the same way");
-    expect(sentBody.messages[0].content).toContain("weak hit");
-  });
-
-  it("keeps a unanimous multi-comparison mismatch at major severity", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({
-          mismatch: true,
-          reason: "Both comparisons failed but the narration describes a clean win.",
-        }),
-      }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    const flag = await checkOutcomeMismatch(
-      "You vault the gap without breaking stride.",
-      [
-        { toolName: "calculate", success: false, contextForStory: "die 1: FALSE" },
-        { toolName: "calculate", success: false, contextForStory: "die 2: FALSE" },
+        verdict("action_roll", "strong_hit", "attack"),
+        verdict("action_roll", "miss", "escape"),
       ],
       { model: "test-model", token: "tok" },
     );
 
     expect(flag?.severity).toBe("major");
-    expect(flag?.correctivePrompt).toContain("was reset");
+    expect(flag?.detail).toContain("Result 2");
   });
 
-  it("gives the judge the adventure's own rules and the GM's reasoning", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({ mismatch: false, reason: "" }),
-      }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
+  it("describes a weak hit to the judge as a partial success, not a failure", async () => {
+    const fetchMock = mockMismatch(false);
 
     await checkOutcomeMismatch(
       "You get through, but the alarm trips.",
-      [{ toolName: "calculate", success: false, contextForStory: "die 2: FALSE" }],
+      [verdict("action_roll", "weak_hit", "score 7 beat one die")],
+      { model: "test-model", token: "tok" },
+    );
+
+    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sentBody.messages[1].content).toContain("WEAK HIT");
+    expect(sentBody.messages[1].content).toContain("partial success");
+    expect(sentBody.messages[0].content).toContain("PARTIAL success");
+  });
+
+  it("gives the judge the adventure's own rules and the GM's reasoning", async () => {
+    const fetchMock = mockMismatch(false);
+
+    await checkOutcomeMismatch(
+      "You get through, but the alarm trips.",
+      [verdict("calculate", "failure", "die 2: FALSE")],
       { model: "test-model", token: "tok" },
       checkSettings(),
       "Sneak past the sentry",
@@ -1030,11 +956,132 @@ describe("checkOutcomeMismatch", () => {
 
     const flag = await checkOutcomeMismatch(
       "Something happens.",
-      [{ toolName: "calculate", success: true, contextForStory: "TRUE" }],
+      [verdict("calculate", "success", "TRUE")],
       { model: "test-model", token: "tok" },
     );
 
     expect(flag).toBeNull();
+  });
+
+  it("lets a Stop through instead of reading it as 'the judge had nothing to say'", async () => {
+    const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
+    global.fetch = vi.fn().mockRejectedValue(abort) as unknown as typeof fetch;
+
+    await expect(
+      checkOutcomeMismatch(
+        "Something happens.",
+        [verdict("calculate", "success", "TRUE")],
+        { model: "test-model", token: "tok" },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+});
+
+describe("extractOutcomeVerdicts", () => {
+  const calc = (
+    expression: string,
+    result: Record<string, unknown>,
+    context: string,
+    success = true,
+  ) => ({
+    toolName: "calculate",
+    toolCallId: `calc-${expression}`,
+    success,
+    result: { type: "calculate", expression, ...result },
+    contextForStory: context,
+  });
+
+  it("gives a comparison that evaluated as success or failure", () => {
+    const verdicts = extractOutcomeVerdicts([
+      calc("17+3 >= 15", { result: 20, comparison: { operator: ">=", left: 20, right: 15, isTrue: true } }, "TRUE"),
+      calc("8 >= 15", { result: 8, comparison: { operator: ">=", left: 8, right: 15, isTrue: false } }, "FALSE", false),
+    ]);
+    expect(verdicts.map((v) => v.tier)).toEqual(["success", "failure"]);
+    expect(verdicts.map((v) => v.checkId)).toEqual(["calc-17+3 >= 15", "calc-8 >= 15"]);
+  });
+
+  it("never turns a plain sum into a SUCCESS (finding 6)", () => {
+    // Arithmetic returns success:true; "you still cannot afford passage" after
+    // a remaining-gold sum must not be judged against a "SUCCESS".
+    expect(
+      extractOutcomeVerdicts([calc("50 - 20", { result: 30 }, "[Gold left: 50 - 20 = 30]")]),
+    ).toEqual([]);
+  });
+
+  it("never turns an evaluation error into a FAILURE (finding 6)", () => {
+    expect(
+      extractOutcomeVerdicts([
+        calc("min(12,10", { result: 0 }, '[ERROR: Could not evaluate "min(12,10"]', false),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("reads action_roll and progress_roll by the engine's outcome tier", () => {
+    const verdicts = extractOutcomeVerdicts([
+      {
+        toolName: "action_roll",
+        toolCallId: "a1",
+        success: true,
+        result: { type: "action_roll", outcome: "weak_hit" },
+        contextForStory: "weak",
+      },
+      {
+        toolName: "action_roll",
+        toolCallId: "a2",
+        success: false,
+        result: { type: "action_roll", outcome: "miss" },
+        contextForStory: "miss",
+      },
+      {
+        toolName: "manage_track",
+        toolCallId: "t1",
+        success: true,
+        result: { type: "manage_track", action: "progress_roll", outcome: "strong_hit" },
+        contextForStory: "progress",
+      },
+      {
+        // A track update is not a roll.
+        toolName: "manage_track",
+        toolCallId: "t2",
+        success: true,
+        result: { type: "manage_track", action: "mark_progress" },
+        contextForStory: "marked",
+      },
+    ]);
+    expect(verdicts.map((v) => [v.toolName, v.tier])).toEqual([
+      ["action_roll", "weak_hit"],
+      ["action_roll", "miss"],
+      ["progress_roll", "strong_hit"],
+    ]);
+  });
+
+  it("reads a recorded challenge outcome, and skips a refused one", () => {
+    const verdicts = extractOutcomeVerdicts([
+      {
+        toolName: "record_challenge_result",
+        toolCallId: "c1",
+        success: false,
+        result: { type: "record_challenge_result", outcome: "failure" },
+        contextForStory: "[Challenge Check FAILURE]",
+      },
+      {
+        toolName: "record_challenge_result",
+        toolCallId: "c2",
+        success: false,
+        result: { type: "record_challenge_result", outcome: "success" },
+        contextForStory: "[ERROR: no active challenge]",
+      },
+    ]);
+    expect(verdicts.map((v) => [v.checkId, v.tier])).toEqual([["c1", "failure"]]);
+  });
+
+  it("ignores the dice tools and the oracle", () => {
+    expect(
+      extractOutcomeVerdicts([
+        { toolName: "formula_roll", toolCallId: "f", success: true, result: { type: "formula_roll" }, contextForStory: "3d6 = 11" },
+        { toolName: "fate_question", toolCallId: "q", success: true, result: { type: "fate_question" }, contextForStory: "No" },
+      ]),
+    ).toEqual([]);
   });
 });
 
@@ -1716,7 +1763,7 @@ describe("character context reaches the judges", () => {
     // decide to run") as an exoneration, so only the outcome judge gets it.
     const fetchMock = mockJudge({ violation: false, severity: "minor", reason: "" });
 
-    await runObserver({
+    await runAllJudges({
       narration: "The rain keeps falling.",
       playerChoice: "I wait",
       narrationThoughts: "I'll have her decide to run for the treeline.",
@@ -1743,19 +1790,26 @@ describe("runObserver", () => {
   });
 
   it("combines a length flag with an agency flag when both trigger", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        content: JSON.stringify({
-          violation: true,
-          severity: "major",
-          reason: "Spoke for the player.",
+    // The length judge has to answer "not justified" for the flag to stand
+    // (an unanswered judge is unknown, not a flag).
+    const fetchMock = vi.fn().mockImplementation(async (_url, init) => {
+      const system = JSON.parse(init.body).messages[0].content as string;
+      return {
+        ok: true,
+        json: async () => ({
+          content: system.includes("usual ceiling of ~")
+            ? JSON.stringify({ justified: false, reason: "" })
+            : JSON.stringify({
+                violation: true,
+                severity: "major",
+                reason: "Spoke for the player.",
+              }),
         }),
-      }),
+      };
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: Array(400).fill("word").join(" "),
       playerChoice: "I draw my sword",
       replyLength: "medium",
@@ -1779,17 +1833,13 @@ describe("runObserver", () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const pending = runObserver({
+    const pending = runAllJudges({
       narration: Array(400).fill("word").join(" "),
       playerChoice: "I draw my sword",
       replyLength: "medium",
       toolNames: ["formula_roll", "calculate"],
       rollResults: [
-        {
-          toolName: "calculate",
-          success: true,
-          contextForStory: "Climb check: 14 >= 12 -> **TRUE**",
-        },
+        verdict("calculate", "success", "Climb check: 14 >= 12 -> **TRUE**"),
       ],
       tierUsed: 1,
       apiOptions: { model: "test-model", token: "tok" },
@@ -1857,7 +1907,7 @@ describe("runObserver", () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const pending = runObserver({
+    const pending = runAllJudges({
       narration: Array(400).fill("word").join(" "),
       playerChoice: "I draw my sword",
       replyLength: "medium",
@@ -1879,7 +1929,7 @@ describe("runObserver", () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: Array(800).fill("word").join(" "), // a setup dump, legitimately huge
       playerChoice: "A grim lighthouse mystery, please",
       replyLength: "medium",
@@ -1896,7 +1946,7 @@ describe("runObserver", () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: Array(800).fill("word").join(" "),
       playerChoice: "Let's begin",
       replyLength: "medium",
@@ -1913,7 +1963,7 @@ describe("runObserver", () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: Array(800).fill("word").join(" "),
       playerChoice: "Something gothic, I think",
       replyLength: "medium",
@@ -1934,7 +1984,7 @@ describe("runObserver", () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: Array(400).fill("word").join(" "),
       playerChoice: "I head for the cliffs",
       replyLength: "medium",
@@ -1956,7 +2006,7 @@ describe("runObserver", () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: "You draw your sword.",
       playerChoice: "I draw my sword",
       replyLength: "medium",
@@ -1981,7 +2031,7 @@ describe("runObserver", () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: "You guess the trap is disarmed, and it is.",
       playerChoice: "Disarm the trap",
       replyLength: "medium",
@@ -2002,7 +2052,7 @@ describe("runObserver", () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: "You decide whether to betray the kingdom.",
       playerChoice: "Decide whether to betray the kingdom",
       apiOptions: { model: "test-model", token: "tok" },
@@ -2034,7 +2084,7 @@ describe("runObserver", () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const flags = await runObserver({
+    const flags = await runAllJudges({
       narration: "You decide whether to betray the kingdom.",
       playerChoice: "Decide whether to betray the kingdom",
       tierUsed: 0,
@@ -2053,12 +2103,12 @@ describe("runObserver", () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await runObserver({
+    await runAllJudges({
       narration: "You slip aboard, but the hatch seals behind you.",
       playerChoice: "Board the derelict",
       rollResults: [
-        { toolName: "calculate", success: true, contextForStory: "die 1: TRUE" },
-        { toolName: "calculate", success: false, contextForStory: "die 2: FALSE" },
+        verdict("calculate", "success", "die 1: TRUE"),
+        verdict("calculate", "failure", "die 2: FALSE"),
       ],
       characterContext: {
         playerName: "Kira Vance",
@@ -2261,27 +2311,51 @@ describe("reconcileGmThinkingAfterRewrite", () => {
 });
 
 describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
-  it("reproduces today's shipped reset behavior by default", () => {
-    // The three checks that can naturally be "major" reset by default...
-    expect(DEFAULT_OBSERVER_SETTINGS.response_length.triggersReset).toBe(true);
-    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.triggersReset).toBe(true);
-    expect(
-      DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch.triggersReset,
-    ).toBe(true);
-    // ...the two tool-usage-gap checks stay log-only, exactly as before.
-    expect(
-      DEFAULT_OBSERVER_SETTINGS.missing_oracle_or_table.triggersReset,
-    ).toBe(false);
-    expect(
-      DEFAULT_OBSERVER_SETTINGS.missing_scene_increment.triggersReset,
-    ).toBe(false);
-    // Every check is on and at the balanced default sensitivity.
+  it("is flag only by default: nothing rewrites or rerolls on its own (decision 187)", () => {
+    // No check is allowed to correct a turn.
     for (const type of Object.keys(DEFAULT_OBSERVER_SETTINGS) as Array<
       keyof typeof DEFAULT_OBSERVER_SETTINGS
     >) {
-      expect(DEFAULT_OBSERVER_SETTINGS[type].enabled).toBe(true);
+      expect(DEFAULT_OBSERVER_SETTINGS[type].triggersReset).toBe(false);
+    }
+    // Only the outcome judge is on, at sensitivity 2.
+    expect(DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch).toEqual({
+      enabled: true,
+      triggersReset: false,
+      sensitivity: 2,
+    });
+    expect(DEFAULT_OBSERVER_SETTINGS.player_agency).toEqual({
+      enabled: false,
+      triggersReset: false,
+      sensitivity: 3,
+    });
+    for (const type of [
+      "response_length",
+      "missing_oracle_or_table",
+      "missing_scene_increment",
+      "tier_escalation_missed",
+    ] as const) {
+      expect(DEFAULT_OBSERVER_SETTINGS[type].enabled).toBe(false);
       expect(DEFAULT_OBSERVER_SETTINGS[type].sensitivity).toBe(5);
     }
+    // ...so by default no turn ever waits on a judge that could change it.
+    expect(canObserverTriggerReset(undefined)).toBe(false);
+  });
+
+  it("is frozen, and settingsFor hands out copies so no caller can change it", () => {
+    expect(Object.isFrozen(DEFAULT_OBSERVER_SETTINGS)).toBe(true);
+    expect(Object.isFrozen(DEFAULT_OBSERVER_SETTINGS.player_agency)).toBe(true);
+
+    const copy = settingsFor(undefined, "player_agency");
+    copy.enabled = true;
+    copy.sensitivity = 9;
+    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.enabled).toBe(false);
+    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.sensitivity).toBe(3);
+    expect(settingsFor(undefined, "player_agency").enabled).toBe(false);
+
+    const fresh = cloneDefaultObserverSettings();
+    fresh.response_length.enabled = true;
+    expect(DEFAULT_OBSERVER_SETTINGS.response_length.enabled).toBe(false);
   });
 
   it("falls back to defaults when no settings object is provided", () => {
@@ -2292,19 +2366,223 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
 
   it("merges a partial override with that type's defaults", () => {
     const merged = settingsFor(
-      { player_agency: { enabled: false } } as any,
+      { player_agency: { enabled: true } } as any,
       "player_agency",
     );
-    expect(merged.enabled).toBe(false);
+    expect(merged.enabled).toBe(true);
     // Fields the override didn't specify still fall back to the default.
-    expect(merged.triggersReset).toBe(true);
-    expect(merged.sensitivity).toBe(5);
+    expect(merged.triggersReset).toBe(false);
+    expect(merged.sensitivity).toBe(3);
   });
 
   it("does not let an override for one type leak into another", () => {
-    const settings = { response_length: { enabled: false } } as any;
-    expect(settingsFor(settings, "response_length").enabled).toBe(false);
-    expect(settingsFor(settings, "player_agency").enabled).toBe(true);
+    const settings = { response_length: { enabled: true } } as any;
+    expect(settingsFor(settings, "response_length").enabled).toBe(true);
+    expect(settingsFor(settings, "player_agency").enabled).toBe(false);
+    expect(settingsFor(settings, "outcome_narration_mismatch").enabled).toBe(true);
+  });
+
+  it("reports the tool-usage gaps as unable to reset whatever a stored config says (finding 4)", () => {
+    const stored = {
+      missing_oracle_or_table: { enabled: true, triggersReset: true, sensitivity: 9 },
+      missing_scene_increment: { enabled: true, triggersReset: true, sensitivity: 9 },
+    } as any;
+    for (const type of ["missing_oracle_or_table", "missing_scene_increment"] as const) {
+      expect(FLAG_ONLY_FLAG_TYPES.has(type)).toBe(true);
+      expect(settingsFor(stored, type).triggersReset).toBe(false);
+    }
+    expect(canObserverTriggerReset(stored)).toBe(false);
+  });
+
+  it("maps a check to Off / Flag / Rewrite for Settings and back", () => {
+    expect(observerModeOf({ enabled: false, triggersReset: false, sensitivity: 5 })).toBe("off");
+    expect(observerModeOf({ enabled: true, triggersReset: false, sensitivity: 5 })).toBe("flag");
+    expect(observerModeOf({ enabled: true, triggersReset: true, sensitivity: 5 })).toBe("rewrite");
+    expect(observerModePatch("off")).toEqual({ enabled: false, triggersReset: false });
+    expect(observerModePatch("flag")).toEqual({ enabled: true, triggersReset: false });
+    expect(observerModePatch("rewrite")).toEqual({ enabled: true, triggersReset: true });
+  });
+
+  it("counts the calls the enabled judges can add, for the cost line", () => {
+    // Defaults: the outcome judge only, and only on a turn with a ruling.
+    expect(countJudgeCalls(cloneDefaultObserverSettings())).toEqual({
+      always: 0,
+      sometimes: 1,
+      rewrites: false,
+    });
+    // Every judge on: the oracle and scene judges share one call.
+    expect(countJudgeCalls(LEGACY_OBSERVER_SETTINGS)).toEqual({
+      always: 3,
+      sometimes: 2,
+      rewrites: true,
+    });
+  });
+});
+
+describe("runObserver with the default settings", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("makes no judge call on a turn with no engine ruling", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: Array(400).fill("word").join(" "),
+      playerChoice: "I draw my sword",
+      replyLength: "medium",
+      toolNames: [],
+      tierUsed: 0,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(flags).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("judges only the outcome, once, on a turn with a ruling", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ mismatch: true, reason: "Result 1 was a miss." }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: "You clear the gap cleanly.",
+      playerChoice: "I jump",
+      rollResults: [verdict("action_roll", "miss", "MISS")],
+      tierUsed: 0,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(flags.map((f) => f.type)).toEqual(["outcome_narration_mismatch"]);
+    // Flag only: never reset-eligible under the defaults.
+    expect(
+      flags.some(
+        (f) => f.severity === "major" && settingsFor(undefined, f.type).triggersReset,
+      ),
+    ).toBe(false);
+  });
+
+  it("is not plausible-to-reset on any turn, so the player never waits on a judge", () => {
+    expect(
+      plausibleResetFlagTypes({
+        narration: Array(400).fill("word").join(" "),
+        rollResults: [verdict("action_roll", "miss", "MISS")],
+        tierUsed: 0,
+        highStakes: true,
+        replyLength: "medium",
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("a rewrite is checked before it replaces anything (finding 5)", () => {
+  const original = "You draw your sword and apologize.";
+
+  it("accepts a clean replacement and strips the thinking the story stage would strip", () => {
+    const checked = validateRewriteResponse(
+      { content: "<thinking>keep the flinch</thinking>You draw your sword.", finishReason: "stop" },
+      original,
+    );
+    expect(checked).toEqual({ ok: true, text: "You draw your sword." });
+  });
+
+  it("rejects a reply cut off at the token limit", () => {
+    expect(
+      validateRewriteResponse({ content: "You draw your", finishReason: "length" }, original),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining("token limit") });
+  });
+
+  it("rejects a reply that carries tool calls", () => {
+    expect(
+      validateRewriteResponse(
+        { content: "You draw your sword.", toolCalls: [{ id: "1" }] },
+        original,
+      ),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining("tool calls") });
+  });
+
+  it("rejects a refusal or an introduction instead of prose", () => {
+    for (const reply of [
+      "I'm sorry, but I can't rewrite that scene.",
+      "I cannot continue with this request.",
+      "Here is the rewritten narration: You draw your sword.",
+      "Sure! You draw your sword.",
+      "As an AI, I should note that...",
+    ]) {
+      expect(validateRewriteResponse({ content: reply }, original), reply).toMatchObject({
+        ok: false,
+      });
+    }
+  });
+
+  it("rejects a reply that is empty once the normal cleanup has run", () => {
+    expect(validateRewriteResponse({ content: "   " }, original)).toMatchObject({ ok: false });
+    expect(
+      validateRewriteResponse({ content: "<thinking>only thoughts</thinking>" }, original),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("rejects the original text handed back unchanged", () => {
+    expect(
+      validateRewriteResponse({ content: `  ${original.toUpperCase()}  ` }, original),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining("unchanged") });
+  });
+
+  it("makes rewriteFlaggedNarration return null (the original is kept) for a rejected reply", async () => {
+    const originalFetch = global.fetch;
+    try {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ content: "I'm sorry, I can't help with that.", toolCalls: [] }),
+      }) as unknown as typeof fetch;
+      const rewritten = await rewriteFlaggedNarration({
+        narration: original,
+        playerChoice: "I draw my sword",
+        flag: {
+          type: "player_agency",
+          severity: "major",
+          detail: "Spoke for the player.",
+          correctivePrompt: "x",
+        },
+        apiOptions: { model: "test-model", token: "tok" },
+      });
+      expect(rewritten).toBeNull();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("never rewrites for a tool that did not run, and never would mark it corrected (finding 4)", async () => {
+    const originalFetch = global.fetch;
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+    try {
+      for (const type of [
+        "missing_oracle_or_table",
+        "missing_scene_increment",
+        "tier_escalation_missed",
+      ] as const) {
+        const rewritten = await rewriteFlaggedNarration({
+          narration: original,
+          playerChoice: "I draw my sword",
+          flag: { type, severity: "major", detail: "x", correctivePrompt: "x" },
+          apiOptions: { model: "test-model", token: "tok" },
+        });
+        expect(rewritten).toBeNull();
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });
 
