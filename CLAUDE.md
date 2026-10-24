@@ -382,7 +382,15 @@ always runs **before** the story stage:
    works on a `structuredClone` and hands state tools to
    `toolExecutor.executeTools`) until the model stops calling tools or hits
    `maxToolLoops` (default 10). The roll gate (M2), the plan gate and, in session zero, the setup gate can force
-   `tool_choice: "required"`. This is the "brain": it reads the character
+   `tool_choice: "required"`. After those, a system's **turn-end checks** run
+   (decision 183, `docs/dawn-gate-design.md`): when a turn ends on prose and
+   the turn's words (the GM's visible prose, or any one player line) cross a
+   line the system declared and no executed result of the check's tool exists
+   this turn, one conditional user message is appended and the next round runs
+   with an explicit `tool_choice: "auto"`, so the GM may decline. Off in
+   session zero and for a repetitive round; one reminder per check per turn;
+   logged and skipped when no round is left. The only check so far is Blood &
+   Bone's `night-ended` (dawn, so `end_session` and the Reckoning). This is the "brain": it reads the character
    sheet and mechanics notes and decides on rolls and state changes. Its
    budget comes from `computeGMStageBudget()`: the Memory Size slider
    (localStorage `customMaxContext`, default `GM_STAGE_DEFAULT_BUDGET` =
@@ -744,6 +752,16 @@ report's §11.3. The ones that shape play:
   its budget is its own 3,000 tokens, not the 2,500 read cap.
   `tests/systems.bloodAndBone.test.ts` holds the token budgets and runs the
   core's recipes against the engine.
+  **A system can declare engine checks** (decision 183): `BuiltinSystem.turnEndChecks`
+  (`SystemTurnEndCheck`, `systems/types.ts`) names trigger phrases (`phrases` for
+  the GM's prose and player lines, `playerOnly` for a player's line, span-local
+  `exceptions`), the tool result that settles it (`satisfiedBy`) and the
+  message sent to the GM. `turnEndChecks.ts` (`textCrosses`, `pendingCheck`,
+  `splitPlayerLines`) is the one evaluator and `generation.ts` the one gate;
+  a second system adds data, not engine code. Blood & Bone declares
+  `night-ended` (`blood-and-bone/turnEndChecks.ts`). `GenerateRequestBody.toolChoice`
+  now also takes `"auto"`, which every provider honours (Google's unset
+  default is still `required`).
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9
   chaos factor) and the 45 **built-in** Mythic element tables. The
   adventure's own tables are `StoryLore` notes with `type: "table"` that name

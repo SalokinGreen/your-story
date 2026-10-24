@@ -79,6 +79,7 @@ import { OBJECTS_NOTE } from "./oracles/objects";
 import { INVESTIGATION_NOTE } from "./oracles/investigation";
 import { ROADS_NOTE } from "./oracles/roads";
 import { TIME_SKIP_NOTE } from "./timeSkip";
+import { BLOOD_AND_BONE_TURN_END_CHECKS } from "./turnEndChecks";
 
 // Europe by Night: the six original cities and the overview, then the
 // expansion's continent notes, cities and wild places (E2, decisions 150-159).
@@ -191,6 +192,7 @@ export const BLOOD_AND_BONE: BuiltinSystem = {
   creationNoteId: "builtin:blood-and-bone:character-creation",
   creationSteps: BLOOD_AND_BONE_CREATION_STEPS,
   meterSets: BLOOD_AND_BONE_METER_SETS,
+  turnEndChecks: BLOOD_AND_BONE_TURN_END_CHECKS,
   endOfSessionReminder:
     "Dawn. Run the Reckoning for each character now: formula_roll [\"<Stress>d6\"] (skip it at Stress 0: no 1s), count the 1s, manage_meter adjust Beast by that count. Then: Wendigo Slipping Mask +1 (+2 Graverobber) for a foodless night; Heat -1 if nobody breached and someone suppressed attention; offer two downtime actions; clear every \"used tonight\" on the sheets.",
 };

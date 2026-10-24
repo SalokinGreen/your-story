@@ -851,6 +851,9 @@ async function runRound(
     toolNames.length === 0 ||
     answer.toolCalls.length > 0 ||
     body.toolChoice === "required" ||
+    // A turn-end reminder round (decision 183) invites a tool call and lets
+    // the model decline: an "auto" request is never forced on a claim.
+    body.toolChoice === "auto" ||
     !(isFreshTranscript(body.messages)
       ? claimsToolsUnavailable(answer.narration)
       : claimsToolsUnavailableLater(answer.narration))

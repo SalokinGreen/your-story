@@ -68,9 +68,11 @@ export interface GenerateRequestBody {
   messages: ChatMessage[];
   tools?: any[];
   // Caller-forced tool_choice (e.g. the M2 roll-invariant gate's retry
-  // round, generation.ts). Only "required" is meaningful - anything else
-  // falls back to the provider's normal default.
-  toolChoice?: "required";
+  // round, generation.ts). "required" forces a call. "auto" is an explicit
+  // choice (a system's turn-end reminder, decision 183): the model may decline
+  // the tool, which Google could not do while an unset choice meant
+  // "required" there. Unset falls back to the provider's normal default.
+  toolChoice?: "required" | "auto";
   model?: string;
   maxTokens?: number;
   temperature?: number;
@@ -596,14 +598,15 @@ function resolveModelConfig(
  * "required" - except on Claude, where forced tool use is a 400, on Qwen 3.8
  * (modelRejectsForcedToolChoice), and on Z.ai, which accepts only "auto".
  * There the gate's own user message, which already says a tool call is
- * required, does the forcing. `autoOnly` is true for the first two.
+ * required, does the forcing. `autoOnly` is true for the first two. A caller
+ * that asks for "auto" outright gets it from every provider, Google included.
  */
 function resolveToolChoice(
   provider: Provider,
   toolChoice: GenerateRequestBody["toolChoice"],
   autoOnly: boolean,
 ): "required" | "auto" {
-  if (autoOnly || provider === "zai") return "auto";
+  if (autoOnly || provider === "zai" || toolChoice === "auto") return "auto";
   return toolChoice === "required" || provider === "google" ? "required" : "auto";
 }
 

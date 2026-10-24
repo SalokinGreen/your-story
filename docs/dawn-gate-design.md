@@ -193,3 +193,38 @@ The suite and `tsc`; the engine-review agent; then on the desktop app, the
 playtest's Grave Watcher line ("at dawn I climb down and go to bed. Next
 morning, I go find Cora"): after the morning prose, `end_session` is called
 and the Reckoning rolled in the same turn.
+
+## Decisions made during implementation (2026-10-24)
+
+- **`textCrosses` returns the match, not a boolean**: `{ source: "prose" |
+  "player", phrase, lineIndex? } | null`, so the gate's log line can say what
+  matched (§4 step 4). `pendingCheck` returns `{ check, match } | null`, and
+  takes `(system, { text: { gmProse, playerLines }, results, prompted })`.
+  Extra exports: `checkSatisfied` and `splitPlayerLines`.
+- **Where the player lines come from**: `generation.ts` has only
+  `gmUserChoice`, the turn's one string. A party or online batch is
+  `aggregateBatch`'s lines joined by newlines, each starting with `>`, so
+  `splitPlayerLines` splits at each line that starts with `>` and keeps a
+  continuation line with its player. Anything else is one line.
+- **Exceptions are overlap-based**: a phrase match is dropped when any
+  exception match overlaps its span. The question exception is the clause up
+  to its `?` (`[^.!?
+]*...\?`), so "Is it safe? At dawn we go." still fires.
+- **Gate placement and the budget case**: the gate runs only when
+  `resolveSystem(story).usesSystemTools` is true and the check's tool is in
+  `gmBaseTools`. With `gmRound >= MAX_GM_ROUNDS` it logs "Turn-end check
+  night-ended could not run: no rounds left" and the turn ends; the id is
+  marked prompted either way.
+- **`forceToolChoiceNextRound`** widened to `"required" | "auto"`; the
+  existing request code already forwards whatever it holds.
+- **Subscription**: `runRound` (`claudeCli.ts`) skips its "tools are down"
+  forced retry when `body.toolChoice === "auto"`; the schema was already
+  optional for anything but `"required"`.
+- **Tests**: the failed-`end_session` case uses a real refusal (the tool
+  needs a `reason`). The "session-zero turn that calls `start_game`" case is
+  covered by the gate reading the turn-start `sessionZeroTurn` flag, which
+  stays true after `start_game`; the test asserts a session-zero turn gets no
+  reminder, not the `start_game` round specifically. The Google `auto` check
+  is in `providerCall.forcedToolChoice.test.ts`, the subscription one in
+  `claudeCli.fetch.test.ts`.
+- **Devlog**: the playtest devlog's status note was not touched, as asked.

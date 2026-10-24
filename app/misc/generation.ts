@@ -102,6 +102,8 @@ import {
   extractThinkingText,
 } from "@/app/misc/turnTimeline";
 import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
+import { resolveSystem } from "@/app/misc/systems/resolve";
+import { pendingCheck, splitPlayerLines } from "@/app/misc/turnEndChecks";
 import { deAiifyText } from "@/app/misc/deAiify";
 import {
   executeGMTools,
@@ -2371,7 +2373,10 @@ async function generateStoryTurnOnce(
         // below) when it forces a retry round - makes that one round require
         // a tool call outright rather than relying on prose alone to ask for
         // one. Consumed (read then cleared) at the top of the next round.
-        let forceToolChoiceNextRound: "required" | undefined;
+        let forceToolChoiceNextRound: "required" | "auto" | undefined;
+        // A system's turn-end checks (decision 183, turnEndChecks.ts): the ids
+        // already sent back this turn. One reminder per check per turn.
+        const turnEndChecksPrompted = new Set<string>();
 
         // ---- Session zero's setup gate (docs/session-zero-plan.md, slice 4) ----
         // Read ONCE, from the story as the turn found it. start_game flips
@@ -3322,6 +3327,72 @@ async function generateStoryTurnOnce(
               });
               forceToolChoiceNextRound = "required";
               continue gmRoundLoop;
+            }
+
+            // The system's turn-end checks (decision 183,
+            // docs/dawn-gate-design.md). When the turn's words cross a line a
+            // system declared (Blood & Bone: the night ended) and nothing this
+            // turn did what that needs (end_session), send the GM back once.
+            // A follow-up, not a hold: this round's prose has already reached
+            // the feed, so the GM is asked to do the work now and narrate any
+            // change. The message is conditional and the round runs on
+            // `auto`, so the GM may decline when it is not actually dawn.
+            // Session zero is off (it has its own gate), as is a repetitive
+            // round. Runs after the setup, M2 and plan gates, whose order is
+            // unchanged.
+            if (!sessionZeroTurn && !isRepetitive) {
+              const resolved = resolveSystem(storyData);
+              const pending = resolved.usesSystemTools
+                ? pendingCheck(resolved.system, {
+                    text: {
+                      gmProse: extractVisibleText(
+                        gmAccumulatedStory.join("\n\n"),
+                      ),
+                      playerLines: splitPlayerLines(gmUserChoice),
+                    },
+                    results: gmResults,
+                    prompted: turnEndChecksPrompted,
+                  })
+                : null;
+              // The tool that settles the check must be on this turn's list
+              // (a story with the system tools off never offers it).
+              const offered = pending
+                ? gmBaseTools.some(
+                    (t) =>
+                      (t as { function?: { name?: string } }).function?.name ===
+                      pending.check.satisfiedBy.toolName,
+                  )
+                : false;
+              if (pending && offered) {
+                const matchLog = {
+                  check: pending.check.id,
+                  source: pending.match.source,
+                  phrase: pending.match.phrase,
+                  round: gmRound,
+                };
+                if (gmRound >= MAX_GM_ROUNDS) {
+                  // No request left to run it in; say so rather than drop it.
+                  turnEndChecksPrompted.add(pending.check.id);
+                  logger.action(
+                    `Turn-end check ${pending.check.id} could not run: no rounds left`,
+                    matchLog,
+                  );
+                } else {
+                  turnEndChecksPrompted.add(pending.check.id);
+                  logger.action(
+                    `Turn-end check ${pending.check.id}: the turn's text crossed it and ${pending.check.satisfiedBy.toolName} was not called - sending the GM back once`,
+                    matchLog,
+                  );
+                  conversationHistory.push({
+                    role: "user",
+                    content: pending.check.message,
+                  });
+                  // Explicit auto: the GM may decline, even on Google, where
+                  // an unset choice means "required".
+                  forceToolChoiceNextRound = "auto";
+                  continue gmRoundLoop;
+                }
+              }
             }
 
             // Leniency audit (widened past M2's hard gate): M2 only forces a

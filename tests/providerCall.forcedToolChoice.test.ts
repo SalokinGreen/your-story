@@ -154,6 +154,23 @@ describe.each(["streaming", "non-streaming"] as const)("a gate's forced tool cal
   });
 });
 
+// A system's turn-end reminder (decision 183) asks for an explicit "auto" so
+// the GM can decline. An unset choice still means "required" on Google, which
+// is why the explicit value exists.
+describe.each(["streaming", "non-streaming"] as const)("an explicit auto, %s", (path) => {
+  it("reaches Google as auto, where an unset choice is required", async () => {
+    const google = "Google Gemini 2.5 Flash";
+    expect(await toolChoiceSent(path, { model: google, toolChoice: "auto" })).toBe("auto");
+    expect(await toolChoiceSent(path, { model: google })).toBe("required");
+  });
+
+  it("is auto on every other provider too", async () => {
+    for (const model of ["Grok 4.7", "Mistral Large 4", "DeepSeek V4 Flash", "Qwen 3.8 Max"]) {
+      expect(await toolChoiceSent(path, { model, toolChoice: "auto" }), model).toBe("auto");
+    }
+  });
+});
+
 describe("the new DeepSeek entries replay reasoning_content like the old ones", () => {
   const TOOL_ROUND: GenerateRequestBody["messages"] = [
     { role: "user", content: "> try the door" },
