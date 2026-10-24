@@ -10,6 +10,20 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Blood & Bone character options (E3)
+
+Needs a real model:
+
+- **A third Archetype in session zero.** Start a Blood & Bone story, step by
+  step, and pick a Vampire. Expected: the archetype question offers three
+  options, the Courtier among them, with what each does in play, and the GM
+  read `B&B — Vampire: The Courtier` to describe it. Failure looks like: only
+  the two Archetypes from the Kind note (the GM did not open the new note;
+  a story made before E3 holds the old creation note, which says two).
+- **A new asset bought with XP.** In play, spend 2 XP on a Path from
+  `B&B — More Paths`. Expected: the GM reads that note and writes the first
+  ability onto the sheet.
+
 ## 2026-10-24 — Blood & Bone tables, E1 (decisions 150–159)
 
 Run on the desktop app with the author's go (Claude Haiku subscription,
