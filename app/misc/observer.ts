@@ -48,10 +48,11 @@
  *   followed by an LLM justification pass (same fail-open/API-error posture
  *   as the checks below) that reads the turn in context and decides whether
  *   the overage was earned. Only an unjustified overage becomes a flag.
- * - checkPlayerAgencyViolation: an LLM call that judges whether the GM
- *   decided/narrated what the player character says, thinks, or does beyond
- *   what the player declared - the "PLAYER AGENCY (NON-NEGOTIABLE)" rule
- *   already in ai_staged.ts's GM system prompt.
+ * - checkPlayerAgencyViolation: an LLM call that judges whether the GM took a
+ *   decision away from the player (new meaningful dialogue, a significant
+ *   choice, a decided feeling, a new action past the declared one). Narrating
+ *   the character carrying out the declared action, in second person, is
+ *   fine (decision 185).
  * - checkOutcomeMismatch: an LLM call that judges whether the finished
  *   narration contradicts the mechanical results (SUCCESS/FAILURE) of the
  *   rolls/checks made this turn. The roll results are ground truth - this
@@ -1112,7 +1113,7 @@ ${sensitivityInstruction(sensitivity)}
 Respond with ONLY a JSON object, no other text:
 {"violation": true|false, "severity": "minor"|"major", "reason": "<one sentence naming who was spoken/acted for, empty string if no violation>"}
 
-"major" = the GM clearly gave the player character new meaningful dialogue or made a significant choice for them. "minor" = borderline: it leans that way but could reasonably be read as narrating the declared action.`;
+"major" = any of the four violations above, clearly (new meaningful dialogue, a significant choice, a decided feeling or belief, or a new action past the declared one). "minor" = borderline: it leans that way but could reasonably be read as narrating the declared action.`;
 
   const user = `Player's declared action:\n"""\n${
     playerChoice.trim() || "(none - opening scene)"
@@ -1172,7 +1173,7 @@ export async function checkPlayerAgencyViolation(
     type: "player_agency",
     severity: result.severity,
     detail: reason,
-    correctivePrompt: `Your previous attempt at this turn was reset because it violated the PLAYER AGENCY rule you were already given ("Never decide what the player character says, thinks, feels, or does next"): ${reason} Rewrite this turn so you resolve the outcome of the player's declared action without inventing anything further the player character says, thinks, or does.`,
+    correctivePrompt: `Your previous attempt at this turn was reset because it broke the PLAYER AGENCY rule: it took a decision away from the player. ${reason} Rewrite this turn: narrate the character carrying out what the player declared (second person is fine) and the world's answer, but give them no new meaningful dialogue, no significant choice and no decided feeling the player didn't give.`,
   };
 }
 

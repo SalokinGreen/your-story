@@ -101,7 +101,7 @@ const OBSERVER_FLAG_INFO: Record<
   player_agency: {
     label: "Player Agency",
     description:
-      "The GM decided what the player character says, thinks, feels, or does beyond what the player declared.",
+      "The GM took a decision away from the player: new meaningful dialogue, a significant choice, or a decided feeling. Narrating your character carrying out what you said is fine.",
     llmBacked: true,
   },
   outcome_narration_mismatch: {
