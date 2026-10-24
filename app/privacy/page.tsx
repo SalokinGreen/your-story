@@ -100,7 +100,7 @@ export default function PrivacyPolicy() {
             title="Your Privacy Matters"
           >
             <p className="leading-relaxed">
-              Your Story has no accounts and no database of its own. Your
+              Endless Adventure has no accounts and no database of its own. Your
               stories live on your device, and the app talks to AI services
               with API keys you bring yourself. This page lists every place
               your data can go, in plain terms.

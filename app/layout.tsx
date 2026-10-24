@@ -25,7 +25,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Your Story",
+  title: "Endless Adventure",
   description: "Interactive story game powered by AI",
   formatDetection: {
     telephone: false,

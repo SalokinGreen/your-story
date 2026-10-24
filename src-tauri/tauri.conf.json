@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Your Story",
+  "productName": "Endless Adventure",
   "version": "0.1.0",
   "identifier": "com.yourstory.desktop",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Your Story",
+        "title": "Endless Adventure",
         "width": 1280,
         "height": 832,
         "minWidth": 720,

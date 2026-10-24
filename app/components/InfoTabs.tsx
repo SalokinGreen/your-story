@@ -48,7 +48,7 @@ export default function InfoTabs() {
           </h2>
         </div>
         <p className="text-center text-sm text-ys-muted mb-4 max-w-lg mx-auto">
-          Your Story runs entirely on API keys you provide - no accounts, no
+          Endless Adventure runs entirely on API keys you provide - no accounts, no
           subscriptions. Keys are stored in your browser and only sent
           directly to power the feature that needs them.
         </p>

@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Run the Your Story verification suite — the Vitest suite, the typecheck, lint, the web and standalone builds, and on this machine the Tauri desktop build — and report the evidence. Use after any code change, before any commit or merge, or when asked whether the app still passes.
+description: Run the Endless Adventure verification suite — the Vitest suite, the typecheck, lint, the web and standalone builds, and on this machine the Tauri desktop build — and report the evidence. Use after any code change, before any commit or merge, or when asked whether the app still passes.
 ---
 
-# Verifying Your Story
+# Verifying Endless Adventure
 
 Everything the engine does is checkable from a terminal. Whether the
 *product* works — the native app reaching a provider, a screen laid out
@@ -27,7 +27,7 @@ run by the session that made the change, and nobody else runs it.
 | web build | `npm run build` | the Next build with API routes, ~2 min. Needs no env vars | anywhere |
 | standalone build | `node scripts/build-standalone.mjs` | the static export to `out/` that Tauri and Capacitor package. **The build that counts** (decision 1). Use the script rather than `NEXT_PUBLIC_STANDALONE=true npm run build`: that prefix is POSIX-only and fails under `cmd.exe` (which Tauri's `beforeBuildCommand` uses) and PowerShell | anywhere |
 | desktop build | `RUSTUP_TOOLCHAIN=1.99.1 npx tauri build` | the Windows MSI and NSIS installers under `src-tauri/target/release/bundle/`, ~5 min warm, ~10 min cold. Run when anything under `src-tauri/`, a Tauri plugin or `package.json`'s Tauri deps changes. `Cargo.toml` needs rustc ≥ 1.90; this machine's default `stable` is 1.86, so name the newer toolchain | this machine only |
-| desktop app starts | launch `src-tauri/target/release/app.exe`, wait 10 s, check it is still running with the window title "Your Story", then close it | the shell and its plugins initialise. Not that a turn works | this machine only |
+| desktop app starts | launch `src-tauri/target/release/app.exe`, wait 10 s, check it is still running with the window title "Endless Adventure", then close it | the shell and its plugins initialise. Not that a turn works | this machine only |
 | the screens | the browser preview (`.claude/launch.json`, `your-story-dev`) and the preview tools | a UI change renders and behaves. Screenshot it before the summary | this machine only |
 | Android APK | `node scripts/build-standalone.mjs`, `npx cap sync android`, then in `android/`: `gradlew.bat assembleDebug` with `JAVA_HOME` = `C:\Program Files\Android\Android Studio\jbr` (JDK 21; the JDK 17 on PATH is too old) and `-Pandroid.injected.signing.store.file=%USERPROFILE%\.android\your-story-debug.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=androiddebugkey -Pandroid.injected.signing.key.password=android` | the APK at `android/app/build/outputs/apk/debug/app-debug.apk`, ~2 min. The shared key (the same one as the `ANDROID_DEBUG_KEYSTORE` secret, never in the repo) lets it install over the last build and keep the player's keys. The SDK is in `%LOCALAPPDATA%\Android\Sdk` (installed 2026-10-24) | this machine only |
 | Android in CI, iOS | `.github/workflows/build-apps.yml` (manual) | the fallback for Android, and the only iOS build (no Mac here). Uses the author's Actions minutes, so it **waits for the author's go** | GitHub only |

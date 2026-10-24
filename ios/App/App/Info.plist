@@ -5,11 +5,11 @@
     <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Your Story uses the microphone for voice input: you speak your action and it is typed for you.</string>
+	<string>Endless Adventure uses the microphone for voice input: you speak your action and it is typed for you.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Your Story</string>
+        <string>Endless Adventure</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

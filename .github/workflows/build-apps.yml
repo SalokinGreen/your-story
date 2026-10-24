@@ -193,5 +193,5 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
-          name: "Your Story ${{ github.ref_name }}"
+          name: "Endless Adventure ${{ github.ref_name }}"
           files: release-assets/*

@@ -24,7 +24,7 @@ export interface SavedFile {
  * On the web and in the Tauri desktop app this clicks a download link on a
  * blob URL, as the app always did. The Capacitor WebViews ignore
  * `<a download>` on a blob URL. On Android the file is saved straight into
- * the public Downloads folder (Downloads/Your Story) through the FileSaver
+ * the public Downloads folder (Downloads/Endless Adventure) through the FileSaver
  * plugin, with no share sheet, and the returned `location` says where. iOS has
  * no Downloads folder, so there the file is written to the app's cache
  * directory and offered through the system share sheet, from which the player

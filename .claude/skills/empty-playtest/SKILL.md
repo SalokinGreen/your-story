@@ -1,6 +1,6 @@
 ---
 name: empty-playtest
-description: Walk player archetypes through the actual current build to find what a system is missing. Use when the ask is "how would players react to this", "poke this system and find out what's missing", "what would a player think of X", or any request for a playtest, player reaction, or UX critique of Your Story. This is the method — do not invent a lighter version of it.
+description: Walk player archetypes through the actual current build to find what a system is missing. Use when the ask is "how would players react to this", "poke this system and find out what's missing", "what would a player think of X", or any request for a playtest, player reaction, or UX critique of Endless Adventure. This is the method — do not invent a lighter version of it.
 ---
 
 # The Empty Playtest

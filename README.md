@@ -1,6 +1,6 @@
-# Your Story
+# Endless Adventure
 
-Your Story is a Next.js 16 + React 19 app for AI-powered, choice-driven storytelling. It now includes a unified Library with search, filter, sort, and folder organization for your stories.
+Endless Adventure is a Next.js 16 + React 19 app for AI-powered, choice-driven storytelling. It now includes a unified Library with search, filter, sort, and folder organization for your stories.
 
 ## Features
 
@@ -13,7 +13,7 @@ Your Story is a Next.js 16 + React 19 app for AI-powered, choice-driven storytel
 
 ## Data Structure
 
-The data structure for Your Story is designed to efficiently manage story elements, user choices, and game state. Below is an overview of the key components:
+The data structure for Endless Adventure is designed to efficiently manage story elements, user choices, and game state. Below is an overview of the key components:
 
 ### Story Elements
 

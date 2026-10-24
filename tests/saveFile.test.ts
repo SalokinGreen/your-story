@@ -34,7 +34,7 @@ beforeEach(() => {
   canShare.mockResolvedValue({ value: true });
   getPlatform.mockReturnValue("web");
   saveToDownloads.mockResolvedValue({
-    path: "Download/Your Story/a.txt",
+    path: "Download/Endless Adventure/a.txt",
   });
 });
 
@@ -51,7 +51,7 @@ describe("saveFile on Android", () => {
       mimeType: "text/plain",
       base64: Buffer.from("héllo", "utf8").toString("base64"),
     });
-    expect(result).toEqual({ location: "Download/Your Story/a.txt" });
+    expect(result).toEqual({ location: "Download/Endless Adventure/a.txt" });
   });
 
   it("saves a Blob as base64", async () => {
