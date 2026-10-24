@@ -50,6 +50,18 @@ import {
 import { type ResolvedTier } from "../misc/reasoningTiers";
 import { useBackHandler } from "@/app/misc/useBackHandler";
 import { PLAYER_TEXT_COLOR } from "../misc/multiplayer/palette";
+import { feedbackAvailable } from "../misc/feedbackClient";
+import { openFeedback } from "../misc/feedbackLauncher";
+import { starterIdFor, turnAttachmentFrom } from "../misc/feedback";
+import {
+  FEEDBACK_STATE_EVENT,
+  afterNightEnabled,
+  readSessionMarker,
+  sessionFeedbackOffer,
+  writeSessionMarker,
+} from "../misc/feedbackSession";
+import { resolveSystem } from "../misc/systems/resolve";
+import SessionFeedbackCard from "./SessionFeedbackCard";
 
 interface StoryProps {
   storyData: StoryData;
@@ -789,6 +801,46 @@ export default function Story({
   const couchPlayers =
     (storyData.multiplayer?.enabled && storyData.multiplayer.couchPlayers) ||
     [];
+  // Feedback (docs/feedback-design.md): the turn's "Feedback" action and the
+  // after-a-night card. Neither exists for an online guest, and the card is
+  // also off in couch, party and online play (a shared screen). The switch and
+  // the markers live in localStorage; a change announces itself on window.
+  const [, setFeedbackTick] = React.useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    window.addEventListener(FEEDBACK_STATE_EVENT, setFeedbackTick as () => void);
+    return () =>
+      window.removeEventListener(FEEDBACK_STATE_EVENT, setFeedbackTick as () => void);
+  }, []);
+  const feedbackOk = feedbackAvailable() && netSession?.role !== "guest";
+  const sessionOffer = storyId
+    ? sessionFeedbackOffer(
+        storyData.scene.parts,
+        {
+          couch: !!storyData.multiplayer?.enabled,
+          party: !!partyTable,
+          online: !!netSession,
+          enabled: afterNightEnabled(),
+          available: feedbackOk,
+        },
+        (n) => readSessionMarker(storyId, n),
+      )
+    : null;
+  const offeredSession = sessionOffer?.session;
+  useEffect(() => {
+    if (storyId && offeredSession !== undefined && readSessionMarker(storyId, offeredSession) === null) {
+      writeSessionMarker(storyId, offeredSession, "offered");
+    }
+  }, [storyId, offeredSession]);
+  // What every feedback entry on this screen knows about the story.
+  const feedbackContext = () => {
+    const { system } = resolveSystem(storyData);
+    return {
+      systemId: system?.id,
+      starterId: starterIdFor(storyData, system) ?? undefined,
+      heading: storyData.story_name || undefined,
+    };
+  };
+
   // Whether the floating voice bubbles are on screen (couch co-op and online
   // play only; solo play has the composer's mic). They hang over the
   // bottom of the feed, so the feed gets room to scroll its last lines (and
@@ -1062,6 +1114,18 @@ export default function Story({
             : "Undo last action"
         }
         onEdit={onEdit && !busy ? () => startEditing(partIndex) : undefined}
+        onFeedback={
+          feedbackOk && turnPart && !turnPart.user
+            ? closeThen(() =>
+                openFeedback({
+                  kind: "turn",
+                  target: `${storyId ?? "story"}:${turnPart.id ?? partIndex}`,
+                  ...feedbackContext(),
+                  turn: turnAttachmentFrom(storyData.scene.parts, partIndex) ?? undefined,
+                }),
+              )
+            : undefined
+        }
         onIllustrate={
           isLatest && canIllustrateLast
             ? closeThen(() => onIllustrate?.(lastPartIndex))
@@ -1243,6 +1307,34 @@ export default function Story({
                     actions={renderTurnActions(exchange.gmMsg.partIndex)}
                   />
                 )}
+                {exchange.gmMsg &&
+                  sessionOffer &&
+                  storyId &&
+                  sessionOffer.partIndex === exchange.gmMsg.partIndex &&
+                  !loading &&
+                  !loadingStage && (
+                    <SessionFeedbackCard
+                      onGive={() =>
+                        openFeedback({
+                          kind: "session",
+                          target: `${storyId}:${sessionOffer.session}`,
+                          ...feedbackContext(),
+                          heading: `Night ${sessionOffer.session}`,
+                          session: sessionOffer.session,
+                          turn:
+                            turnAttachmentFrom(
+                              storyData.scene.parts,
+                              sessionOffer.partIndex,
+                            ) ?? undefined,
+                          onSent: () =>
+                            writeSessionMarker(storyId, sessionOffer.session, "sent"),
+                        })
+                      }
+                      onDismiss={() =>
+                        writeSessionMarker(storyId, sessionOffer.session, "dismissed")
+                      }
+                    />
+                  )}
               </div>
             ))}
 

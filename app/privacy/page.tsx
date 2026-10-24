@@ -88,7 +88,7 @@ export default function PrivacyPolicy() {
           </button>
           <h1 className="text-3xl font-bold text-ys-text mb-2">Privacy Policy</h1>
           <p className="text-ys-muted text-sm">
-            Last updated: October 20, 2026
+            Last updated: October 24, 2026
           </p>
         </div>
 
@@ -100,10 +100,12 @@ export default function PrivacyPolicy() {
             title="Your Privacy Matters"
           >
             <p className="leading-relaxed">
-              Endless Adventure has no accounts and no database of its own. Your
-              stories live on your device, and the app talks to AI services
-              with API keys you bring yourself. This page lists every place
-              your data can go, in plain terms.
+              Endless Adventure has no accounts and no database of your
+              stories. They live on your device, and the app talks to AI
+              services with API keys you bring yourself. The one thing
+              the developer can read is feedback you choose to send (see
+              &ldquo;Feedback You Send&rdquo; below). This page lists every
+              place your data can go, in plain terms.
             </p>
           </Section>
 
@@ -228,6 +230,58 @@ export default function PrivacyPolicy() {
           </Section>
 
           <Section
+            icon="MessageSquare"
+            iconClassName="text-ys-accent"
+            title="Feedback You Send"
+          >
+            <div className="space-y-4">
+              <Point title="Optional, and only when you press Send">
+                The app has places to leave feedback: on a turn, on a built-in
+                system or starter, after a night, and from the menu and
+                Settings. Nothing is sent until you press Send, and you can
+                turn off the after-a-night prompt in Settings.
+              </Point>
+              <Point title="What is sent">
+                Your optional star rating and the text you write, which kind of
+                feedback it is, the built-in system or starter it is about (if
+                any), the app version and platform, and a random id made for
+                this feedback. If you tick &ldquo;Attach this turn&rdquo; it
+                also sends that turn: your line, the turn&apos;s story text as
+                you see it (with anything marked hidden left out), a short
+                summary of its dice rolls, and the model name. You see and can
+                edit the attached text before sending. Nothing else is
+                attached: no other turns, notes, character sheets, memory,
+                settings or keys, and no device id.
+              </Point>
+              <Point title="Who can read it, and for how long">
+                The developer can read it. It is stored in the developer&apos;s
+                Cloudflare database for 180 days and then deleted. Feedback is
+                separate from sync, and is not encrypted the way synced data
+                is.
+              </Point>
+              <Point title="Your IP address">
+                Your IP address reaches Cloudflare with the request. It is used
+                only to limit abuse (how many sends one device can make in a
+                minute) and is not stored with your feedback.
+              </Point>
+              <Point title="Asking for it to be deleted">
+                After a send, the app shows a reference for it. To have that
+                feedback deleted, open an issue on{" "}
+                <a
+                  href={ISSUES_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-ys-text"
+                >
+                  our GitHub
+                </a>{" "}
+                quoting the reference. Issues are public, so don&apos;t put
+                anything else private in one.
+              </Point>
+            </div>
+          </Section>
+
+          <Section
             icon="Users"
             iconClassName="text-ys-accent"
             title="Playing Online"
@@ -322,6 +376,10 @@ export default function PrivacyPolicy() {
               <Summary>We don&apos;t train AI on your stories</Summary>
               <Summary>
                 Sync is optional and encrypted on your device first
+              </Summary>
+              <Summary>
+                The only thing the developer can read is feedback you choose to
+                send; it is kept for 180 days
               </Summary>
               <Summary>
                 Online play shares the whole story, hidden notes included,

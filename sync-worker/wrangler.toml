@@ -7,9 +7,37 @@ compatibility_date = "2025-01-01"
 # Set via `wrangler secret put ALLOWED_ORIGINS` or as a plain var below.
 [vars]
 ALLOWED_ORIGINS = "http://localhost:3000,https://your-story.io,https://www.your-story.io"
+# Feedback kill switch ("false" refuses submissions with 503) and the global
+# daily cap. FEEDBACK_ADMIN_TOKEN is a secret, never put here:
+#   npx wrangler secret put FEEDBACK_ADMIN_TOKEN
+FEEDBACK_ENABLED = "true"
+FEEDBACK_DAILY_CAP = "300"
 
 # Create with: wrangler kv namespace create SYNC_KV
 # then paste the returned id here.
 [[kv_namespaces]]
 binding = "SYNC_KV"
 id = "efacd6096b594b85b2444944f10ff273"
+
+# Feedback (docs/feedback-design.md). Create with:
+#   npx wrangler d1 create endless-adventure-feedback
+# then paste the returned database_id here and apply the migration (README).
+[[d1_databases]]
+binding = "FEEDBACK_DB"
+database_name = "endless-adventure-feedback"
+database_id = "REPLACE_AFTER_wrangler_d1_create"
+migrations_dir = "migrations"
+
+# Burst limit for POST /feedback: 5 per 60 seconds per IP. The `[[ratelimits]]`
+# form is the one wrangler 4 documents (wrangler >= 4.36); `period` can only be
+# 10 or 60, and `namespace_id` is any number unique in the account.
+[[ratelimits]]
+name = "FEEDBACK_RATE_LIMITER"
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
+# Daily retention (feedback older than 180 days is deleted), 03:00 UTC.
+[triggers]
+crons = ["0 3 * * *"]
