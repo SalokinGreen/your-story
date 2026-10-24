@@ -44,6 +44,8 @@ import { CARPATHIANS_NOTE } from "./europe/carpathians";
 import { HIGHLANDS_NOTE } from "./europe/highlands";
 import { ALPS_NOTE } from "./europe/alps";
 import { buildHollowHour } from "./hollowHour";
+import { buildGraveWatcher } from "./starters/grave-watcher";
+import { buildLastResort } from "./starters/last-resort";
 import { KIND_NOTES } from "./kinds";
 import { REVENANT_NOTE } from "./kinds-more/revenant";
 import { REVENANT_PROMPTS_NOTE } from "./kinds-more/revenant-prompts";
@@ -170,6 +172,8 @@ export const BLOOD_AND_BONE: BuiltinSystem = {
   packs: [BLOOD_AND_BONE_RULES_PACK, BLOOD_AND_BONE_EUROPE_PACK],
   starters: [
     buildHollowHour([...RULES_NOTES, ...EUROPE_PACK_NOTES]),
+    buildGraveWatcher(RULES_NOTES),
+    buildLastResort(RULES_NOTES),
   ],
   sheetTemplate: BLOOD_AND_BONE_SHEET_TEMPLATE,
   creationNoteId: "builtin:blood-and-bone:character-creation",

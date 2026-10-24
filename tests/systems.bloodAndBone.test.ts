@@ -54,13 +54,13 @@ const starter = sys.starters[0];
 const core = rules.notes.find((n) => n.title === "B&B — Core rules")!;
 
 describe("the registry", () => {
-  it("holds Blood & Bone, with two packs, one starter, a sheet and meter sets", () => {
+  it("holds Blood & Bone, with two packs, three starters, a sheet and meter sets", () => {
     expect(BUILTIN_SYSTEMS).toContain(sys);
     expect(sys.packs.map((p) => p.id)).toEqual([
       "blood-and-bone:rules",
       "blood-and-bone:europe",
     ]);
-    expect(sys.starters).toHaveLength(1);
+    expect(sys.starters).toHaveLength(3); // The Hollow Hour, and E5's Grave Watcher and The Last Resort
     expect(sys.sheetTemplate).toBe(BLOOD_AND_BONE_SHEET_TEMPLATE);
     expect(sys.meterSets.map((s) => s.name)).toEqual([
       "Blood & Bone character",
