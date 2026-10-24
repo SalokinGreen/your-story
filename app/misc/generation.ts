@@ -33,6 +33,8 @@ import {
   findPartIndexById,
   hashNarration,
   isEmptyLayersDelta,
+  snapshotValue,
+  valueChanged,
 } from "@/app/misc/backgroundPatch";
 import {
   enqueueImageJob,
@@ -1671,7 +1673,8 @@ export async function generateStoryTurn(
     // (the eval harness, the tests) reads.
     const backgroundPartId = result.scenePart.id ?? scenePartId;
     const memoryLengthBefore = storyData.memory?.length ?? 0;
-    const directorAssistantBefore = storyData.directorAssistant;
+    // The Director Assistant mutates its state in place, so compare by value.
+    const directorAssistantBefore = snapshotValue(storyData.directorAssistant);
     const progressCounterBefore = storyData.turnsSinceStoryProgressCheck;
     let progressPartNotes: BackgroundLayersDelta["partNotes"];
 
@@ -1965,7 +1968,7 @@ export async function generateStoryTurn(
       const layersDelta: BackgroundLayersDelta = {
         partId: backgroundPartId,
         newMemory: (storyData.memory ?? []).slice(memoryLengthBefore),
-        ...(storyData.directorAssistant !== directorAssistantBefore && {
+        ...(valueChanged(directorAssistantBefore, storyData.directorAssistant) && {
           directorAssistant: storyData.directorAssistant,
         }),
         ...(storyData.turnsSinceStoryProgressCheck !== progressCounterBefore && {

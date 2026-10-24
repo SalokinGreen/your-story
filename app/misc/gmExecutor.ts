@@ -5,6 +5,7 @@
  * rolling dice, checking items/abilities, and returning results for the story stage.
  */
 
+import { isHiddenFromPlayerNote } from "./noteVisibility";
 import {
   StoryData,
   SceneChallenge,
@@ -1394,7 +1395,13 @@ export async function executeGMTools(
                 } semantically related note${
                   semanticMatches.length === 1 ? "" : "s"
                 }:\n${semanticMatches
-                  .map((m) => `• "${m.key}": ${m.content.slice(0, 200)}`)
+                  .map((m) => {
+                    const excerpt = m.content.slice(0, 200);
+                    const note = modified.lore?.find((l) => l.title === m.key);
+                    return isHiddenFromPlayerNote(note)
+                      ? `• "${m.key}": [[HIDDEN_LORE:${m.key}]]${excerpt}[[/HIDDEN_LORE]]`
+                      : `• "${m.key}": ${excerpt}`;
+                  })
                   .join("\n")}`;
               } else if (semanticOutcome.status === "error") {
                 // A real degradation, not "genuinely nothing relevant" -
@@ -3524,10 +3531,9 @@ function executeReadNotes(
       // everything between these markers before the Narrator stage ever
       // sees it - it literally cannot leak into prose until you call
       // edit_note to flip this entry's visibility to "always_reveal".
-      const isHidden =
-        note.visibility === "hidden" ||
-        note.visibility === "to_be_revealed" ||
-        note.visibility === "check_per_turn";
+      // A secret note is wrapped too, so the player's view of this result
+      // ends its redaction at the marker, not at a guess (turnTimeline.ts).
+      const isHidden = isHiddenFromPlayerNote(note);
       if (isHidden) {
         contextForStory += `\n\n---\n### ${note.title}${typeSuffix} [[HIDDEN_LORE:${note.title}]]\n(HIDDEN FROM PLAYER - do not narrate this content or reveal its existence. To reveal it once the player genuinely discovers it, call edit_note with visibility: "always_reveal".)\n${note.content}[[/HIDDEN_LORE]]`;
       } else {

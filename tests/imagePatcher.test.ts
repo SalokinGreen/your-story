@@ -126,3 +126,42 @@ describe("after the page has gone", () => {
     expect(host.stored).toHaveLength(1);
   });
 });
+
+describe("a background patch that arrives mid-turn (judge-layer review, finding 3)", () => {
+  it("is held, survives the tool batch's write-back, and lands after the turn", async () => {
+    const { createPatchQueue } = await import("@/app/misc/imagePatcher");
+    const { host, patchHost } = page();
+    const queue = createPatchQueue();
+    patchHost.defer = (fn) => {
+      queue.push(patchHost, fn);
+      return true;
+    };
+    const mark = (sd: StoryData): StoryData => ({ ...sd, memory: ["late memory"] });
+    applyStoryPatch(patchHost, mark);
+    // Nothing was written into the live object, so the batch's clone
+    // write-back (Object.assign of a clone made before) cannot undo it.
+    expect(host.live.memory).toBeUndefined();
+    const clone = structuredClone(host.live);
+    Object.assign(host.live, clone);
+    // The turn ends and commits; the queue then applies to the committed state.
+    host.inTurn = false;
+    host.state = { ...host.live };
+    queue.flush();
+    expect(host.state.memory).toEqual(["late memory"]);
+    expect(host.saved).toHaveLength(1);
+  });
+});
+
+describe("page.tsx wiring (source checks; the page cannot be mounted in Vitest)", () => {
+  it("a late patch compares the story on screen, a batch keeps itself while a turn runs, flags toast only when applied", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/story/page.tsx", "utf8");
+    expect(src).toContain("currentStoryIdRef");
+    expect(src).toMatch(/isMounted: \(\) => mountedRef\.current && onScreenStory\(patchStoryId\)/);
+    const batch = src.slice(src.indexOf("function startBatchedTurn"));
+    expect(batch.indexOf("turnInFlightRef.current")).toBeGreaterThan(-1);
+    expect(batch.indexOf("turnInFlightRef.current")).toBeLessThan(batch.indexOf("clearBatch("));
+    expect(batch.indexOf("A turn is still finishing")).toBeLessThan(batch.indexOf("broadcastNetTurnStatus"));
+    expect(src).toMatch(/applyBackgroundFlags\(target, partId, flags\) === target\) return/);
+  });
+});

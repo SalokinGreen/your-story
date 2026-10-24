@@ -246,3 +246,34 @@ forced a different shape from the design, or the design left a call open:
     suite's pure helpers (`observerModeOf`, `countJudgeCalls`) only, not by a
     browser (no preview in the build session; `pending_tests.md` has the
     check).
+
+### 2026-10-24: fixes from the engine review
+
+1. **Late patch on the wrong story.** `page.tsx` keeps `currentStoryIdRef`;
+   `buildPatchHost`'s `isMounted` is now "mounted and still showing the story
+   the closure captured", so a patch for a story the player left goes through
+   `patchStored` (the picture queue gets the same host). A turn that started on
+   a not-yet-saved story (captured id null) is treated as the story on screen.
+2. **`applyBackgroundLayersDelta` skips the whole delta** when its part id is
+   gone, memory and progress counter included. The old test was rewritten.
+3. **Patches during a turn are queued, not written into the live object.**
+   `PatchHost.defer` and `createPatchQueue()` (`imagePatcher.ts`); only the
+   background wave's host defers (pictures keep the in-place path). The queue
+   is flushed from `generateTrackedTurn`'s `finally`, after the turn's final
+   save was awaited, on a `setTimeout(0)` so the turn's commit has reached
+   `storyDataRef`. A queued patch keeps the host (story id) it arrived with.
+4. **`search_notes` and secret notes.** Rather than thread the lore through the
+   timeline and the UI, the executors wrap a hidden or secret note's excerpt in
+   the same `[[HIDDEN_LORE]]` markers `read_notes` uses (`noteVisibility.ts`
+   is the one rule), so `redactForPlayer` blanks it. The GM still sees the text.
+5. **Secret `read_notes` bodies** are now wrapped in the markers too, so the
+   redaction ends at the marker. `SECRET_NOTE_SECTION` stays only for results
+   saved before this change.
+6. **Director spotlight:** `snapshotValue` / `valueChanged` (value compare).
+7. **Online batch:** `startBatchedTurn` checks `turnInFlightRef` before
+   clearing the batch, with the toast "A turn is still finishing".
+8. **Flag toast** only when `applyBackgroundFlags` changes the story on screen.
+
+Tests for the page-level wiring (1, 7, 8) are source checks: the page cannot be
+mounted in Vitest. A browser check of a Save-as jump during a background wave
+is owed.

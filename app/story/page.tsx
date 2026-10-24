@@ -64,7 +64,11 @@ import {
   type ImageJobState,
 } from "../misc/imageJobs";
 import { getImageSettings } from "../misc/imageSettings";
-import { applyStoryPatch, type PatchHost } from "../misc/imagePatcher";
+import {
+  applyStoryPatch,
+  createPatchQueue,
+  type PatchHost,
+} from "../misc/imagePatcher";
 import {
   applyBackgroundFlags,
   applyBackgroundLayersDelta,
@@ -526,6 +530,13 @@ function StoryPageContent() {
   const turnInFlightRef = useRef(false);
   const [turnInFlight, setTurnInFlight] = useState(false);
   const mountedRef = useRef(true);
+  // The id of the story on screen right now. The page stays mounted when the
+  // player jumps to another story, so a closure that captured the id a turn
+  // started with must compare against this before touching on-screen state.
+  const currentStoryIdRef = useRef<string | null>(null);
+  // Background patches that arrived while a turn was in flight; applied after
+  // the turn's final save (imagePatcher.ts, createPatchQueue).
+  const patchQueueRef = useRef(createPatchQueue());
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -619,11 +630,19 @@ function StoryPageContent() {
       turnSaveRef.current = null;
       turnInFlightRef.current = false;
       setTurnInFlight(false);
+      // Late results that arrived mid-turn land now, on the saved story. A
+      // tick later so the turn's own commit has reached storyDataRef.
+      if (patchQueueRef.current.size() > 0) {
+        setTimeout(() => patchQueueRef.current.flush(), 0);
+      }
       endTurnKeepAlive(turnId, outcome, args[0].story_name);
     }
   }
   const [illustrating, setIllustrating] = useState(false);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
+  useEffect(() => {
+    currentStoryIdRef.current = storyDbId;
+  }, [storyDbId]);
   const [sourceAdventureId, setSourceAdventureId] = useState<string | null>(
     null,
   );
@@ -1822,12 +1841,20 @@ function StoryPageContent() {
   // part it names, by id, still exists holding the text it read.
 
   function patchCurrentStory(fn: (sd: StoryData) => StoryData): void {
-    applyStoryPatch(buildPatchHost(), fn);
+    applyStoryPatch(buildPatchHost({ defer: true }), fn);
+  }
+
+  // The story a background result would land on, if it is still the one on
+  // screen (the page can stay mounted while the player is on another story).
+  function backgroundTargetStory(): StoryData | null {
+    if (!mountedRef.current) return null;
+    return turnLiveRef.current ?? storyDataRef.current;
   }
 
   function handleBackgroundObserverRewrite(patch: BackgroundRewritePatch): void {
-    if (!mountedRef.current) {
-      // The page is gone: the stored story takes the patch, if it still fits.
+    if (!mountedRef.current || !onScreenStory(storyDbId)) {
+      // The page is gone, or showing another story: the stored story takes the
+      // patch, if it still fits.
       patchCurrentStory((sd) => applyBackgroundRewrite(sd, patch));
       return;
     }
@@ -1862,7 +1889,10 @@ function StoryPageContent() {
     flags: ObserverFlag[],
     partId: string,
   ): void {
+    const target = onScreenStory(storyDbId) ? backgroundTargetStory() : null;
     patchCurrentStory((sd) => applyBackgroundFlags(sd, partId, flags));
+    // Only tell the player about a turn that still exists on their screen.
+    if (!target || applyBackgroundFlags(target, partId, flags) === target) return;
     addNotification(
       `GM response flagged: ${flags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
       "warning",
@@ -1878,11 +1908,15 @@ function StoryPageContent() {
   // save, or, once this page is gone, into the stored story. Pictures and the
   // background wave's late results (rewrites, flags, memory) share it, so none
   // of them ever republishes or saves an object it captured earlier.
-  function buildPatchHost(): PatchHost {
+  function onScreenStory(storyId: string | null): boolean {
+    return storyId === null || currentStoryIdRef.current === storyId;
+  }
+
+  function buildPatchHost(opts: { defer?: boolean } = {}): PatchHost {
     // Captured now: this closure outlives the page when a story is left while
     // a picture paints or a judge decides.
     const patchStoryId = storyDbId;
-    return {
+    const host: PatchHost = {
       getLive: () => turnLiveRef.current,
       getState: () => storyDataRef.current,
       setState: (next) => {
@@ -1890,7 +1924,13 @@ function StoryPageContent() {
         setStoryData(next);
       },
       save: (next) => saveProgress(next),
-      isMounted: () => mountedRef.current,
+      isMounted: () => mountedRef.current && onScreenStory(patchStoryId),
+      ...(opts.defer && {
+        defer: (fn: (sd: StoryData) => StoryData) => {
+          patchQueueRef.current.push(host, fn);
+          return true;
+        },
+      }),
       patchStored: (patch) => {
         if (!patchStoryId) return;
         void (async () => {
@@ -1912,6 +1952,7 @@ function StoryPageContent() {
         })();
       },
     };
+    return host;
   }
 
   // What the picture queue needs from this page. Pictures settle after the turn
@@ -2183,6 +2224,12 @@ function StoryPageContent() {
   // generate once. Reused by the auto-fire path and the "Start now" override.
   function startBatchedTurn(): void {
     if (netSession?.role !== "host") return;
+    // A turn is still finishing (its save, a late result): keep the batch so
+    // the table's inputs are not lost, and let the host start it again.
+    if (turnInFlightRef.current) {
+      addNotification("A turn is still finishing", "warning");
+      return;
+    }
     const aggregated = aggregateBatch(turnBatchRef.current, expectedSeatIds());
     clearBatch(turnBatchRef.current);
     setTurnLobby(null);

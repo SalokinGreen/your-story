@@ -182,16 +182,16 @@ describe("applyBackgroundLayersDelta", () => {
     expect(next.scene.parts[1].storyProgressNote).toBeUndefined();
   });
 
-  it("drops part notes whose turn is gone but keeps the rest", () => {
+  it("drops the whole delta, memory included, when its turn is gone", () => {
     const story = storyOf([gmPart("b", "B")]);
     const next = applyBackgroundLayersDelta(story, {
       partId: "a",
-      newMemory: [],
+      newMemory: ["Remembered a thing from an undone turn"],
       turnsSinceStoryProgressCheck: 1,
       partNotes: { storyProgressNote: "Pace is fine." },
     });
-    expect(next.turnsSinceStoryProgressCheck).toBe(1);
-    expect(next.scene.parts[0].storyProgressNote).toBeUndefined();
+    expect(next).toBe(story);
+    expect(next.memory ?? []).toHaveLength(0);
   });
 
   it("knows when a delta carries nothing", () => {
@@ -213,5 +213,17 @@ describe("hashNarration / findPartIndexById", () => {
     expect(findPartIndexById(story, "a")).toBe(1);
     expect(findPartIndexById(story, "nope")).toBe(-1);
     expect(findPartIndexById(story, undefined)).toBe(-1);
+  });
+});
+
+describe("value snapshots for in-place state (judge-layer review, finding 6)", () => {
+  it("sees a mutation the object identity hides", async () => {
+    const { snapshotValue, valueChanged } = await import("@/app/misc/backgroundPatch");
+    const director = { spotlight: { a: 1 } } as { spotlight: Record<string, number> };
+    const before = snapshotValue(director);
+    expect(valueChanged(before, director)).toBe(false);
+    director.spotlight.a = 2; // what directorAssistant.ts does, in place
+    expect(valueChanged(before, director)).toBe(true);
+    expect(valueChanged(snapshotValue(undefined), undefined)).toBe(false);
   });
 });

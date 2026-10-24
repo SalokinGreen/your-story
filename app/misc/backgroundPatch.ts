@@ -45,6 +45,16 @@ export function findPartIndexById(
   return (story.scene?.parts ?? []).findIndex((p) => p.id === partId);
 }
 
+/** A value-level snapshot, for state a layer mutates in place. */
+export function snapshotValue(value: unknown): string {
+  return JSON.stringify(value ?? null);
+}
+
+/** True when `current` no longer equals the value `snapshot` was taken of. */
+export function valueChanged(snapshot: string, current: unknown): boolean {
+  return snapshotValue(current) !== snapshot;
+}
+
 function isGmPart(part: ScenePart | undefined): part is ScenePart {
   return Boolean(part && !part.user && part.role === "assistant");
 }
@@ -198,6 +208,8 @@ export function applyBackgroundLayersDelta(
   story: StoryData,
   delta: BackgroundLayersDelta,
 ): StoryData {
+  // A turn that was undone or retried takes its memory with it.
+  if (delta.partId && findPartIndexById(story, delta.partId) < 0) return story;
   let next = story;
   const have = new Set((story.memory ?? []).map(memoryKey));
   const fresh = delta.newMemory.filter((m) => !have.has(memoryKey(m)));

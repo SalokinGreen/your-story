@@ -27,6 +27,13 @@ export interface PatchHost {
   isMounted: () => boolean;
   /** The page is gone: apply the patch to the stored story, if any. */
   patchStored: (fn: (sd: StoryData) => StoryData) => void;
+  /**
+   * Optional. While a turn is in flight, a host that can hold a patch until
+   * the turn has saved takes it here and returns true. The turn's tool batches
+   * work on a clone they assign back, and Stop restores a snapshot, so a patch
+   * written into the live object mid-turn can be lost.
+   */
+  defer?: (fn: (sd: StoryData) => StoryData) => boolean;
 }
 
 /** Makes `target` look like `next` without changing its identity. */
@@ -48,6 +55,7 @@ export function applyStoryPatch(
   }
   const live = host.getLive();
   if (live) {
+    if (host.defer?.(fn)) return;
     const next = fn(live);
     if (next === live) return;
     syncInPlace(live, next);
@@ -60,4 +68,32 @@ export function applyStoryPatch(
   if (next === current) return;
   host.setState(next);
   host.save(next);
+}
+
+/**
+ * Patches held while a turn runs, applied once it has saved. A queued entry
+ * keeps the host it arrived with (so its story id stays the one it was made
+ * for) and is applied as if no turn were live: against the page's committed
+ * state, with a save, or to the stored story if the page has moved on.
+ */
+export function createPatchQueue() {
+  const pending: Array<{
+    host: PatchHost;
+    fn: (sd: StoryData) => StoryData;
+  }> = [];
+  return {
+    push(host: PatchHost, fn: (sd: StoryData) => StoryData): void {
+      pending.push({ host, fn });
+    },
+    size: () => pending.length,
+    flush(): void {
+      const batch = pending.splice(0, pending.length);
+      for (const { host, fn } of batch) {
+        applyStoryPatch(
+          { ...host, getLive: () => null, defer: undefined },
+          fn,
+        );
+      }
+    },
+  };
 }
