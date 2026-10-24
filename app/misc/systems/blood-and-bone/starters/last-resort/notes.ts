@@ -11,9 +11,9 @@ const RUNNING_IT = `# The Last Resort — Running it
 
 A season at the Belhaven, a broke 1920s hotel in Cutler's Bend, left to a family by a relative who died in it. The hotel is full of the dead and something sits in the boiler room. Comedy and horror from the same place: let the dead be funny and the danger be real. A ghost's running bit gets laughs; what the cold does to a living guest does not. Never wink at the horror to rescue a joke, and never kill a joke to prove the horror.
 
-Rhythm. One session is one week. Each week has a booking (roll "Bookings this week"), a problem with the dead ("What the dead did last night", "Room trouble"), and the bills. End the week with end_session. Under the weeks run the seven beats in The Last Resort — The season. Read that note at the start of each week, the residents when a ghost is on stage, the Belhaven when the party moves rooms, Cutler's Bend for townsfolk, The will when a clause matters.
+Rhythm. A booking is a week, but the rules count nights. A week usually holds one or two played nights; call end_session at each dawn played, so the Reckoning, recovery, "used tonight" and once-per-session limits run as written. Each week has a booking (roll "Bookings this week"), a problem with the dead ("What the dead did last night", "Room trouble"), and the bills. Under the weeks run the seven beats in the secret The Last Resort — The season (the public calendar is This season). Read the season at the start of each week, the residents when a ghost is on stage, the Belhaven when the party moves rooms, Cutler's Bend for townsfolk, The will when a clause matters.
 
-The rules, reread. Exposure is as written, and means paying guests noticing: a ghost seen in daylight, a bill that makes no sense, a scream. The town half-knows and does not talk about it, so townsfolk never raise Exposure. Its thresholds read for the hotel: "in the home city" means in the Belhaven, a compromised Haven is a room the guests now avoid, and Burned (6) means the guests know about this one of you: they will not be served by them, and Vacancy +1; nobody has to leave. Heat does not exist here: the world meter is Vacancy (0-6), already in Meters & tracks, so do NOT create the City set. Raise it with manage_meter adjust Vacancy +1 for a refund, a bad review, a guest who flees, an unpaid bill; lower it by 1 for a full house, a wedding that goes well, a review that says "charming". Thresholds: 3 the bank sent a letter, 4 the bank sends a man (Orme), 5 a buyer is circling, 6 the doors close. In the end-of-session reminder, "Heat" means Vacancy. The core's list of oracle tables does not apply; use the Last Resort tables: Bookings this week, Guests, What the dead did last night, Room trouble, Town faces (all 1d20).
+The rules, reread. Exposure works as written, with its thresholds read for the hotel, and means paying guests noticing: a ghost seen in daylight, a bill that makes no sense, a scream. The town half-knows and does not talk about it, so townsfolk never raise Exposure. Its thresholds read for the hotel: "in the home city" means in the Belhaven, a compromised Haven is a room the guests now avoid, and Burned (6) means the guests know about this one of you: they will not be served by them, and Vacancy +1; nobody has to leave. Heat does not exist here: the world meter is Vacancy (0-6), already in Meters & tracks, so do NOT create the City set. Raise it with manage_meter adjust Vacancy +1 for a refund, a bad review, a guest who flees, an unpaid bill; lower it by 1 for a full house, a wedding that goes well, a review that says "charming". Thresholds: 3 the bank sent a letter, 4 the bank sends a man (Orme), 5 a buyer is circling, 6 the doors close. In the end-of-session reminder, "Heat" means Vacancy. The core's list of oracle tables does not apply; use the Last Resort tables: Bookings this week, Guests, What the dead did last night, Room trouble, Town faces (all 1d20).
 
 Fights. The dead are almost never fights. A cold hand in a hallway is Troublesome (one action_roll); Hester at her angriest, or the Colonel when told the date, is Dangerous. The thing in the boiler room is Formidable or higher and is never beaten head on. Do not use start_combat.
 
@@ -21,9 +21,9 @@ The cast. The family is the roster in The Last Resort — The family: Dara (the 
 
 Treat the Masquerade as comedy first: the guests invent explanations ("old building", "clever staging") until one of them does not.
 
-If there is no Campaign Plan note yet, write one before the first week: a medium spine, seven beats, from The Last Resort — The season (read the three secrets first). Then session zero builds the characters (B&B — Character creation, or the five pre-made family members), the setup card is approved, and start_game runs. Open on the lobby, the bell ringing by itself, Mr. Pell at the desk.`;
+If there is no Campaign Plan note yet, write one before the first week: a medium spine, seven beats, from The Last Resort — The season (read the secrets first). Then session zero builds the characters (B&B — Character creation, or the five pre-made family members), the setup card is approved, and start_game runs. Open on the lobby, the bell ringing by itself, Mr. Pell at the desk.`;
 
-const SEASON = `# The Last Resort — The season
+const SEASON = `The Last Resort — The season (the GM's outline; the players have This season)
 
 Dara Alder's great-aunt Winifred ("Winnie") ran the Belhaven for forty-four years and died in it last May. Her will leaves the hotel to Dara on one condition: it stays open to the public through the season, until 31 October. Fail, and it is sold to pay the bank. The family arrives the last Friday of August. The Belhaven needs about four rooms taken every night to break even. A full house is twenty-six.
 
@@ -33,15 +33,23 @@ The season is about nine weeks. Run seven beats, in order, with slack weeks betw
 2. **The full house** (Week 2). A wedding Winnie booked a year ago: two feuding families. The Silver Room is open, and Delphine's party never ended. If the night goes well, Vacancy -1; if the party spills into the lobby, +1.
 3. **Strangers with cameras** (Week 3). A ghost-hunting crew arrives wanting proof. The dead decide to give them a better show than the building can afford. The crew's producer sees something real.
 4. **The room that isn't there** (Week 4). A quiet man in a grey coat asks for the room at the end of the corridor that is on no plans. The register already has a line for it. The boiler goes out for a night. The first cold week.
-5. **The audit** (Week 5). Thaddeus Orme from the bank and a fire inspector come to see the books. Gideon's report goes out. Vacancy hits 4 if nothing is done. The town stops dropping off casseroles.
+5. **The audit** (Week 5). Thaddeus Orme from the bank and a fire inspector come to see the books. Vacancy hits 4 if nothing is done. The town stops dropping off casseroles.
 6. **What Winnie wrote** (Week 6). Winnie hid a letter where only family standing in the lobby at midnight would find it. It opens the question of how she died. The residents split: some want to be freed, some want nothing to change.
 7. **Checkout** (Weeks 7-9). Founders' Weekend, the last full house of the season, and the boiler room. The family must decide what to do with what lives down there: feed it, evict it, let it leave, or something they invent. The ending is whether the doors stay open.
 
-The truths are in the secrets: how Winnie died, what the Boarder is and wants, and what Gideon is hiding. Decide nothing in play that they contradict. Reveal them through people and places, one fact at a time: a witness, a record, a room.
+The truths are in the other secrets: how Winnie died, what the Boarder is and wants, what Gideon is hiding, and the song. Decide nothing in play that they contradict. Reveal them through people and places, one fact at a time: a witness, a record, a room.
 
 Tracks. "Keep the doors open" (the family's Vow, Epic): mark when the fiction earns it, with a full house, a month of solvent books, a bargain with the bank. "Why did they die?" (Formidable): mark on each of the facts learned. The Ghost Seeker's Unquiet Record works on it.
 
 Endings that count: the doors stay open and the dead stay (the hotel is a home for them); the doors stay open and the dead move on (the hotel is a hotel); the doors close and the family leaves with something; the doors close and the family stays. Run what the family earns.`;
+
+const THIS_SEASON = `# The Last Resort — This season
+
+Winifred "Winnie" Alder ran the Belhaven for forty-four years and died in it last May. Her will leaves it to her great-niece Dara on one condition: it stays open to the public until 31 October. Fail, and it is sold to pay the Bend Savings & Loan.
+
+The family arrives the last Friday of August. The loan is $186,000, due in full on 1 November unless the hotel has been open through October. About four rooms a night break even; a full house is twenty-six. The season is about nine weeks, and the last big weekend is Founders' Weekend, at the end of October.
+
+The family's Vow, "Keep the doors open", is the season's track.`;
 
 const BELHAVEN = `# The Last Resort — The Belhaven
 
@@ -65,7 +73,7 @@ Built 1924 by Cornelius Belhaven. Six floors including the basement and the roof
 - 401: Winnie's suite. Her tea is still on the table. The register in her desk is blank for one page.
 - 412 on the plans is the roof door. Room 0 is on no plans (see the secret).
 
-**What is where.** The master keys are in the pigeonholes. The old register is in Winnie's desk. The deed and the lease are in the lobby safe (the combination is Pell's birthday, which he will not give out; he cannot tell a lie, so ask him the right question). The Sunday plate was a covered dish; the Boarder wants a plate.
+**What is where.** The master keys are in the pigeonholes. The old register is in Winnie's desk. The deed and the lease are in the lobby safe (the combination is Pell's birthday, which he will not give out; it is also the date the Room 0 line was written in the register, and he cannot lie about a room, so ask him when Room 0 was entered). The Sunday plate was a covered dish; the Boarder wants a plate.
 
 **Money.** The loan is $186,000 at the Bend Savings & Loan, due in full on 1 November unless the hotel has been open through October, in which case the bank must refinance (the will's lawyer says so; Mr. Orme says otherwise). Costs about $14,000 a month. Average room $120 a night. A bad week loses $2,000; a full house earns $9,000.`;
 
@@ -79,7 +87,7 @@ About forty of the dead are on the books; eight matter. Each is a want, a room, 
 
 **Pip Dunmore**, bellhop, the dumbwaiter and service routes. Died 1938, age nineteen, in the shaft. *Wants* a tip. A real silver dollar, not a promise. *Rule:* he travels only by service routes: dumbwaiter, chutes, back corridors. *Bit:* "I'll take that" and delivers it to the wrong room. President of the Dumbwaiter Society, which has two members.
 
-**Delphine Corvin and the Gala of '58**, the Silver Room. The party that never ended; Delphine sings with a band of nine, a hundred dancers. *Wants* the last number played (the drummer never got to it). *Rule:* a mortal in the ballroom must dance one dance to leave; while the party is on, the room is warm. *Bit:* calls everyone "darling" and takes requests. Winnie asked in writing that one song not be played; the band keeps asking.
+**Delphine Corvin and the Gala of '58**, the Silver Room. The party that never ended; Delphine sings with a band of nine, a hundred dancers. *Wants* the last number played (the drummer never got to it): the song the will names. *Rule:* a mortal in the ballroom must dance one dance to leave; while the party is on, the room is warm. *Bit:* calls everyone "darling" and takes requests. Winnie asked in writing that one song not be played (see the secret The song); the band keeps asking.
 
 **Miss Odile Marrow**, the mirrors. The seamstress and hair-dresser, died 1952. *Wants* to be looked at properly. *Rule:* she appears only in mirrors and can see what is reflected, including behind you; she cannot lie in a glass. *Bit:* a verdict on everyone's posture, hair and shoes; spoils the plot of whoever is behind the next door.
 
@@ -87,9 +95,9 @@ About forty of the dead are on the books; eight matter. Each is a want, a room, 
 
 **Colonel Barnaby Strand**, 301. Died in the bath in 1947 and thinks it is 1947; the hotel is under new, shoddy staff. *Wants* his bill settled ($11.40). *Rule:* a living person cannot tell him he is dead; he goes cold and loud. A ghost he trusts can. *Bit:* he complains about the radio, which plays 1947.
 
-**Hester Quill**, night maid, the laundry, after midnight. Died 1996, never clocked off. *Wants* the hotel clean and the family safe; guards the green door. *Rule:* she appears only between midnight and five, and can lock any door in the building but one. *Bit:* a chocolate and a note on every pillow; the notes are passive-aggressive. She saw Winnie the night she died.
+**Hester Quill**, night maid, the laundry, after midnight. Died 1996, never clocked off. *Wants* the hotel clean and the family safe; guards the green door. *Rule:* she appears only between midnight and five, and can lock any door in the building but one. *Bit:* a chocolate and a note on every pillow; the notes are passive-aggressive.
 
-Playing the dead: they have jobs, habits and opinions, but they are not safe. A ghost who is crossed gets cold: a chill, a breath on the neck, the wrong face in the mirror. Wants can be solved, and the one who is solved goes. Decide with the family whether that is a win.`;
+Playing the dead: they have jobs, habits and opinions, but they are not safe. A ghost who is crossed gets cold: a chill, a breath on the neck, the wrong face in the mirror. Leaving, one rule. Solving a want gives a resident peace, not departure: the cold stops, the bit softens, they are settled. While the Boarder holds the building they cannot go, and it holds every resident on the register (all eight here, and the rest). They go when it is checked out or evicted, or may choose when it is bargained with. Hester's Sunday plate only keeps the Boarder fed; it neither holds nor frees anyone. Winnie is the exception: she died unbound, so her Seeker rule decides when she moves on.`;
 
 const TOWN = `# The Last Resort — Cutler's Bend
 
@@ -99,13 +107,13 @@ Pop. 3,100, in the hills above a bend in the Marlow River. A tannery turned brew
 
 **Town faces (use Town faces).**
 - **Odessa Brill**, mayor, 63. Runs the Founders' Weekend, which is the hotel's last full house. *Wants* it to go smoothly and quietly. Will do almost anything, except mention the hotel's reputation.
-- **Sheriff Amos Fenn**, 58. Writes "natural causes" on everything. *Wants* retirement in March. Knows more about Winnie's death than he wrote.
-- **Dr. Imelda Tuck**, coroner and large-animal vet. Signed Winnie's certificate. *Wants* no one to ask what she saw on the stairs.
+- **Sheriff Amos Fenn**, 58. Writes "natural causes" on everything. *Wants* retirement in March, and no loose ends.
+- **Dr. Imelda Tuck**, coroner and large-animal vet. Signed Winnie's certificate. Brisk, and goes quiet when the service stairs come up. *Wants* to be left out of it.
 - **Thaddeus Orme**, manager of Bend Savings & Loan. Polite, thin, a reader of fine print. *Wants* the loan repaid or the property sold. He is in contact with a buyer.
 - **Marguerite "Mags" Haskell**, Haskell's Hardware. *Wants* her salt account paid. Will deliver anything to the hotel's kitchen door and never come in.
 - **Reverend Lowell Quist**, 70. Will not bury the hotel's dead and will not say why. *Wants* to be asked the right question.
 - **Bernadette "Bernie" Kowalczyk**, Firstlight Bakery. Supplies the hotel breakfast and a running commentary. *Wants* Winnie's last order paid.
-- **Dev Raman**, 17, the diner's line cook. Wren's age; talks to anyone. *Wants* out of Cutler's Bend, and a good story to take with him.
+- **Dev Raman**, 17, the diner's line cook. Talks to anyone. *Wants* out of Cutler's Bend, and a good story to take with him.
 
 How the town helps: a casserole, a tip, a rumour, a ride. How it hurts: a petition, a bad review that says "old building, odd smells", an inspector it let in.
 
@@ -125,7 +133,7 @@ Read in the Belhaven's lobby by Mr. Oswin Teague, Esq., of Teague & Daughter, wh
 
 **4.** To Mr. Ambrose Pell, who held the desk before I was born and has not left it since: his post, for as long as he wants it, and my apology about the card machine.
 
-**5.** The Silver Room is to be left unlocked and the gramophone left alone. If a girl in silver asks for a particular song, I am sorry. Do not play it.
+**5.** The Silver Room is to be left unlocked and the gramophone left alone. If a girl in silver asks for Last Dance at the Belhaven, I am sorry. Do not play it.
 
 **6.** To Mrs. Lucille Grandison, room 214: typewriter ribbons at cost, in perpetuity.
 
@@ -141,25 +149,35 @@ Using it: clause 3 and 8 are the plot; 5 and 9 are the Seeker's hooks; 4, 6 and 
 
 const SECRET_DEATH = `How Winnie died
 
-Natural causes, and not. Winifred Alder died at 11:40 on the night of 14 May, age seventy-four, of heart failure on the service stairs between the boiler room and the kitchen, carrying the Sunday plate back up, uneaten. She had decided the week before to stop feeding the Boarder: the feeding was a bargain made in 1924, and it was what kept the hotel's dead unable to leave. She meant to starve the arrangement open and let them go, one by one, by finishing their business. She was seventy-four, carrying a tray up thirty stairs, and the thing downstairs called her name up the stairwell for an hour and she ran from it. It did not touch her. It does not need to.
+Natural causes, and not. Winifred Alder died at 11:40 on the night of 14 May, age seventy-four, of heart failure on the service stairs between the boiler room and the kitchen, carrying the Sunday plate back up, uneaten. She had decided the week before to stop feeding the Boarder: the feeding was a bargain made in 1924, and it was what kept the hotel's dead unable to leave. She meant to starve the Boarder until it left or showed itself, and settle the dead's business meanwhile, so that they could go when it did. She was seventy-four, carrying a tray up thirty stairs, and the thing downstairs called her name up the stairwell for an hour and she ran from it. It did not touch her. It does not need to.
 
-The facts, each held by someone: (1) she went down at ten with the plate (Pell saw her go, and knows he must not lie); (2) she came back up alone, and Hester heard her counting the stairs aloud; (3) the plate was found cold on the landing and Chef Rooke has kept it in the cold store; (4) Dr. Imelda Tuck saw the coat-hook marks on her sleeve and the burn on her palm and wrote "heart"; (5) she wrote the will clause that week and left a letter under the lobby's third floor-tile; (6) the Boarder called her by a name she had not heard since 1971, her childhood name.
+The facts, each held by someone: (1) she went down at ten with the plate (Pell saw her go; he cannot lie about a room, so asked about the basement he says so, and anything more he tells is his choice); (2) she came back up alone; Hester saw her pass the laundry and heard her counting the stairs aloud; (3) the plate was found cold on the landing and Chef Rooke has kept it in the cold store; (4) Dr. Imelda Tuck saw the coat-hook marks on her sleeve and the burn on her palm and wrote "heart"; (5) she wrote the will clause that week and left a letter under the lobby's third floor-tile; (6) the Boarder called her by a name she had not heard since 1971, her childhood name; (7) Sheriff Fenn was called at midnight, saw the burn and the plate and heard the boiler, and wrote "natural causes" to keep the town out of it; (8) Dr. Tuck, called to the stairs, felt the cold and heard her own name called, and signed "heart" to be done with it, and will not say so.
 
 Her ghost, if one wakes, has no memory of the night. The last fact (6) is the full truth. If she is a Ghost Seeker, count the facts as they are learned, and say when one is left.`;
 
 const SECRET_BOARDER = `What is in the boiler room
 
-The Boarder. In 1924, on the Belhaven's opening night, Cornelius Belhaven signed a guest into Room 0, on no plans, and agreed a rent: one plate each Sunday, and a lodger who would not leave, one every decade, so the hotel never stood empty. The Boarder is not a demon. It is a guest that cannot check out, and it has been paid to stay. It keeps the building warm and the hotel booked in its own way. It is why the dead of the Belhaven cannot leave: unfinished business is its board.
+The Boarder. In 1924, on the Belhaven's opening night, Cornelius Belhaven signed a guest into Room 0, on no plans, and agreed a rent: one plate each Sunday, and a lodger who would not leave, one every decade, so the hotel never stood empty. The weekly plate keeps the existing bindings; only the decade brings a new permanent lodger. The next falls due on the last night of this season. The Boarder is not a demon. It is a guest that cannot check out, and it has been paid to stay. It keeps the building warm and the hotel booked in its own way. It is why the dead of the Belhaven cannot leave: it holds every resident on the register, settled or not. Solving a want brings peace, never departure; only the Boarder going lets them go. Hester's plate only keeps it fed. Winnie died unbound and is not held.
 
 It wants a room, a name on the door, a plate, and to be treated as a paying guest. It has never been treated as one. What it fears: being unseen on the register. It cannot leave without someone with a right to the register checking it out. That is a signature, and it is Dara's now.
 
 Since the funeral Hester has left the plate every Sunday at midnight, because the boiler rattled the first week she did not; the family does not know.
 
-Behaviour. Hungry (plate not left) for a week: the boiler fails and the hotel goes cold. Two weeks: it calls names up the stairwell, and a living guest goes down to answer. Three: it takes a lodger. If fed it is quiet, but one more resident is stuck. Its voice is a polite, patient clerk's, and it sounds like a friend. Presence: a flat, steady heat, damp wool, a coin-counting sound.
+Behaviour. Hungry (plate not left) for a week: the boiler fails and the hotel goes cold. Two weeks: it calls names up the stairwell, and a living guest goes down to answer. Three: it takes a lodger early, a living guest kept, as if the decade had come. If fed it is quiet and the bindings hold; no new one is taken before the decade. Its voice is a polite, patient clerk's, and it sounds like a friend. Presence: a flat, steady heat, damp wool, a coin-counting sound.
 
-Ways out. Feed it (the hotel runs, the dead stay); evict it (needs the founder's lease from the safe, and the register's last page); check it out (sign it out, and then it leaves, and every resident whose business is finished goes with it, and the heat goes); bargain it a room (a real, named room and a real plate, and it becomes a long-stay guest); or destroy the register (the hotel and the dead go too). Do not make the right answer obvious.
+Ways out. Feed it (the hotel runs, the dead stay, no one new is held before the decade); evict it (needs the founder's lease from the safe, and the register's last page); check it out (sign it out, and then it leaves, and every settled resident goes with it, and the heat goes); bargain it a room (a real, named room and a real plate, and it becomes a long-stay guest); or destroy the register (the hotel and the dead go too). Do not make the right answer obvious.
 
 Rank Formidable, and Epic if the register is signed in its favour. It is never fought head on.`;
+
+const SECRET_SONG = `The song
+
+"Last Dance at the Belhaven" was the tune of the opening night in 1924, and Delphine's last number at the Gala of '58, which the drummer never reached. Its last bar is the Boarder's invitation: the one dance it was never given.
+
+Part of it (the gramophone, a few bars, the table's result 13): the Silver Room warms, the boiler answers in time, the dancers lean toward the basement door and every resident in earshot feels pulled toward their old room. Sleepers dream of the corridor. The living in the room take 1 Stress.
+
+All of it: the Boarder comes up to the Silver Room as a guest, visible, for one dance. This is the one time it can be spoken to, bargained with or signed out in person. It will ask a mortal for the dance, and a mortal who dances it is the decade's lodger and cannot leave. If the dance ends unfinished, the party ends too, and Delphine with it. Winnie knew; that is why she wrote the clause.
+
+Delphine does not know. She only wants the last number played.`;
 
 const SECRET_GIDEON = `What Gideon is hiding
 
@@ -270,8 +288,8 @@ A room that has a problem tonight. Pair with a guest. The trouble is a bit, a da
 10. 305: Odile's mirror room. She is showing a guest something true they did not ask to see.
 11. 309: the bed is made again within a minute of being unmade, by an annoyed pair of hands.
 12. 311: the radio plays 1947 and cannot be turned off, unplugged or sold.
-13. 314: the light switch controls something that is not the light.
-14. 320: the window looks out on the hotel as it was in 1924.
+13. 303: the light switch controls something that is not the light.
+14. 307: the window looks out on the hotel as it was in 1924.
 15. 401, Winnie's suite: tea, still warm. A guest has found the page in the register that is blank.
 16. The Silver Room: the chandeliers sway. A guest is dancing alone with somebody.
 17. The lift: it stops at a floor with no number. Doors open on a corridor that smells of wet wool.
@@ -313,8 +331,12 @@ export const LR_NOTES: StoryLore[] = [
   starterNote("The Last Resort — Running it", "dm_instructions", RUNNING_IT, {
     keys: ["Belhaven", "Vacancy", "Last Resort"],
   }),
-  starterNote("The Last Resort — The season", "lore", SEASON, {
-    keys: ["season", "Belhaven", "bank", "Founders' Weekend"],
+  starterNote("The Last Resort — This season", "lore", THIS_SEASON, {
+    keys: ["season", "Belhaven", "bank", "Founders' Weekend", "31 October"],
+  }),
+  starterNote("The Last Resort — The season", "secret", SEASON, {
+    secret: true,
+    keys: ["season", "beats", "Belhaven", "Founders' Weekend"],
   }),
   starterNote("The Last Resort — The Belhaven", "lore", BELHAVEN, {
     keys: ["Belhaven", "hotel", "lobby", "Silver Room", "basement", "boiler"],
@@ -336,6 +358,10 @@ export const LR_NOTES: StoryLore[] = [
   starterNote("The Last Resort — The Boarder", "secret", SECRET_BOARDER, {
     secret: true,
     keys: ["Boarder", "boiler", "Room 0", "Sunday plate", "basement"],
+  }),
+  starterNote("The Last Resort — The song", "secret", SECRET_SONG, {
+    secret: true,
+    keys: ["song", "Last Dance", "Delphine", "gramophone", "Silver Room"],
   }),
   starterNote("The Last Resort — What Gideon is hiding", "secret", SECRET_GIDEON, {
     secret: true,

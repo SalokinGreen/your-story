@@ -69,7 +69,7 @@ ${s.burdens}
 }
 
 const HUNTER_TRIGGERS =
-  "A hunt or a night going wrong; being forced to work with or spare a monster; seeing how close you have come to becoming what you hunt";
+  "A hunt goes wrong; being forced to work with or spare a monster; seeing how close you have come to becoming what you hunt";
 const HUNTER_RECOVER =
   "Steel the Resolve: confide in an ally, return to a place of safety or finish a hunt clean (Heart if leaning on a connection, Wits if on routine)";
 const HUNTER_WEAKNESS =
@@ -188,9 +188,9 @@ const GIDEON = sheet({
   weakness: HUNTER_WEAKNESS,
   xp: "Archetype XP",
   connections:
-    "Fenella, his wife, a field researcher away since June (Steady); Ines Vane at Corbin & Vane Hospitality, who pays his debts (Weak)",
+    "Fenella, his wife, a field researcher away since June (Steady); a lender who settled his debts and writes every month (Weak)",
   burdens:
-    "Indebted: Corbin & Vane Hospitality settled his debts, and he reports to them on the hotel (begins play at Stress 1)",
+    "Indebted, to a lender who expects something in return (begins play at Stress 1)",
   power:
     "The Network 1 (you have contacts in one county who can provide shelter, information or a clean exit; when you Slip Away through them, add +1)",
   pathAbility:
@@ -200,7 +200,7 @@ const GIDEON = sheet({
   before: "A contracts lawyer who left a firm one step ahead of a lawsuit.",
   moment: "Reading the register's last page by flashlight and finding it already signed.",
   whoKnows:
-    "Nobody knows he is reporting to Corbin & Vane. He does not know about the dead. He is learning, and he is fond of the family.",
+    "Nobody knows what he owes. He does not know about the dead. He is learning, and he is fond of the family.",
 });
 
 export const LR_PRESETS: Preset[] = [
@@ -252,7 +252,7 @@ export const LR_PRESETS: Preset[] = [
     icon: "Drama",
     characterSheet: GIDEON,
     authorNotes:
-      "The in-law with a secret: he reports to Corbin & Vane (the secret What Gideon is hiding). Let the player choose when it breaks: Beat 5, the audit, is the natural moment. A Pragmatist who may still be talked into the right thing. Begins at Stress 1 (his Burden's benefit).",
+      "The in-law with a secret: he owes someone, and the debt has a price (the secret What Gideon is hiding). Let the player choose when it breaks: Beat 5, the audit, is the natural moment. A Pragmatist who may still be talked into the right thing. Begins at Stress 1 (his Burden's benefit).",
   },
 ];
 
@@ -268,7 +268,7 @@ The five relatives. Players pick from the pre-made sheets; the ones nobody picks
 
 **Winnie Alder**, 74, dead. *Wants* to know what happened and to see the hotel survive; has no memory of her last night. *Bit:* an old hotelier's gentle command over everyone, living or not. *Played by you:* she wakes by Week 2, confused at the desk, tethered to the question. She asks the questions the table has not. Her death is the secret How Winnie died. *Hand off:* she can be a player at any time; offer her sheet.
 
-**Gideon Marsh**, 44, the in-law. *Wants* to be useful, and to stop being the one who reports. *Bit:* offers to take a call and takes it in the car park. *Played by you:* helpful, charming, observant, slightly too interested in the books. His secret is in the note What Gideon is hiding: do not play it as villainy. *Hand off:* a private moment with a player, a confession.
+**Gideon Marsh**, 44, the in-law. *Wants* to be useful, and to stop owing. *Bit:* offers to take a call and takes it in the car park. *Played by you:* helpful, charming, observant, slightly too interested in the books. His secret is in the note What Gideon is hiding: do not play it as villainy. *Hand off:* a private moment with a player, a confession.
 
 If only one player is at the table, pair them with whichever relative they most want to travel with; the rest of the family is the supporting cast. If two, the others are the same. All five live in the hotel: the family rooms are on the fourth floor.`;
 

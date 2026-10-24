@@ -110,7 +110,7 @@ export const LR_NPCS: NPC[] = [
   npc("hester-quill", {
     name: "Hester Quill",
     description:
-      "Night maid, died 1996 and never clocked off. Appears only between midnight and five, and can lock any door in the building but one. Leaves a chocolate and a passive-aggressive note on every pillow. Guards the green door in the basement. Knew Winnie better than she lets on.",
+      "Night maid, died 1996 and never clocked off. Appears only between midnight and five, and can lock any door in the building but one. Leaves a chocolate and a passive-aggressive note on every pillow. Guards the green door in the basement. Fond of Winnie, and says so only in notes.",
     role: "Night maid (ghost)",
     status: "dead",
     relationship: "Watching to see what you do",
@@ -136,7 +136,7 @@ export const LR_NPCS: NPC[] = [
   npc("amos-fenn", {
     name: "Sheriff Amos Fenn",
     description:
-      "Writes \"natural causes\" on everything. Wants retirement in March. Knows more about Winnie's death than he wrote down, and would rather it stayed that way.",
+      "Writes \"natural causes\" on everything. Wants retirement in March. Wants no loose ends.",
     role: "Sheriff",
     status: "alive",
     relationship: "Would rather you left it",
@@ -149,7 +149,7 @@ export const LR_NPCS: NPC[] = [
   npc("imelda-tuck", {
     name: "Dr. Imelda Tuck",
     description:
-      "Coroner and large-animal vet. Signed Winnie's death certificate. Wants no one to ask what she saw on the stairs.",
+      "Coroner and large-animal vet. Signed Winnie's death certificate. Brisk, and goes quiet when the service stairs come up. Wants to be left out of it.",
     role: "Coroner",
     status: "alive",
     relationship: "Nervous around you",
@@ -214,7 +214,7 @@ export const LR_NPCS: NPC[] = [
   npc("dev-raman", {
     name: "Dev Raman",
     description:
-      "Seventeen, line cook at the Marlow Diner. Wren's age; talks to anyone. Wants out of Cutler's Bend, and a good story to take with him. Sees through Wren in about a minute.",
+      "Seventeen, line cook at the Marlow Diner. Talks to anyone. Wants out of Cutler's Bend, and a good story to take with him. Sees through Wren in about a minute.",
     role: "Line cook",
     status: "alive",
     relationship: "Curious",
