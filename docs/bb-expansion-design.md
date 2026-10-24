@@ -236,6 +236,36 @@ says.
 
 **Not in E1**: cities, Archetypes, Kinds, starters (E2–E5).
 
+## 7c. E4 — the plan (2026-10-24)
+
+The author: "Go on", then picked the Kinds (decision 160): **Revenant,
+Changeling, Doppelgänger, Rusalka**. Branch `claude/bb-kinds`, off master.
+
+- **One Kind note each** (`kinds-more/<kind>.ts`, `B&B — <Kind>`, type
+  `mechanics`, tag "Kind"), in the exact shape of the seven in `kinds.ts`:
+  the Kind (one line), Stress Escalation triggers, Recover Move, Progression
+  Triggers, Weakness; two Archetypes in the existing bullet shape; a
+  ten-step Beast track with First Crack (3), Slipping (6), Last Warning (9)
+  and Control (10); six Kind Powers and two Powers per Archetype, three
+  abilities each. About 1,700–2,100 tokens, under the 2,500 cap.
+- **One creation-prompts table each** (`B&B — Creation prompts: <Kind>`,
+  shaped like the existing seven in `creationPrompts.ts`).
+- **No new meter sets**: the four run on Stress, the Beast meter and Vow
+  tracks; a Kind's special pressure is written as Stress triggers and
+  Beast steps. The balance rules of §7b apply.
+- **The Kind list, once.** A `BLOOD_AND_BONE_KINDS` constant in the system
+  folder; the sheet template's Kind hint, the creation note's Kind line and
+  the core's note index are built from it, and `tests/helpers/tableShape.ts`
+  and the tests read it instead of their own copies.
+- **The per-Kind tables grow**: People's "tell of the Kind" and Feeding's
+  "feeding ground" get a d6 list for each new Kind (the shape check requires
+  every Kind).
+- **Recovery for each** (what "feeding" means): Revenant, advancing its
+  purpose; Changeling, a bargain kept or a mortal's joy taken; Doppelgänger,
+  living a stolen life for a night; Rusalka, drawing a life into the water.
+- Older stories receive the four Kind notes and prompts on load (Rules
+  notes); their held creation note and core still list seven Kinds.
+
 ## 8. Sources for §4.2
 
 The research for this design (2026-10-24) found little hard data on which

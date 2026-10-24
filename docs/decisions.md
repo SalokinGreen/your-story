@@ -228,6 +228,7 @@ The author: "Okay next we need to expand blood and bones by a lot". Blood & Bone
 | 157 | "Tripling is ~70,000+ new words. How do you want to review it?" | **"Sample first, then PRs (Recommended)."** One small sample of each kind of material (a table family, a city, an Archetype) for the author to approve the voice and depth; then each themed PR ships with a readable artifact, read or skimmed before merging. Rejected: read every PR in full; spot-check. |
 | 158 | The expansion design and roadmap (`docs/bb-expansion-design.md`, 2026-10-24) | **"approved"** — start with the E0 samples, then E1 once the samples are approved. |
 | 159 | The E0 samples (`docs/bb-expansion-samples.md`: the People table family, Budapest, the Vampire's Courtier) | **"approved"** — the voice and depth for E1–E3. Build E1. |
+| 160 | "E4 adds new Kinds, each with its own Beast, Stress triggers, Recover Move, weakness, Powers, two Archetypes and creation prompts. Which should they be? (Pick two or three.)" | **All four offered: Revenant, Changeling, Doppelgänger, Rusalka** (the author picked four, past the two or three asked). Revenant: the dead back in their own body for one purpose. Changeling: fae-touched, bound by bargains and iron. Doppelgänger: wears stolen faces and lives. Rusalka: the drowned of rivers and lakes. |
 
 ### Interview — the reading themes reach the whole app (2026-10-23)
 
