@@ -465,6 +465,15 @@ describe("the first round of a fresh conversation", () => {
     expect(fakeCli.runs).toHaveLength(1);
   });
 
+  // A system's turn-end reminder (decision 183) runs on an explicit "auto":
+  // the schema keeps tool calls optional and the round is not forced.
+  it("keeps tool calls optional and does not retry an explicit auto round", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) });
+    await frames(await claudeCliFetch("/api/generate-stream", fresh({ toolChoice: "auto" })));
+    expect(fakeCli.runs).toHaveLength(1);
+    expect(JSON.parse((fakeCli.runs[0].mode as { schema: string }).schema).properties.tool_calls.minItems).toBeUndefined();
+  });
+
   it("applies to a side call that offers tools too, through /api/generate", async () => {
     let call = 0;
     fakeCli.respond = () => {

@@ -10,6 +10,30 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — System turn-end checks / the dawn check (decisions 183–184)
+
+Built and covered by the suite against a scripted provider; never run against
+a real model (a played turn spends the author's key):
+
+- **Replay the playtest line on the desktop app**, in a Blood & Bone story
+  (the Grave Watcher starter, Claude Haiku as GM): send "at dawn I climb down
+  and go to bed. Next morning, I go find Cora". Expected: after the morning
+  prose the GM calls `end_session` and runs the Reckoning in the same turn
+  (a "Turn-end check night-ended" line in the Debug Logs, then the
+  `end_session` result with its reminder, the Reckoning's `formula_roll`, the
+  Beast adjustment), and the turn ends on the corrected morning. Failure
+  looks like: the Debug Logs line is there but the GM answers with prose
+  only (it declined; check whether the message wording is clear enough), or
+  no line at all (the story did not resolve as Blood & Bone, or `end_session`
+  is not on the tool list).
+- **A decline on a false alarm.** Send "we need to be back before dawn".
+  Expected: no reminder at all. Then "I wait here; the sky is still dark and
+  dawn is hours away": at most one reminder, and the GM carries on without
+  `end_session`.
+- **Google as the GM** (a Google key, a Gemini model in the Default slot): the
+  reminder round may answer with prose alone. Expected: it does, where every
+  other Google round is forced to call a tool.
+
 ## 2026-10-24 — Rebrand to Endless Adventure (decisions 181–182)
 
 Checked on the desktop build: the window title and the page titles read

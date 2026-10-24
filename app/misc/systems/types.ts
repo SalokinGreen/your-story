@@ -42,6 +42,29 @@ export interface BuiltinAdventure {
   adventure: Partial<Adventure>; // storyTemplate.lore holds copies of the packs' notes
 }
 
+/**
+ * A check the engine runs when the GM ends a turn on prose (decision 183,
+ * docs/dawn-gate-design.md). The system declares what in the turn's words sets
+ * it off, which tool result settles it and what to say to the GM; the one
+ * evaluator in turnEndChecks.ts and the one gate in generation.ts run every
+ * system's declarations, so a new system adds data, not engine code.
+ */
+export interface SystemTurnEndCheck {
+  id: string; // "night-ended"
+  trigger: {
+    /** Phrases that count in the GM's visible prose and in a player's line. */
+    phrases: RegExp[];
+    /** Phrases that count only in a player's line ("in the morning" is a plan in prose). */
+    playerOnly?: RegExp[];
+    /** Local exclusions: a match inside one of these spans does not count. */
+    exceptions: RegExp[];
+  };
+  /** Satisfied when this turn has an executed result of this tool and type. */
+  satisfiedBy: { toolName: string; resultType: string };
+  /** The message sent back to the GM. Conditional ("may"): the GM can decline. */
+  message: string;
+}
+
 export interface BuiltinSystem {
   id: string;
   title: string;
@@ -57,4 +80,6 @@ export interface BuiltinSystem {
   creationSteps?: CreationStep[];
   meterSets: MeterSet[];
   endOfSessionReminder?: string; // returned by end_session
+  // Checks the engine runs when a turn ends on prose (turnEndChecks.ts).
+  turnEndChecks?: SystemTurnEndCheck[];
 }
