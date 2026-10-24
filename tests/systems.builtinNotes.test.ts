@@ -174,7 +174,9 @@ describe("new built-in notes on load", () => {
     const pushed = pushedBuiltinNotes(sys);
     const pinnedCount = rules.notes.filter((n) => n.type === "dm_instructions").length;
     expect(pinnedCount).toBe(1); // the core
-    expect(pushed.length).toBe(rules.notes.length - pinnedCount + 1);
+    const crossEurope = europe.notes.filter((n) => n.scope === "cross-europe").length;
+    expect(crossEurope).toBe(4); // the overview and E2's three continent notes
+    expect(pushed.length).toBe(rules.notes.length - pinnedCount + crossEurope);
     expect(pushed.every((n) => n.scope === undefined || n.scope === "cross-europe")).toBe(true);
     expect(pushed.some((n) => n.title.endsWith("— London"))).toBe(false);
   });

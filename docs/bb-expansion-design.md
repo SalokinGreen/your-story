@@ -236,6 +236,45 @@ says.
 
 **Not in E1**: cities, Archetypes, Kinds, starters (E2–E5).
 
+## 7a. E2 — the plan (2026-10-24)
+
+The author's go: "Merge, make apk, and then go on" after E1 (#237). E2 is
+content only; E1 built the engine it needs. Branch `claude/bb-europe`, one
+PR. Which cities and regions is the coordinator's call, recorded here; the
+author reads the reading copy before merging (decision 157).
+
+- **Eleven new cities**, each one note in the shape and depth of the
+  approved Budapest sample (atmosphere, who holds it, two local factions, a
+  local threat with its stated truth, three or four places, four or five
+  named people, three hooks; about 1,000–1,400 tokens): Budapest (the sample,
+  as approved), Edinburgh, Dublin, Amsterdam, Stockholm, Lisbon, Marseille,
+  Venice, Naples, Kraków, Bucharest. Scope: the city.
+- **The six existing cities deepened in place** to the same depth, keeping
+  their ids, titles, factions and facts (London's Undersett, Paris's
+  L'Atelier, Prague's Watching Stone, Rome's Curia Umbrae, Berlin's Ninth
+  Ward, Vienna's Salon), adding a second faction, places, people and a third
+  hook. Stories that hold the old text keep it (decision 156).
+- **Three wild places**, scoped by region: the Carpathians, the Scottish
+  Highlands and islands, the Alps and the Black Forest.
+- **Three cross-Europe notes**, scope `cross-europe`, so stories that run
+  Blood & Bone receive them on load: *The Hollow Roads* (the roads as
+  places: waystations, keepers, tolls, the old routes), *Powers of the
+  continent* (how the Concord and the Vigil actually work across borders,
+  plus three or four continent-wide factions), *Who's who* (about fifteen
+  named people who matter across cities).
+- **The overview** gains a short "where to read more" list.
+- **Files**: one file per note under `app/misc/systems/blood-and-bone/europe/`,
+  wired into `EUROPE_NOTES`; the six deepened cities stay in `europe.ts`.
+  Ids `builtin:blood-and-bone:europe-by-night-<slug>`, titles
+  `Europe by Night — <Name>`, `type: "lore"`, `keys` for search.
+- **Checks**: every note ≤ 2,500 tokens; ids unique; scopes set; local
+  factions named once only (no two cities invent the same name); the starter
+  still carries London and the overview, plus the three cross-Europe notes.
+- **Rules carried over from §4.1**: real places as backdrop, invented
+  night-world, no real living person or real organisation made part of the
+  supernatural world (Rome's Curia Umbrae is the author's own and stays as
+  written).
+
 ## 7b. E3 — the plan (2026-10-24)
 
 Under the same go ("go on"), on its own branch `claude/bb-characters`, off
