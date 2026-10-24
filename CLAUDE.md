@@ -679,7 +679,12 @@ report's §11.3. The ones that shape play:
   (People, The night, Places, The Concord and the factions, The Vigil and
   hunters, The Masquerade, Rumours, Feeding and hunger, Hooks, Objects and
   relics, Investigation, The Hollow Roads), one note each with 3–6 sub-tables,
-  and grows the three older oracles from d10 to d20. A sub-table names its die
+  and grows the three older oracles from d10 to d20. E3 adds a third
+  Archetype for every Kind, each in its own note `B&B — <Kind>: The <Archetype>`
+  (`archetypes/`: the Courtier, Pilgrim, Shepherd, Hound, Apostate, Penitent,
+  Seeker) with two Archetype Powers and two more Kind Powers, and five
+  `B&B — More <Assets>` notes (`assets-more/`, six assets each); the creation
+  note, the `archetype` step hint and the sheet say three Archetypes. A sub-table names its die
   in its heading: `(1d6)`, `(1d20)`, `(1d100)`, `(1d6, on the Kind's list)` or
   `(d66: roll ["1d6","1d6"], first die is the tens)`. `tests/helpers/tableShape.ts`
   (`checkTableShape`) checks every table note in the packs against those forms

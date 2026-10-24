@@ -40,7 +40,6 @@ const europe = sys.packs[1];
 const starter = sys.starters[0];
 const template = starter.adventure.storyTemplate!;
 
-
 function loreOf(ids: string[]): StoryLore[] {
   return [...rules.notes, ...europe.notes]
     .filter((n) => ids.includes(n.id))
@@ -159,10 +158,14 @@ describe("the compact note list", () => {
 
   it("costs fewer live-block tokens than one line per note", () => {
     const tokens = enc.encode(liveBlock(starterStory())).length;
-    // The pre-E1 starter was 1,397 (header comment); the starter has grown since (E1's
-    // tables, E2's three continent notes: 1,398), so only the ceiling holds.
-    // Pinned loosely: a growing pack must not bring back a line per note.
-    expect(tokens).toBeLessThan(1450);
+    // The same story with its pack notes unlinked: every note takes its own
+    // "- Title.md" line, which is what the compact list replaced. The pack
+    // grows with each expansion step, so the comparison is relative, not a
+    // fixed ceiling.
+    const unlinked = starterStory();
+    unlinked.lore = unlinked.lore.map((l) => ({ ...l, libraryNoteId: undefined }));
+    const oneLineEach = enc.encode(liveBlock(unlinked)).length;
+    expect(tokens).toBeLessThan(oneLineEach - 150);
   });
 });
 
