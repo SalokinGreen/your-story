@@ -22,7 +22,7 @@ Bought and used as in B&B — Companions. Assets come in three abilities, bought
 
 **THE RAVEN**
 *Wants: something shiny, something dead, and a perch that is not yours.*
-1. A bird that follows you. It watches, carries small things, and wakes you when someone comes.
+1. A bird that follows you. It watches, carries small things, and wakes you when someone comes. Add +1 to Slip Away from a pursuer it warned you of.
 2. Add +1 to Gather Information about a place it can fly over, and it can tell you who is there now.
 3. Once per session, it brings back something it should not have found: a name, a key, a ring still on a finger.
 
@@ -35,7 +35,7 @@ Bought and used as in B&B — Companions. Assets come in three abilities, bought
 **THE BARGE-MASTER**
 *Wants: the barge kept, paid and out of trouble.*
 1. A river hand with a flat boat and a crew. Add +1 to Undertake a Journey by water with them.
-2. They carry anything and answer no questions. Add +1 to move goods, people or a body unseen.
+2. They carry anything and answer no questions. Add +1 to Face Danger moving goods, people or a body unseen.
 3. Once per session, they take you to a place the road does not go.
 
 **THE DEFECTOR**
@@ -46,7 +46,7 @@ Bought and used as in B&B — Companions. Assets come in three abilities, bought
 
 **THE TWIN**
 *Wants: to be the one who was chosen.*
-1. A sibling who shares your face. Add +1 to pass as each other, to mortals and to anyone who has not met both.
+1. A sibling who shares your face. Add +1 to Face Danger to pass as each other, to mortals and to anyone who has not met both.
 2. They live your old life and answer for you. Add +1 to Clean Up.
 3. Once per session, they stand in for you in a place you could not be. Their jealousy comes up before dawn.`,
 };

@@ -16,7 +16,7 @@ Bought and used as in B&B — Paths. Assets come in three abilities, bought in o
 
 **SAILOR**
 1. Add +1 to Undertake a Journey by water, and to Face Danger on a deck, a dock or in a swell.
-2. Every port town has a bar, a boarding house and a bosun who will take a drink with you. You can find passage, rumours and a bed without a reason.
+2. Every port town has a bar, a boarding house and a bosun who will take a drink with you. You can find passage, rumours and a bed without a reason; when you Gather Information in a port or on a ship, add +1.
 3. Once per session, a ship is in port, or a boat is tied up, exactly where you need it to leave by.
 
 **MIDWIFE**
@@ -26,7 +26,7 @@ Bought and used as in B&B — Paths. Assets come in three abilities, bought in o
 
 **SHEPHERD**
 1. Add +1 to Slip Away and Undertake a Journey across open country, mountain or moor, and to read weather and ground.
-2. Animals and dogs are calm around you. Livestock and strays will not give you away.
+2. Animals and dogs are calm around you. Livestock and strays will not give you away. Add +1 to Face Danger when an animal is the danger or the witness.
 3. Once per session, spend a night in the open with no one finding you, no roll required.
 
 **EXILE**
@@ -36,7 +36,7 @@ Bought and used as in B&B — Paths. Assets come in three abilities, bought in o
 
 **WAYFARER**
 1. Add +1 to Steel the Resolve or Resist the Hunger when you are on the road, or in a place of worship.
-2. Any parish, hospice or monastery will take you in for a night, and the people there remember you kindly.
+2. Any parish, hospice or monastery will take you in for a night, and the people there remember you kindly. Recover in one and add +1.
 3. Once per session, walk a long road without sleeping or feeding and arrive unhurt. Stress +1 when you stop.
 
 **BUTCHER**

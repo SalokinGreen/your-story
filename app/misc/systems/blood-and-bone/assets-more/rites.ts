@@ -16,7 +16,7 @@ Bought and used as in B&B — Rites. Assets come in three abilities, bought in o
 
 **THE SALT LINE** — *A line on the floor, and nothing crosses it.*
 1. A night spent laying a line of salt around a room or a yard. Intruders, mortal or supernatural, must Face Danger to cross it.
-2. It holds for a month, and you know when it is broken.
+2. It holds for a month, and you know when it is broken. Add +1 to the first roll you make in answer to a breach.
 3. Once per session, a creature that crosses it is stopped for a scene and cannot cross back.
 *Price: the salt, a night, and Stress +1. The line breaks the moment you cross it yourself.*
 
@@ -28,7 +28,7 @@ Bought and used as in B&B — Rites. Assets come in three abilities, bought in o
 
 **THE TITHE** — *The ground is hungry, and you feed it.*
 1. Give your blood or a living offering to the earth of a place. Add +1 to every roll made there for a week.
-2. The place warns you of anyone who means harm to it.
+2. The place warns you of anyone who means harm to it, and you cannot be ambushed there.
 3. Once per session, the ground acts on your side: roots hold, stones shift, a door sticks.
 *Price: your blood (Stress +1), or a mortal's life. Skip it and the place turns against you.*
 
@@ -46,7 +46,7 @@ Bought and used as in B&B — Rites. Assets come in three abilities, bought in o
 
 **THE KNOTTING** — *A name, a hair, a string, and a curse.*
 1. Bind a small bad luck on someone whose name and hair you hold. Their next roll is at -1.
-2. A hex that lasts a month. They are stalked by small misfortunes.
+2. A hex that lasts a month. They are stalked by small misfortunes: their first roll each scene is at -1.
 3. Once per session, bind them to a single outcome: they lose what they love most, if they keep to their course.
 *Price: it can come back. If the victim finds the knot, it breaks and Exposure +1.*`,
 };
