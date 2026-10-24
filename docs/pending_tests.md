@@ -12,12 +12,10 @@ session cannot do".
 
 ## 2026-10-24 — Europe by Night, deeper (E2)
 
-Content only; the engine paths it uses were tested in E1. Needs a real model:
+Checked in the browser preview: a *Hollow Hour* story from 2026-10-23 gains
+the three continent notes (and E1's twelve tables) on opening, and no new city.
+Needs a real model:
 
-- **The continent notes arrive.** Open a Blood & Bone story made before E2.
-  Expected: its Notes page now lists *Europe by Night — The Hollow Roads*,
-  *Powers of the continent* and *Who's who*, and no new city. Failure looks
-  like: a city note arriving (scope rule broken), or none of the three.
 - **The GM uses a city.** In a story set in London, travel ("I take the night
   train to Edinburgh"). Expected: the GM reads *Europe by Night — Edinburgh*
   if the story holds it, or the overview's "where to read more" list tells it
