@@ -687,7 +687,8 @@ report's §11.3. The ones that shape play:
   so a per-Kind table must list every Kind. Decision 161: every ability of
   every Power gives a mechanical edge (an add, a better outcome, a penalty
   ignored), never a permission alone; the seven original Kinds' Powers were
-  rewritten to it. A sub-table names its die
+  rewritten to it, and decision 162 extends the rule to every asset (Paths, Havens,
+  Companions, Relics, Rites). A sub-table names its die
   in its heading: `(1d6)`, `(1d20)`, `(1d100)`, `(1d6, on the Kind's list)` or
   `(d66: roll ["1d6","1d6"], first die is the tens)`. `tests/helpers/tableShape.ts`
   (`checkTableShape`) checks every table note in the packs against those forms
