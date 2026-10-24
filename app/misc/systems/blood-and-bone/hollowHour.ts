@@ -18,6 +18,15 @@ const STARTED_AT = Date.parse("2026-01-01T00:00:00.000Z");
 
 export const HOLLOW_HOUR_ID = "builtin:blood-and-bone:hollow-hour";
 
+// The Hollow Hour happens in London (the intro's disused Underground station),
+// so it carries London's note and no other city's. Its copy of the packs is
+// every unscoped (rules) note, the cross-Europe setting notes and this city.
+export const HOLLOW_HOUR_CITY = "London";
+
+function inStarter(n: BuiltinNote): boolean {
+  return n.scope === undefined || n.scope === "cross-europe" || n.scope === HOLLOW_HOUR_CITY;
+}
+
 function noteToLore(n: BuiltinNote): StoryLore {
   return {
     title: n.title,
@@ -119,7 +128,7 @@ function heat() {
 
 export function buildHollowHour(packNotes: BuiltinNote[]): BuiltinAdventure {
   const lore: StoryLore[] = [
-    ...packNotes.map(noteToLore),
+    ...packNotes.filter(inStarter).map(noteToLore),
     {
       title: "The Hollow Hour — Running it",
       content: RUNNING_IT,

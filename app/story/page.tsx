@@ -56,6 +56,7 @@ import {
 } from "../misc/reasoningTiers";
 import { migrateCustomTablesToNotes } from "../misc/tableNotes";
 import { ensureStoryDataArrays } from "../misc/storyDataDefaults";
+import { addMissingBuiltinNotes } from "../misc/systems/builtinNotes";
 import {
   enqueueImageJob,
   type ImageJobDeps,
@@ -1430,6 +1431,16 @@ function StoryPageContent() {
       // and a story started from a Designer-made adventure before the fix
       // was saved without the legacy stat-block arrays.
       ensureStoryDataArrays(loadedStoryData);
+
+      // A story that runs a built-in system gains the system's notes added
+      // since it started (Blood & Bone expansion, decision 156). Only adds;
+      // a note the story holds or deleted is left alone.
+      const addedBuiltin = addMissingBuiltinNotes(loadedStoryData);
+      if (addedBuiltin > 0) {
+        logger.info(
+          `[Story Load] Added ${addedBuiltin} built-in note${addedBuiltin === 1 ? "" : "s"} from the story's system`,
+        );
+      }
 
       // A banner never survives a different story.
       setInterruptedTurn(null);

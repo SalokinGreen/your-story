@@ -265,3 +265,52 @@ is a prompt to interpret, not a verdict, is a design choice here.
   with each family note, about 5 tokens each in the compact list.
 - **On-load adding** changes old saves. It only adds, records what it added
   and never re-adds a deleted note.
+
+## Decisions made during implementation
+
+### 2026-10-24 — E1 slice 1 (the engine)
+
+- **The list separator is "; ", not a comma.** A built-in title can hold a
+  comma ("Progress, vows and XP"), so comma-joining would not let the GM
+  rebuild the exact title. The line reads `- B&B rules (read_notes "B&B —
+  <name>", <name> as listed here): Moves; Vampire; …`. The label is the title
+  prefix plus the category ("B&B rules", "B&B tables", "Europe by Night
+  lore"), not a hand-written "Blood & Bone tables".
+- **Every category uses the compact list** (`renderNoteTitleList`, exported
+  from `ai_staged.ts`), not only mechanics, tables and lore. A story-made note
+  keeps its `- Title.md` line. The creation-prompt tables are a separate
+  section ("CHARACTER CREATION PROMPTS") rather than a label inside the tables
+  section.
+- **Live block of The Hollow Hour** (cl100k): 1,397 tokens before, 1,314 with
+  the compact list alone, 1,304 after the slice (the starter now carries 33 pack
+  notes instead of 38). The saving per added family note is the 5 tokens or so
+  the design estimated; the bigger win comes as the pack grows.
+- **`BuiltinNote.scope` marks the setting notes; the Rules pack is unscoped.**
+  `pushedBuiltinNotes(system)` is every note of a pack whose id ends `:rules`
+  plus every note scoped `cross-europe`. The starter filters inside
+  `buildHollowHour` (`HOLLOW_HOUR_CITY = "London"`), so `index.ts` still passes it
+  both packs and needed no change. The Hollow Hour is London in all but name:
+  the premise and intro say "Underground" and never name the city.
+- **On-load adding lives in `app/misc/systems/builtinNotes.ts`** and runs in
+  `setupUIFromStory` (`app/story/page.tsx`) right after `ensureStoryDataArrays`.
+  Online guests (which receive the host's story) and Designer drafts do not go
+  through it. It writes `systemState.builtinNotesOffered` on every story that
+  resolves to a system, even when nothing is added, so a note deleted later is
+  not mistaken for a new one. The Debug Logs line is `logger.info("[Story Load]
+  Added N built-in notes …")`.
+- **A pack note whose title is already taken by a note the story wrote is not
+  added** (two notes with one title cannot both be read), but is recorded as
+  offered. Not in the plan.
+- **An old save without the list** counts the ids it holds as offered, so a
+  note it lacks arrives once; a note it deleted before this release also
+  arrives once, as the plan says.
+- **Table shape check:** `tests/helpers/tableShape.ts` (`checkTableShape`),
+  run over every `type: "table"` note in the packs. Known shapes: the `Roll
+  1dN:` oracle, the `## <name> (<die>)` family note, and the miss tables and
+  creation prompts (which only need to open `Roll 1d6`; their layout has its
+  own tests). Any other table shape fails, so a new layout must be added to the
+  check on purpose. The closing "Use when " check reads the last paragraph, as
+  People wraps its closing line.
+- **Tests:** the new checks for the compact list, on-load adding and the
+  starter are in `tests/systems.builtinNotes.test.ts`; the exact counts in
+  `systems.bloodAndBone.test.ts` became derived or at-least checks.

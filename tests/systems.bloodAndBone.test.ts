@@ -40,6 +40,7 @@ import {
   capPinnedForGM,
 } from "@/app/misc/contextLimits";
 import { call, mockStory, run } from "./helpers/systemsHarness";
+import { checkTableShape } from "./helpers/tableShape";
 
 const enc = getEncoding("cl100k_base");
 const tokens = (s: string) => enc.encode(s).length;
@@ -80,6 +81,19 @@ describe("the registry", () => {
     expect(core.id).toBe("builtin:blood-and-bone:core");
   });
 
+  it("scopes every setting note to the cross-Europe set or one city, and no rules note", () => {
+    for (const n of rules.notes) expect(n.scope, n.title).toBeUndefined();
+    const scopes = europe.notes.map((n) => n.scope);
+    expect(scopes.every((x) => typeof x === "string")).toBe(true);
+    expect(scopes.filter((x) => x === "cross-europe")).toHaveLength(1);
+    expect(europe.notes.find((n) => n.scope === "cross-europe")?.title).toBe(
+      "Europe by Night — Overview",
+    );
+    for (const n of europe.notes.filter((x) => x.scope !== "cross-europe")) {
+      expect(n.title, n.title).toContain(n.scope!);
+    }
+  });
+
   it("keeps titles unique across both packs and the starter", () => {
     const titles = [
       ...allNotes.map((n) => n.title),
@@ -93,7 +107,13 @@ describe("the registry", () => {
       "The truth about Runa",
     ]);
     expect(new Set(allNotes.map((n) => n.title)).size).toBe(allNotes.length);
-    expect(titles.length).toBe(allNotes.length * 2 + 2);
+    // The starter copies the notes it carries (not every city's, E1) plus
+    // its two own notes, so the list is never longer than a copy of both.
+    const carried = (starter.adventure.storyTemplate?.lore ?? []).filter((l) =>
+      allNotes.some((n) => n.title === l.title),
+    );
+    expect(titles.length).toBe(allNotes.length + carried.length + 2);
+    expect(carried.length).toBeLessThanOrEqual(allNotes.length);
   });
 });
 
@@ -102,8 +122,8 @@ describe("budgets (cl100k)", () => {
     expect(tokens(core.content)).toBeLessThanOrEqual(3000);
   });
 
-  it("keeps every mechanics note under 2,500 tokens", () => {
-    for (const n of allNotes.filter((x) => x.type === "mechanics")) {
+  it("keeps every note under 2,500 tokens, so one read_notes never costs more", () => {
+    for (const n of allNotes) {
       expect(tokens(n.content), n.title).toBeLessThanOrEqual(2500);
     }
   });
@@ -284,19 +304,30 @@ describe("the notes follow the decided rules", () => {
     expect(core.content).toMatch(/Feed the Beast \(Stress \+2\)/);
   });
 
-  it("makes every table note a rollable die", () => {
-    for (const n of allNotes.filter((x) => x.type === "table")) {
-      expect(n.content.startsWith("Roll 1d"), n.title).toBe(true);
+  it("gives every table note a die the GM can roll, with every entry present", () => {
+    const tables = allNotes.filter((x) => x.type === "table");
+    expect(tables.length).toBeGreaterThanOrEqual(14);
+    for (const n of tables) {
+      expect(checkTableShape(n.title, n.content), n.title).toEqual([]);
     }
+  });
+
+  it("keeps the three oracles, the miss tables and their moves", () => {
     const oracles = allNotes.filter((n) => n.title.startsWith("B&B — Oracles"));
-    expect(oracles).toHaveLength(3);
+    expect(oracles.map((o) => o.title)).toEqual(
+      expect.arrayContaining([
+        "B&B — Oracles: complication",
+        "B&B — Oracles: scene",
+        "B&B — Oracles: what they want",
+      ]),
+    );
     for (const o of oracles) {
-      expect(o.content.match(/^\d+\. /gm)).toHaveLength(10);
+      expect(o.content.match(/^\d+\. /gm)?.length ?? 0, o.title).toBeGreaterThanOrEqual(10);
     }
     const miss = allNotes.filter((n) => n.title.startsWith("B&B — Miss tables"));
-    expect(miss).toHaveLength(4);
+    expect(miss.length).toBeGreaterThanOrEqual(4);
     const moves = miss.flatMap((n) => n.content.match(/^\*\*.* — miss/gm) ?? []);
-    expect(moves.length).toBe(18);
+    expect(moves.length).toBeGreaterThanOrEqual(18);
   });
 
   it("gives each Kind a creation-prompts table", () => {
@@ -375,9 +406,13 @@ describe("meter sets", () => {
 describe("the starter, The Hollow Hour", () => {
   const template = starter.adventure.storyTemplate!;
 
-  it("carries both packs with their built-in ids, so the system is found", () => {
+  it("carries the rules, the cross-Europe notes and London, so the system is found", () => {
     const linked = (template.lore ?? []).filter((l) => l.libraryNoteId);
-    expect(linked).toHaveLength(allNotes.length);
+    const expected = allNotes.filter(
+      (n) => n.scope === undefined || n.scope === "cross-europe" || n.scope === "London",
+    );
+    expect(linked.map((l) => l.libraryNoteId)).toEqual(expected.map((n) => n.id));
+    expect(linked.length).toBeLessThan(allNotes.length);
     for (const l of linked) expect(getBuiltinNote(l.libraryNoteId!)?.title).toBe(l.title);
     const resolved = resolveSystem({ lore: template.lore!, systemState: template.systemState });
     expect(resolved.system?.id).toBe("blood-and-bone");
