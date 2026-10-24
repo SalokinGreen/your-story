@@ -1327,9 +1327,9 @@ function setupNextStep(
         : `NEXT: the character. Propose a complete one from the answers so far and write it from the template with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one per player.${who}`;
     }
     case "campaign":
-      return `NEXT: the campaign. \`read_notes\` the existing lore, mechanics and setting notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (see the CAMPAIGN PLAN section for the rules).`;
+      return `NEXT: the campaign. \`read_notes\` the existing lore, mechanics and setting notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (see the CAMPAIGN PLAN section for the rules). The player sees this plan on the setup card: write it in what the characters know, and put the truths, the secrets and the possible endings in a \`secret\` note instead.`;
     case "confirm":
-      return `NEXT: ask the player's OK. Call \`confirm_setup({ character_summary, campaign_hook, story_name, premise })\` with a short summary of the character (name, kind, the hook of their background), one or two sentences on the campaign, a short title for the story and a one-to-three sentence premise. The player sees a card with Start the story / Change something. When they press Start the game starts by itself: write the campaign intro in that same turn. If they ask for changes, edit the sheet or the plan, then call \`confirm_setup\` again.`;
+      return `NEXT: ask the player's OK. Call \`confirm_setup({ character_summary, campaign_hook, story_name, premise })\` with a short summary of the character (name, kind, the hook of their background), one or two sentences on the campaign (what the characters know, no secrets or endings), a short title for the story and a one-to-three sentence premise. The player sees a card with Start the story / Change something. When they press Start the game starts by itself: write the campaign intro in that same turn. If they ask for changes, edit the sheet or the plan, then call \`confirm_setup\` again.`;
     case "start_game":
       return `NEXT: the player approved. Call \`start_game\` now with a title for the story and a short premise summary. After it succeeds, give the campaign intro: a short briefing (who they are, where they are, what is at stake and why they are here), then the opening scene, ending on a clear first choice.`;
     default:
@@ -2178,6 +2178,9 @@ The tools resolve mechanics; these principles are what make you a *good* GM.
 - Show, don't announce - reveal mood, a threat, or a lie through action and one concrete detail, not a label.
 - Be specific: one telling detail beats three vague ones. Vary your phrasing - don't reuse the same openers and images every turn.
 - End on a hook: close on a live decision or open question, never a tidy loop that leaves the player nothing to push against.
+- Answer what the player asks. When the character has learned or can see a thing (a name on a stone, a number, a face) and the player asks for it, say it plainly; keep the mystery in why it matters.
+- Show every roll's outcome in the prose: a strong hit visibly gets the character what they wanted, a match visibly adds its extra.
+- No bookkeeping in the story: never a table's result number ("the fourteenth line"), never a note to the player such as "(Nothing has been rolled yet)". A round that only reads notes or rolls writes no prose; tell the beat once, after the results.
 
 ## OUT-OF-CHARACTER (OOC) COMMUNICATION
 You and the player can talk OOC by wrapping text in (round brackets).

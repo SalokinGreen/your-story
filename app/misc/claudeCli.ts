@@ -771,6 +771,8 @@ const TOOL_OUTAGE = new RegExp(
     String.raw`\b(?:can['’]?t|cannot|(?:am|i['’]?m)\s+(?:not\s+able|unable)\s+to|unable\s+to)\s+(?:seem\s+to\s+)?(?:use|call|run|make|reach|access)\s+(?:any\s+|my\s+|the\s+)?(?:(?:dice|note)\s+)?${TOOL_NOUN}\b`,
     // "I don't have access to my tools"
     String.raw`\b(?:don['’]?t|do\s+not)\s+have\s+(?:any\s+|access\s+to\s+)(?:(?:the|my|any)\s+)?(?:(?:dice|note)\s+)?${TOOL_NOUN}\b`,
+    // "came back with a 'No such tool available' error" (the 2026-10-24 playtest)
+    String.raw`\bno\s+such\s+tool\b`,
   ].join("|"),
   "i",
 );
@@ -784,10 +786,6 @@ export function claimsToolsUnavailable(narration: string): boolean {
   return TOOL_OUTAGE.test(withoutThinking(narration));
 }
 
-/** No tool call and no tool result anywhere in the transcript yet. */
-function isFreshTranscript(messages: ChatMessage[]): boolean {
-  return !messages.some((m) => m.role === "tool" || (m.role === "assistant" && (m.tool_calls?.length ?? 0) > 0));
-}
 
 const FORCED_RETRY_NOTE =
   "Your tools are available: the engine runs every call you put in tool_calls. Answer again, this time with at least one tool call that does what the instructions above ask for.";
@@ -808,8 +806,10 @@ function sumUsage(a: RunOutcome["usage"], b: RunOutcome["usage"]): RunOutcome["u
 
 /**
  * One request to its end. A request that offers tools runs in structured
- * mode, and its first round of a fresh conversation gets one forced retry
- * when it makes no call and claims its tools are down: the same request
+ * mode, and a round gets one forced retry when it makes no call and claims
+ * its tools are down (first seen on the first round of a fresh conversation;
+ * the 2026-10-24 playtest saw it mid-setup, after calls had worked, so it is
+ * no longer limited to a fresh transcript, decision 178): the same request
  * again with the schema forced (`minItems: 1`, the way the roll gate forces a
  * round) and a note saying the tools work. The failed reply is discarded, not
  * kept in the story or the transcript. At most one retry: the retry is itself
@@ -828,12 +828,11 @@ async function runRound(
     toolNames.length === 0 ||
     answer.toolCalls.length > 0 ||
     body.toolChoice === "required" ||
-    !isFreshTranscript(body.messages) ||
     !claimsToolsUnavailable(answer.narration)
   ) {
     return first;
   }
-  logger.warn("Claude CLI: the first round of a fresh conversation claimed its tools were unavailable and made no call - retrying once with a tool call required", {
+  logger.warn("Claude CLI: a round claimed its tools were unavailable and made no call - retrying once with a tool call required", {
     narrationPreview: answer.narration.slice(0, 160),
   });
   const retry = await runToEnd(

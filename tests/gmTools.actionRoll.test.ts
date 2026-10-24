@@ -62,6 +62,14 @@ describe("action_roll", () => {
     expect(r.result.contextForStory).toContain("MATCH");
   });
 
+  // The core's rule, not "a complication on a hit" (decision 178).
+  it("says what a match means for each outcome", async () => {
+    const strong = await roll(6, [2, 2], { stat_value: 3 });
+    expect(strong.result.contextForStory).toContain("something memorable goes right");
+    const miss = await roll(1, [9, 9]);
+    expect(miss.result.contextForStory).toContain("roll the miss table twice");
+  });
+
   it("rejects invalid given dice and a missing stat value", async () => {
     const bad = await roll(7, [2, 2]);
     expect(bad.result.success).toBe(false);

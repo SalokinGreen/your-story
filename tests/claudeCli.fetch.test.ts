@@ -437,8 +437,23 @@ describe("the first round of a fresh conversation", () => {
     expect(events[0]).toMatchObject({ type: "content" });
   });
 
-  it("does not retry a tool-less round later in the turn, whatever it says", async () => {
-    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: OOC, tool_calls: [] }) });
+  // The 2026-10-24 playtest: mid-setup, after calls had worked, a round
+  // claimed "No such tool available" and stalled the setup (decision 178).
+  it("retries a later round once too, when it claims its tools are down", async () => {
+    let call = 0;
+    fakeCli.respond = () => {
+      call++;
+      return call === 1
+        ? { lines: fakeCli.structured({ narration: 'Every attempt came back with a "No such tool available" error.', tool_calls: [] }) }
+        : { lines: fakeCli.structured({ narration: "", tool_calls: [{ name: "calculate", arguments: {} }] }) };
+    };
+    const events = await frames(await claudeCliFetch("/api/generate-stream", laterRound()));
+    expect(fakeCli.runs).toHaveLength(2);
+    expect(events.map((e) => e.type)).toEqual(["tool_calls", "done"]);
+  });
+
+  it("does not retry an ordinary tool-less round later in the turn", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: "The door creaks open onto the stair.", tool_calls: [] }) });
     const events = await frames(await claudeCliFetch("/api/generate-stream", laterRound()));
     expect(fakeCli.runs).toHaveLength(1);
     expect(events[0]).toMatchObject({ type: "content" });

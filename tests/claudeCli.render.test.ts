@@ -335,6 +335,7 @@ describe("claimsToolsUnavailable", () => {
     "I can't use my tools in this conversation.",
     "I'm unable to call any tools right now.",
     "The tools seem to be unresponsive.",
+    'Every attempt came back with a "No such tool available" error, so none of it exists.',
   ])("recognises a claim that the tools are down: %s", (text) => {
     expect(claimsToolsUnavailable(text)).toBe(true);
   });
