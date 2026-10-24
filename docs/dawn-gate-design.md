@@ -1,101 +1,195 @@
-# The dawn gate
+# System turn-end checks, and the dawn check as the first one
 
-Status: **design and plan, waiting for the author's approval.** Decisions
-179–180. Found by the 2026-10-24 playtest (`docs/devlog/2026-10-24-playtest.md`,
-Codex finding 3): when the fiction crosses into the next day, the GM (Claude
-Haiku) narrates the morning and never calls `end_session`, so the Reckoning,
-the meter resets, the downtime offer and "clear every used tonight" never
-happen. The rule is in Blood & Bone's pinned core (§5, "The night"); a
-sharper wording in #243 did not change it in the replay.
+Status: **design and plan, revised after Codex's review; waiting for the
+author's approval.** Decisions 179–180 (the dawn gate) and 183 (house systems
+with code support). Found by the 2026-10-24 playtest
+(`docs/devlog/2026-10-24-playtest.md`, Codex finding 3): when the fiction
+crosses into the next day, the GM (Claude Haiku) narrates the morning and never
+calls `end_session`, so the Reckoning, the meter resets, the downtime offer and
+"clear every used tonight" never happen. The rule is in Blood & Bone's pinned
+core (§5, "The night"); sharper wording (#243) did not change it.
 
 ## 1. What the author decided
 
-- **179, a dawn gate**: like the roll gate. After the GM's prose, if the
-  player's line or the GM's own prose this turn crossed into the next day and
-  nothing called `end_session` this turn, the GM is sent back once.
-- **180, the GM may decline**: the gate's message says "if dawn has not
-  actually come, carry on", and it never forces a tool call, so a false alarm
-  costs at most one short extra round.
+- **179, a dawn gate**: after the GM's prose, if the player's line or the GM's
+  own prose this turn crossed into the next day and nothing ended the session
+  this turn, the GM is sent back once.
+- **180, the GM may decline**: the message says to carry on if dawn has not
+  come, and never forces a tool call.
+- **183, house systems with code support**: the author, on reading the first
+  draft: *"I think it's a great idea to make house systems that have proper
+  code support like the dawn gate or action roll. It's open source, so people
+  can just make their own default systems."* So the dawn gate is not a Blood &
+  Bone special case in `generation.ts`: a system **declares** it, and one
+  generic engine piece runs every system's declarations. A second system
+  ("the expedition returned → end_session") must need no change to
+  `generation.ts`.
 
-## 2. When it fires
+## 2. What it promises, honestly
 
-All of these, in the no-tool-call branch of the GM loop
-(`app/misc/generation.ts`, after the plan gate, ~line 3304):
+The first draft promised "the Reckoning before the morning scene". It cannot:
+the round that narrated the morning has already reached the feed, read-aloud
+and online guests when the check runs (`generation.ts` ~2660), and ordinary
+play has no way to hold prose back (only the setup gate does). So the contract
+is a **follow-up reminder**: the morning stays as written, and the GM is asked,
+once, to run dawn now (end the session, the Reckoning, downtime), which comes
+after it in the same turn. If the Reckoning changes something the morning
+already showed, the GM narrates the correction. Holding narration until
+adjudication is a larger change and is not part of this.
 
-1. The story runs a built-in system whose rules have a session end: the
-   resolved system (`resolveSystem(story)`) uses its system tools and has an
-   `endOfSessionReminder` (Blood & Bone does; a story with no system never
-   gates).
-2. Not a session-zero turn (`sessionZeroTurn` false). The setup turn ends on
-   the intro, not on dawn.
-3. No `end_session` call anywhere in this turn's rounds.
-4. The dawn gate has not fired yet this turn (cap **1**,
-   `MAX_DAWN_PROMPTS = 1`).
-5. The text crossed into the day: `crossesDawn(text)` is true for the
-   player's line, or for the turn's accumulated prose (not the GM's
-   `<thinking>`).
+**Coverage**: ordinary GM-loop turns only. A Retry that replays a saved
+conversation, a turn with no choice, and the separate story-continuation call
+can still cross dawn without the check (`generation.ts` ~2058, ~2116, ~3496);
+that is stated, not fixed.
 
-## 3. `crossesDawn`
+## 3. The hook: `turnEndChecks` on a system
 
-A pure function in a new file, `app/misc/dawnGate.ts`: phrases that put the
-story in the next day, matched case-insensitively on word boundaries:
+In `app/misc/systems/types.ts`:
 
-- the day arrives: "at dawn", "dawn breaks / comes / arrives", "first light",
-  "sunrise", "the sun comes up / rises", "daybreak";
-- the next day: "next morning", "the next day", "the following morning",
-  "come morning", "in the morning" (in the player's line only: in prose it is
-  too often a plan);
-- sleep through: "I sleep / go to bed / turn in … until / through / till …",
-  "sleep through the day", "wake up the next", "the night passes".
+```ts
+/** A check the engine runs when the GM ends a turn on prose (decision 183). */
+export interface SystemTurnEndCheck {
+  id: string;                       // "night-ended"
+  /** What in this turn's text sets it off. */
+  trigger: {
+    /** Phrases that count in the GM's visible prose and in a player's line. */
+    phrases: RegExp[];
+    /** Phrases that count only in a player's line ("in the morning" is a plan in prose). */
+    playerOnly?: RegExp[];
+    /** Local exclusions: a match inside one of these spans does not count. */
+    exceptions: RegExp[];
+  };
+  /** Satisfied when this turn has an executed result of this tool and type. */
+  satisfiedBy: { toolName: string; resultType: string };
+  /** The message sent back to the GM, conditional ("may"). */
+  message: string;
+}
 
-Never a match (checked first, and the sentence is skipped): "before dawn",
-"until dawn" with "wait/hold/keep", "hours till dawn", "not yet dawn",
-"dawn is (still) hours away", a dawn in quotation marks in someone's speech
-about another day ("tomorrow at dawn"). A misfire is cheap by decision 180,
-so the list aims to catch the real crossings the playtest showed ("at dawn I
-climb down and go to bed. Next morning…"), not to be exhaustive.
+export interface BuiltinSystem {
+  // ...
+  turnEndChecks?: SystemTurnEndCheck[];
+}
+```
 
-## 4. The message
+Blood & Bone declares one, in `app/misc/systems/blood-and-bone/turnEndChecks.ts`:
 
-Pushed as a user message, the way the roll gate's is (`toolChoice` left
-`auto`, decision 180):
+- `id: "night-ended"`;
+- `phrases`: "at dawn", "dawn breaks/broke/comes/came", "first light",
+  "sunrise", "the sun rises/rose/comes up/came up", "daybreak", "next morning",
+  "the next day", "the following morning", "the night passes/passed",
+  "(I|we|you) (sleep|slept|go to bed|went to bed|turn in) … (until|till|through)",
+  "(I|we|you) wake (up )?(the next|in the morning)", "wait (until|till) dawn";
+- `playerOnly`: "in the morning", "come morning";
+- `exceptions` (span-local, not whole sentences): "before dawn", "hours
+  (till|until|before) dawn", "not yet dawn", "dawn is (still )?(hours|far)
+  away", "tomorrow at dawn", "at dawn tomorrow", a question ("…at dawn?"),
+  "remember(ed)? the next morning";
+- `satisfiedBy: { toolName: "end_session", resultType: "end_session" }`;
+- `message`: "The text may say the night ended this turn. If the shared
+  story really has reached dawn, run dawn now as the rules say: call
+  end_session, then follow the reminder it returns (the Reckoning for every
+  character, downtime, clear what was used tonight), and narrate any change it
+  makes to the morning. If it is not dawn yet, carry on without it."
 
-> Dawn has come in the story (the night ended this turn). Before the day
-> goes on, run dawn as the rules say: call end_session, then the Reckoning for
-> each character, then offer the downtime actions. If dawn has not actually
-> come yet, carry on without it.
+The Reckoning wording lives in Blood & Bone's declaration and its
+`endOfSessionReminder`, never in the engine.
 
-The rejected round's prose stays (as the roll and plan gates leave theirs):
-the next round's text continues after it, so the morning narration is not
-written twice. The turn's text is the GM's prose plus whatever the dawn
-round adds.
+## 4. The engine: one generic evaluator
 
-## 5. Files
+New `app/misc/turnEndChecks.ts`, pure:
 
-- `app/misc/dawnGate.ts` (new): `crossesDawn(text, { playerLine })`,
-  `DAWN_GATE_MESSAGE`, `MAX_DAWN_PROMPTS`. Pure, no imports from the turn.
-- `app/misc/generation.ts`: the check beside the plan gate; a per-turn
-  counter; a Debug Logs line when it fires (the gates log theirs); the
-  `end_session`-called test reads this turn's tool calls the way the roll gate
-  reads `ROLL_OR_ORACLE_TOOL_NAMES`.
-- Tests: `tests/dawnGate.test.ts` (the phrase list both ways: every playtest
-  line that should fire, every "before dawn" that should not) and a turn test
-  in the existing gate tests' style (a fake provider: a prose round crossing
-  dawn, then an `end_session` round; and the same with `end_session` already
-  called, and in session zero, and in a story without a system: no re-prompt).
-- Docs: `CLAUDE.md` (the gates line), the status note in the playtest devlog
-  and `docs/pending_tests.md` (the replay check).
+- `textCrosses(check, { gmProse, playerLines })`: matches `phrases` on the
+  GM's **visible** prose of this turn (`extractVisibleText`, no `<thinking>`,
+  no tool results, no history, not the reminder itself) and `phrases` plus
+  `playerOnly` on **each** player line separately (a party turn's several named
+  lines, `multiplayer/turnBatch.ts`, are tested one by one, so one player's
+  "not yet" cannot hide another's crossing). A match inside an `exceptions`
+  span on the same clause does not count; the rest of the sentence still can
+  ("Before dawn we hide; at sunrise we leave" fires).
+- `pendingCheck(system, turn)`: the first declared check that crossed, is not
+  satisfied (no **executed** result with `result.type === satisfiedBy.resultType`
+  this turn; a failed or refused call does not count) and has not been
+  prompted this turn.
+
+In `app/misc/generation.ts`, in the no-tool-call branch, after the setup, M2
+and plan gates (their order unchanged):
+
+1. Resolve the story's system (`resolveSystem`), honouring
+   `usesSystemTools: false`; no system, or no `turnEndChecks`, does nothing.
+2. Skip a captured session-zero turn (`sessionZeroTurn`, also after
+   `start_game` succeeds that turn) and repetitive output (as M2 and plan do).
+3. Skip unless the check's `satisfiedBy.toolName` is in the offered tool list
+   and at least one more round is left in `maxToolLoops`; if the budget is
+   spent, log "turn-end check <id> could not run: no rounds left" and end the
+   turn.
+4. Otherwise push the check's `message` as a user message, record the id in
+   the turn's prompted set (one prompt per check per turn), set the next
+   round's tool choice to an explicit **`auto`**, log the id and what matched
+   (player line or prose, and the phrase), and continue the loop.
+
+Round budget: every request counts as usual; nothing is refunded. Dawn may
+need several rounds (end_session, the Reckoning rolls, the meter
+adjustments, the prose); if the budget runs out partway, the turn ends there
+as any turn does.
+
+## 5. Provider: an explicit `auto`
+
+`GenerateRequestBody.toolChoice` gains `"auto"` beside `"required"`
+(`providerCall.ts`). Today an unset choice is still sent to Google as
+`"required"` (`providerCall.ts` ~594), so a Google GM could not decline;
+`"auto"` is honoured as auto by every provider, Google included. The other
+gates keep sending `"required"`. On the subscription (`claudeCli.ts`) an
+`"auto"` round keeps the schema's tool list optional (`minItems` unset), and
+the "tools are down" retry does not force a call on a turn-end reminder round
+(it only applies when the model claims an outage, decision 178).
 
 ## 6. What it does not do
 
-- No time-of-day state, no clock: the engine reads words, the GM decides.
-- No change to `end_session` itself or to Blood & Bone's reminder text.
-- No forcing: Claude and Z.ai get `auto` anyway (`providerCall.ts`), and
-  decision 180 keeps it `auto` for every model.
+- No time-of-day state, no clock; it reads this turn's words, and cannot tell
+  two references to the same dawn across turns apart, or count two nights
+  crossed in one turn. Stated, not solved.
+- `end_session` resets the whole story's meters. The message asks whether the
+  **shared** story reached dawn, so one character going to bed does not end
+  everybody's night on its own.
+- No change to `end_session` or to Blood & Bone's reminder text.
+- No other hook yet. Codex's ordering of the next candidates, for later
+  designs: (1) which system tools a system offers and a named, coded roll
+  (`action_roll` today hard-codes d6 against two d10s, the +2 cap and B&B's
+  match wording); meter sets, end-of-session reminders and creation steps
+  already follow the declared pattern and stay as they are.
 
-## 7. Verification
+## 7. Files
+
+- `app/misc/systems/types.ts`: `SystemTurnEndCheck`, `BuiltinSystem.turnEndChecks`.
+- `app/misc/systems/blood-and-bone/turnEndChecks.ts` (new) and its line in
+  `blood-and-bone/index.ts`.
+- `app/misc/turnEndChecks.ts` (new): `textCrosses`, `pendingCheck`.
+- `app/misc/generation.ts`: the evaluator call after the plan gate, the
+  prompted set and the explicit `auto`.
+- `app/misc/providerCall.ts`, `app/misc/claudeCli.ts`: `toolChoice: "auto"`.
+- Docs: `CLAUDE.md` (the gates line and the systems section), the playtest
+  devlog's status note, `docs/pending_tests.md`.
+
+## 8. Tests
+
+- `tests/turnEndChecks.test.ts`: the phrase lists both ways (every playtest
+  line that should fire; "before dawn", "at dawn tomorrow?", "I remember the
+  next morning" that should not; "Before dawn we hide; at sunrise we leave"
+  that should); visible text only; each party line on its own; a second,
+  synthetic system with its own check ("the expedition returned") firing
+  through the same evaluator.
+- A turn test in the gate tests' style (fake provider): prose crossing dawn
+  then an `end_session` round (one reminder, then done); the GM declining (one
+  reminder only); a failed `end_session` (still prompted, once); `end_session`
+  already executed earlier in the turn (no reminder); the last round of the
+  budget (logged, no reminder); after an M2 or plan re-prompt; a session-zero
+  turn that calls `start_game`; a story with no system, and one with the tools
+  off (nothing); the system prompt and tool list byte-identical with and
+  without the reminder; the explicit `auto` reaching Google as `auto`.
+
+## 9. Verification
 
 The suite and `tsc`; the engine-review agent; then on the desktop app, the
-same Grave Watcher line as the playtest ("at dawn I climb down and go to
-bed. Next morning, I go find Cora"): `end_session` is called and the
-Reckoning rolled before the morning scene.
+playtest's Grave Watcher line ("at dawn I climb down and go to bed. Next
+morning, I go find Cora"): after the morning prose, `end_session` is called
+and the Reckoning rolled in the same turn.
