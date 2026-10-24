@@ -10,6 +10,30 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Blood & Bone tables, E1 (decisions 150–159)
+
+Checked in the browser preview: an old *Hollow Hour* story (made before E1)
+gains all twelve new table notes when it opens, and its own notes are
+untouched. Needs a real model and the author's go:
+
+- **The GM finds and rolls a new table.** In a Blood & Bone story, do
+  something that calls for a stranger or a rumour ("I ask around the bar
+  about who's new in town"). Expected: the GM calls `read_notes` on "B&B —
+  People" or "B&B — Rumours" (title rebuilt from the compact list) and rolls
+  the die the heading names. Failure looks like: a "Not found" for a
+  shortened title (the closest-titles line should then fix it next round),
+  or the GM inventing a result without reading the note.
+- **A d66 roll.** Get the GM to roll on a d66 sub-table (the look in People,
+  the city's mood in The night). Expected: `formula_roll` with
+  `["1d6","1d6"]`, and the result read as tens and ones (e.g. 4 and 2 → 42).
+  Failure looks like: a `1d66` call refused with the two-d6 message and the
+  GM not retrying, or a sum (6) used as the key.
+- **Old stories keep their oracles.** In a story made before E1, the three
+  old oracles still read `Roll 1d10:` (held notes are never updated,
+  decision 156); a new story from the starter has them at `Roll 1d20:`.
+- **A new Hollow Hour story** carries London only among the cities (plus the
+  Europe overview); the other five cities stay in the library.
+
 
 ## 2026-10-24 — session zero detail (decision 148)
 

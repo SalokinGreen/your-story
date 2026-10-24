@@ -1,6 +1,8 @@
 # Blood & Bone, expanded — design, roadmap and the first plan
 
-Status: **draft, waiting for the author's approval.** Decisions 150–157.
+Status: **approved (decision 158); E0 samples approved (159); E1 built** on
+`claude/bb-expansion`. Decisions 150–159. Where the build differs, the
+"Decisions made during implementation" sections at the bottom win.
 Builds on [`default-systems-design.md`](default-systems-design.md)
 (decisions 62–89), which made Blood & Bone the first built-in system.
 

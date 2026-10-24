@@ -454,7 +454,7 @@ prompt with nothing per-turn in it; one user message, the stable block
 part after `summarizedThroughIndex`), its last message marked
 `cacheBreakpoint: "prefix"`; then ONE user message, the live block and the
 player's action (`buildLiveBlock`: the character sheet, the campaign plan,
-the note-title lists, memory, NPCs, goals, threads, the oracle line, combat,
+the note-title lists (`renderNoteTitleList`: a built-in pack's notes on one line per category with the shared prefix said once, its creation prompts under their own heading, the story's own notes one line each), memory, NPCs, goals, threads, the oracle line, combat,
 timers, pending events and moves, then the setup blocks, the Observer,
 progress, repetition and knowledge notes, the pacing note and the GM tip),
 marked `"turn"`. `generation.ts` marks the last message of each later round's
@@ -608,8 +608,9 @@ a `character_sheet` note (freeform text — "notes, not stat blocks"), then
 calls tools. **What the GM sees of the notes is decided by `type` and
 `enabled` alone** (`buildGMStagePrompt`): `dm_instructions`,
 `character_sheet` and `gm_plan` notes go in full into every round, never
-truncated, and every other type — `mechanics` included — is listed by title,
-for the GM to open with `read_notes`. Neither `alwaysOn` nor keyword
+truncated, and every other type — `mechanics` included — is listed by title (a
+built-in pack's titles folded into one line per category), for the GM to
+open with `read_notes`. Neither `alwaysOn` nor keyword
 triggers change that (§6.15), and no note has a size cap, so a system's
 core rules belong in a pinned note and the rest in notes read on demand
 (decision 72). **A GM tool lives in up to six places** — its schema
@@ -628,7 +629,11 @@ report's §11.3. The ones that shape play:
   across them, and every die in the call is thrown in one physical toss. It
   supports `stakes` (low/medium/high/deadly), per-outcome `consequences`
   (both branches echoed back, since the engine doesn't know which landed),
-  and the `target`/`forces_choice` hardness dimensions.
+  and the `target`/`forces_choice` hardness dimensions. `parseFormula`
+  (`diceFormula.ts`) reads a bare `dN` as `1dN`; refuses any `d66` (two d6,
+  tens then ones: `["1d6","1d6"]`); refuses `*`, `/`, `×`, `÷`, `^` and `%`
+  with a pointer to `calculate`; ignores words and brackets as labels, so
+  `1d6+2 (Nerve)` rolls as `1d6+2`.
 - `calculate` — math *and comparisons*: `'17+3 >= 15'` comes back TRUE/FALSE.
   The only place a pass/fail verdict is decided, so every check is two steps.
   One comparison per call, and no functions: letters and commas are stripped
@@ -657,10 +662,12 @@ report's §11.3. The ones that shape play:
   d10s, adds capped at +2, score at 10, ties to the dice; `success` is false
   on a miss). Shapes in `structs.ts`, arithmetic in `metersAndTracks.ts`.
 - **Blood & Bone is the first default system** (`app/misc/systems/blood-and-bone/`,
-  decisions 62–89; design `docs/default-systems-design.md`). Two built-in
-  packs (*Rules*: a ≤3,000-token `dm_instructions` core the GM carries every
-  round plus ~30 notes it reads on demand, miss tables and oracles as `table`
-  notes; *Europe by Night*: a setting), the starter *The Hollow Hour*, the
+  decisions 62–89, 150–159; design `docs/default-systems-design.md`,
+  expansion `docs/bb-expansion-design.md`). Two built-in packs (*Rules*, id
+  ending `:rules`: a ≤3,000-token `dm_instructions` core the GM carries every
+  round, the rest read on demand, including the miss tables, oracles and
+  table families as `table` notes; *Europe by Night*, id ending `:europe`: an
+  overview and six cities), the starter *The Hollow Hour*, the
   sheet template and four meter sets (character, Witch, Wendigo, City). The
   text is original, condensed from the author's `docs/blood-and-bone/rulebook.md`
   and credited to the Ironsworn engine under CC BY 4.0. A note keeps its
@@ -668,6 +675,27 @@ report's §11.3. The ones that shape play:
   `resolveSystem` knows a story runs it; `merge_lore` now keeps that id (and
   the sources' shared type and most restrictive visibility), but `delete_note`
   can still remove built-in notes, which turns the tools off in Automatic mode.
+  E1 adds twelve table families in `app/misc/systems/blood-and-bone/oracles/`
+  (People, The night, Places, The Concord and the factions, The Vigil and
+  hunters, The Masquerade, Rumours, Feeding and hunger, Hooks, Objects and
+  relics, Investigation, The Hollow Roads), one note each with 3–6 sub-tables,
+  and grows the three older oracles from d10 to d20. A sub-table names its die
+  in its heading: `(1d6)`, `(1d20)`, `(1d100)`, `(1d6, on the Kind's list)` or
+  `(d66: roll ["1d6","1d6"], first die is the tens)`. `tests/helpers/tableShape.ts`
+  (`checkTableShape`) checks every table note in the packs against those forms
+  and rolls each stated die.
+  On load, `addMissingBuiltinNotes` (`app/misc/systems/builtinNotes.ts`, called
+  from `setupUIFromStory`) adds the Rules notes and the cross-Europe notes a
+  story has not been offered (`systemState.builtinNotesOffered`), for a story
+  that holds the core note and has not switched the system tools off. It never
+  adds a pinned type (`dm_instructions`, `character_sheet`, `gm_plan`), never
+  touches a note the story holds, and never re-adds a note the player deleted.
+  A story started from an adventure or starter is seeded with every id it
+  would be given (`seedBuiltinNotesOffered`). The additions are not saved on
+  load; they persist with the story's next save. A pack note's `scope` is a
+  city's name, or `cross-europe` (only the overview has it so far); the cities
+  are not pushed. `buildHollowHour` copies the Rules pack, the cross-Europe
+  notes and London (`HOLLOW_HOUR_CITY`) only.
   `tests/systems.bloodAndBone.test.ts` holds the token budgets and runs the
   core's recipes against the engine.
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9
@@ -729,7 +757,11 @@ report's §11.3. The ones that shape play:
 - `read_notes` / `search_notes` / `create_note` / `edit_note` / `delete_note`
   and the `edit_lore_*` / `merge_lore` / `duplicate_lore` family — the GM's
   way of reading and updating lore, secrets, the character sheet and the
-  mechanics note.
+  mechanics note. `read_notes` (`gmExecutor.ts`) matches a title loosely: an
+  en dash, em dash or hyphen between spaces is one separator; a built-in
+  note may be asked for by its name after " — " (`"Havens"` for
+  `"B&B — Havens"`) when exactly one has that name; a miss reports up to
+  three closest titles.
 - `search_memory` — durable recall. The GM does not write memory:
   `add_memory` was deleted (decision 128). The Memory Keeper (`memoryAgent.ts`)
   writes the turn memories, and Reflection (`reflection.ts`) appends its
@@ -1301,9 +1333,10 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 193 files and 3,000 tests (2026-10-24, after session zero
-  detail; the file count was checked, the test count is from the implementation
-  log in `docs/session-zero-detail-design.md`, not a run). Earlier: 189 files and 2,933 tests (2026-10-23, after session
+- `tests/` — Vitest, 195 files and 3,032 tests (2026-10-24, after Blood & Bone
+  E1; the counts were run). Earlier: 193 files and 3,000 tests (2026-10-24, after session
+  zero detail; the test count is from the implementation log in
+  `docs/session-zero-detail-design.md`, not a run), 189 files and 2,933 tests (2026-10-23, after session
   zero), largely against `app/misc/`.
   Deterministic tests seed `Math.random`; follow that for new dice and oracle
   tests.
