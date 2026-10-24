@@ -27,9 +27,9 @@ export function buildTextInvite(roomId: RoomId, backend: MPBackend): string {
     MP_BACKEND_OPTIONS.find((option) => option.value === backend)?.label ??
     backend;
   return [
-    "Join my Your Story game!",
+    "Join my Endless Adventure game!",
     `Room code: ${roomId}`,
     `Connection: ${connection}`,
-    'Open Your Story, choose "Join a Game" and enter the code.',
+    'Open Endless Adventure, choose "Join a Game" and enter the code.',
   ].join("\n");
 }

@@ -149,7 +149,7 @@ async function handleOpenRouter(
       headers: {
         Authorization: `Bearer ${openRouterKey}`,
         "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "https://your-story.app",
-        "X-Title": "Your Story - Adventure Cover Generator",
+        "X-Title": "Endless Adventure - Adventure Cover Generator",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

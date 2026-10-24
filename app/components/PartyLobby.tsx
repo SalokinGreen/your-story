@@ -15,10 +15,10 @@ export function explainPartyError(error: PartyError): { title: string; steps: st
   switch (error.code) {
     case "PORT_RESERVED":
       return {
-        title: "Windows has reserved the ports Your Story wanted",
+        title: "Windows has reserved the ports Endless Adventure wanted",
         steps: [
           "Windows sets some ports aside for itself, often for Hyper-V or WSL, and refuses to let apps listen on them (error 10013).",
-          "Try starting again. Your Story tries ten ports in a row, so a reserved block usually clears on its own.",
+          "Try starting again. Endless Adventure tries ten ports in a row, so a reserved block usually clears on its own.",
           "To see what's reserved, run: netsh interface ipv4 show excludedportrange protocol=tcp",
         ],
       };
@@ -35,7 +35,7 @@ export function explainPartyError(error: PartyError): { title: string; steps: st
     case "UNAVAILABLE":
       return {
         title: "Party mode needs the desktop app",
-        steps: ["Phones join through a small server that only the Your Story desktop app runs."],
+        steps: ["Phones join through a small server that only the Endless Adventure desktop app runs."],
       };
     default:
       return { title: "Party mode couldn't start", steps: [error.message] };
@@ -62,7 +62,7 @@ function CantConnectHelp() {
         <li>
           <span className="text-ys-text">The firewall prompt was dismissed.</span> Open Windows
           Security, Firewall &amp; network protection, Allow an app through firewall, and tick
-          Private for Your Story.
+          Private for Endless Adventure.
         </li>
         <li>
           <span className="text-ys-text">The wrong network.</span> If this PC has a VPN or other
@@ -91,7 +91,7 @@ export default function PartyLobby({
   if (!party.available) {
     return (
       <div className="p-4 bg-ys-text/5 rounded-xl border border-ys-border text-sm text-ys-muted">
-        Party mode runs in the Your Story desktop app: the desktop is the table, and phones join it
+        Party mode runs in the Endless Adventure desktop app: the desktop is the table, and phones join it
         over your home Wi-Fi.
       </div>
     );
@@ -186,7 +186,7 @@ export default function PartyLobby({
         <p>
           Starting opens a small server on your home network for as long as the table is open.{" "}
           <span className="text-ys-text">
-            The first time, Windows will ask whether to let Your Story through its firewall. Allow it
+            The first time, Windows will ask whether to let Endless Adventure through its firewall. Allow it
             on Private networks only.
           </span>
         </p>

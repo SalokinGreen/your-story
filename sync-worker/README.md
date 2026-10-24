@@ -1,6 +1,6 @@
 # your-story-sync
 
-Minimal Cloudflare Worker + KV backend for cross-device sync of Your Story's
+Minimal Cloudflare Worker + KV backend for cross-device sync of Endless Adventure's
 local data (stories, adventures, notes, tables, folders, settings). No accounts — the app
 generates a random "sync key" that doubles as the client-side encryption key;
 this worker only ever stores encrypted blobs, keyed by a hash of that key.

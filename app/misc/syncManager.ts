@@ -1,4 +1,4 @@
-// Cross-device sync for Your Story's local-only data (stories, adventures,
+// Cross-device sync for Endless Adventure's local-only data (stories, adventures,
 // folders, settings) against the sync-worker/ Cloudflare Worker. There is no
 // account system - a random "sync key" doubles as both the lookup id
 // (server sees only its SHA-256 hash) and the client-side encryption key, so

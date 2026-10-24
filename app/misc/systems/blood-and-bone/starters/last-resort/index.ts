@@ -73,7 +73,7 @@ export function buildLastResort(packNotes: BuiltinNote[]): BuiltinAdventure {
       "A family inherits a broke 1920s hotel in a small town. It is full of the dead, and something in the boiler room.",
     description:
       "A Blood & Bone campaign starter, comedy-horror. A season at the Belhaven: each week a booking, a problem with the dead, and the bills. Five pre-made relatives, including the one who died and left the hotel (playable as a Ghost), eight residents with a want and a rule apiece, a town that half-knows, and a will that asks you in writing not to feed the basement. Vacancy is the clock; Exposure is the guests noticing.",
-    author: "Your Story",
+    author: "Endless Adventure",
     tags: ["supernatural", "comedy", "horror", "campaign", "Blood & Bone"],
     difficulty: "medium",
     estimatedDuration: "A season (many sessions)",

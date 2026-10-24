@@ -108,10 +108,10 @@ export default function TermsOfService() {
           <Section
             icon="FileText"
             iconClassName="text-ys-accent"
-            title="Welcome to Your Story"
+            title="Welcome to Endless Adventure"
           >
             <p className="leading-relaxed">
-              By using Your Story, you agree to these terms. Your Story runs on
+              By using Endless Adventure, you agree to these terms. Endless Adventure runs on
               your device: there are no accounts, your stories are saved
               locally, and the AI is run by providers you choose, with API keys
               you bring yourself. The core principles are simple: be
@@ -124,7 +124,7 @@ export default function TermsOfService() {
                   className="w-4 h-4 shrink-0 mt-0.5"
                 />
                 <span>
-                  <strong>Alpha Notice:</strong> Your Story is still in alpha,
+                  <strong>Alpha Notice:</strong> Endless Adventure is still in alpha,
                   and these terms will change as the app does. When they
                   change, the date at the top of this page changes too.
                 </span>
@@ -140,7 +140,7 @@ export default function TermsOfService() {
             </h2>
             <div className="space-y-3">
               <p className="text-lg font-medium text-ys-text">
-                You must be at least 18 years old to use Your Story.
+                You must be at least 18 years old to use Endless Adventure.
               </p>
               <p className="text-sm text-ys-muted">
                 The AI can generate mature themes, violence, and other content
@@ -156,7 +156,7 @@ export default function TermsOfService() {
             title="Acceptable Use"
           >
             <div className="space-y-4">
-              <p>When using Your Story, you agree to:</p>
+              <p>When using Endless Adventure, you agree to:</p>
               <div className="grid gap-3">
                 <Point title="Create responsibly">
                   Use the app for creative storytelling and entertainment
@@ -271,7 +271,7 @@ export default function TermsOfService() {
           >
             <div className="space-y-3 text-sm">
               <p>
-                Your Story has no in-app purchases and no credit balance. All AI
+                Endless Adventure has no in-app purchases and no credit balance. All AI
                 generation runs on API keys you supply yourself:
               </p>
               <ul className="space-y-2">
@@ -309,7 +309,7 @@ export default function TermsOfService() {
           >
             <div className="space-y-3 text-sm">
               <p>
-                Your Story runs on your device, so most of it doesn&apos;t
+                Endless Adventure runs on your device, so most of it doesn&apos;t
                 depend on us. Still, as an alpha app:
               </p>
               <ul className="space-y-2 text-ys-muted">
@@ -370,7 +370,7 @@ export default function TermsOfService() {
               TL;DR
             </h2>
             <ul className="space-y-2 text-sm">
-              <Summary>You must be 18 or older to use Your Story</Summary>
+              <Summary>You must be 18 or older to use Endless Adventure</Summary>
               <Summary>
                 Never create content sexualizing minors, not even privately
               </Summary>

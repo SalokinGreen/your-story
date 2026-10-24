@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import PartyController from "./PartyController";
 
 export const metadata: Metadata = {
-  title: "Your Story · table",
+  title: "Endless Adventure · table",
 };
 
 // The phone controller for party mode. The desktop app serves this page to

@@ -150,7 +150,7 @@ describe("notifyPlayerNeeded", () => {
     notifyPlayerNeeded("roll");
     expect(native.notifyAttention).toHaveBeenCalledWith({
       title: "The GM needs a roll from you",
-      body: "Your Story",
+      body: "Endless Adventure",
     });
   });
 

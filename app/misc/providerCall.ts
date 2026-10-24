@@ -713,7 +713,7 @@ function buildHeaders(provider: Provider, apiKey: string): Record<string, string
   };
   if (provider === "openrouter") {
     headers["HTTP-Referer"] = process.env.NEXT_PUBLIC_SITE_URL || "";
-    headers["X-Title"] = "Your Story";
+    headers["X-Title"] = "Endless Adventure";
   }
   return headers;
 }

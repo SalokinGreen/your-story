@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.yourstory.app',
-  appName: 'Your Story',
+  appName: 'Endless Adventure',
   webDir: 'out',
   // Overrides window.fetch/XMLHttpRequest on native to route through
   // native HTTP instead of the WebView's fetch - bypasses CORS the same
