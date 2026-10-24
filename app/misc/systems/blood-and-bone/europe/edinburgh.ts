@@ -15,8 +15,9 @@ export const EDINBURGH_NOTE: BuiltinNote = {
 **Atmosphere:** A city built on a ridge and then built on top of itself. The
 Old Town climbs a volcanic spine from the castle to the palace, its tenements
 ten and twelve storeys high because there was nowhere to go but up. When the
-street level got too foul, the city simply paved over it. The streets that were
-buried are still there, with their doors and their dead.
+street level got too foul, the city built over it, and later buildings kept the
+lower storeys. The closes that survive underneath are still there, with their
+doors and their dead.
 
 The weather does the rest. Haar rolls in off the Forth and swallows the
 spires. Wind funnels down every close. The New Town across the valley is all

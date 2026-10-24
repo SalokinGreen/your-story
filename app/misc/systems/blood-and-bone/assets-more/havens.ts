@@ -15,7 +15,7 @@ Bought and used as in B&B — Havens. Assets come in three abilities, bought in 
 *Ground you hold. Somewhere to retreat, recover, and lose.*
 
 **THE LIGHTHOUSE**
-1. A tall place on a coast or a river mouth. Add +1 to observe the sea, the shore and the road in. Recover there and add +1.
+1. A tall place on a coast or a river mouth. Add +1 to observe the sea, the shore and the road in. Recover there and add +1 to Sate the Beast or Steel the Resolve.
 2. A lamp, a stair and a sea wall. Add +1 to Face Danger defending it.
 3. Once per session, signal to someone far away, or see who is on the water before they see you.
 *Weakness: it is visible for miles. Anyone who looks for you from the water or the hill knows exactly where you are.*
@@ -27,13 +27,13 @@ Bought and used as in B&B — Havens. Assets come in three abilities, bought in 
 *Weakness: the miller's lease. A landlord or a guild can call on it, and the water can be turned away.*
 
 **THE SLEEPER CAR**
-1. A railway carriage kept on a siding or a line you can take. Recover there and add +1; you can sleep through daylight in it.
+1. A railway carriage kept on a siding or a line you can take. Recover there and add +1 to Sate the Beast or Steel the Resolve; you can sleep through daylight in it.
 2. It can be hitched and moved. Add +1 to Slip Away or Undertake a Journey by rail.
 3. Once per session, the carriage is waiting in the next station, no roll required.
 *Weakness: it is on someone else's track. A railway clerk, an inspector or a derailment can ruin you, and every hunter knows the timetable.*
 
 **THE CLOISTER**
-1. A ruined or half-abandoned convent with a garden and a well. Mortals in trouble come to you. Recover there and add +1.
+1. A ruined or half-abandoned convent with a garden and a well. Mortals in trouble come to you. Recover there and add +1 to Sate the Beast or Steel the Resolve.
 2. A walled quiet. Add +1 to Steel the Resolve or Resist the Hunger within its walls.
 3. Once per session, a mortal arrives who needs you, and brings something you need with them.
 *Weakness: it belongs to the Church. A bishop's visit, a pilgrim's complaint or a sale can end your tenancy.*
@@ -45,7 +45,7 @@ Bought and used as in B&B — Havens. Assets come in three abilities, bought in 
 *Weakness: it is a small boat on a moving road. Every landing can be watched, and it can be boarded, sunk or seized for debts.*
 
 **THE BATHHOUSE**
-1. Public baths with steam, hot springs, and a back room. Recover there and add +1; everyone who comes is stripped of their rank.
+1. Public baths with steam, hot springs, and a back room. Recover there and add +1 to Sate the Beast or Steel the Resolve; everyone who comes is stripped of their rank.
 2. Add +1 to Gather Information here. People talk when they are undressed.
 3. Once per session, a rival or an ally, caught unguarded, agrees to speak to you on your terms.
 *Weakness: it has no secrets. Staff, regulars and patrons see everything, so anything you hide there is found sooner or later.*`,

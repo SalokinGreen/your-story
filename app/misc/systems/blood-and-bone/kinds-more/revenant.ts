@@ -31,7 +31,7 @@ The dead who climbed back into their own body for one purpose: vengeance, a prom
 - **Stress Relief:** the target seeing you and understanding; a piece of the target's world falling away; a quiet night in a place the target will never find.
 
 **The Oathkeeper** — *The purpose is a promise to someone, or a debt to the dead.*
-- A strong hit on Sate the Beast by keeping faith with the person you promised, or the memory of them, also removes the "idle dawn" trigger at the next dawn.
+- A strong hit on Sate the Beast by keeping faith with the person you promised, or the memory of them, also means the next idle dawn after that one does not raise Stress; this ends at the dawn after.
 - +1 to any Heart roll made to keep the promise at personal cost.
 - **Archetype XP:** 1 XP for a small kindness to the one you promised; 3 XP for keeping the promise when keeping it was the harder thing; 5 XP for passing the promise on to someone who can carry it.
 - **Alternate XP:** 1 XP for hearing out someone who says the promise should be broken; 3 XP for finding what the one you promised would actually have wanted; 5 XP for being released from it by the one you promised.
@@ -65,17 +65,17 @@ The dead who climbed back into their own body for one purpose: vengeance, a prom
 **DEAD MAN'S PATIENCE**
 1. You do not sleep, tire or need to be fed. When you Face Danger by outlasting something (cold, hunger, a long stakeout), add +1.
 2. When you Secure an Advantage by waiting and watching, add +2.
-3. Once per session, begin a scene exactly where you chose to be, unnoticed, with +1 Advantage on your first roll there.
+3. Once per session, begin a scene exactly where you chose to be, unnoticed, and add +1 to your first action roll there.
 
 **THE FACE AT THE FUNERAL**
 1. People who knew you in life believe the dead can walk less than they believe their own eyes. When you Compel someone who loved you, add +1.
 2. Mortals who see you do not look long. Add +1 to Slip Away from a crowd.
-3. You can leave the mark of the grave on a person you touch: a chill, a smell, an unease that will not lift. Until dawn they take -1 to Compel you and to Slip Away from you. Doing so raises your Stress by 1.
+3. You can leave the mark of the grave on a person you touch: a chill, a smell, an unease that will not lift. Until dawn, add +1 to Compel them and to Slip Away from them, and they cannot Slip Away from you in sight. Doing so raises your Stress by 1.
 
 **GRAVE STRENGTH**
 1. Mundane barriers (doors, bars, a lock) need no roll from you. When you break free of a restraint or a hold, add +1.
 2. When you Face Danger or Secure an Advantage with raw strength, add +1.
-3. Once per fight in a Skirmish, you may reroll one Action Die. Doing so raises your Stress by 1.
+3. Once per fight in a Skirmish, you may reroll only your action die (the core's Reading abilities give the procedure: formula_roll ["1d6"], keep both challenge dice, recompute the score with calculate, before any consequence or record). Doing so raises your Stress by 1.
 
 **THE LAST WORD**
 1. When you Gather Information about someone's account of the dead, add +1, and on a hit you know what they are hiding.

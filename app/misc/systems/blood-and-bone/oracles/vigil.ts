@@ -94,7 +94,7 @@ Five tables for a hunter cell that has the characters' scent. Build the cell wit
 12. They take a hostage who is not a hostage, a volunteer.
 13. They burn something the characters need.
 14. They lay a trap at a place the characters always go.
-15. They go to the Concord and say what they know. Heat +1, if anyone pays attention.
+15. They go to the Concord and say what they know. Heat +1 only if it reaches mortal authorities, the press or the public; otherwise the Concord's attention is a faction consequence.
 16. Two of them follow the characters out of the city.
 17. They offer a Relic, shining, ownerless.
 18. They poison a Companion, a Connection or a dog.

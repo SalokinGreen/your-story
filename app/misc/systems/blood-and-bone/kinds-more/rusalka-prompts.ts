@@ -88,7 +88,7 @@ export const RUSALKA_PROMPTS_NOTE: BuiltinNote = {
 2. A promise that must be kept.
 3. A name, spoken once to the water.
 4. A secret they've never told.
-5. A coin, a ring, a lock of hair.
+5. A coin, a ring or a lock of hair, left on the water as the token of a vow.
 6. The truth about what they came here to forget.
 
 **Willing Tide — Who has swum with you?**

@@ -51,17 +51,17 @@ const INTRO =
 
 const RUNNING_IT = `# The Hollow Hour — Running it
 
-One night, Troublesome to Dangerous. Run it with any Cohort and any mix of Kinds. If there is no Campaign Plan note yet, write one from the four endings below (read the secret first) and call start_game; session zero builds the characters (B&B — Character creation), then play.
+One night, Troublesome to Dangerous. Run it with any Cohort and any mix of Kinds. Session zero runs as usual: build the characters (B&B — Character creation), write the Campaign Plan from the four endings below (read the secret first), then get the player's OK on the setup card (confirm_setup), which starts the game.
 
 The situation. Runa Sandhu (Troublesome, wants to stop being hungry and be told what she is) is a fledgling abandoned six weeks ago; she is feral, fast, untrained and sleeping in the tunnels. Callum Reyes (Dangerous, wants the killing to stop tonight) is a competent Vigil hunter working alone, three tunnels from her, who will listen to a Hunter and not to a monster. Margot Severin (Formidable, wants Heat down and credit for it) is the local authority who gave the order "fix this before Heat hits 4"; she stays offstage unless the Cohort makes her appear. Heat starts at 3; it is the clock: every masquerade breach pushes it toward 4, where Margot becomes an on-screen problem.
 
-How to run it. Open in motion: the Cohort is already in the tunnels or already told to handle it. Make Runa sympathetic before she is dangerous: let them find her nest before they meet her. Callum arrives at the worst moment, ideally while they decide. A fight with Runa should not be a fight; if it becomes one, it is a Rule of 3 against a Troublesome.
+How to run it. Open in motion: the Cohort is already in the tunnels or already told to handle it. Make Runa sympathetic before she is dangerous: let them find her nest before they meet her. Callum arrives at the worst moment, ideally while they decide. A fight with Runa should not be a fight; if it becomes one, use one action roll against her, and a Rule of 3 only if that roll misses.
 
 Tracks. The Cohort's shared Vows are in Meters & tracks: Find Runa before Callum does (Dangerous), Resolve the situation without raising Heat (Dangerous), Identify and locate her maker (Formidable). Mark them when the fiction earns it.
 
 The question has four endings and no clean one:
 1. Kill Runa: fast, clean, Margot is satisfied and Heat drops. Every character who takes part raises Beast by 1.
-2. Teach her: someone takes responsibility for a dependent, dangerous, visible fledgling. They gain a Companion and a permanent Connection; the deaths were still real.
+2. Teach her: someone takes responsibility for a dependent, dangerous, visible fledgling. They gain Runa as a Companion (B&B — Companions, first ability only) and as a Steady Connection that, while she lives, is never removed for neglect (it can still be Burned); the deaths were still real.
 3. Hand her to Callum: neat and deniable, and it means trusting a hunter with a monster. The Vigil learns the Cohort will deal.
 4. Find her maker: the hard option and the only one that solves the real problem. A Formidable thread that turns a night into a campaign.
 

@@ -65,7 +65,7 @@ export const TABLE_NOTES: BuiltinNote[] = [
 **Undertake A Journey — miss**
 1. You're intercepted en route by someone who knew you'd come this way.
 2. The route is closed, collapsed, claimed, or watched. You need another.
-3. You arrive, but far later than you needed to. Something has already happened.
+3. You reach a stop on the way far later than you needed to, or the next leg starts late. Something has already happened.
 4. Supplies, transport, or a companion are lost along the way.
 5. You're followed for the entire journey and only realize at the end.
 6. The journey itself marks you. Take a Condition, or Stress +1.
@@ -163,8 +163,8 @@ Resist the Hunger: a miss uses the Sate the Beast table.
 2. Infection, complication, or rejection. Take a second, related Condition.
 3. Healing requires something you don't have and will have to go get.
 4. Whoever treated you asks a question you can't answer, or wants something.
-5. It heals wrong. The Condition becomes Permanent as a cosmetic or minor lasting mark.
-6. You push through too early and undo the progress entirely. Clear the track.
+5. It heals wrong. The Condition becomes Permanent: a lasting -1 to a named kind of roll, and it keeps its slot, besides the visible mark.
+6. You push through too early and undo the progress entirely. Remove the track and create it again at the same rank, active, with no ticks.
 
 **Fulfil Your Vow — miss**
 1. You were working from a false premise. Someone fed you the wrong thing, deliberately.

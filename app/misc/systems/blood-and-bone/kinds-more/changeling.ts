@@ -54,7 +54,7 @@ Fae-touched: a child swapped in the cradle, or someone who came back from the hi
 
 **GLAMOUR**
 1. When you Compel or Slip Away with a borrowed face or an illusion over you, add +1.
-2. Your glamour holds against close scrutiny: a mortal who looks hard still needs a roll to see through it, and when you Slip Away from someone who has just seen through it, add +1.
+2. Your glamour holds against close scrutiny: when a mortal looks hard at you, add +1 to the roll that keeps the disguise (Face Danger or Compel), and when you Slip Away from someone who has just seen through it, add +1.
 3. You can wear another person's face and voice for a night. Add +2 to Compel as them. Doing so raises your Stress by 1.
 
 **THE FAIR BARGAIN**
@@ -65,7 +65,7 @@ Fae-touched: a child swapped in the cradle, or someone who came back from the hi
 **THE THIN PLACES**
 1. When you Undertake a Journey by hedge, stream or crossroads, add +1.
 2. In a threshold place (a doorway, a stile, a graveyard gate), add +1 to Slip Away.
-3. Once per session, step through a threshold and come out somewhere else in the same city, with a +1 Advantage on your first roll there. Raise your Stress by 1.
+3. Once per session, step through a threshold and come out somewhere else in the same city, and add +1 to your first action roll there. Raise your Stress by 1.
 
 **FAE SIGHT**
 1. When you Gather Information about glamour, illusion or a hidden thing, add +1.
@@ -74,13 +74,13 @@ Fae-touched: a child swapped in the cradle, or someone who came back from the hi
 
 **WILD LUCK**
 1. Once per scene, when you Face Danger by trusting to chance, add +1.
-2. Mundane bad luck passes you by: when you are the target of a misfortune that no one aimed at you, ignore it.
+2. Mundane bad luck passes you by: once per scene, ignore the cost of a weak hit that is only a misfortune no one aimed at you. If you ignore a miss's consequence this way, raise your Stress by 1.
 3. Once per session, turn a miss into a weak hit. The luck is owed; the GM names what it costs later.
 
 **THE SWAPPED TONGUE**
 1. Mortals and animals understand you. When you Compel a child, an animal or a drunk, add +1.
 2. You can mimic any voice you have heard. Add +1 to Compel by voice alone.
-3. You can speak a short phrase that only one listener hears as meant for them. Once per session, that person's next roll against you is at -1.
+3. You can speak a short phrase that only one listener hears as meant for them. Once per session, add +1 to your next roll against that person (+2 if it is a Compel).
 
 ### Swapped Powers
 

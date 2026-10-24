@@ -129,7 +129,8 @@ describe("budgets (cl100k)", () => {
   });
 
   it("keeps every note under 2,500 tokens, so one read_notes never costs more", () => {
-    for (const n of allNotes) {
+    // The core is pinned, never read with read_notes: its own budget is 3,000.
+    for (const n of allNotes.filter((x) => x !== core)) {
       expect(tokens(n.content), n.title).toBeLessThanOrEqual(2500);
     }
   });

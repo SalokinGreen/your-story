@@ -17,7 +17,7 @@ Tools: manage_track create (kind, rank), mark (times), progress_roll (the engine
 
 ## Ranks
 
-Everything difficult in Blood & Bone has a **rank**. Vows, enemies, investigations, journeys, and long projects all use the same five-step ladder, and rank means the same thing everywhere: how much work it takes to get through.
+Vows, enemies, investigations, journeys and long projects share one five-step ladder of **rank**: how much work it takes to get through.
 
 | Rank | What It Means | Progress Per Mark |
 |---|---|---|
@@ -33,7 +33,7 @@ A progress track is **ten boxes**, each divided into **four ticks** — forty ti
 
 When you make meaningful progress toward a ranked objective, you **mark progress**: fill in the amount listed above for that rank. Four ticks fill a box.
 
-You mark progress when the fiction earns it — not on a schedule. Defeating a lieutenant, uncovering a crucial name, surviving a journey leg, completing a ritual step. The GM decides when progress is earned; the rank decides how much.
+Mark progress when the fiction earns it: defeating a lieutenant, uncovering a crucial name, surviving a journey leg, completing a ritual step.
 
 **Marking progress on a miss.** You never mark progress on a miss. A miss means the obstacle held.
 
@@ -49,19 +49,17 @@ When you believe you've done everything the Vow required and move to complete it
 - **Weak hit:** The Vow is fulfilled, but not cleanly — something you wanted is lost, or the resolution creates a new problem. Take XP as normal, minus 1 (minimum 1).
 - **Miss:** The Vow is not fulfilled. Something you believed was wrong. Either abandon the Vow, or the GM reveals what remains and you continue with your progress reduced to half its current boxes, rounded down (manage_track halve).
 
-You may attempt to Fulfil Your Vow at any time. Attempting it at two boxes is a legitimate, desperate choice, and the dice will treat it accordingly.
+You may attempt it at any time; at two boxes the dice will treat it accordingly.
 
 ## Forsaking a Vow
 
 You may abandon a Vow at any point: set_status forsaken, and take **1 Stress** — it costs something to stop caring about a thing you swore to. You do not gain XP.
 
-A Vow forsaken is often more interesting than one fulfilled. The people who were counting on it are still out there.
+The people who were counting on it are still out there.
 
 ## Downtime
 
-Not every gap between sessions is a Time Skip. Most of them are just a quiet week where nothing is hunting you.
-
-Between sessions, each character may take **two Downtime actions** from the list below. Downtime is narrated, not played out — say what you did, resolve it, move on.
+Between sessions each character takes **two Downtime actions**. Downtime is narrated: say what you did, resolve it, move on.
 
 **MEND** — Mark progress on one Condition per its rank, or roll to Clear a Condition if you have progress to spend.
 
@@ -79,9 +77,7 @@ Between sessions, each character may take **two Downtime actions** from the list
 
 ### Downtime and the Reckoning
 
-The Reckoning happens at the end of the session, **before** downtime. You cannot use downtime to reduce Stress and dodge the dice — the tax is collected on the night you finished, not the week that followed.
-
-This is deliberate. Downtime is for repairing what the session cost you. It is not a way out of what the session did to you.
+The Reckoning comes **before** downtime. Downtime cannot reduce Stress to dodge the dice.
 
 ## The XP Economy
 
@@ -92,8 +88,6 @@ This is deliberate. Downtime is for repairing what the session cost you. It is n
 | **Fulfilling a Vow** | Troublesome 1 · Dangerous 2 · Formidable 3 · Extreme 4 · Epic 5 |
 | **Kind Progression Triggers** (Ch. 2) | 1, 3, or 5 as listed |
 | **Archetype XP / Alternate XP** (Ch. 2) | 1, 3, or 5 as listed |
-
-**Expected yield:** 3-6 XP per character per session.
 
 **Each trigger pays once per session**, however many times you technically satisfy it. Feeding undetected four times in a night is 1 XP, not 4.
 
@@ -106,13 +100,9 @@ This is deliberate. Downtime is for repairing what the session cost you. It is n
 | **Raise a stat by 1** (maximum 4) | 10 XP |
 | **Raise a Connection by one rank** | 3 XP |
 
-**Stats above 3.** A stat may be raised to 4 through play, but never at creation, and never higher. A 4 in any stat marks a character as genuinely exceptional — most creatures in the setting, including most elders, sit at 3.
+**Stats above 3.** A stat may reach 4 through play, never at creation, never higher.
 
 **You cannot buy off the Beast Meter.** No amount of XP touches it. That's the point of it.
-
-## No Hit Points
-
-Blood & Bone doesn't track wounds numerically. A Skirmish is three rolls and an outcome, not an exchange of damage. What lasts after a fight isn't a number — it's a **Condition**.
 
 ## Conditions
 
@@ -129,27 +119,39 @@ Conditions have a **rank**, which determines how hard they are to clear:
 | Minor | Troublesome | Cracked ribs, deep laceration, badly sprained |
 | Serious | Dangerous | Broken limb, severe burns, concussion |
 | Grave | Formidable | Destroyed hand, punctured lung, silver wound |
-| Permanent | — | Cannot be cleared; becomes part of the character |
+| Permanent | — | Cannot be cleared; becomes part of the character. Kept on the sheet, not as a track (below) |
 
 ## CLEAR A CONDITION
 
 When you take real time and appropriate care to recover — rest in a Haven, treatment from a Companion or Path, or your Kind's natural healing — mark progress on the Condition's track per its rank. When you have progress to spend, roll to clear it exactly as you would Fulfil Your Vow.
 
 - **Strong hit:** The Condition is cleared entirely.
-- **Weak hit:** The Condition is cleared, but downgrade it to a lesser Condition rather than removing it, or it leaves a permanent mark that is cosmetic only.
+- **Weak hit:** The Condition is cleared, but downgrade it to a lesser Condition rather than removing it, or it leaves a Permanent Condition (below) in place of the old one.
 - **Miss:** It hasn't healed, and something has gone wrong — infection, a badly-set bone, something worse. The GM may raise its rank.
+
+**Permanent Conditions.** Never a manage_track: a track can be cleared and these cannot. Write each on the sheet's Permanent Conditions line with its scope ("-1 to Bone and fine work"). It applies -1 to the rolls it plausibly affects, like any Condition, and takes one of the three slots for good. A Permanent Condition is never healed by Downtime, Regeneration or any Power. A purely cosmetic mark is no Condition and never counts as a miss's price.
 
 **Supernatural healing.** Kinds and Powers that heal rapidly (Regeneration, The Old Blood) clear Troublesome and Dangerous Conditions automatically between sessions, provided the character has fed. They do not clear Grave Conditions, and they never clear silver wounds for Werewolves or sunlight damage for Vampires — those follow the mundane track.
 
-**Hunters have no shortcut.** They clear Conditions through time, medicine, and other people, exactly as the Hunter Weakness in Chapter 2 says.
+**Hunters have no shortcut:** time, medicine and other people.
+
+## FINISHING AN ENEMY
+
+A Formidable-or-higher enemy's track (manage_track create, kind enemy) is marked by Decisive Victories and by plans that work. When the players have a way to bring them down for good (a trap sprung, a rite, allies, a weakness found), they make the finishing move: manage_track progress_roll. Strong hit: the enemy is ended in the way the plan set up; set_status fulfilled. Weak hit: they are ended or driven out for good, at a cost you name. Miss: it fails, they escape or escalate, and the track is halved (manage_track halve). The track need not be full to try. An Epic one can only be unmade, bargained with or outmanoeuvred, so its finishing move needs a fictional means the players have earned, not a stronger roll.
+
+## CONNECTIONS
+
+Strong: +1 when you call on it, or an automatic weak hit instead of rolling, once a session. Steady: reliable and ordinary; calling on it for aid, information or shelter is a normal roll, with no bonus and no risk to the bond. Weak: calling on it needs a Heart roll to see if it holds; a miss breaks it. Forge a new Connection, always at Weak, whenever the fiction earns it: an ally won, a debt repaid, a truce struck. A rank falls when you use a Connection carelessly or endanger it, and a Weak one that falls again is removed. Repair a Bond and XP raise a rank. A Connection made by the Making starts at Steady and is never Burned (Time Skip note).
+
+## BURDENS
+
+A Burden does not fade; it is resolved. Doomed ends when the character confronts its source in a scene you frame as the climax: win or lose, the Burden is then removed. Indebted ends when the debt is fully paid: by service the faction sets (you judge how much), by an equivalent trade, or by the faction's destruction, which carries its own consequences. No asset is needed. Many Burdens mean a Time Skip or the Successor path is coming.
 
 ## BROKEN
 
-When you take a fourth Condition, you are **Broken**. You are not dead — death is rare in this game and usually a choice — but you are out of the fight, out of the scene, and at the mercy of whoever is standing over you.
-
-While Broken, you cannot take any action but speaking. To recover, someone must get you somewhere safe, and you must clear at least one Condition. Waking up Broken somewhere you don't recognize is one of the most common ways a chronicle turns.
+When you take a fourth Condition, you are **Broken**. You are not dead, but you are out of the fight and the scene, at the mercy of whoever stands over you. While Broken you can only speak. To recover, someone must get you somewhere safe and you must clear at least one Condition.
 
 ## Death
 
-A character dies only when the player agrees, or when the fiction leaves absolutely no other reading. If a character would die and the player isn't ready, the GM should reach for Broken, a Time Skip, a Burden, or capture instead. This game has better endings than death available — the Successor path exists precisely so that losing a character can be a beginning.`,
+A character dies only when the player agrees, or when the fiction leaves no other reading. Otherwise reach for Broken, a Time Skip, a Burden or capture; the Successor path exists so that losing a character can be a beginning.`,
 };

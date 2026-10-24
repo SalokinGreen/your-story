@@ -13,7 +13,7 @@ export const FEEDING_NOTE: BuiltinNote = {
 
 Three tables for the nights a character has to Sate the Beast. Roll the
 feeding ground when they go looking, what goes wrong when the move misses
-or the night is already tight, and who notices when the Mask is at risk.
+or the night is already tight (on a miss it adds to the move's own miss table and never replaces its price), and who notices when the Mask is at risk.
 
 ## A feeding ground (1d6, on the Kind's list)
 What "feeding" means follows the Kind's Recover Move: blood, flesh, dominion, a hunt, a sacrifice, a tether.

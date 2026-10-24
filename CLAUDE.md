@@ -732,6 +732,15 @@ report's §11.3. The ones that shape play:
   Night) comes from the starter's template and is kept by the Designer's
   draft; only a Europe by Night story is given the cross-Europe notes on
   load. `tests/systems.starters.test.ts` holds both starters.
+  **The core's "Reading abilities" line** (decisions 174–177, after Codex
+  reviewed the whole book on 2026-10-24) is how every ability is read:
+  non-players never roll (an ability that makes one Face Danger stops a
+  Troublesome or Dangerous one, and a Formidable one passes at a cost), "+1
+  Advantage" counts one recorded Rule of 3 result a step better, an outright
+  defeat works only on Troublesome and Dangerous foes (Formidable and up: the
+  track marked three times, Epic once), and rerolling the action die is
+  formula_roll ["1d6"] against the same challenge dice. The core is pinned, so
+  its budget is its own 3,000 tokens, not the 2,500 read cap.
   `tests/systems.bloodAndBone.test.ts` holds the token budgets and runs the
   core's recipes against the engine.
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9

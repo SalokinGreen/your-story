@@ -122,7 +122,7 @@ The center is lit like a stage and nobody who lives there stays long. The real c
 **Story hooks:**
 - A member of L'Atelier has been secretly binding Ghosts as magical batteries, violating every unspoken rule about how the Kinds treat each other — and the Ghosts are starting to fight back.
 - A mortal true-crime podcaster has stumbled onto a pattern of disappearances that traces directly back to a Werewolf dominance challenge gone wrong.
-- Aurélien's runner arrives with a map and a request: take a lantern to the unmapped chamber, and come back before dawn. The map has one door marked in a hand that is not his.
+- Comte Hugues de Vaux's runner arrives with a map and a request: take a lantern to the unmapped chamber, and come back before dawn. The map has one door marked in a hand that is not his.
 
 Use when the story is set in Paris, or when the characters pass through it on the Hollow Roads.`,
   },
@@ -180,17 +180,17 @@ Use when the story is set in Prague, or when the characters travel there along t
 
 You cannot dig anywhere in Rome without finding a floor. Every church was built on a temple that was built on a house. The Tiber embankment is high walls and plane trees, and after dark the city belongs to cats, stray dogs and the people who watch them. Rome's monsters are patient in a way that outlasts empires. Nothing is ever settled here; it is merely postponed, and the postponements have been accumulating interest for a very long time.
 
-**Who holds it:** Vampires with genuinely ancient lineages treat Rome as something close to sacred ground, and the Church's historical entanglement with the supernatural means the Vigil here is unusually institutional — several cells operate with quiet, unofficial blessing from within the Vatican itself.
+**Who holds it:** Vampires with genuinely ancient lineages treat Rome as something close to sacred ground, and the Vigil here is unusually organised: its cells share safe houses in the city's old convents and parish halls, and nobody in an official office knows they exist.
 
-**Faction — The Curia Umbrae ("Shadow Curia"):** A secretive body within the Church, separate from any official Vatican structure, that has tracked and managed supernatural activity in Rome for centuries. They don't hunt indiscriminately — they catalog, contain, and occasionally recruit. Most Kinds in Rome know better than to draw their attention.
+**Faction — The Curia Umbrae ("Shadow Curia"):** An invented secret order, answerable to no church and no state, that uses churches, sacristies and crypts as its places and has tracked and managed supernatural activity in Rome for centuries. They don't hunt indiscriminately — they catalog, contain, and occasionally recruit. Most Kinds in Rome know better than to draw their attention.
 
 **Faction — The Hill Houses:** The old Vampire lineages, each named for the hill its founder first claimed. They are not friends. They have kept the peace for fifteen hundred years by never being in the same room without a witness, and the witness has always been a Ghost. They treat the Concord as a courtesy they extend to guests. They are very good at letting someone else pay for their quarrels. A Hill House invitation is a summons dressed as a courtesy, and anyone who has accepted one knows what it costs to refuse the second.
 
-**Local threat:** A newly-turned Vampire, unaware of the Curia Umbrae's existence, has been feeding recklessly near the Vatican itself, and the Curia is running out of patience for the local Vampire elders to handle it internally. The truth is that the newcomer was turned on purpose by an elder of one of the Hill Houses, and set loose so that the Curia would be forced to act against a rival house. The elder expects the Curia to take the newcomer and, with him, the rival's name. The first sign is that Fabio keeps saying a stranger told him where to feed, and describes the stranger's ring.
+**Local threat:** A newly-turned Vampire, unaware of the Curia Umbrae's existence, has been feeding recklessly near St Peter's Square, and the Curia is running out of patience for the local Vampire elders to handle it internally. The truth is that the newcomer was turned on purpose by an elder of one of the Hill Houses, and set loose so that the Curia would be forced to act against a rival house. The elder expects the Curia to take the newcomer and, with him, the rival's name. The first sign is that Fabio keeps saying a stranger told him where to feed, and describes the stranger's ring.
 
 **Places:**
 - **The Aventine keyhole at midnight.** The orange garden above the Tiber, with a famous door. The Hill Houses' stewards meet there to arrange who will not be in the room.
-- **A basilica crypt in Trastevere.** Pilgrims by day. At night a priest named in no register unlocks the lower door for anyone the Curia has marked.
+- **A basilica crypt in Trastevere.** Pilgrims by day. At night a priest named in no register unlocks the lower door for anyone the Curia has marked. The Curia borrows the building; the parish knows nothing.
 - **The Protestant Cemetery by the pyramid.** Poets and cats under cypresses. A Ghost sits at the gate and keeps the ledger of who has come to be buried there.
 - **Termini station, platform 1, last train.** The Hollow Roads come into Rome here. A Werewolf porter checks whoever steps off.
 
@@ -206,7 +206,7 @@ You cannot dig anywhere in Rome without finding a floor. Every church was built 
 - Catacombs beneath a minor basilica turn out to be a Ghost's tether — one who died believing themselves a saint, and whose fading grip on that belief is becoming dangerous.
 - Fabio finds the characters first. He has been told by a stranger where to hide and has just noticed the stranger has been following him for three nights.
 
-Use when the story is set in Rome, or when the characters have business with the Church's hidden side.`,
+Use when the story is set in Rome, or when the characters have business with the Curia Umbrae.`,
   },
   {
     id: "builtin:blood-and-bone:europe-by-night-berlin",
@@ -232,7 +232,7 @@ The night never really ends here. Clubs open Friday and close Monday. Courtyards
 **Places:**
 - **The Tempelhof runway at dawn.** The old airport field is a public park. Packs gather on the tarmac at first light and settle disputes under a very big sky.
 - **A pre-war brewery in Prenzlauer Berg.** Now a club, once an arsenal. The Ninth Ward auctions in the cold cellar, where phones do not work.
-- **The Spreepark ruins.** A derelict amusement park whose Ferris wheel still turns in the wind. Ghosts of its old attendants keep the gate.
+- **The Spreepark ruins.** A former amusement park, now a building site for its reopening, with the rebuilt Ferris wheel standing still. The Ghosts of its old attendants keep the gate and work the wheel only after the crews go home.
 - **A U-Bahn ghost station.** The trains pass it without stopping. A single maintenance hatch leads in, and the Hollow Roads cross there.
 
 **People:**

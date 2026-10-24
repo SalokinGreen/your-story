@@ -16,7 +16,7 @@ The third Archetype of the Vampire, beside the two in B&B — Vampire. Everythin
 **The Courtier** — *Feeds only by arrangement: willing donors, standing agreements, blood as a social currency.*
 - Sate the Beast on a willing donor you have an arrangement with: on a strong hit, also choose one: the donor owes you a favour, or tells you something they heard. On a miss, the arrangement sours: the donor wants more from you than blood.
 - Feeding by arrangement never risks The Mask Slips from the feeding itself. A donor who is hurt, frightened or cheated becomes a talker (Exposure +1 the first time they talk).
-- +1 when you Persuade, Bargain or read someone across a table you set, in a room you chose.
+- +1 when you Compel or Gather Information across a table you set, in a room you chose (only while you host).
 - **Archetype XP:** 1 XP for feeding by arrangement through a whole night without once taking more than agreed; 3 XP for turning a donor's favour into leverage over someone who outranks you; 5 XP for building a standing arrangement with a household, a club or a faction that feeds you and keeps your secret.
 - **Alternate XP:** 1 XP for hosting a gathering where the Kinds meet and nobody bleeds; 3 XP for keeping a donor safe when keeping them cost you; 5 XP for being invited, openly and by name, into a mortal home you will never be asked to leave.
 - **Stress Relief:** an evening of good company where you are wanted for more than what you are; a donor who comes back because they choose to; setting a table and watching other people eat.
@@ -25,8 +25,8 @@ The third Archetype of the Vampire, beside the two in B&B — Vampire. Everythin
 
 **THE OPEN HOUSE**
 1. You keep one place others come to: a salon, a club, a back room. A willing donor is always among its guests, unless the fiction has closed the house. When you Sate the Beast on that donor, add +1.
-2. While you host, no guest raises a hand against another under your roof without Facing Danger first. Add +1 to Compel anyone in your house.
-3. Once per session, call a truce in a room you host: nobody in it may attack until someone breaks it. If your truce is broken, Exposure +1 for you; you did not keep your house.
+2. While you host, a guest who raises a hand against another under your roof must first get past you: you Compel them, and on a strong hit they stand down, on a weak hit they stand down and you owe the room a favour, on a miss the fight starts and the house is blamed. Add +1 to Compel anyone in your house.
+3. Once per session, call a truce in a room you host: nobody in it may attack for the rest of the scene. An attempt is stopped before it lands and ends the truce; the one who tried is named, and Exposure +1 for you; you did not keep your house.
 
 **THE LEDGER OF FAVOURS**
 1. When someone owes you a favour, you may call it in for +1 to any one roll. Each favour is spent when you do.

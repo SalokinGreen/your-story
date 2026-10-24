@@ -29,7 +29,7 @@ When you lose control to your beast, or fall into a long despair, time marches o
 
 After a Time Skip, the player has two options:
 
-1. **The Long Hangover:** You keep playing the character. Your Stress is reset to zero (manage_meter set), but you bear the permanent scars, debts, and enemies your beast accumulated during the missing years. **Your Beast Meter does not reset** — advance it by 1 for the years you lost.
+1. **The Long Hangover:** You keep playing the character. Your Stress is reset to its floor: zero, or 1 at Beast 9 or more (manage_meter set; the engine holds the floor), but you bear the permanent scars, debts, and enemies your beast accumulated during the missing years. **Your Beast Meter does not reset** — advance it by 1 for the years you lost.
 2. **The Successor:** Your original character is too far gone. They become an Epic-ranked NPC antagonist monster roaming the city. You roll a new character — perhaps a childe, victim, or hunter connected to the original — and begin play with an **Epic-rank Vow** to deal with the monster you used to be.
 
 **At Beast 10, you don't get the choice.** The Successor path is automatic, immediately, with no Surrender to the Years roll. The Long Hangover exists because a Time Skip is a crisis. Beast 10 is an ending.
@@ -40,8 +40,8 @@ Powers survive a Time Skip. Whatever your Beast did in the missing years, it did
 Assets do not survive a Time Skip cleanly. On **Surrender to the Years**:
 
 - **Strong hit:** All assets remain. You may buy one new ability on any asset free of XP cost.
-- **Weak hit:** Lose one asset entirely, or reduce two assets by one ability each. Player's choice.
-- **Miss:** Lose two assets entirely, GM's choice, and one surviving asset is corrupted — its abilities still function, but the fiction around them has turned against you. A Haven now belongs to someone else. A Companion resents you. A Relic has been used for something while you were gone.
+- **Weak hit:** Lose one asset entirely, or reduce two assets by one ability each. Player's choice. Powers are never chosen for this.
+- **Miss:** Lose two assets entirely, GM's choice (never a Power; Powers are only ever twisted, above), and one surviving asset is corrupted — its abilities still function, but the fiction around them has turned against you. A Haven now belongs to someone else. A Companion resents you. A Relic has been used for something while you were gone.
 
 Havens, Companions, and Relics are the assets the world can take. That's the point of them.
 
@@ -56,7 +56,7 @@ Mechanically, turning someone always does three things:
 
 1. **Increase your Exposure by 1.** Another creature exists who knows exactly what you are.
 2. **Increase your Beast Meter by 1.** You've done the thing that was done to you, and something in you agreed to it.
-3. **Create a Connection at Steady rank** with the person you turned, whether either of you wants it. It cannot be removed except by their destruction.
+3. **Create a Connection at Steady rank** with the person you turned, whether either of you wants it. It cannot be removed except by their destruction, and it is never Burned: Burn a Connection is not available on it, at any rank.
 
 ### THE MAKING
 
@@ -78,7 +78,8 @@ When a player character becomes a different Kind, they do not roll a new charact
 - **Keep your stats, Connections, Burdens, Conditions, Vows, and XP total.** You are the same person. You want the same things.
 - **Keep every asset you've bought** — but Powers from your old Kind stop functioning. They aren't refunded; they're *lost*, and that loss should be felt. You may buy new Powers from your new Kind's list at normal cost.
 - **Your Beast Meter does not reset.** Advance it by 2. Whatever you are now, you got here by losing ground.
-- **Your Stress resets to 4.** You are new to this, and badly out of control.
+- **Your Stress resets to 4, or to 3 when the Beast has lowered the cap to 4.** You are new to this, and badly out of control. This reset is part of the Crossing and never starts a Time Skip.
+- **Create the new Kind's meters** now if it needs a set the character lacks: manage_meter create_set "Witch" (the Ledger) or "Wendigo" (the Slipping Mask), owner their name. Apply the Beast thresholds the +2 crosses.
 - **Take a new Vow at Formidable rank or higher**, about what you are now.
 
 ### The Hunter's Fall

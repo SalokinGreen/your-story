@@ -21,8 +21,9 @@ hill like a hand round a throat.
 
 Under the square there is a second market, cellars and streets from before
 the city was moved to its present level. Under the city there is salt.
-Mines run out to the southeast for kilometres, cut by generations of miners
-who never entirely left. Kraków is a place of debts: old churches, old
+The great mine is at Wieliczka, just southeast of the city, and the Brine Court
+holds that its galleries run on, by ways no map shows, to Kraków's cellars. The
+miners never entirely left. Kraków is a place of debts: old churches, old
 guilds, old promises written down and kept.
 
 **Who holds it:** Warlocks, and the dead. The living power in Kraków is

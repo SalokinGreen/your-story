@@ -21,8 +21,8 @@ places are not empty. Roofless crofts stand in rows. Every glen has a
 ruined chapel, every island a standing stone.
 
 Weather is the only authority. Sleet in August. A sea mist that lifts to show
-a mountain you did not know was there. The nearest city is Edinburgh, a day
-away by train and a world away in manners. Out here, the night does not hide.
+a mountain you did not know was there. The northern gateway is Inverness; Edinburgh is a day
+away to the south by train and a world away in manners. Out here, the night does not hide.
 It waits, and it has patience that cities lose.
 
 **Who claims the land:** Nobody, and everybody. Werewolves hold the glens as
