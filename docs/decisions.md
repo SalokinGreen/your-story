@@ -226,6 +226,7 @@ The author: "Okay next we need to expand blood and bones by a lot". Blood & Bone
 | 155 | "For character options: more of what exists, or new kinds of creature?" | **"Both (Recommended)."** A third Archetype per Kind, more Powers, Paths, Relics, Rites and Companions, and two or three new Kinds that fit the setting. |
 | 156 | "Stories copy Blood & Bone's notes when they start, so a story started today would never see the new tables. Should older stories get the new material?" | **"Add new notes on load (Recommended)."** When a Blood & Bone story opens, built-in notes it doesn't have yet are added; notes already in the story are never touched, so edits survive, and corrections to existing notes are not pushed. Rejected: a button on the Lore page; new stories only. |
 | 157 | "Tripling is ~70,000+ new words. How do you want to review it?" | **"Sample first, then PRs (Recommended)."** One small sample of each kind of material (a table family, a city, an Archetype) for the author to approve the voice and depth; then each themed PR ships with a readable artifact, read or skimmed before merging. Rejected: read every PR in full; spot-check. |
+| 158 | The expansion design and roadmap (`docs/bb-expansion-design.md`, 2026-10-24) | **"approved"** — start with the E0 samples, then E1 once the samples are approved. |
 
 ### Interview — the reading themes reach the whole app (2026-10-23)
 
