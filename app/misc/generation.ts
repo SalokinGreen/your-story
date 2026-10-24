@@ -806,6 +806,22 @@ const MAX_OBSERVER_RESETS = 1;
  * fail-open posture as the M2 roll-invariant gate below: never blocks play
  * forever.
  */
+/**
+ * The player's line for a turn: the one passed in, or, when the page passed
+ * "" because the line is already in the story, the last player part (its ">"
+ * prefix stripped).
+ */
+export function playerLineOf(
+  storyData: Pick<StoryData, "scene">,
+  userChoice: string,
+): string {
+  if (userChoice) return userChoice;
+  const lastUserPart = [...(storyData.scene?.parts ?? [])]
+    .reverse()
+    .find((p) => p.user && p.content);
+  return lastUserPart ? lastUserPart.content.replace(/^>\s*/, "") : "";
+}
+
 export async function generateStoryTurn(
   storyData: StoryData,
   userChoice: string,
@@ -819,6 +835,15 @@ export async function generateStoryTurn(
   // from the module because the background layer wave deliberately outlives
   // this turn and must keep billing to it after the next turn has opened.
   const costTurnId = beginTurnCost();
+
+  // The player's line for this turn. The page sends a typed action or a
+  // picked choice as "" (it is already the last part of the story), so the
+  // side agents - the Observer, the Memory Keeper, the Director Assistant -
+  // read it from the story the way the GM stage does. Before this they were
+  // told "(none - opening scene)" on every such turn, and the Observer's
+  // player-agency judge flagged any narration of the character as an
+  // undeclared action (the author's playtest, 2026-10-24, decision 185).
+  const playerLine = playerLineOf(storyData, userChoice);
 
   // Pictures (generate_image). The tool is offered only when the page gave us
   // the queue's dependencies, the story has an id to file pictures under, and
@@ -1231,7 +1256,7 @@ export async function generateStoryTurn(
 
       const promise = rewriteFlaggedNarration({
         narration: result.content,
-        playerChoice: userChoice,
+        playerChoice: playerLine,
         gmStoryContext: result.gmStoryContext,
         flag: speculativeFlag,
         replyLength: options.replyLength,
@@ -1286,7 +1311,7 @@ export async function generateStoryTurn(
       try {
         flags = await runObserver({
           narration: result.content,
-          playerChoice: userChoice,
+          playerChoice: playerLine,
           replyLength: options.replyLength,
           toolNames: turnToolNames,
           rollResults: (result.gmResults || []).map((r) => ({
@@ -1402,7 +1427,7 @@ export async function generateStoryTurn(
           try {
             rewrittenNarration = await rewriteFlaggedNarration({
               narration: result.content,
-              playerChoice: userChoice,
+              playerChoice: playerLine,
               gmStoryContext: result.gmStoryContext,
               flag: majorFlag,
               replyLength: options.replyLength,
@@ -1591,7 +1616,7 @@ export async function generateStoryTurn(
         try {
           const backgroundFlags = await runObserver({
             narration: result.content,
-            playerChoice: userChoice,
+            playerChoice: playerLine,
             replyLength: options.replyLength,
             toolNames: turnToolNames,
             rollResults: (result.gmResults || []).map((r) => ({
@@ -1645,7 +1670,7 @@ export async function generateStoryTurn(
               try {
                 rewrittenNarration = await rewriteFlaggedNarration({
                   narration: result.content,
-                  playerChoice: userChoice,
+                  playerChoice: playerLine,
                   gmStoryContext: result.gmStoryContext,
                   flag: majorFlag,
                   replyLength: options.replyLength,
@@ -1797,7 +1822,7 @@ export async function generateStoryTurn(
         await runMemoryAgent(
           storyData,
           result.content,
-          userChoice,
+          playerLine,
           memoryKeeperApiOptions,
         );
       } catch (memoryAgentError) {
@@ -1826,7 +1851,7 @@ export async function generateStoryTurn(
           await runDirectorAssistant(
             storyData,
             result.content,
-            userChoice,
+            playerLine,
             directorAssistantApiOptions,
           );
         } catch (directorAssistantError) {
@@ -2033,17 +2058,7 @@ async function generateStoryTurnOnce(
     // part. Needed by every branch below: the round loop uses it to run
     // the GM stage, and the precomputed-conversation (retry) / no-choice
     // branches use it to rebuild the GM base prompt without an API call.
-    let gmUserChoice = userChoice;
-    if (!gmUserChoice) {
-      // Find the last user message in scene parts
-      const lastUserPart = [...storyData.scene.parts]
-        .reverse()
-        .find((p) => p.user && p.content);
-      if (lastUserPart) {
-        // Strip the ">" prefix if present (custom input format)
-        gmUserChoice = lastUserPart.content.replace(/^>\s*/, "");
-      }
-    }
+    let gmUserChoice = playerLineOf(storyData, userChoice);
 
     // True once the reasoning-tier router actually resolves a tier this
     // turn (the precomputed-GM-conversation/retry branch below never runs

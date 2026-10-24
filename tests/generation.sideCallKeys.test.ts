@@ -95,7 +95,7 @@ const isStoryProgress = (call: SideCall) =>
 const isDirectorAssistant = (call: SideCall) =>
   call.body.messages[0]?.content?.includes("spotlight-tracking layer") ?? false;
 const isObserverJudge = (call: SideCall) =>
-  call.body.messages[0]?.content?.includes("non-negotiable rule") ?? false;
+  call.body.messages[0]?.content?.includes("took a decision away from the player") ?? false;
 
 /**
  * Non-streaming /api/generate side calls get canned answers keyed on their

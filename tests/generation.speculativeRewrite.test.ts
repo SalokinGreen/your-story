@@ -226,7 +226,7 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
       .filter(isRewrite)[0]
       .body.messages.map((m) => m.content)
       .join("\n");
-    expect(speculativePrompt).toContain("beyond what the player actually declared");
+    expect(speculativePrompt).toContain("makes a significant choice for them");
     expect(speculativePrompt).toContain("Do not invent a problem to fix");
 
     // Exactly one rewrite call - the speculation was reused, not re-issued
@@ -349,7 +349,7 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
             : REWRITTEN;
         }
         if (isLengthJudge(call)) return passingJudgeContent(true);
-        if (call.body.messages[0]?.content?.includes("non-negotiable rule")) {
+        if (call.body.messages[0]?.content?.includes("took a decision away from the player")) {
           return JSON.stringify({
             violation: true,
             severity: "major",

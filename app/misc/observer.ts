@@ -48,10 +48,11 @@
  *   followed by an LLM justification pass (same fail-open/API-error posture
  *   as the checks below) that reads the turn in context and decides whether
  *   the overage was earned. Only an unjustified overage becomes a flag.
- * - checkPlayerAgencyViolation: an LLM call that judges whether the GM
- *   decided/narrated what the player character says, thinks, or does beyond
- *   what the player declared - the "PLAYER AGENCY (NON-NEGOTIABLE)" rule
- *   already in ai_staged.ts's GM system prompt.
+ * - checkPlayerAgencyViolation: an LLM call that judges whether the GM took a
+ *   decision away from the player (new meaningful dialogue, a significant
+ *   choice, a decided feeling, a new action past the declared one). Narrating
+ *   the character carrying out the declared action, in second person, is
+ *   fine (decision 185).
  * - checkOutcomeMismatch: an LLM call that judges whether the finished
  *   narration contradicts the mechanical results (SUCCESS/FAILURE) of the
  *   rolls/checks made this turn. The roll results are ground truth - this
@@ -817,7 +818,7 @@ export interface RewriteNarrationParams {
  * addresses any of them.
  */
 const ALSO_FIX_CLAUSES: Partial<Record<ObserverFlagType, string>> = {
-  player_agency: `if the narration decides what the player character says, thinks, feels, chooses, or does beyond what the player actually declared, cut that back - describe what the world does and leave the player's response to the player`,
+  player_agency: `if the narration gives the player character new meaningful dialogue, makes a significant choice for them or decides what they feel, cut that back and leave that choice to the player; narrating them carrying out what they declared, in second person, stays`,
   outcome_narration_mismatch: `if the narration contradicts what a roll or check mechanically resolved to this turn, correct the narration to match the result - the result is ground truth and never changes to suit the prose`,
 };
 
@@ -1083,26 +1084,36 @@ async function callAgencyCheckApi(
   sensitivity: number,
   characterContext?: ObserverCharacterContext,
 ): Promise<AgencyCheckResult | null> {
-  const system = `You are a strict but fair reviewer for a tabletop-style interactive fiction game. The Game Master AI you're reviewing was given this non-negotiable rule:
+  // Loosened after the author's playtest (2026-10-24, decision 185): "that
+  // use of you and describing the player actions is completely okay for a
+  // DM." A GM at a real table narrates the character carrying out what the
+  // player said, in second person, including the ordinary steps it takes.
+  // What stays a violation is the GM taking a decision away from the player.
+  const system = `You are a fair reviewer for a tabletop-style interactive fiction game. The Game Master AI you're reviewing follows this rule:
 
-"NEVER decide what the player character says, thinks, feels, or does next. You resolve outcomes for the action they already declared - you don't invent their next action."
+"Don't take the player's decisions away from them. Narrate the character doing what the player declared, and the world's answer; leave the player's next choice to the player."
 
-Given the player's declared action and the GM's narration written in response, decide whether the GM violated this rule by putting new dialogue, thoughts, feelings, or actions into the player character that the player didn't declare.
+Given the player's declared action and the GM's narration written in response, decide whether the GM took a decision away from the player.
 
-IDENTIFY WHO IS WHO FIRST. The "WHO IS WHO" block below names the player character; everyone else in the scene is an NPC. This distinction decides the whole judgment, so make it explicitly before you rule:
-- Dialogue, thoughts, feelings, and actions belonging to an NPC are the GM's job. They are NEVER a violation, no matter how much of the turn they take up.
-- Dialogue, thoughts, feelings, or decisions attributed to the PLAYER CHARACTER - by name, or in second person ("you say...", "you decide...", "you feel...") - that the player did not declare ARE a violation.
-- Do not excuse a violation on the grounds that the line "sounds like a character talking": if the speaker is the player character, it is a violation regardless of how in-character it reads. Equally, do not flag a line just because it is emotive or first-person-sounding when the speaker is an NPC.
-- If the player's declared action itself includes dialogue or intent, the GM restating or lightly rephrasing it is not a violation.
+WHAT IS FINE (never a violation):
+- Second-person narration of the player character carrying out what the player declared, including the ordinary steps it takes: "go on" or "I check the light" becomes "you walk the gravel toward the Rise"; "I climb down" becomes "you take the ladder, rung by rung". Describing how they move, what they see and hear, and small natural gestures while doing it is normal GM narration.
+- A short continuation the declared intent clearly implies (getting there, opening the door they were heading for, picking up the radio they said they'd use).
+- Everything NPCs say, think and do, however much of the turn it takes. The "WHO IS WHO" block below names the player character; everyone else is an NPC.
+- The consequences of the action: what happens around them, how NPCs react, dice outcomes, and involuntary results the world imposes (taking a hit, being shoved, losing their footing).
+- Restating or lightly rephrasing dialogue or intent the player gave.
 
-Resolving the CONSEQUENCES of the player's stated action (what happens around them, how NPCs react, dice outcomes) is fine and expected - that is not a violation. Describing involuntary physical results the world imposes on the player character (taking a hit, being shoved, losing their footing) is also fine; deciding how they CHOOSE to respond is not.
+WHAT IS A VIOLATION (the player character, by name or as "you"):
+- New dialogue the player didn't give: the character says something meaningful (a promise, an answer, a lie, a confession, a decision spoken aloud).
+- A significant choice the player didn't make: attacking, fleeing, agreeing, refusing, revealing a secret, spending or giving away something that matters, choosing between options the scene offered.
+- Telling the player what their character feels, believes or wants, as a decided fact ("you decide to trust her", "you feel nothing for him"), beyond a passing physical sensation.
+- Continuing past the declared action into a new one the player should have chosen (they asked to look at the stone; the GM has them dig it up).
 
 ${sensitivityInstruction(sensitivity)}
 
 Respond with ONLY a JSON object, no other text:
 {"violation": true|false, "severity": "minor"|"major", "reason": "<one sentence naming who was spoken/acted for, empty string if no violation>"}
 
-"major" = the GM clearly wrote new dialogue, a new decision, or a new action for the player character that the player never declared. "minor" = borderline/ambiguous phrasing that leans that way but could reasonably be read as just narrating the player's own stated action.`;
+"major" = any of the four violations above, clearly (new meaningful dialogue, a significant choice, a decided feeling or belief, or a new action past the declared one). "minor" = borderline: it leans that way but could reasonably be read as narrating the declared action.`;
 
   const user = `Player's declared action:\n"""\n${
     playerChoice.trim() || "(none - opening scene)"
@@ -1162,7 +1173,7 @@ export async function checkPlayerAgencyViolation(
     type: "player_agency",
     severity: result.severity,
     detail: reason,
-    correctivePrompt: `Your previous attempt at this turn was reset because it violated the PLAYER AGENCY rule you were already given ("Never decide what the player character says, thinks, feels, or does next"): ${reason} Rewrite this turn so you resolve the outcome of the player's declared action without inventing anything further the player character says, thinks, or does.`,
+    correctivePrompt: `Your previous attempt at this turn was reset because it broke the PLAYER AGENCY rule: it took a decision away from the player. ${reason} Rewrite this turn: narrate the character carrying out what the player declared (second person is fine) and the world's answer, but give them no new meaningful dialogue, no significant choice and no decided feeling the player didn't give.`,
   };
 }
 

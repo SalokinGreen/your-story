@@ -97,7 +97,7 @@ function isRewrite(call: ObserverCall): boolean {
 }
 
 function isAgencyJudge(call: ObserverCall): boolean {
-  return call.body.messages[0]?.content?.includes("non-negotiable rule") ?? false;
+  return call.body.messages[0]?.content?.includes("took a decision away from the player") ?? false;
 }
 
 /**
@@ -248,6 +248,30 @@ describe("observer deferral - generateStoryTurn integration", () => {
         call.body.messages[0]?.content?.includes("usual ceiling of ~"),
       ).length,
     ).toBe(1);
+  });
+});
+
+// Decision 185: the page sends a typed action as "" (it is already the last
+// part of the story); the Observer must still judge against it, not against
+// "(none - opening scene)".
+describe("the player's line reaches the Observer on a typed turn", () => {
+  it("reads it from the story when the page passes an empty choice", async () => {
+    const { fetchMock, observerCalls } = createFetchMock(SHORT_NARRATION, async () => ALL_CLEAR);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const storyData = createTestStory();
+    storyData.scene.parts = [
+      ...(storyData.scene.parts ?? []),
+      { content: ">Like, go on.", user: true } as unknown as StoryData["scene"]["parts"][number],
+    ];
+    await generateStoryTurn(storyData, "", baseOptions, {
+      onStoryContent: scenePartPublisher(storyData),
+    });
+    await flushBackground();
+    const agency = observerCalls.filter(isAgencyJudge);
+    expect(agency.length).toBeGreaterThan(0);
+    const user = String(agency[0].body.messages[1]?.content ?? "");
+    expect(user).toContain("Like, go on.");
+    expect(user).not.toContain("none - opening scene");
   });
 });
 
