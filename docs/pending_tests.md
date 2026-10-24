@@ -10,6 +10,22 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Playtest fixes (decision 178)
+
+Needs a real model (the desktop app, the subscription or a key):
+
+- **Taint on a miss near the green light.** In Grave Watcher, go down to the
+  light and fail a roll. Expected: manage_meter adjust Taint +1, whatever the
+  miss table gives. Failure looks like: "no Taint trigger here".
+- **A strong hit shows.** Talk an NPC round with a strong Compel. Expected: the
+  prose shows them agreeing. Failure looks like: the GM records it (attitude,
+  plan) and the story never says it.
+- **A matched miss.** Expected: the miss table rolled twice, or one result at
+  double severity, as the MATCH line now says.
+- **Known open, not fixed by wording:** crossing dawn ("next morning") still
+  skips end_session and the Reckoning on Haiku (devlog
+  2026-10-24-playtest). Needs an engine reminder.
+
 ## 2026-10-24 — Blood & Bone campaign starters (E5, decisions 163–173)
 
 Checked in the browser preview: both starters are on the Library home; Play
