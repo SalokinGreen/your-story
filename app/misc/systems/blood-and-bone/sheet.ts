@@ -7,7 +7,7 @@
  */
 export const BLOOD_AND_BONE_SHEET_TEMPLATE = `# {{Name | Your character's name | Unnamed}}
 **Kind:** {{Kind | Vampire, Gargoyle, Wendigo, Werewolf, Witch/Warlock, Hunter or Ghost | Vampire}}
-**Archetype:** {{Archetype | One of your Kind's two Archetypes | The Ripper}}
+**Archetype:** {{Archetype | One of your Kind's three Archetypes | The Ripper}}
 **Path:** {{Path | What you were before this (a Path from the book) | Investigator}}
 
 ## Stats (each 1-3; assign 3, 2, 2, 1, 1)

@@ -9,6 +9,18 @@
  */
 import type { BuiltinNote, BuiltinPack, BuiltinSystem } from "../types";
 import { ASSET_NOTES } from "./assets";
+import { VAMPIRE_COURTIER_NOTE } from "./archetypes/vampire";
+import { GARGOYLE_PILGRIM_NOTE } from "./archetypes/gargoyle";
+import { WENDIGO_SHEPHERD_NOTE } from "./archetypes/wendigo";
+import { WEREWOLF_HOUND_NOTE } from "./archetypes/werewolf";
+import { WITCH_APOSTATE_NOTE } from "./archetypes/witch";
+import { HUNTER_PENITENT_NOTE } from "./archetypes/hunter";
+import { GHOST_SEEKER_NOTE } from "./archetypes/ghost";
+import { MORE_PATHS_NOTE } from "./assets-more/paths";
+import { MORE_HAVENS_NOTE } from "./assets-more/havens";
+import { MORE_COMPANIONS_NOTE } from "./assets-more/companions";
+import { MORE_RELICS_NOTE } from "./assets-more/relics";
+import { MORE_RITES_NOTE } from "./assets-more/rites";
 import { CORE_NOTE } from "./core";
 import { CREATION_NOTE } from "./creation";
 import { CREATION_PROMPT_NOTES } from "./creationPrompts";
@@ -42,6 +54,19 @@ const RULES_NOTES: BuiltinNote[] = [
   MOVES_NOTE,
   ...KIND_NOTES,
   ...ASSET_NOTES,
+  // The expansion's third Archetypes and more assets (E3, decisions 150-159).
+  VAMPIRE_COURTIER_NOTE,
+  GARGOYLE_PILGRIM_NOTE,
+  WENDIGO_SHEPHERD_NOTE,
+  WEREWOLF_HOUND_NOTE,
+  WITCH_APOSTATE_NOTE,
+  HUNTER_PENITENT_NOTE,
+  GHOST_SEEKER_NOTE,
+  MORE_PATHS_NOTE,
+  MORE_HAVENS_NOTE,
+  MORE_COMPANIONS_NOTE,
+  MORE_RELICS_NOTE,
+  MORE_RITES_NOTE,
   PROGRESS_NOTE,
   TIME_SKIP_NOTE,
   CREATION_NOTE,
