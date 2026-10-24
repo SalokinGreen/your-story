@@ -10,6 +10,34 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Feedback in the app (decisions 190–194)
+
+Run locally against `wrangler dev` with a local D1, from the web preview and a
+debug desktop build (`docs/devlog/2026-10-24-feedback.md`). Owed, because
+they need the author's Cloudflare account or a phone:
+
+- **Deploy it.** Follow `sync-worker/README.md` → Feedback: `wrangler d1
+  create`, paste the id into `wrangler.toml`, apply the migration with
+  `--remote`, `wrangler secret put FEEDBACK_ADMIN_TOKEN`, deploy. Expected:
+  `curl -X POST <worker>/feedback` with a valid body answers `{"ok":true,
+  "ref":…}`, and `<worker>/feedback/admin` with the token lists it. If the
+  deploy refuses the `[[ratelimits]]` block, the account's wrangler is older
+  than 4.36.
+- **The burst limit.** Send six submissions from one machine within a minute.
+  The sixth should answer 429 `rate_limited`, and the form should say "That's
+  a lot of feedback at once". Locally the limiter is only simulated.
+- **Retention.** A day after deploying, the Worker's Cron Events should show
+  the 03:00 UTC run, with no errors.
+- **The repository variable.** Create `NEXT_PUBLIC_SYNC_API_URL` (Settings →
+  Secrets and variables → Actions → Variables) before the next
+  `build-apps.yml` run, or the native builds ship with no feedback entries.
+- **Android.** In an APK built with `NEXT_PUBLIC_SYNC_API_URL` set, send from
+  a starter's Feedback button. Expected: a reference shown, and the row on
+  the admin page with platform `android`. A failure would read "Couldn't
+  reach the feedback server" (the patched native fetch) or "The server didn't
+  accept that" (a body the Worker refused).
+- **iOS.** The same, with platform `ios`; there is no Mac here.
+
 ## 2026-10-24 — The judge layer: flag only (decisions 187–189)
 
 Built and covered by the suite against scripted providers and pure functions;

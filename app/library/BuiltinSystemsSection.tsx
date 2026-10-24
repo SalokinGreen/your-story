@@ -8,6 +8,8 @@ import {
   builtinAdventureToLocal,
   type BuiltinSystem,
 } from "@/app/misc/systems";
+import { feedbackAvailable } from "@/app/misc/feedbackClient";
+import { openFeedback } from "@/app/misc/feedbackLauncher";
 
 interface BuiltinSystemsSectionProps {
   /** Starts a starter through the same pre-play flow as a saved adventure. */
@@ -32,6 +34,7 @@ export default function BuiltinSystemsSection({
 }: BuiltinSystemsSectionProps) {
   const [openPack, setOpenPack] = useState<string | null>(null);
   if (systems.length === 0) return null;
+  const canGiveFeedback = feedbackAvailable();
 
   return (
     <section>
@@ -47,10 +50,28 @@ export default function BuiltinSystemsSection({
             key={system.id}
             className="rounded-xl border border-ys-warning/40 p-4 bg-ys-warning/15"
           >
-            <h3 className="font-semibold flex items-center gap-2">
-              <DynamicIcon name="Package" className="w-4 h-4 text-ys-warning" />
-              {system.title}
-            </h3>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                <DynamicIcon name="Package" className="w-4 h-4 text-ys-warning" />
+                {system.title}
+              </h3>
+              {canGiveFeedback && (
+                <button
+                  onClick={() =>
+                    openFeedback({
+                      kind: "system",
+                      target: system.id,
+                      heading: system.title,
+                      systemId: system.id,
+                    })
+                  }
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-sm bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text flex items-center gap-1.5"
+                >
+                  <DynamicIcon name="MessageSquare" className="w-4 h-4" />
+                  Feedback
+                </button>
+              )}
+            </div>
             <p className="text-sm text-ys-muted mt-1">
               {system.description}
             </p>
@@ -119,7 +140,7 @@ export default function BuiltinSystemsSection({
                           </p>
                         )}
                       </div>
-                      <div className="flex gap-2 shrink-0">
+                      <div className="flex flex-wrap gap-2 min-w-0">
                         <button
                           onClick={() => onPlay(local)}
                           className="px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-ys-accent text-ys-on-accent hover:opacity-90"
@@ -134,6 +155,23 @@ export default function BuiltinSystemsSection({
                           <DynamicIcon name="Copy" className="w-4 h-4" />
                           Open a copy in the Designer
                         </button>
+                        {canGiveFeedback && (
+                          <button
+                            onClick={() =>
+                              openFeedback({
+                                kind: "starter",
+                                target: starter.id,
+                                heading: local.title,
+                                systemId: system.id,
+                                starterId: starter.id,
+                              })
+                            }
+                            className="px-3 py-1.5 rounded-lg text-sm bg-ys-surface hover:bg-ys-surface-2 border border-ys-border text-ys-text flex items-center gap-1.5"
+                          >
+                            <DynamicIcon name="MessageSquare" className="w-4 h-4" />
+                            Feedback
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

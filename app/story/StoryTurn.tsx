@@ -264,6 +264,9 @@ export interface TurnActionsProps {
   onEdit?: () => void;
   onIllustrate?: () => void;
   onReadAloud?: () => void;
+  // Opens the feedback form for this turn; absent for an online guest and
+  // where the feedback address is not set (docs/feedback-design.md).
+  onFeedback?: () => void;
   disabled?: boolean;
 }
 
@@ -275,6 +278,7 @@ export function TurnActions({
   onEdit,
   onIllustrate,
   onReadAloud,
+  onFeedback,
   disabled = false,
 }: TurnActionsProps) {
   const action = (
@@ -308,6 +312,7 @@ export function TurnActions({
       {action("Edit", "Pencil", onEdit, "Edit response")}
       {action("Illustrate", "Image", onIllustrate, "Paint a picture of this moment")}
       {action("Read aloud", "Volume2", onReadAloud)}
+      {action("Feedback", "MessageSquare", onFeedback, "Feedback on this turn")}
     </div>
   );
 }

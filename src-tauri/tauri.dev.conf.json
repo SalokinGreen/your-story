@@ -1,0 +1,21 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "app": {
+    "security": {
+      "capabilities": [
+        "default",
+        {
+          "identifier": "feedback-dev",
+          "description": "DEBUG ONLY. Lets the app reach a local Worker (wrangler dev, port 8787) so feedback and sync can be tried before the real Worker is deployed. Merged only by `tauri build --debug --config src-tauri/tauri.dev.conf.json` (or `tauri dev --config ...`); a plain `tauri build` never reads this file, so a release has no localhost scope.",
+          "windows": ["main"],
+          "permissions": [
+            {
+              "identifier": "http:default",
+              "allow": [{ "url": "http://localhost:8787/*" }]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

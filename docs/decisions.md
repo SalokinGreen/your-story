@@ -359,3 +359,4 @@ The author asked for image generation in play, through fal.ai, with an image too
 | 191 | "What should a feedback submission include?" | **"Text + optional turn (Recommended)."** Rating, words, what it is about, app version and platform; attaching the turn is an unticked checkbox; never keys or other stories. |
 | 192 | "Where should players be able to give feedback?" | **All four:** on a turn, on a system or starter, in the menu / Settings, and after a session. |
 | 193 | "How do you want to read it?" | **"A private page (Recommended)."** Behind a secret the author keeps. |
+| 194 | The revised feedback design (`docs/feedback-design.md`, after Codex's review) moved storage from the Worker's KV to Cloudflare D1, cut the contact field and made the turn attachment an allowlist the player previews. | **"Build it."** The revised design is approved as written, D1 included; it revises decision 190's "in its KV". |

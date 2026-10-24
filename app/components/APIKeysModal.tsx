@@ -12,6 +12,7 @@ import ImageSettingsTab from "./ImageSettingsTab";
 import CustomVoiceManager from "./CustomVoiceManager";
 import FontSettingsTab from "./FontSettingsTab";
 import SyncTab from "./SyncTab";
+import FeedbackSettingsSection from "./FeedbackSettingsSection";
 import { TTSModelKey } from "@/app/misc/ai_prices";
 
 interface APIKeysModalProps {
@@ -990,6 +991,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     {defaultUserNotes.length} characters
                   </p>
                 </div>
+                <FeedbackSettingsSection />
               </div>
             </>
           ) : (

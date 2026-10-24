@@ -7,6 +7,7 @@ import NotificationContainer from "./components/NotificationContainer";
 import SiteHeader from "./components/SiteHeader";
 import FontInitializer from "./components/FontInitializer";
 import NativeBackButton from "./components/NativeBackButton";
+import FeedbackHost from "./components/FeedbackHost";
 import InlineScript from "./components/InlineScript";
 import { THEME_BOOTSTRAP_SCRIPT } from "./misc/themeBootstrap";
 
@@ -63,6 +64,7 @@ export default function RootLayout({
           <NotificationContainer />
           <FontInitializer />
           <NativeBackButton />
+          <FeedbackHost />
         </NotificationProvider>
       </body>
     </html>

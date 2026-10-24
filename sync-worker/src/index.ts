@@ -1,5 +1,7 @@
-export interface Env {
-  SYNC_KV: KVNamespace;
+import { handleFeedback, runRetention, type FeedbackEnv, type KVLike } from "./feedback";
+
+export interface Env extends FeedbackEnv {
+  SYNC_KV: KVLike;
   ALLOWED_ORIGINS: string;
 }
 
@@ -23,15 +25,16 @@ async function hashKey(syncKey: string): Promise<string> {
     .join("");
 }
 
+// An origin that is not in ALLOWED_ORIGINS gets no Access-Control-Allow-Origin
+// header at all (it used to fall back to the first allowed origin).
 function corsHeaders(origin: string | null, allowedOrigins: string[]): HeadersInit {
-  const allowOrigin =
-    origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0] ?? "null";
-  return {
-    "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     Vary: "Origin",
   };
+  if (origin && allowedOrigins.includes(origin)) headers["Access-Control-Allow-Origin"] = origin;
+  return headers;
 }
 
 function json(body: unknown, status: number, headers: HeadersInit): Response {
@@ -65,6 +68,10 @@ export default {
 
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean); // ["sync", ...]
+
+    if (parts[0] === "feedback") {
+      return handleFeedback(request, env, headers, url, parts);
+    }
 
     if (parts[0] !== "sync") {
       return json({ error: "not_found" }, 404, headers);
@@ -130,5 +137,10 @@ export default {
     }
 
     return json({ error: "not_found" }, 404, headers);
+  },
+
+  // Daily cron (wrangler.toml [triggers]): feedback retention.
+  async scheduled(_controller: unknown, env: Env): Promise<void> {
+    await runRetention(env);
   },
 };
