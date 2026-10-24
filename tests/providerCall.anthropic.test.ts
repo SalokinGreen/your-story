@@ -531,6 +531,12 @@ describe("Claude prompt caching on the GM stage (A3)", () => {
     expect(marks1[0]).toBe(0);
     expect(sent1.messages[0].role).toBe("system");
     expect(sent1.messages[marks1[1]].role).toBe("assistant");
+    // The marks reused across turns live an hour; the turn's own, five
+    // minutes (decision 186: a player who pauses past five minutes kept
+    // paying the write on the whole prefix).
+    const ttlOf = (m: SentMessage) => (m.content as SentPart[])[0].cache_control;
+    expect(ttlOf(sent1.messages[0])).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(ttlOf(sent1.messages[marks1[1]])).toEqual({ type: "ephemeral", ttl: "1h" });
 
     // marks1[2] is the action; keep the older names below.
     marks1.splice(1, 1);
@@ -652,6 +658,49 @@ describe("Claude's billed cost", () => {
       .map((f) => JSON.parse(f))
       .find((e) => e.type === "done");
     expect(done.meta.estimatedCost).toBe(0.0095);
+  });
+
+  // The 2026-10-24 Debug Logs: streamed turns reported 0 tokens and no cost,
+  // because the read stopped at finish_reason and OpenRouter's usage comes
+  // in a chunk of its own after it.
+  it("reads the usage chunk that follows the finish chunk", async () => {
+    const encoder = new TextEncoder();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        text: async () => "",
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ choices: [{ delta: { content: "The lock clicks." }, finish_reason: "stop" }] })}\n\n` +
+                  `data: ${JSON.stringify({ choices: [], usage: CACHED_ROUND_USAGE })}\n\n` +
+                  "data: [DONE]\n\n",
+              ),
+            );
+            controller.close();
+          },
+        }),
+      })),
+    );
+    const frames = await drain(
+      generateStream({
+        messages: [{ role: "user", content: "hi" }],
+        model: "Claude Sonnet 5.5",
+        openRouterKey: "test-key",
+      }),
+    );
+    const done = frames
+      .split("\n\n")
+      .map((f) => f.replace(/^data: /, ""))
+      .filter((f) => f.startsWith("{"))
+      .map((f) => JSON.parse(f))
+      .find((e) => e.type === "done");
+    expect(done.meta.estimatedCost).toBe(0.0095);
+    expect(done.meta.usage.promptTokens).toBeGreaterThan(0);
   });
 
   it("leaves other OpenRouter models on list-price arithmetic", async () => {

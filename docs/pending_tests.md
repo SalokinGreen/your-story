@@ -10,6 +10,21 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — The 1-hour cache and streamed usage (decision 186)
+
+Needs a real model (an OpenRouter key; a few cents):
+
+- **The 1-hour cache is accepted.** Play two turns with a Claude model through
+  OpenRouter, more than five minutes apart. Expected: the second turn's "AI
+  generation (stream) complete" line in the Debug Logs shows a large
+  `cachedTokens` (most of the ~60k prefix) and a small `cacheWriteTokens`.
+  Failure looks like: `cachedTokens` 0 after the pause (OpenRouter dropped the
+  TTL), or a warning "OpenRouter rejected the 1-hour cache TTL" (it refused
+  it; the turn still went through on the 5-minute cache).
+- **Streamed turns report usage.** Any streamed turn's "AI generation (stream)
+  complete" line shows non-zero `promptTokens`, and the turn cost panel a
+  cost. Failure looks like: `promptTokens: 0` as in the 2026-10-24 logs.
+
 ## 2026-10-24 — System turn-end checks / the dawn check (decisions 183–184)
 
 Built and covered by the suite against a scripted provider; never run against
