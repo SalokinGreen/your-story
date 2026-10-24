@@ -10,6 +10,20 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Europe by Night, deeper (E2)
+
+Content only; the engine paths it uses were tested in E1. Needs a real model:
+
+- **The continent notes arrive.** Open a Blood & Bone story made before E2.
+  Expected: its Notes page now lists *Europe by Night — The Hollow Roads*,
+  *Powers of the continent* and *Who's who*, and no new city. Failure looks
+  like: a city note arriving (scope rule broken), or none of the three.
+- **The GM uses a city.** In a story set in London, travel ("I take the night
+  train to Edinburgh"). Expected: the GM reads *Europe by Night — Edinburgh*
+  if the story holds it, or the overview's "where to read more" list tells it
+  the city lives in the library (it is not pushed); it then plays the
+  Closemen or Tollhouse Court rather than inventing a faction.
+
 ## 2026-10-24 — Blood & Bone tables, E1 (decisions 150–159)
 
 Run on the desktop app with the author's go (Claude Haiku subscription,
