@@ -20,7 +20,14 @@ export interface BuiltinNote {
   // scoped "cross-europe" (missingBuiltinNotes). Unset means the note is
   // not scoped (a rules note).
   scope?: "cross-europe" | string;
+  // A Rules note written for one setting (the E1 table families are Europe
+  // by Night's): pushed on load only to stories in that setting, and left out
+  // of the starters set elsewhere. Unset means every setting (design E5 §5).
+  setting?: string;
 }
+
+/** `SystemState.setting` for Europe by Night, the setting an unset field means. */
+export const EUROPE_BY_NIGHT_SETTING = "europe-by-night";
 
 export interface BuiltinPack {
   id: string; // "blood-and-bone:rules"

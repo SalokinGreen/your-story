@@ -599,6 +599,11 @@ export interface SystemState {
   // the player deleted stays deleted. Absent on a story saved before the list
   // existed: the ids it holds then count as offered (builtinNotes.ts).
   builtinNotesOffered?: string[];
+  // The built-in setting the story is played in, set by the starter it came
+  // from: "grave-watch", "last-resort". Unset means Europe by Night (every
+  // story before E5, and The Hollow Hour). Only a Europe by Night story is
+  // given the cross-Europe notes on load (builtinNotes.ts, design E5 §5).
+  setting?: string;
 }
 
 // ============================================

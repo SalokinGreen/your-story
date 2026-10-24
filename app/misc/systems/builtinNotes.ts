@@ -25,7 +25,7 @@
 import type { StoryData, StoryLore } from "../structs";
 import { BUILTIN_SYSTEMS } from "./index";
 import { resolveSystem } from "./resolve";
-import type { BuiltinNote, BuiltinSystem } from "./types";
+import { EUROPE_BY_NIGHT_SETTING, type BuiltinNote, type BuiltinSystem } from "./types";
 
 /** The core note's id: a story holding it runs the system (design 3.2). */
 export const BLOOD_AND_BONE_CORE_ID = "builtin:blood-and-bone:core";
@@ -47,14 +47,31 @@ function heldIds(story: Pick<StoryData, "lore">): Set<string> {
   return ids;
 }
 
-/** The notes a story of this system is given on load: the Rules pack and the cross-setting notes. */
-export function pushedBuiltinNotes(system: BuiltinSystem): BuiltinNote[] {
+export { EUROPE_BY_NIGHT_SETTING };
+
+/** Whether a story's setting is Europe by Night: unset is (every story before E5). */
+function inCrossSetting(setting: string | undefined): boolean {
+  return setting === undefined || setting === EUROPE_BY_NIGHT_SETTING;
+}
+
+/**
+ * The notes a story of this system is given on load: the Rules pack, and the
+ * cross-setting notes when the story is played in that setting (a Grave
+ * Watcher story is not given Europe by Night's notes; design E5 §5).
+ */
+export function pushedBuiltinNotes(
+  system: BuiltinSystem,
+  setting?: string,
+): BuiltinNote[] {
+  const cross = inCrossSetting(setting);
+  const storySetting = setting ?? EUROPE_BY_NIGHT_SETTING;
   const out: BuiltinNote[] = [];
   for (const pack of system.packs) {
     const isRules = pack.id.endsWith(":rules");
     for (const n of pack.notes) {
       if (PINNED_TYPES.has(n.type)) continue;
-      if (isRules || n.scope === CROSS_SETTING_SCOPE) out.push(n);
+      if (n.setting !== undefined && n.setting !== storySetting) continue;
+      if (isRules || (cross && n.scope === CROSS_SETTING_SCOPE)) out.push(n);
     }
   }
   return out;
@@ -70,7 +87,7 @@ export function missingBuiltinNotes(
 ): BuiltinNote[] {
   const held = heldIds(story);
   const offered = new Set(story.systemState?.builtinNotesOffered ?? [...held]);
-  return pushedBuiltinNotes(system).filter(
+  return pushedBuiltinNotes(system, story.systemState?.setting).filter(
     (n) => !held.has(n.id) && !offered.has(n.id),
   );
 }
@@ -146,7 +163,7 @@ export function seedBuiltinNotesOffered(
   if (!system) return;
   const offered = new Set(story.systemState?.builtinNotesOffered ?? []);
   for (const id of heldIds(story)) offered.add(id);
-  for (const n of pushedBuiltinNotes(system)) offered.add(n.id);
+  for (const n of pushedBuiltinNotes(system, story.systemState?.setting)) offered.add(n.id);
   story.systemState = {
     sessionCount: 0,
     dedupKeys: [],

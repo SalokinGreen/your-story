@@ -159,7 +159,7 @@ each is playable on its own.
 | **E2** | **Europe, deeper**: about 10 new cities, the countryside and borderlands, the Hollow Roads as places, cross-Europe factions, a roster of named NPCs | ~25k | E1 |
 | **E3** | **Character options**: a third Archetype for each of the seven Kinds; more Powers, Paths, Havens, Companions, Relics, Rites | ~18k | E0 |
 | **E4** | **New Kinds**: two or three, each with Archetypes, Powers, Stress triggers, a Beast, creation prompts, meter sets as needed; the `KINDS` constant (§3.4) | ~12k | E3 |
-| **E5** | **Starters**: three or four new ones in different cities and tones, built on everything above | ~12k | E1–E4 |
+| **E5** | **Starters**: three or four new ones in different cities and tones, built on everything above. *Replaced (2026-10-24, decisions 163–173) by two campaigns in their own worlds, Grave Watcher and The Last Resort: `docs/bb-starters-design.md`.* | ~12k (built: ~33k) | E1–E4 |
 
 Total about **90,000 tokens**, a little over three times the current
 42,800. The order after E1 can change; E5 is last because a starter leans

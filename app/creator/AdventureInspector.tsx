@@ -10,7 +10,11 @@
 
 import { useState } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
-import { AdventureDraft, draftReadiness } from "@/app/misc/designer_executor";
+import {
+  AdventureDraft,
+  draftReadiness,
+  withSystemToolsSwitch,
+} from "@/app/misc/designer_executor";
 import { pinnedNoteWarning } from "@/app/misc/contextLimits";
 import { LoreType, NPC, StoryLore } from "@/app/misc/structs";
 import { resolveSystem } from "@/app/misc/systems/resolve";
@@ -434,10 +438,10 @@ export default function AdventureInspector({
                   onChange={(e) => {
                     const v = e.target.value;
                     onChange({
-                      systemState:
-                        v === "auto"
-                          ? undefined
-                          : { usesSystemTools: v === "on" },
+                      systemState: withSystemToolsSwitch(
+                        draft.systemState,
+                        v === "auto" ? undefined : v === "on",
+                      ),
                     });
                   }}
                 >
