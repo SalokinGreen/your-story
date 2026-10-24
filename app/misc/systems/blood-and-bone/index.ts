@@ -16,6 +16,14 @@ import { BLOOD_AND_BONE_CREATION_STEPS } from "./creationSteps";
 import { EUROPE_NOTES } from "./europe";
 import { buildHollowHour } from "./hollowHour";
 import { KIND_NOTES } from "./kinds";
+import { REVENANT_NOTE } from "./kinds-more/revenant";
+import { REVENANT_PROMPTS_NOTE } from "./kinds-more/revenant-prompts";
+import { CHANGELING_NOTE } from "./kinds-more/changeling";
+import { CHANGELING_PROMPTS_NOTE } from "./kinds-more/changeling-prompts";
+import { DOPPELGANGER_NOTE } from "./kinds-more/doppelganger";
+import { DOPPELGANGER_PROMPTS_NOTE } from "./kinds-more/doppelganger-prompts";
+import { RUSALKA_NOTE } from "./kinds-more/rusalka";
+import { RUSALKA_PROMPTS_NOTE } from "./kinds-more/rusalka-prompts";
 import { BLOOD_AND_BONE_METER_SETS } from "./meterSets";
 import { MOVES_NOTE } from "./moves";
 import { PROGRESS_NOTE } from "./progress";
@@ -41,6 +49,11 @@ const RULES_NOTES: BuiltinNote[] = [
   CORE_NOTE,
   MOVES_NOTE,
   ...KIND_NOTES,
+  // The expansion's four new Kinds (E4, decision 160).
+  REVENANT_NOTE,
+  CHANGELING_NOTE,
+  DOPPELGANGER_NOTE,
+  RUSALKA_NOTE,
   ...ASSET_NOTES,
   PROGRESS_NOTE,
   TIME_SKIP_NOTE,
@@ -60,6 +73,10 @@ const RULES_NOTES: BuiltinNote[] = [
   INVESTIGATION_NOTE,
   ROADS_NOTE,
   ...CREATION_PROMPT_NOTES,
+  REVENANT_PROMPTS_NOTE,
+  CHANGELING_PROMPTS_NOTE,
+  DOPPELGANGER_PROMPTS_NOTE,
+  RUSALKA_PROMPTS_NOTE,
 ];
 
 export const BLOOD_AND_BONE_RULES_PACK: BuiltinPack = {

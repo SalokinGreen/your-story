@@ -74,6 +74,38 @@ What "feeding" means follows the Kind's Recover Move: blood, flesh, dominion, a 
 5. The unfinished thing: an unsent letter, an unpaid debt, a question nobody answered.
 6. A mirror, a gate, a threshold: any place the tether runs thin.
 
+### Revenant
+1. A rival's office after hours, a ledger in the drawer.
+2. A graveside, where the one wronged has never been told.
+3. The target's front step at the hour they leave for work.
+4. A courtroom gallery on the day a verdict is due.
+5. A letter box, a long-delayed payment, a bus to a town you left.
+6. The kitchen of someone who owes the dead a word.
+
+### Changeling
+1. A christening, a wedding or a retirement party, and a joyful face in the crowd.
+2. A kitchen table where someone is in the middle of a bargain they do not understand.
+3. A hospital waiting room and a mother who has just been told the good news.
+4. A crossroads or a footbridge at the turn of the night.
+5. A schoolyard at the end of term, and a child laughing about nothing.
+6. A shop with a lost-and-found box, a desperate customer and a favour that can be traded.
+
+### Doppelgänger
+1. A grieving household that has lost someone and is glad of a replacement at the table.
+2. A flat whose owner has been missing a week, and a neighbour who already waves.
+3. A wedding party, where everyone assumes you're another cousin.
+4. A night-shift workplace with a locker full of someone's coat and badge.
+5. A hospice, with a relative who hasn't visited in years.
+6. A student house where the quiet one left for a month and nobody asked.
+
+### Rusalka
+1. A quay at 3 a.m. and a drunk who wants to sit at the edge.
+2. A river-bank bar where the lights over the water make everyone romantic.
+3. A late ferry, almost empty, and a passenger who stays on deck.
+4. A bridge where lovers pledge things to each other, and one has been left behind.
+5. A summer swim at a quiet bend, and a stranger who says yes to a dare.
+6. A canal-side garden party and a guest who steps out for air.
+
 ## What goes wrong (1d20)
 1. They aren't alone. The one you chose is already someone's.
 2. It's not who it seems. Their blood, their flesh, their fear is wrong.
