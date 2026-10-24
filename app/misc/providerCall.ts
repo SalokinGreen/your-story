@@ -635,6 +635,32 @@ function buildEndpoint(provider: Provider, hasPrefill: boolean, hasTools: boolea
  */
 let mistralCacheKeyRejected = false;
 
+/**
+ * Set when OpenRouter refuses the 1-hour cache TTL (decision 186). It was
+ * written from the docs and not yet seen working live, so a 400 that names
+ * it is answered by sending the request once more without it, and the rest
+ * of the session uses the 5-minute cache only: a refused field must never
+ * stop every Claude turn.
+ */
+let cacheTtlRejected = false;
+
+/** Test hook: forget a TTL rejection. */
+export function resetCacheTtlRejected(): void {
+  cacheTtlRejected = false;
+}
+
+/** Removes every `ttl` from the request's cache_control parts, in place. */
+function stripCacheTtl(requestBody: Record<string, unknown>): void {
+  const messages = requestBody.messages;
+  if (!Array.isArray(messages)) return;
+  for (const m of messages as Array<{ content?: unknown }>) {
+    if (!Array.isArray(m.content)) continue;
+    for (const part of m.content as Array<{ cache_control?: { ttl?: string } }>) {
+      if (part.cache_control?.ttl) delete part.cache_control.ttl;
+    }
+  }
+}
+
 /** Test hook: forget a rejection. */
 export function resetMistralCacheKeyRejected(): void {
   mistralCacheKeyRejected = false;
@@ -706,6 +732,23 @@ async function postChatRequest(
       return send();
     }
   }
+  if (
+    !response.ok &&
+    provider === "openrouter" &&
+    response.status === 400 &&
+    JSON.stringify(requestBody.messages ?? "").includes('"ttl"')
+  ) {
+    const text = await response.clone().text().catch(() => "");
+    if (/\bttl\b|cache_control/i.test(text)) {
+      cacheTtlRejected = true;
+      stripCacheTtl(requestBody);
+      logger.warn("OpenRouter rejected the 1-hour cache TTL - retrying with the 5-minute cache, and using it for the rest of the session", {
+        status: response.status,
+        detail: text.slice(0, 200),
+      });
+      return send();
+    }
+  }
   return response;
 }
 
@@ -755,6 +798,7 @@ function dropMidHistoryPrefills(messages: ChatMessage[]): ChatMessage[] {
  * 1.25x, reads stay at a tenth).
  */
 function withCacheBreakpoint(content: string, ttl?: "1h"): CachedTextPart[] {
+  if (cacheTtlRejected) ttl = undefined;
   return [
     {
       type: "text",
