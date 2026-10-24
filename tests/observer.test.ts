@@ -1725,7 +1725,7 @@ describe("character context reaches the judges", () => {
 
     const agencyCalls = fetchMock.mock.calls.filter((call) =>
       JSON.parse(call[1].body).messages[0].content.includes("PLAYER AGENCY") ||
-      JSON.parse(call[1].body).messages[0].content.includes("player character says, thinks"),
+      JSON.parse(call[1].body).messages[0].content.includes("took a decision away from the player"),
     );
     expect(agencyCalls.length).toBeGreaterThan(0);
     for (const call of agencyCalls) {
@@ -2381,7 +2381,7 @@ describe("rewriteFlaggedNarration", () => {
     const prompt = body.messages
       .map((m: { content: string }) => m.content)
       .join("\n");
-    expect(prompt).toContain("beyond what the player actually declared");
+    expect(prompt).toContain("makes a significant choice for them");
     expect(prompt).toContain("contradicts what a roll or check mechanically");
     // Conditional, never asserted as found - a clean narration must not be
     // "corrected" for a problem it doesn't have.
