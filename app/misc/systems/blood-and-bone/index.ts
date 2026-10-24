@@ -14,6 +14,23 @@ import { CREATION_NOTE } from "./creation";
 import { CREATION_PROMPT_NOTES } from "./creationPrompts";
 import { BLOOD_AND_BONE_CREATION_STEPS } from "./creationSteps";
 import { EUROPE_NOTES } from "./europe";
+import { ROADS_NOTE as EUROPE_ROADS_NOTE } from "./europe/roads";
+import { POWERS_NOTE } from "./europe/powers";
+import { WHOS_WHO_NOTE } from "./europe/whos-who";
+import { BUDAPEST_NOTE } from "./europe/budapest";
+import { EDINBURGH_NOTE } from "./europe/edinburgh";
+import { DUBLIN_NOTE } from "./europe/dublin";
+import { AMSTERDAM_NOTE } from "./europe/amsterdam";
+import { STOCKHOLM_NOTE } from "./europe/stockholm";
+import { LISBON_NOTE } from "./europe/lisbon";
+import { MARSEILLE_NOTE } from "./europe/marseille";
+import { VENICE_NOTE } from "./europe/venice";
+import { NAPLES_NOTE } from "./europe/naples";
+import { KRAKOW_NOTE } from "./europe/krakow";
+import { BUCHAREST_NOTE } from "./europe/bucharest";
+import { CARPATHIANS_NOTE } from "./europe/carpathians";
+import { HIGHLANDS_NOTE } from "./europe/highlands";
+import { ALPS_NOTE } from "./europe/alps";
 import { buildHollowHour } from "./hollowHour";
 import { KIND_NOTES } from "./kinds";
 import { BLOOD_AND_BONE_METER_SETS } from "./meterSets";
@@ -34,6 +51,29 @@ import { OBJECTS_NOTE } from "./oracles/objects";
 import { INVESTIGATION_NOTE } from "./oracles/investigation";
 import { ROADS_NOTE } from "./oracles/roads";
 import { TIME_SKIP_NOTE } from "./timeSkip";
+
+// Europe by Night: the six original cities and the overview, then the
+// expansion's continent notes, cities and wild places (E2, decisions 150-159).
+const EUROPE_PACK_NOTES: BuiltinNote[] = [
+  ...EUROPE_NOTES,
+  EUROPE_ROADS_NOTE,
+  POWERS_NOTE,
+  WHOS_WHO_NOTE,
+  BUDAPEST_NOTE,
+  EDINBURGH_NOTE,
+  DUBLIN_NOTE,
+  AMSTERDAM_NOTE,
+  STOCKHOLM_NOTE,
+  LISBON_NOTE,
+  MARSEILLE_NOTE,
+  VENICE_NOTE,
+  NAPLES_NOTE,
+  KRAKOW_NOTE,
+  BUCHAREST_NOTE,
+  CARPATHIANS_NOTE,
+  HIGHLANDS_NOTE,
+  ALPS_NOTE,
+];
 
 export const BLOOD_AND_BONE_ID = "blood-and-bone";
 
@@ -77,7 +117,7 @@ export const BLOOD_AND_BONE_EUROPE_PACK: BuiltinPack = {
   title: "Blood & Bone — Europe by Night",
   description:
     "A setting for the rules: the Concord, the Vigil and the Hollow Roads, and six cities (London, Paris, Prague, Rome, Berlin, Vienna) with factions, threats and hooks.",
-  notes: EUROPE_NOTES,
+  notes: EUROPE_PACK_NOTES,
 };
 
 export const BLOOD_AND_BONE: BuiltinSystem = {
@@ -87,7 +127,7 @@ export const BLOOD_AND_BONE: BuiltinSystem = {
     "A modern supernatural horror game of monsters holding on to something human, and the hunters who stalk them. Roll a d6 plus a stat against two d10s; keep Stress, Beast and Exposure in check; fight in three exchanges. Built on the Ironsworn engine (CC BY 4.0, Tomkin Press); not an official Ironsworn product.",
   packs: [BLOOD_AND_BONE_RULES_PACK, BLOOD_AND_BONE_EUROPE_PACK],
   starters: [
-    buildHollowHour([...RULES_NOTES, ...EUROPE_NOTES]),
+    buildHollowHour([...RULES_NOTES, ...EUROPE_PACK_NOTES]),
   ],
   sheetTemplate: BLOOD_AND_BONE_SHEET_TEMPLATE,
   creationNoteId: "builtin:blood-and-bone:character-creation",

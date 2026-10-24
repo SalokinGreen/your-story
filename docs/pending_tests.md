@@ -10,6 +10,18 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Europe by Night, deeper (E2)
+
+Checked in the browser preview: a *Hollow Hour* story from 2026-10-23 gains
+the three continent notes (and E1's twelve tables) on opening, and no new city.
+Needs a real model:
+
+- **The GM uses a city.** In a story set in London, travel ("I take the night
+  train to Edinburgh"). Expected: the GM reads *Europe by Night — Edinburgh*
+  if the story holds it, or the overview's "where to read more" list tells it
+  the city lives in the library (it is not pushed); it then plays the
+  Closemen or Tollhouse Court rather than inventing a faction.
+
 ## 2026-10-24 — Blood & Bone tables, E1 (decisions 150–159)
 
 Run on the desktop app with the author's go (Claude Haiku subscription,
