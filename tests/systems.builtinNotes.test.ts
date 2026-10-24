@@ -40,7 +40,6 @@ const europe = sys.packs[1];
 const starter = sys.starters[0];
 const template = starter.adventure.storyTemplate!;
 
-const LIVE_BEFORE = 1397;
 
 function loreOf(ids: string[]): StoryLore[] {
   return [...rules.notes, ...europe.notes]
@@ -160,7 +159,8 @@ describe("the compact note list", () => {
 
   it("costs fewer live-block tokens than one line per note", () => {
     const tokens = enc.encode(liveBlock(starterStory())).length;
-    expect(tokens).toBeLessThan(LIVE_BEFORE);
+    // The pre-E1 starter was 1,397 (header comment); the starter has grown since (E1's
+    // tables, E2's three continent notes: 1,398), so only the ceiling holds.
     // Pinned loosely: a growing pack must not bring back a line per note.
     expect(tokens).toBeLessThan(1450);
   });
@@ -171,7 +171,9 @@ describe("new built-in notes on load", () => {
     const pushed = pushedBuiltinNotes(sys);
     const pinnedCount = rules.notes.filter((n) => n.type === "dm_instructions").length;
     expect(pinnedCount).toBe(1); // the core
-    expect(pushed.length).toBe(rules.notes.length - pinnedCount + 1);
+    const crossEurope = europe.notes.filter((n) => n.scope === "cross-europe").length;
+    expect(crossEurope).toBe(4); // the overview and E2's three continent notes
+    expect(pushed.length).toBe(rules.notes.length - pinnedCount + crossEurope);
     expect(pushed.every((n) => n.scope === undefined || n.scope === "cross-europe")).toBe(true);
     expect(pushed.some((n) => n.title.endsWith("— London"))).toBe(false);
   });
