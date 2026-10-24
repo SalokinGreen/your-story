@@ -15,7 +15,7 @@ Four tables for Undertake a Journey on the Hollow Roads, the old smuggling
 and travel routes under Europe. Roll a stretch of road, who controls it,
 what travels it tonight, and the trouble that finds the characters on it.
 
-## A stretch of road (d20)
+## A stretch of road (1d20)
 1. A drowned tunnel under a river, passable at low water.
 2. A mountain pass where the snow never fully melts.
 3. A railway siding the timetable has never listed.
@@ -37,7 +37,7 @@ what travels it tonight, and the trouble that finds the characters on it.
 19. A mountain hut with a door on each side and a different country behind each.
 20. A stretch that was closed, and has quietly been reopened.
 
-## Who controls it (d20)
+## Who controls it (1d20)
 1. A Vampire court, who take a toll and keep a ledger.
 2. A Werewolf pack, who patrol it and decide who passes.
 3. A coven that tends the road as a working, like a garden.
@@ -59,7 +59,7 @@ what travels it tonight, and the trouble that finds the characters on it.
 19. Nobody knows. Everyone who has tried to find out has not come back.
 20. The road itself, if it can be said to want anything.
 
-## What travels it tonight (d20)
+## What travels it tonight (1d20)
 1. A convoy of black cars moving someone who does not want to be moved.
 2. A caravan of Witches, a dozen vans, a funeral at the other end.
 3. A single traveller, running, and not for the first time.
@@ -81,7 +81,7 @@ what travels it tonight, and the trouble that finds the characters on it.
 19. Another party, like yours, on the same errand, and wanting the same thing.
 20. Nothing at all, which on this road is the worst sign.
 
-## Trouble on the road (d20)
+## Trouble on the road (1d20)
 1. A toll nobody told you about, due now.
 2. The way is closed. Something has collapsed, flooded or been claimed.
 3. A guide who is not what they claim.

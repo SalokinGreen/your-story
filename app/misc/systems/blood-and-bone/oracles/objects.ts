@@ -15,7 +15,7 @@ Three tables for an object that matters: what it is, where it has been, and
 who would pay or kill for it. An object is a lead, not a magic item; let its
 power stay small, strange and expensive.
 
-## An odd object (d66)
+## An odd object (d66: roll ["1d6","1d6"], first die is the tens)
 11 A pocket watch that runs backward at night.
 12 A silver spoon, tarnished black on one side only.
 13 A child's music box that plays something the child never heard.
@@ -53,7 +53,7 @@ power stay small, strange and expensive.
 65 A bundle of bandages stiff with old, dark stains.
 66 Roll twice. The two were made as a pair and should never have been parted.
 
-## Its history (d20)
+## Its history (1d20)
 1. It was in a house fire and came out unmarked.
 2. Taken from a grave, and the grave has since been disturbed again.
 3. Left to the wrong heir, who died within the year.
@@ -75,7 +75,7 @@ power stay small, strange and expensive.
 19. It belonged to someone you loved, and you don't remember them.
 20. Roll twice. Two stories, and only one can be true.
 
-## Who wants it (d20)
+## Who wants it (1d20)
 1. A collector who pays for exactly this sort of thing, and then regrets it.
 2. A rival court, coven or pack, for leverage in a feud.
 3. A hunter who thinks it will finish the work.

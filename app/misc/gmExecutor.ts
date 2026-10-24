@@ -3425,19 +3425,59 @@ function executeReadNotes(
     visibility?: LoreVisibility;
   }> = [];
   const notFoundTitles: string[] = [];
+  const notFoundHints = new Map<string, string>();
 
-  // Helper to normalize title for matching (strip .md suffix, case-insensitive)
+  // Helper to normalize title for matching (strip .md suffix, case-insensitive,
+  // and one separator for the en dash, em dash and hyphen between spaces).
   const normalizeTitle = (title: string): string => {
-    return title.toLowerCase().replace(/\.md$/i, "").trim();
+    return title
+      .toLowerCase()
+      .replace(/\.md$/i, "")
+      .replace(/\s+[–—-]\s+/g, " — ")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+  // The part of a built-in note's title after its " — " prefix.
+  const builtinName = (e: { title: string; libraryNoteId?: string }) => {
+    if (!e.libraryNoteId?.startsWith("builtin:")) return null;
+    const t = normalizeTitle(e.title);
+    const at = t.indexOf(" — ");
+    return at < 0 ? null : t.slice(at + 3);
+  };
+  // Up to three enabled titles sharing the most words with a missed request.
+  const closestTitles = (request: string): string[] => {
+    const words = new Set(
+      normalizeTitle(request).split(/[^a-z0-9]+/).filter((w) => w.length > 1)
+    );
+    return loreEntries
+      .filter((e) => e.enabled !== false)
+      .map((e) => ({
+        title: e.title,
+        score: normalizeTitle(e.title)
+          .split(/[^a-z0-9]+/)
+          .filter((w) => words.has(w)).length,
+      }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((x) => x.title);
   };
 
   for (const requestedTitle of titles) {
     const normalizedRequest = normalizeTitle(requestedTitle);
     // Find entry with matching title (case-insensitive, .md suffix tolerant)
-    const entry = loreEntries.find(
+    let entry = loreEntries.find(
       (e) =>
         normalizeTitle(e.title) === normalizedRequest && e.enabled !== false
     );
+    if (!entry) {
+      // "Havens" for "B&B — Havens": accepted when exactly one built-in note
+      // carries that name.
+      const byName = loreEntries.filter(
+        (e) => e.enabled !== false && builtinName(e) === normalizedRequest
+      );
+      if (byName.length === 1) entry = byName[0];
+    }
 
     if (entry) {
       foundNotes.push({
@@ -3447,7 +3487,14 @@ function executeReadNotes(
         visibility: entry.visibility,
       });
     } else {
+      const close = closestTitles(requestedTitle);
       notFoundTitles.push(requestedTitle);
+      if (close.length) {
+        notFoundHints.set(
+          requestedTitle,
+          `${requestedTitle} (closest: ${close.map((t) => `"${t}"`).join(", ")})`
+        );
+      }
     }
   }
 
@@ -3457,12 +3504,12 @@ function executeReadNotes(
   if (foundNotes.length === 0) {
     contextForStory += `\n[No notes found with those titles]`;
     if (notFoundTitles.length > 0) {
-      contextForStory += `\n[Not found: ${notFoundTitles.join(", ")}]`;
+      contextForStory += `\n[Not found: ${notFoundTitles.map((t) => notFoundHints.get(t) ?? t).join(", ")}]`;
     }
   } else {
     contextForStory += `\n[Found ${foundNotes.length} of ${titles.length} notes]`;
     if (notFoundTitles.length > 0) {
-      contextForStory += `\n[Not found: ${notFoundTitles.join(", ")}]`;
+      contextForStory += `\n[Not found: ${notFoundTitles.map((t) => notFoundHints.get(t) ?? t).join(", ")}]`;
     }
     for (const note of foundNotes) {
       const typeSuffix =

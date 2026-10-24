@@ -13,7 +13,7 @@ export const MASQUERADE_NOTE: BuiltinNote = {
 
 Four tables for when a secret slips. A breach says what happened; who saw and how it spreads say what follows; burying it is the characters' work. Exposure goes on a character's meter, Heat on the city's. Apply a meter change only when it fits the scene and the core's Exposure and Heat rules already allow it.
 
-## A breach (d66)
+## A breach (d66: roll ["1d6","1d6"], first die is the tens)
 11 A phone camera records a face that doesn't show in the reflection. Exposure +1.
 12 A body is found with the wrong kind of wounds, and the wrong amount of blood.
 13 A witness lives, and does not scream. They go home and write it all down. Exposure +1.
@@ -51,7 +51,7 @@ Four tables for when a secret slips. A breach says what happened; who saw and ho
 65 A mortal asks the characters directly, politely: what are you?
 66 Roll twice. The breaches are linked, and someone arranged both.
 
-## Who saw (d20)
+## Who saw (1d20)
 1. One person, alone, who is deciding what to do.
 2. A child, with a good memory.
 3. A drunk nobody will believe, until someone does.
@@ -73,7 +73,7 @@ Four tables for when a secret slips. A breach says what happened; who saw and ho
 19. Several witnesses, none of whom saw the same thing.
 20. Nobody did. The risk is the thing left lying around.
 
-## How it spreads (d20)
+## How it spreads (1d20)
 1. A single phone call, made by someone sure of themselves.
 2. A forum thread that dies, and is revived a week later.
 3. It spreads by the gossip of a dozen neighbours, no one in charge.
@@ -95,7 +95,7 @@ Four tables for when a secret slips. A breach says what happened; who saw and ho
 19. A cluster of unrelated deaths makes the rumour believable.
 20. It was already everywhere. The characters are the last to know.
 
-## How to bury it (d20)
+## How to bury it (1d20)
 Each is a way to attempt Clean Up. Pick one that fits the breach; a miss makes it worse, in the way the entry suggests.
 1. Pay the witness, and then pay them again. They will come back for more.
 2. Replace the footage with something dull, from a different night.

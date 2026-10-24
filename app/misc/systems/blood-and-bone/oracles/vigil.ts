@@ -13,7 +13,7 @@ export const VIGIL_NOTE: BuiltinNote = {
 
 Five tables for a hunter cell that has the characters' scent. Build the cell with the first three, then reach for its next move and its mistake as the pursuit goes on. Exposure and Heat say how close they are.
 
-## Who they are (d20)
+## Who they are (1d20)
 1. Three friends who found out last year and cannot stop looking.
 2. A family with a cellar full of old books and older grudges.
 3. A parish group that meets after evensong and doesn't pray.
@@ -35,7 +35,7 @@ Five tables for a hunter cell that has the characters' scent. Build the cell wit
 19. Professionals hired through a broker. Nobody has told them the client is the Concord.
 20. Roll twice. They are two cells in one coat, and the join is a weakness.
 
-## How they found out (d20)
+## How they found out (1d20)
 1. They watched one of you feed. They kept their hands still.
 2. A photograph with too much shadow in it.
 3. A body that had been counted wrong at a morgue.
@@ -57,7 +57,7 @@ Five tables for a hunter cell that has the characters' scent. Build the cell wit
 19. An old Vigil dossier, last updated before the characters were born.
 20. They don't know yet. They are guessing, and guessing well.
 
-## What they want (d20)
+## What they want (1d20)
 1. To kill the characters, soon, in daylight.
 2. To use the characters against something worse.
 3. To save one particular person, and they think the characters hold them.
@@ -79,7 +79,7 @@ Five tables for a hunter cell that has the characters' scent. Build the cell wit
 19. A confession they can believe.
 20. Roll twice. The cell wants both, and has not noticed they conflict.
 
-## Their next move (d20)
+## Their next move (1d20)
 1. They tail a Connection of the characters' for three days.
 2. They put silver in the water supply of a Haven. A little, to see who flinches.
 3. They stake out a feeding ground and wait for dawn.
@@ -101,7 +101,7 @@ Five tables for a hunter cell that has the characters' scent. Build the cell wit
 19. They split: one watches, one acts, one leaves.
 20. They wait. A season of nothing, and then a door opens that should have been locked.
 
-## Their mistake (d20)
+## Their mistake (1d20)
 Something that can be used against them. Offer it in the fiction; don't hand it over.
 1. A written list, left in a coat.
 2. A member who is in love with one of the characters' Connections.

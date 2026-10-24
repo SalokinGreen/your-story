@@ -15,7 +15,7 @@ Four tables for the people the characters meet. Roll the ones you need;
 you rarely need all four. A name and one line of look are enough for a
 walk-on. A secret is for anyone who will be seen twice.
 
-## Names (d100)
+## Names (1d100)
 Mixed on purpose: the cities of the night are full of people from somewhere else.
 
 1. Anka Dorn
@@ -119,7 +119,7 @@ Mixed on purpose: the cities of the night are full of people from somewhere else
 99. Gideon Ashby
 100. A name they won't give. Roll again for the one on their papers, which is a lie.
 
-## A stranger's look (d66)
+## A stranger's look (d66: roll ["1d6","1d6"], first die is the tens)
 11 A good coat, a cheap phone, cracked down the middle.
 12 Hospital wristband still on, cut half through.
 13 Wedding ring worn on the wrong hand.
@@ -157,7 +157,7 @@ Mixed on purpose: the cities of the night are full of people from somewhere else
 65 Clean, pressed, terrified.
 66 Roll twice. Both are true, and they don't fit together.
 
-## What they're hiding (d20)
+## What they're hiding (1d20)
 1. A debt to someone who isn't human, and they know it.
 2. They saw something last winter and have told no one.
 3. They're informing on the people they work for.
@@ -179,7 +179,7 @@ Mixed on purpose: the cities of the night are full of people from somewhere else
 19. They owe the Vigil, and the Vigil is calling it in.
 20. Roll twice: the first is what they'll admit, the second is the truth.
 
-## A tell of the Kind (d6, on the Kind's list)
+## A tell of the Kind (1d6, on the Kind's list)
 A small sign a sharp-eyed character could notice. Noticing is a Wits roll
 at most; the tell is never proof on its own.
 

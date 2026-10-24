@@ -16,11 +16,13 @@ import { BLOOD_AND_BONE } from "@/app/misc/systems/blood-and-bone";
 import { PEOPLE_NOTE } from "@/app/misc/systems/blood-and-bone/oracles/people";
 import {
   addMissingBuiltinNotes,
+  BLOOD_AND_BONE_CORE_ID,
   missingBuiltinNotes,
   pushedBuiltinNotes,
+  seedBuiltinNotesOffered,
 } from "@/app/misc/systems/builtinNotes";
 import { resolveSystem } from "@/app/misc/systems/resolve";
-import { mockStory } from "./helpers/systemsHarness";
+import { mockStory, run } from "./helpers/systemsHarness";
 import { checkTableShape } from "./helpers/tableShape";
 import { warmTokenizer } from "./helpers/turnHarness";
 
@@ -54,6 +56,10 @@ function loreOf(ids: string[]): StoryLore[] {
     }));
 }
 
+function plain(title: string): StoryLore {
+  return { title, content: "c", relatedCharacters: [], relatedLocations: [], secrtet: false, keys: [], type: "lore" } as StoryLore;
+}
+
 function oldSave(): StoryData {
   // A story that started before the expansion: the rules and the whole of
   // Europe by Night, as the starter used to copy them.
@@ -73,7 +79,14 @@ describe("the table shape check", () => {
     expect(checkTableShape("t", c.replace(/^36 /m, "37 "))).not.toEqual([]);
     expect(checkTableShape("t", c.replace(/^### Ghost\n/m, ""))).not.toEqual([]);
     expect(checkTableShape("t", c.replace(/Use when [\s\S]*$/, "End."))).not.toEqual([]);
-    expect(checkTableShape("t", c.replace("## Names (d100)", "## Names"))).not.toEqual([]);
+    expect(checkTableShape("t", c.replace("## Names (1d100)", "## Names"))).not.toEqual([]);
+    // The old bare forms are not what the GM passes to formula_roll.
+    expect(checkTableShape("t", c.replace("## Names (1d100)", "## Names (d100)"))).not.toEqual([]);
+    expect(checkTableShape("t", c.replace('(d66: roll ["1d6","1d6"], first die is the tens)', "(d66)"))).not.toEqual([]);
+    // A die that does not cover the table: 1d50 never gives 51-100.
+    expect(checkTableShape("t", c.replace("## Names (1d100)", "## Names (1d50)"))).not.toEqual([]);
+    // A stray numbered line inside a d66 body.
+    expect(checkTableShape("t", c.replace(/^11 /m, "1. x\n11 "))).not.toEqual([]);
     expect(checkTableShape("t", "Just prose.")).not.toEqual([]);
     expect(checkTableShape("t", "Roll 1d6:\n1. a\n2. b\n")).not.toEqual([]);
     expect(checkTableShape("t", "Roll 1d4:\n1. a\n2. b\n3. c\n4. d\n")).toEqual([]);
@@ -154,7 +167,9 @@ describe("the compact note list", () => {
 describe("new built-in notes on load", () => {
   it("pushes the rules and the cross-Europe notes, never a city", () => {
     const pushed = pushedBuiltinNotes(sys);
-    expect(pushed.length).toBe(rules.notes.length + 1);
+    const pinnedCount = rules.notes.filter((n) => n.type === "dm_instructions").length;
+    expect(pinnedCount).toBe(1); // the core
+    expect(pushed.length).toBe(rules.notes.length - pinnedCount + 1);
     expect(pushed.every((n) => n.scope === undefined || n.scope === "cross-europe")).toBe(true);
     expect(pushed.some((n) => n.title.endsWith("— London"))).toBe(false);
   });
@@ -235,10 +250,69 @@ describe("new built-in notes on load", () => {
   });
 
   it("leaves a story with no built-in system alone", () => {
-    const story = mockStory({ lore: [{ title: "Mine", content: "c", relatedCharacters: [], relatedLocations: [], secrtet: false, keys: [], type: "lore" } as StoryLore] });
+    const story = mockStory({ lore: [plain("Mine")] });
     const before = JSON.stringify(story);
     expect(addMissingBuiltinNotes(story)).toBe(0);
     expect(JSON.stringify(story)).toBe(before);
+    expect(story.systemState).toBeUndefined();
+  });
+
+  it("leaves a story that only imported a setting note or one oracle alone", () => {
+    for (const title of ["Europe by Night — Overview", "B&B — Oracles: scene"]) {
+      const note = [...rules.notes, ...europe.notes].find((n) => n.title === title)!;
+      const story = mockStory({ lore: loreOf([note.id]) });
+      const before = JSON.stringify(story);
+      expect(addMissingBuiltinNotes(story), title).toBe(0);
+      expect(JSON.stringify(story), title).toBe(before);
+    }
+  });
+
+  it("leaves a story alone when the system tools are off", () => {
+    const story = oldSave();
+    story.lore = story.lore.filter((l) => l.title !== "B&B — Havens");
+    story.systemState = { sessionCount: 0, dedupKeys: [], usesSystemTools: false, builtinNotesOffered: [] };
+    const count = story.lore.length;
+    expect(addMissingBuiltinNotes(story)).toBe(0);
+    expect(story.lore).toHaveLength(count);
+  });
+
+  it("adds only when the core is held, and never a pinned type", () => {
+    const noCore = oldSave();
+    noCore.lore = noCore.lore.filter((l) => l.libraryNoteId !== BLOOD_AND_BONE_CORE_ID);
+    noCore.systemState = { sessionCount: 0, dedupKeys: [], builtinNotesOffered: [] };
+    expect(addMissingBuiltinNotes(noCore)).toBe(0);
+
+    // Only the core is held, nothing is on the offered list.
+    const coreOnly = mockStory({ lore: loreOf([BLOOD_AND_BONE_CORE_ID]) });
+    coreOnly.systemState = { sessionCount: 0, dedupKeys: [], builtinNotesOffered: [] };
+    const added = addMissingBuiltinNotes(coreOnly);
+    expect(added).toBeGreaterThan(20);
+    const pinned = new Set(["dm_instructions", "character_sheet", "gm_plan"]);
+    expect(pushedBuiltinNotes(sys).some((n) => pinned.has(n.type))).toBe(false);
+    expect(coreOnly.lore.filter((l) => l.type === "dm_instructions")).toHaveLength(1);
+  });
+
+  it("seeds a story created from the starter, so its first load adds nothing", () => {
+    const story = mockStory({ lore: template.lore! });
+    // The author left a note out of the starter's copy.
+    const dropped = rules.notes.find((n) => n.title === "B&B — Rites")!;
+    story.lore = story.lore.filter((l) => l.libraryNoteId !== dropped.id);
+    seedBuiltinNotesOffered(story);
+    const offered = story.systemState!.builtinNotesOffered!;
+    for (const n of pushedBuiltinNotes(sys)) expect(offered).toContain(n.id);
+    const count = story.lore.length;
+    expect(addMissingBuiltinNotes(story)).toBe(0);
+    expect(story.lore).toHaveLength(count);
+    expect(story.lore.some((l) => l.libraryNoteId === dropped.id)).toBe(false);
+    // A note shipped later (simulated: the id is not in the list) arrives.
+    story.systemState!.builtinNotesOffered = offered.filter((id) => id !== dropped.id);
+    expect(addMissingBuiltinNotes(story)).toBe(1);
+    expect(story.lore.some((l) => l.libraryNoteId === dropped.id)).toBe(true);
+  });
+
+  it("seeds nothing for a story that does not run the system", () => {
+    const story = mockStory({ lore: [plain("Mine")] });
+    seedBuiltinNotesOffered(story);
     expect(story.systemState).toBeUndefined();
   });
 
@@ -275,5 +349,35 @@ describe("the starter's notes", () => {
   it("is set in London", () => {
     expect(template.intro).toMatch(/Underground|tunnel/);
     expect(template.premise).toMatch(/Underground/);
+  });
+});
+
+describe("read_notes near misses", () => {
+  it("treats the en dash, em dash and hyphen between spaces alike", async () => {
+    for (const sep of ["-", "–", "—"]) {
+      const { result } = await run(oldSave(), "read_notes", { titles: [`B&B ${sep} Havens`] });
+      expect(result.success, sep).toBe(true);
+      expect(result.contextForStory).toContain("Found 1 of 1");
+    }
+  });
+
+  it("finds the one built-in note by its name after the prefix", async () => {
+    const { result } = await run(oldSave(), "read_notes", { titles: ["havens"] });
+    expect(result.contextForStory).toContain("Found 1 of 1");
+  });
+
+  it("does not guess when two built-in notes carry the name", async () => {
+    const s = oldSave();
+    const dup = { ...s.lore.find((l) => l.title === "B&B — Havens")!, title: "Other — Havens", libraryNoteId: "builtin:other:havens" };
+    s.lore.push(dup);
+    const { result } = await run(s, "read_notes", { titles: ["Havens"] });
+    expect(result.contextForStory).toContain("Not found");
+  });
+
+  it("offers up to three closest titles when nothing matches", async () => {
+    const { result } = await run(oldSave(), "read_notes", { titles: ["Oracles"] });
+    const line = result.contextForStory.split("\n").find((l: string) => l.startsWith("[Not found"))!;
+    expect(line).toContain("closest:");
+    expect(line.match(/"B&B/g)!.length).toBeLessThanOrEqual(3);
   });
 });

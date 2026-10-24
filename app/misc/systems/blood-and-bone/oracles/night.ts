@@ -15,7 +15,7 @@ Four tables for setting a scene after dark. Roll the mood once when the
 night begins, the weather and light when the characters step outside, and
 the other two when you want the street to feel alive.
 
-## The city's mood tonight (d66)
+## The city's mood tonight (d66: roll ["1d6","1d6"], first die is the tens)
 Mood is a pressure on every scene, not a rule. Let it colour what people say and do.
 11 Everyone is a little too polite, as if the city is listening.
 12 A festival the mortals are enjoying and the Kinds are avoiding.
@@ -54,7 +54,7 @@ Mood is a pressure on every scene, not a rule. Let it colour what people say and
 65 Eager to be fooled. Mortals will believe nearly anything tonight.
 66 Roll twice. They are in tension, and the Mask feels it.
 
-## Weather and light (d20)
+## Weather and light (1d20)
 1. Thin rain that makes every streetlight a smear.
 2. Dry cold; breath fogging and sound travelling far.
 3. Heavy fog; you can't see the end of the street.
@@ -76,7 +76,7 @@ Mood is a pressure on every scene, not a rule. Let it colour what people say and
 19. A halo around the moon, and every dog is barking at it.
 20. Roll twice and combine them: the night is not behaving.
 
-## What's moving after dark (d66)
+## What's moving after dark (d66: roll ["1d6","1d6"], first die is the tens)
 Something the characters can see or follow. The answer is a lead, not a verdict.
 11 A hearse with no driver idles at the kerb.
 12 A group of mortals in costume, walking in step and silent.
@@ -115,7 +115,7 @@ Something the characters can see or follow. The answer is a lead, not a verdict.
 65 Footsteps matching yours, one pace behind. Stop and they stop.
 66 Roll twice. The two are related, and one is following the other.
 
-## Sounds and smells (d20)
+## Sounds and smells (1d20)
 1. A distant church bell, tolling the wrong hour.
 2. A violin from an open window, then silence mid-note.
 3. Wet earth and iron, as if the street had just been dug.

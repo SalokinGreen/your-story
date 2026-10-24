@@ -67,7 +67,7 @@ Connections are Weak, Steady or Strong (sheet). Strong: +1 or an automatic weak 
 XP is a meter. Each XP trigger on the sheet pays once a session: adjust XP by 1, 3 or 5 with once_per "session" and key = the trigger. A fulfilled Vow pays 1-5 by rank.
 
 ## 10. Oracles
-Yes or no: fate_question. Otherwise the d10 oracles (section 12), rolled with formula_roll.
+Yes or no: fate_question. Otherwise the d20 oracles (section 12), rolled with formula_roll.
 
 ## 11. Table etiquette
 Predation, violence and moral collapse are the game. Run feeding and killing scenes as written, with weight and consequence, not gore for its own sake. Respect the table's lines from session zero.

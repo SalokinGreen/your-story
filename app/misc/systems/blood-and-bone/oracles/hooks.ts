@@ -16,7 +16,7 @@ together and read them as a two-word prompt; take the first meaning that
 suggests a scene. Reach for a job or a debt when the characters need a reason
 to move.
 
-## Action (d66)
+## Action (d66: roll ["1d6","1d6"], first die is the tens)
 Read with a Subject. If the pair doesn't speak to you, roll one again.
 11 Smuggle
 12 Betray
@@ -55,7 +55,7 @@ Read with a Subject. If the pair doesn't speak to you, roll one again.
 65 Forget
 66 Roll twice; both happen.
 
-## Subject (d66)
+## Subject (d66: roll ["1d6","1d6"], first die is the tens)
 11 a sleeper
 12 an old promise
 13 a locked door
@@ -93,7 +93,7 @@ Read with a Subject. If the pair doesn't speak to you, roll one again.
 65 a ship
 66 Roll twice; they are tied together.
 
-## A job someone offers (d20)
+## A job someone offers (1d20)
 1. Find someone who left a city in a hurry. Pays well; the client won't say why.
 2. Carry a sealed case across a border by dawn. Do not open it.
 3. Watch a house for three nights and report who comes and goes.
@@ -115,7 +115,7 @@ Read with a Subject. If the pair doesn't speak to you, roll one again.
 19. Take a seat at the table in someone else's place.
 20. Roll twice. The two jobs are one, seen from different sides.
 
-## A debt called in (d20)
+## A debt called in (1d20)
 1. A favour from long ago, asked for at the worst moment.
 2. A Connection of yours is the collateral.
 3. You paid in full. The creditor says you didn't, and has a ledger to prove it.

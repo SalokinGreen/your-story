@@ -11,6 +11,14 @@
  *   records every built-in id the story has been given, and only ids outside
  *   it are added.
  * - A story saved before the list existed starts with the ids it holds.
+ * - Only a story that holds the system's core note and has not switched the
+ *   system tools off is touched; a story that merely imported a setting note
+ *   or one oracle is left alone.
+ * - A note of a pinned type (dm_instructions, character_sheet, gm_plan) is
+ *   never pushed: the GM carries those in full every turn.
+ * - A story created from an adventure or starter is seeded with every id
+ *   that would be pushed (`seedBuiltinNotesOffered`), so notes the author left
+ *   out count as offered and only notes shipped later arrive.
  * - City notes are not pushed (scope is a place name); they stay in the
  *   library to import.
  */
@@ -19,8 +27,19 @@ import { BUILTIN_SYSTEMS } from "./index";
 import { resolveSystem } from "./resolve";
 import type { BuiltinNote, BuiltinSystem } from "./types";
 
+/** The core note's id: a story holding it runs the system (design 3.2). */
+export const BLOOD_AND_BONE_CORE_ID = "builtin:blood-and-bone:core";
+
+const PINNED_TYPES = new Set(["dm_instructions", "character_sheet", "gm_plan"]);
+
 /** The scope of the setting notes every story of the setting uses. */
 export const CROSS_SETTING_SCOPE = "cross-europe";
+
+/** Whether a story's built-in notes are kept up to date: it holds the core and the tools are not off. */
+function keepsBuiltinNotes(story: Pick<StoryData, "lore" | "systemState">): boolean {
+  if (story.systemState?.usesSystemTools === false) return false;
+  return (story.lore ?? []).some((l) => l.libraryNoteId === BLOOD_AND_BONE_CORE_ID);
+}
 
 function heldIds(story: Pick<StoryData, "lore">): Set<string> {
   const ids = new Set<string>();
@@ -34,6 +53,7 @@ export function pushedBuiltinNotes(system: BuiltinSystem): BuiltinNote[] {
   for (const pack of system.packs) {
     const isRules = pack.id.endsWith(":rules");
     for (const n of pack.notes) {
+      if (PINNED_TYPES.has(n.type)) continue;
       if (isRules || n.scope === CROSS_SETTING_SCOPE) out.push(n);
     }
   }
@@ -83,6 +103,7 @@ export function addMissingBuiltinNotes(
   story: StoryData,
   systems: BuiltinSystem[] = BUILTIN_SYSTEMS,
 ): number {
+  if (!keepsBuiltinNotes(story)) return 0;
   const { system } = resolveSystem(story, systems);
   if (!system) return 0;
   const missing = missingBuiltinNotes(story, system);
@@ -108,4 +129,28 @@ export function addMissingBuiltinNotes(
     };
   }
   return toAdd.length;
+}
+
+/**
+ * For a story just created from an adventure or starter: records every id
+ * `pushedBuiltinNotes` would push as offered (plus what the story holds), so
+ * a note the author left out stays out and only notes shipped later arrive.
+ * Does nothing to a story that would not be kept up to date.
+ */
+export function seedBuiltinNotesOffered(
+  story: StoryData,
+  systems: BuiltinSystem[] = BUILTIN_SYSTEMS,
+): void {
+  if (!keepsBuiltinNotes(story)) return;
+  const { system } = resolveSystem(story, systems);
+  if (!system) return;
+  const offered = new Set(story.systemState?.builtinNotesOffered ?? []);
+  for (const id of heldIds(story)) offered.add(id);
+  for (const n of pushedBuiltinNotes(system)) offered.add(n.id);
+  story.systemState = {
+    sessionCount: 0,
+    dedupKeys: [],
+    ...story.systemState,
+    builtinNotesOffered: [...offered],
+  };
 }

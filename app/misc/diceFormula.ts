@@ -106,6 +106,9 @@ const MODIFIER_PATTERN = /^[+-]?\d+$/;
 const TOKENIZER_PATTERN =
   /([+-]?\d+d\d+(?:kh\d+|kl\d+)?!?|\{\{[a-zA-Z_][a-zA-Z0-9_]*\}\}|[+-]?\d+|[+-])/gi;
 
+const D66_MESSAGE =
+  'd66 is two d6 read as tens and ones: roll formula_roll with formulas ["1d6","1d6"], the first die is the tens';
+
 // ============================================
 // PARSER
 // ============================================
@@ -119,8 +122,11 @@ export function parseFormula(formula: string): ParsedFormula {
   const tokens: FormulaToken[] = [];
   const variables: string[] = [];
 
-  // Clean up the formula
-  const cleanFormula = formula.trim().replace(/\s+/g, "");
+  // Clean up the formula. A bare "d20" at the start of a term means "1d20".
+  const cleanFormula = formula
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/(^|[+-])d(?=\d)/gi, "$11d");
 
   if (!cleanFormula) {
     return { tokens: [], raw: formula, variables: [] };
@@ -131,6 +137,20 @@ export function parseFormula(formula: string): ParsedFormula {
 
   if (!matches) {
     throw new Error(`Invalid formula: "${formula}"`);
+  }
+
+  // d66 is two d6 read as tens and ones, not a die with 66 sides.
+  if (/\d+d66(?!\d)/i.test(cleanFormula)) {
+    throw new Error(D66_MESSAGE);
+  }
+
+  // Anything the tokenizer cannot account for (a "*", a stray letter) used to
+  // be dropped silently; refuse it so the roll is not something else.
+  const residue = cleanFormula.replace(TOKENIZER_PATTERN, "");
+  if (residue) {
+    throw new Error(
+      `Invalid formula: "${formula}" contains "${residue}", which is not dice, a number, + or -`
+    );
   }
 
   let expectOperator = false;

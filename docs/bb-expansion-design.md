@@ -314,3 +314,36 @@ is a prompt to interpret, not a verdict, is a design choice here.
 - **Tests:** the new checks for the compact list, on-load adding and the
   starter are in `tests/systems.builtinNotes.test.ts`; the exact counts in
   `systems.bloodAndBone.test.ts` became derived or at-least checks.
+
+### 2026-10-24: engine-review fixes for E1
+
+- **Dice the GM can roll.** `parseFormula` (`diceFormula.ts`) reads a bare
+  `dN` at the start of a term as `1dN`; refuses any `d66` die (`d66`, `1d66`,
+  `2d66`, with the message "d66 is two d6 read as tens and ones: roll
+  formula_roll with formulas ["1d6","1d6"], the first die is the tens"); and
+  refuses residue the tokenizer cannot account for (`2d6*2`, `(1d6)`), which
+  used to be dropped silently. The residue check broke no existing formula
+  (the whole suite passed). `executeFormulaRoll` already returned a parse error
+  to the GM as `[ERROR: Invalid formula …]` without rolling; a test holds it.
+- **Table headings** now name the die as the GM passes it: `(1d6)`, `(1d10)`,
+  `(1d20)`, `(1d100)`, `(d66: roll ["1d6","1d6"], first die is the tens)` and
+  `(1d6, on the Kind's list)`. `checkTableShape` parses only those forms and,
+  per sub-table, rolls the stated dice over a seeded sample and asserts they
+  reach exactly 1..N (the d66 pair, the 36 keys) and are not constant. A d66
+  body with a stray `N.` line fails. Core section 10 says "the d20 oracles".
+- **On-load adding is narrower.** It touches only a story that holds the core
+  note (`builtin:blood-and-bone:core`) and has not set `usesSystemTools` to
+  false, and never pushes `dm_instructions`, `character_sheet` or `gm_plan`.
+  A story created by `startAdventureLocally` or `startFreeformStoryLocally`
+  is seeded with `seedBuiltinNotesOffered` (every id that would be pushed, plus
+  what it holds), so notes an author left out stay out and only notes shipped
+  later arrive. A pre-expansion save with no list still counts what it holds
+  as offered (it cannot be told apart from one an author trimmed).
+- **Not made to persist on load.** `setupUIFromStory` has no save of its own;
+  the additions and the offered list are recomputed idempotently on each load
+  and persist with the story's next save (the first turn). A save on load was
+  judged riskier than the repetition.
+- **`read_notes` near misses.** The en dash, em dash and hyphen between spaces
+  match as one separator; failing an exact match, the one built-in note whose
+  name after " — " equals the request is read (two matches: no guess); a
+  "Not found" line lists up to three closest titles by shared words.

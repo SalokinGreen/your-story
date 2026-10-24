@@ -13,7 +13,7 @@ export const RUMOURS_NOTE: BuiltinNote = {
 
 Three tables for what the night says about itself. Roll a rumour, then roll whether it is true, then who is carrying it. Rumours are leads: they point at a scene, not an answer.
 
-## A rumour (d66)
+## A rumour (d66: roll ["1d6","1d6"], first die is the tens)
 11 Someone has been paying for the name of every new face in town.
 12 A Haven nobody has used in a hundred years has its lights on.
 13 The Undersett has lost a member, and nobody will say where.
@@ -51,7 +51,7 @@ Three tables for what the night says about itself. Roll a rumour, then roll whet
 65 The Vigil has a patron, and the patron is a Kind.
 66 Roll twice. The two rumours are two halves of one thing.
 
-## Is it true? (d6)
+## Is it true? (1d6)
 Each entry says how. Roll once when the rumour matters, and let the players find out by acting on it.
 1. True, and worse than it sounds. The person telling it has underplayed it on purpose.
 2. True, and already in motion. The next step happens tonight.
@@ -60,7 +60,7 @@ Each entry says how. Roll once when the rumour matters, and let the players find
 5. False. It was planted, and the planter wants to see who reacts.
 6. False. It grew from a harmless truth, and whoever is hurt by it is real.
 
-## Who's spreading it (d20)
+## Who's spreading it (1d20)
 Who carries a rumour decides what it is for.
 1. A rival, who wants the target moved.
 2. A friend, who is trying to warn you and can't say how they know.

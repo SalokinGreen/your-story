@@ -15,7 +15,7 @@ Three tables for Gather Information and the long trail after it. Roll a clue
 when a character finds something, where it points when they ask what it
 means, and what it costs to follow when the answer is not free.
 
-## A clue (d66)
+## A clue (d66: roll ["1d6","1d6"], first die is the tens)
 11 A phone left charging in an empty flat, still unlocked.
 12 A hotel key card for a hotel that was demolished.
 13 A shopping list in a dead man's hand, with one item crossed out in blood.
@@ -53,7 +53,7 @@ means, and what it costs to follow when the answer is not free.
 65 A stranger's signature in a visitors' book, in your own handwriting.
 66 Roll twice. One clue is real and one was left for you to find.
 
-## Where it points (d20)
+## Where it points (1d20)
 1. A person who lives nearby and will not answer the door.
 2. A place the dead have been using, and which has to be visited at night.
 3. A Connection of yours, who has been keeping something back.
@@ -75,7 +75,7 @@ means, and what it costs to follow when the answer is not free.
 19. Nowhere: the clue was planted, and whoever planted it is watching to see where you go.
 20. Two places at once. They are connected, and the connection is what matters.
 
-## What it costs to follow (d20)
+## What it costs to follow (1d20)
 1. Time. By the time you arrive, someone else already has.
 2. A favour owed to someone you would rather not owe.
 3. Stress +1: what you see in the trail is too close to home.

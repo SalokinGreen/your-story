@@ -15,7 +15,7 @@ Three tables for the nights a character has to Sate the Beast. Roll the
 feeding ground when they go looking, what goes wrong when the move misses
 or the night is already tight, and who notices when the Mask is at risk.
 
-## A feeding ground (d6, on the Kind's list)
+## A feeding ground (1d6, on the Kind's list)
 What "feeding" means follows the Kind's Recover Move: blood, flesh, dominion, a hunt, a sacrifice, a tether.
 
 ### Vampire
@@ -74,7 +74,7 @@ What "feeding" means follows the Kind's Recover Move: blood, flesh, dominion, a 
 5. The unfinished thing: an unsent letter, an unpaid debt, a question nobody answered.
 6. A mirror, a gate, a threshold: any place the tether runs thin.
 
-## What goes wrong (d20)
+## What goes wrong (1d20)
 1. They aren't alone. The one you chose is already someone's.
 2. It's not who it seems. Their blood, their flesh, their fear is wrong.
 3. A phone, a camera, a witness: a flash, and the Mask Slips.
@@ -96,7 +96,7 @@ What "feeding" means follows the Kind's Recover Move: blood, flesh, dominion, a 
 19. Something about them is sick in a way you're about to carry too.
 20. You are interrupted by a rival of your own Kind, and they were waiting to be seen.
 
-## Who notices (d20)
+## Who notices (1d20)
 Roll when the feeding was loud, careless, or already watched.
 1. A neighbour who was awake, who doesn't call anyone, not yet.
 2. A beat police officer, who writes it down and keeps the notebook.

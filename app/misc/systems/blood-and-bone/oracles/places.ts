@@ -15,7 +15,7 @@ Four tables for building a location on the spot. Roll the place first, then
 what's wrong with it, who is already there, and how the characters get in.
 Any of the last three can stand alone for a place you already have.
 
-## A place in the city (d66)
+## A place in the city (d66: roll ["1d6","1d6"], first die is the tens)
 11 A closed tram depot, still warm.
 12 A cathedral crypt with a new lock.
 13 A twenty-four-hour laundrette with nothing running.
@@ -53,7 +53,7 @@ Any of the last three can stand alone for a place you already have.
 65 A rail yard, a locked carriage, a light inside it.
 66 A place that wasn't here yesterday. Roll again for what it is pretending to be.
 
-## What's wrong with it (d20)
+## What's wrong with it (1d20)
 1. Too clean. Someone scrubs it daily, and it still smells.
 2. The temperature drops at one spot, and the spot moves.
 3. Clocks disagree, by a different amount in each room.
@@ -75,7 +75,7 @@ Any of the last three can stand alone for a place you already have.
 19. The place is a trap, and the bait is something you wanted.
 20. Roll twice. One wrong thing hides the other.
 
-## Who's already there (d20)
+## Who's already there (1d20)
 1. No one, but the lights are on and a meal is half-eaten.
 2. A caretaker who knows more than they say and would rather not be asked.
 3. A pair of mortals who shouldn't be here, hiding in the dark.
@@ -97,7 +97,7 @@ Any of the last three can stand alone for a place you already have.
 19. A delegation from another city, in their best clothes.
 20. Roll twice. They know each other, and it's bad.
 
-## A way in (d20)
+## A way in (1d20)
 1. The front door, which is unlocked and shouldn't be.
 2. A back stair from the kitchens.
 3. Through the roof, from the building next door.

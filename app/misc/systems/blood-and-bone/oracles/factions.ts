@@ -13,7 +13,7 @@ export const FACTIONS_NOTE: BuiltinNote = {
 
 Four tables for the powers that run a city's night. Roll the faction's move at the start of a session or after a long scene; reach for the Concord, the broken rule and the price of a favour when the players are standing in front of one of them.
 
-## A faction's move this week (d66)
+## A faction's move this week (d66: roll ["1d6","1d6"], first die is the tens)
 Whoever the faction is: a court, a pack, a coven, the Undersett, the Salon. Their move happens offscreen; the players meet its edges.
 11 They pull a Haven's lease and say nothing. Someone finds the locks changed.
 12 They send an invitation. It names a time, not a reason.
@@ -52,7 +52,7 @@ Whoever the faction is: a court, a pack, a coven, the Undersett, the Salon. Thei
 65 One of their own defects to the characters, and the faction wants that one back.
 66 Roll twice. The two moves are the same plan seen from different ends.
 
-## What the Concord demands (d20)
+## What the Concord demands (1d20)
 The Concord is an understanding enforced by whoever is strong enough. Use this when a Concord-holder wants something of the characters.
 1. A name, unspoken until now, handed over by dawn.
 2. That someone stays out of a district for a season.
@@ -75,7 +75,7 @@ The Concord is an understanding enforced by whoever is strong enough. Use this w
 19. That the Concord's terms are changed, and the characters sign first.
 20. Nothing. The demand is that they wait, and the waiting is the test.
 
-## A broken rule (d20)
+## A broken rule (1d20)
 What was broken, by someone in the Concord's reach. Then ask who is supposed to punish it.
 1. A feeding in a place sworn as neutral.
 2. A Haven entered without leave.
@@ -98,7 +98,7 @@ What was broken, by someone in the Concord's reach. Then ask who is supposed to 
 19. A rule nobody remembers, kept by someone old and furious.
 20. Roll twice. They are one crime, committed by two parties who each think the other did it.
 
-## The price of a favour (d20)
+## The price of a favour (1d20)
 When a faction or one of its members helps. The help is real; so is the cost. Do not name it at once.
 1. A favour owed, to be named later.
 2. One night of the helper's company, on their terms.
