@@ -57,19 +57,19 @@ Driven by an unyielding blood addiction, vampires view mortals as cattle, blendi
 ### Kind Powers
 
 **MIST FORM**
-1. You can dissolve into mist to pass through a gap, grate, or crack. You cannot carry anything larger than a pocket item, and you re-form vulnerable and disoriented.
+1. You can dissolve into mist to pass through a gap, grate, or crack. You cannot carry anything larger than a pocket item, and you re-form vulnerable and disoriented. When you Slip Away through such a gap, add +1.
 2. You can hold mist form for extended periods, and move at walking pace within it. When you Slip Away in mist form, add +1.
-3. While in mist form, mundane weapons and physical restraints cannot touch you. Fire, sunlight, and supernatural force still can.
+3. While in mist form, mundane weapons and physical restraints cannot touch you, and you ignore the cost of a weak hit from them. Fire, sunlight, and supernatural force still can.
 
 **THE LONG LOOK**
 1. When you Compel a mortal through eye contact, roll +Shadow instead of your usual stat.
-2. On a strong hit when you Compel this way, the target doesn't clearly remember the exchange afterward — only that they agreed to something.
-3. You can lay a lasting suggestion on a mortal that persists until fulfilled or broken by contradictory evidence. Doing so raises your Stress by 1.
+2. On a strong hit when you Compel this way, the target doesn't clearly remember the exchange afterward — only that they agreed to something. Add +1 to your next Compel on them.
+3. You can lay a lasting suggestion on a mortal that persists until fulfilled or broken by contradictory evidence. When you Compel them to act on it, add +1. Doing so raises your Stress by 1.
 
 **BLOOD SCENT**
-1. You can identify individuals by the scent of their blood, and tell at a distance whether someone is wounded, ill, or afraid.
+1. You can identify individuals by the scent of their blood, and tell at a distance whether someone is wounded, ill, or afraid. When you Secure an Advantage against someone whose blood you have smelled, add +1.
 2. When you Gather Information by tracking someone's blood scent, add +2.
-3. Tasting a person's blood shows you a fragment of their recent memory — a place, a face, a moment. The GM decides which.
+3. Tasting a person's blood shows you a fragment of their recent memory — a place, a face, a moment. The GM decides which. Add +1 to your next roll acting on it.
 
 **DEAD MAN'S SPEED**
 1. When you Face Danger by moving faster than a mortal can react, add +1.
@@ -77,20 +77,20 @@ Driven by an unyielding blood addiction, vampires view mortals as cattle, blendi
 3. During a Skirmish, you may reroll one Action Die per fight. Doing so raises your Stress by 1.
 
 **THE OLD BLOOD**
-1. Wounds that would kill a mortal close on their own within a night, provided you've fed.
+1. Wounds that would kill a mortal close on their own within a night, provided you've fed. Ignore the cost of a weak hit that is only physical harm.
 2. You can recover from catastrophic injury given time and blood. Add +1 to Face Defeat.
-3. You cannot be permanently destroyed by anything short of fire, sunlight, or the deliberate, informed effort of someone who knows what you are.
+3. You cannot be permanently destroyed by anything short of fire, sunlight, or the deliberate, informed effort of someone who knows what you are. When you Face Defeat from anything else, add +1.
 
 **CHILDER**
 1. You have at least one vampire you turned, somewhere. Treat them as a Connection at Steady rank that cannot fall below Weak.
-2. You can sense your childer's location and condition anywhere in the same city.
+2. You can sense your childer's location and condition anywhere in the same city. When you Aid Another with your childe, or Gather Information through them, add +1.
 3. You may call on a childe to act on your behalf without being present. Once per session, describe what they accomplish; the GM describes what it cost them.
 
 ### Abstinent Powers
 
 **THE VINTNER'S ART**
 1. Animal blood sustains you as well as human blood would: Sate the Beast on animal blood decreases Stress by 2 on a strong hit, as normal.
-2. You can prepare and store blood so it keeps its potency. You always have a reserve unless the fiction has taken it from you.
+2. You can prepare and store blood so it keeps its potency. You always have a reserve unless the fiction has taken it from you. When you Sate the Beast on your reserve, add +1.
 3. Once per session, share your reserve with another feeding Kind to reduce their Stress by 1 without them needing to hunt.
 
 **THE HELD LINE**
@@ -103,7 +103,7 @@ Driven by an unyielding blood addiction, vampires view mortals as cattle, blendi
 **FRENZY**
 1. When you enter a Skirmish having deliberately let go, add +1 to all three Action Rolls. You cannot choose your objective — the fiction chooses it for you.
 2. On a Decisive Victory won in frenzy, decrease your Stress by 1. The violence fed you.
-3. You may enter frenzy at will, without provocation. Each time you do, raise your Stress by 1 afterward.
+3. You may enter frenzy at will, without provocation, and add +1 to your first Action Roll in it (+2 in total with the frenzy bonus). Each time you do, raise your Stress by 1 afterward.
 
 **THE DRAINING**
 1. When you drain a victim completely, decrease your Stress by 3 instead of 2.
@@ -164,19 +164,19 @@ Monstrous physical specimens forced into isolation. They possess terrifying stre
 3. You no longer suffer lingering injuries from mundane sources at all. Only supernatural harm and sunlight leave lasting marks.
 
 **WINGS**
-1. You can glide from height and cross rooftop gaps silently. Landing quietly requires care in populated areas.
+1. You can glide from height and cross rooftop gaps silently. Landing quietly requires care in populated areas. Falls from height never harm you, and a weak hit on Face Danger to cross a gap or drop costs you nothing.
 2. You can achieve genuine powered flight for short bursts. When you Slip Away by taking to the air, add +2.
-3. You can carry another person in flight, and travel across a city in a single night without touching the ground.
+3. You can carry another person in flight, and travel across a city in a single night without touching the ground. When you Undertake a Journey by air, add +2.
 
 **TERRITORIAL SENSE**
-1. Within territory you've claimed, you always know how many people are present and roughly where.
+1. Within territory you've claimed, you always know how many people are present and roughly where. When you Gather Information about who is there, add +1.
 2. Within your territory, add +1 to all Face Danger and Secure an Advantage rolls.
-3. You know instantly when your territory is entered by anything supernatural, and can identify its Kind.
+3. You know instantly when your territory is entered by anything supernatural, and can identify its Kind. Add +1 to your first roll against it.
 
 **THE GARGOYLE'S STILLNESS**
-1. When you hold perfectly still against stone, brick, or statuary, mortals do not notice you. No roll required.
-2. You can maintain this stillness for hours without strain, and observe everything happening around you.
-3. You can enter Stone Slumber voluntarily, at will, and wake from it at a time you choose beforehand.
+1. When you hold perfectly still against stone, brick, or statuary, mortals do not notice you. No roll required. When you Gather Information by watching from stillness, add +1.
+2. You can maintain this stillness for hours without strain, and observe everything happening around you. When you Secure an Advantage from stillness, add +1.
+3. You can enter Stone Slumber voluntarily, at will, and wake from it at a time you choose beforehand. Your first roll after waking this way is at +1.
 
 **RENDING STRENGTH**
 1. You can tear through mundane barriers — doors, fences, sheet metal — without a roll.
@@ -184,9 +184,9 @@ Monstrous physical specimens forced into isolation. They possess terrifying stre
 3. You can lift and throw objects no mortal could move. In a Skirmish, you may use the environment itself as a weapon for an automatic +1 Advantage on one roll.
 
 **THE MASON'S EYE**
-1. You instantly understand a structure's layout, load points, and hidden spaces on entering it.
+1. You instantly understand a structure's layout, load points, and hidden spaces on entering it. When you Slip Away inside it, add +1.
 2. When you Gather Information about a building or Secure an Advantage using its architecture, add +2.
-3. You can bring down a structure, or a critical part of one, deliberately and precisely. Doing so raises your Stress by 1.
+3. You can bring down a structure, or a critical part of one, deliberately and precisely. Add +1 to the roll. Doing so raises your Stress by 1.
 
 ### Warden Powers
 
@@ -197,7 +197,7 @@ Monstrous physical specimens forced into isolation. They possess terrifying stre
 
 **THE QUIET WORD**
 1. You can turn a mortal away from a place or a person without violence or terror. Roll +Heart instead of +Shadow.
-2. Mortals you've turned away this way don't develop a fear of you, and can be turned away again later.
+2. Mortals you've turned away this way don't develop a fear of you, and can be turned away again later. Add +1 when you do.
 3. You can defuse a violent situation entirely without revealing what you are. Once per session, end a Skirmish before the first roll.
 
 ### Tyrant Powers
@@ -210,7 +210,7 @@ Monstrous physical specimens forced into isolation. They possess terrifying stre
 **DOMINION**
 1. You may claim territory by force. Sate the Beast this way decreases Stress by 3 on a strong hit.
 2. Anyone entering your claimed territory who knows what you are must Face Danger or lose their nerve.
-3. You can hold a territory larger than any one Gargoyle should manage — a district, a quarter — but every rival in the city now knows exactly where to find you.`,
+3. You can hold a territory larger than any one Gargoyle should manage — a district, a quarter — and add +1 to Compel anyone in it, but every rival in the city now knows exactly where to find you.`,
   },
   {
     id: "builtin:blood-and-bone:wendigo",
@@ -261,14 +261,14 @@ Once human, now driven by a traumatic, cannibalistic curse. They can pass perfec
 ### Kind Powers
 
 **THE PERFECT MASK**
-1. While well-fed, your human appearance withstands close scrutiny — medical examination, photographs, mirrors.
+1. While well-fed, your human appearance withstands close scrutiny — medical examination, photographs, mirrors. When you Face Danger to pass as human under scrutiny, add +1.
 2. When you Compel or Gather Information while wearing your human face, add +1.
-3. You can alter your human appearance between feedings, taking on a different face entirely. Doing so raises your Stress by 1.
+3. You can alter your human appearance between feedings, taking on a different face entirely. Anyone hunting your old face must Face Danger to find you, and you add +1 to Slip Away from them. Doing so raises your Stress by 1.
 
 **FROSTBOUND**
-1. You are unaffected by cold, exposure, and winter conditions of any severity.
+1. You are unaffected by cold, exposure, and winter conditions of any severity. Add +1 when you Face Danger in them.
 2. You can move through deep snow, ice, and frozen terrain without impediment or trace. Add +1 when you Slip Away in cold conditions.
-3. Your presence chills the air around you. Mortals nearby grow uneasy, sluggish, and slow to act — enough to matter in a Skirmish.
+3. Your presence chills the air around you. Mortals nearby grow uneasy, sluggish, and slow to act: add +1 to your first Action Roll in a Skirmish against them.
 
 **THE HUNGER'S EDGE**
 1. When your Stress is 4 or higher, add +1 to all Bone rolls.
@@ -276,31 +276,31 @@ Once human, now driven by a traumatic, cannibalistic curse. They can pass perfec
 3. At Stress 6, before triggering the Time Skip, you may act once at full monstrous capacity — an automatic strong hit on any single roll. Then the Time Skip proceeds as normal.
 
 **SCENT OF THE DYING**
-1. You can sense mortally wounded, dying, or recently dead people within roughly a city block.
+1. You can sense mortally wounded, dying, or recently dead people within roughly a city block. When you Secure an Advantage on one of them, add +1.
 2. When you Gather Information about a death — how, when, by whom — add +2.
-3. You know, on meeting someone, roughly how close they are to death. This includes deaths that haven't happened yet but are already in motion.
+3. You know, on meeting someone, roughly how close they are to death. This includes deaths that haven't happened yet but are already in motion. Add +1 to Compel anyone whose death you sense is near.
 
 **THE LONG STRIDE**
-1. You can travel on foot faster and longer than any human, without rest.
+1. You can travel on foot faster and longer than any human, without rest. When you Undertake a Journey on foot, add +1.
 2. You can cover distances overnight that should take days. Add +2 when you Slip Away across open country.
 3. You always arrive somewhere sooner than anyone expects you to. Once per session, declare you're already there.
 
 **THE VOICE IN THE TREES**
-1. You can mimic voices you've heard — perfectly, including people you've eaten.
+1. You can mimic voices you've heard — perfectly, including people you've eaten. When you Compel or deceive someone with a voice you've mimicked, add +1.
 2. You can draw a person away from safety and toward you using a voice they trust. Roll +Shadow to Compel.
-3. You can call to a group, and at least one of them will come. They won't be able to explain why afterward, if they get the chance.
+3. You can call to a group, and at least one of them will come. They won't be able to explain why afterward, if they get the chance. Add +1 to your next roll against whoever comes.
 
 ### Graverobber Powers
 
 **THE COLD LARDER**
-1. You maintain a hidden supply of preserved flesh. You always have a feed available unless the fiction has taken it from you.
-2. Your supply is well enough hidden that finding it requires deliberate, informed searching.
+1. You maintain a hidden supply of preserved flesh. You always have a feed available unless the fiction has taken it from you. When you Sate the Beast from it, add +1.
+2. Your supply is well enough hidden that finding it requires deliberate, informed searching. Feeding from it never attracts attention: ignore a witnesses or discovery complication on a weak hit.
 3. Once per session, your stores let you skip a hunt entirely: reduce Stress by 2 with no roll, and no complication.
 
 **GRAVE-SIGHT**
-1. You can sense buried and concealed bodies within a wide radius, and how long they've lain there.
+1. You can sense buried and concealed bodies within a wide radius, and how long they've lain there. When you Secure an Advantage using what you know of where bodies lie, add +1.
 2. When you Gather Information at a burial site, a morgue, or a place of mass death, add +2.
-3. You can tell how someone died by proximity to their remains alone, including whether another Kind was involved.
+3. You can tell how someone died by proximity to their remains alone, including whether another Kind was involved. Add +1 to your next roll against whoever did it.
 
 ### Predator Powers
 
@@ -310,9 +310,9 @@ Once human, now driven by a traumatic, cannibalistic curse. They can pass perfec
 3. Once per session, begin a Skirmish against stalked prey already at +1 Advantage.
 
 **THE KILLING COLD**
-1. Your kills leave no evidence of anything but exposure. Mortal investigators find nothing supernatural.
+1. Your kills leave no evidence of anything but exposure. Mortal investigators find nothing supernatural. Ignore a witnesses or evidence complication on a weak hit when you kill.
 2. Killing living prey decreases your Stress by 3 instead of 2.
-3. You can freeze a victim in place with a touch — not killing them, but leaving them unable to run, call out, or resist.`,
+3. You can freeze a victim in place with a touch — not killing them, but leaving them unable to run, call out, or resist. They cannot Slip Away, and you add +1 to Sate the Beast on them.`,
   },
   {
     id: "builtin:blood-and-bone:werewolf",
@@ -363,33 +363,33 @@ Bound to the moon and their own rage, werewolves fight for dominance as much as 
 ### Kind Powers
 
 **THE PACK BOND**
-1. You always know the rough direction and condition of your packmates.
+1. You always know the rough direction and condition of your packmates. When you Undertake a Journey to reach one, add +1.
 2. When you aid a packmate, they add +1 to their roll rather than the usual bonus.
-3. You can share sensation with a packmate at a distance — see what they see, hear what they hear — for a short time.
+3. You can share sensation with a packmate at a distance — see what they see, hear what they hear — for a short time. When you Gather Information through their senses, add +1.
 
 **THE CHANGE**
-1. You can transform at will outside the full moon. Transforming raises your Stress by 1.
-2. You can transform partially — claws, jaw, eyes — without committing to the full change, and without the Stress cost.
+1. You can transform at will outside the full moon. While transformed, add +1 to Face Danger and to your first Action Roll in a Skirmish. Transforming raises your Stress by 1.
+2. You can transform partially — claws, jaw, eyes — without committing to the full change, and without the Stress cost. While partly changed, add +1 to Gather Information by your senses or to Face Danger with claws.
 3. Your transformation is fast enough to happen mid-action. You may transform as part of any move, including during a Skirmish.
 
 **HUNTER'S NOSE**
-1. You can track a person or creature by scent across a city, through crowds, and over days.
+1. You can track a person or creature by scent across a city, through crowds, and over days. Ignore the cost of a weak hit when you Undertake a Journey following a trail.
 2. When you Gather Information by scent, add +2. You can smell lies — fear, adrenaline, and the physical tells of deception.
-3. You can follow a trail even through water, weather, or deliberate masking, and know if the trail has been laid deliberately to mislead you.
+3. You can follow a trail even through water, weather, or deliberate masking, ignoring any penalty they impose, and know if the trail has been laid deliberately to mislead you.
 
 **ALPHA'S VOICE**
 1. When you Compel another supernatural creature through sheer dominance, roll +Bone.
-2. On a strong hit compelling this way, the target treats you as higher in the hierarchy until they find a reason not to.
-3. You can issue a command to a group and be obeyed instinctively before anyone thinks to question it. Doing so raises your Stress by 1.
+2. On a strong hit compelling this way, the target treats you as higher in the hierarchy until they find a reason not to. Add +1 to your next Compel on them.
+3. You can issue a command to a group and be obeyed instinctively before anyone thinks to question it. Add +1 to the roll. Doing so raises your Stress by 1.
 
 **REGENERATION**
-1. Wounds close within hours rather than weeks. You recover from mundane injury between scenes.
+1. Wounds close within hours rather than weeks. You recover from mundane injury between scenes, and ignore the cost of a weak hit that is only mundane injury.
 2. When you Face Defeat from physical harm, add +2.
-3. You can regrow what's been taken from you, given time. Silver wounds remain the exception — those stay, and they scar.
+3. You can regrow what's been taken from you, given time, and ignore the cost of a weak hit on Face Defeat from losing a limb or organ. Silver wounds remain the exception — those stay, and they scar.
 
 **THE MOON'S GIFT**
 1. On the night of the full moon, add +1 to all rolls made while transformed.
-2. You retain full clarity and control of yourself while transformed on the full moon.
+2. You retain full clarity and control of yourself while transformed on the full moon. A miss on Resisting the Change counts as a weak hit.
 3. On the full moon, treat your Stress as 0 for the purpose of all Powers and penalties, regardless of its actual value.
 
 ### Packbound Powers
@@ -412,8 +412,8 @@ Bound to the moon and their own rage, werewolves fight for dominance as much as 
 3. Once per session, when you would suffer a consequence that requires allies to recover from, ignore it. You've done this before, alone.
 
 **TERRITORY OF ONE**
-1. You can claim temporary territory anywhere, and Sate the Beast within it as though it were established.
-2. Other Werewolves entering your claimed ground know instantly that it's taken, and by whom.
+1. You can claim temporary territory anywhere, and Sate the Beast within it as though it were established. Add +1 to Sate the Beast there.
+2. Other Werewolves entering your claimed ground know instantly that it's taken, and by whom. Add +1 to Compel them there.
 3. You can hold ground against a full pack. Once per session, a pack-backed challenge against you simply fails before it begins.`,
   },
   {
@@ -465,19 +465,19 @@ Once mortal, now bound to power that was never meant for human hands. Magic exac
 ### Kind Powers
 
 **WARDING**
-1. You can lay a ward on a doorway or small space that turns away mortal attention. It holds for a night.
+1. You can lay a ward on a doorway or small space that turns away mortal attention. It holds for a night. When you hide or Slip Away behind it, add +1.
 2. Your wards can bar a specific Kind. Something warded against must Face Danger to cross, and suffers a cost even on a hit.
-3. You can ward a space permanently, so long as you renew it monthly. Add 1 mark to your Ledger each renewal.
+3. You can ward a space permanently, so long as you renew it monthly. Add 1 mark to your Ledger each renewal. You know who crosses it, and add +1 to your first roll against them.
 
 **THE FAMILIAR**
-1. You have a familiar — an animal, an object, a small bound spirit. It can carry messages, observe, and retrieve small items.
+1. You have a familiar — an animal, an object, a small bound spirit. It can carry messages, observe, and retrieve small items. When it Aids Another on your roll, add +1.
 2. Your familiar can act independently and report back. When you Gather Information through your familiar, add +2.
-3. You can see and speak through your familiar at any distance. If it is destroyed, you take a Stress spike (+2) and lose this Power until you bind another.
+3. You can see and speak through your familiar at any distance, and add +1 to Secure an Advantage through it. If it is destroyed, you take a Stress spike (+2) and lose this Power until you bind another.
 
 **THE READING**
-1. Touching an object shows you a flash of its recent history — who held it, and roughly when.
-2. You can read a place rather than an object, sensing significant events that happened there.
-3. You can read a person by touch, learning a secret they're actively concealing. Doing so adds 1 mark to your Ledger.
+1. Touching an object shows you a flash of its recent history — who held it, and roughly when. When you Gather Information that way, add +1.
+2. You can read a place rather than an object, sensing significant events that happened there. When you Gather Information that way, add +1.
+3. You can read a person by touch, learning a secret they're actively concealing, and add +2 to that Gather Information roll. Doing so adds 1 mark to your Ledger.
 
 **THE BORROWED WORD**
 1. Once per session, you may add +2 to any roll by calling on your power's source. Add 1 mark to your Ledger.
@@ -485,19 +485,19 @@ Once mortal, now bound to power that was never meant for human hands. Magic exac
 3. Once per session, you may turn a weak hit into a strong hit. Add 3 marks to your Ledger. Your source will remember this.
 
 **THE BINDING**
-1. You can bind a minor spirit or supernatural presence into an object for a night. Add 1 mark to your Ledger.
-2. You can bind something significant — a Ghost, a lesser power — into a vessel, holding it as long as the vessel is intact.
-3. You can bind a creature of any Kind, briefly, in place. Doing so adds 3 marks to your Ledger and makes a permanent enemy.
+1. You can bind a minor spirit or supernatural presence into an object for a night, and add +1 to one roll using it. Add 1 mark to your Ledger.
+2. You can bind something significant — a Ghost, a lesser power — into a vessel, holding it as long as the vessel is intact. It Aids Another on your rolls in the vessel's presence (add +1).
+3. You can bind a creature of any Kind, briefly, in place, and add +2 to any roll against it while it is bound. Doing so adds 3 marks to your Ledger and makes a permanent enemy.
 
 **THE HEXING HAND**
 1. You may curse a person you've touched or taken something from. They suffer -1 on rolls related to a domain you name, until it's lifted.
-2. Your curses can be laid at a distance, given something personal of theirs. Add 1 mark to your Ledger.
+2. Your curses can be laid at a distance, given something personal of theirs, at -2 instead of -1. Add 1 mark to your Ledger.
 3. You can lay a curse that escalates over time, growing worse until it's addressed. Add 2 marks to your Ledger. Curses this heavy tend to find their way back.
 
 ### Hedge Witch Powers
 
 **THE KITCHEN CRAFT**
-1. You can produce minor workings — healing, warding, luck, sleep — from ordinary materials, with no Ledger cost.
+1. You can produce minor workings — healing, warding, luck, sleep — from ordinary materials, with no Ledger cost, and add +1 to any roll using them.
 2. Your small workings affect others as easily as yourself. Once per session, remove 1 Stress from someone else.
 3. Once per session, solve a problem entirely with small magic that should have required a major working. No Ledger marks.
 
@@ -511,10 +511,10 @@ Once mortal, now bound to power that was never meant for human hands. Magic exac
 **THE DEEPER PACT**
 1. Choose a domain your source holds power over. Add +1 to all rolls within that domain.
 2. Your source will act on your behalf unprompted, once per session, in ways you don't control.
-3. You may call on your source for something enormous — a genuine act of power. Add 5 marks to your Ledger, and the GM tells you what it wants in return.
+3. You may call on your source for something enormous — a genuine act of power. Add +2 to the roll. Add 5 marks to your Ledger, and the GM tells you what it wants in return.
 
 **THE SECOND VOICE**
-1. Your source speaks to you directly. Once per session, ask it a question; the GM answers, truthfully but not helpfully.
+1. Your source speaks to you directly. Once per session, ask it a question; the GM answers, truthfully but not helpfully. Add +1 to your next roll acting on the answer.
 2. You can let it speak through you. Add +2 to Compel, but the target will remember something was wrong with your voice.
 3. You may surrender control to your source entirely for a scene. Whatever it accomplishes, it accomplishes. Raise your Stress by 2 afterward.`,
   },
@@ -570,28 +570,28 @@ Not a monster — the thing that hunts monsters. No claws, no fangs, just traini
 ### Kind Powers
 
 **THE FIELD KIT**
-1. You have a prepared kit of counter-supernatural gear. Once per session, declare you brought exactly the right tool for a situation.
+1. You have a prepared kit of counter-supernatural gear. Once per session, declare you brought exactly the right tool for a situation, and add +1 to the roll that uses it.
 2. Your kit includes Kind-specific countermeasures. When you Secure an Advantage against a Kind you've correctly identified, add +2.
 3. Once per session, your kit lets you neutralize a Kind's signature ability outright for a single scene — silver bindings, UV flood, a warded circle.
 
 **MONSTER LORE**
 1. When you Gather Information about a supernatural creature, add +1.
-2. On a strong hit identifying a creature's Kind, you also learn its specific Weakness as written in Chapter 2.
-3. You can identify an individual creature's Archetype and likely Stress state from behavior alone.
+2. On a strong hit identifying a creature's Kind, you also learn its specific Weakness as written in Chapter 2. Add +1 to your next roll exploiting it.
+3. You can identify an individual creature's Archetype and likely Stress state from behavior alone. Add +1 to your next Secure an Advantage against it.
 
 **STEADY HANDS**
 1. When you Face Danger against something that should terrify you, add +1.
-2. Supernatural fear effects, dominance, and compulsion have no automatic hold on you — you always get a roll to resist.
+2. Supernatural fear effects, dominance, and compulsion have no automatic hold on you — you always get a roll to resist, and add +1 to it.
 3. Once per session, when you would take a Stress increase from horror, revulsion, or moral injury, you may ignore it entirely.
 
 **THE NETWORK**
-1. You have contacts in one city who can provide shelter, information, or a clean exit.
+1. You have contacts in one city who can provide shelter, information, or a clean exit. When you Slip Away through them, add +1.
 2. Your contacts extend across the Vigil. When you Gather Information through the network, add +2.
 3. Once per session, you may call in the network for direct support — a distraction, an extraction, a second pair of hands at the worst moment.
 
 **THE SAFEHOUSE**
 1. You maintain a warded, stocked safehouse. Steel the Resolve there and add +2.
-2. Your safehouse is genuinely secure — finding it requires a dedicated, informed effort by someone who already knows you exist.
+2. Your safehouse is genuinely secure — finding it requires a dedicated, informed effort by someone who already knows you exist. When you Slip Away to reach it, add +1.
 3. You maintain safehouses in multiple cities. Once per session, declare you have one wherever you currently are.
 
 **THE HARD-WON SCAR**
@@ -614,7 +614,7 @@ Not a monster — the thing that hunts monsters. No claws, no fangs, just traini
 ### Pragmatist Powers
 
 **THE UNEASY ALLIANCE**
-1. You may hold Connections with supernatural creatures at Steady or Strong rank, which most hunters cannot.
+1. You may hold Connections with supernatural creatures at Steady or Strong rank, which most hunters cannot. When you call on one for aid, add +1.
 2. When you Compel a monster by offering a genuine trade rather than a threat, add +2.
 3. Once per session, call on a monstrous Connection for aid in a way no other hunter could arrange. Their price comes later.
 
@@ -672,40 +672,40 @@ Death didn't take. Something kept you tethered — unfinished business, a violen
 ### Kind Powers
 
 **PASSING THROUGH**
-1. You can pass through walls, doors, and solid objects. Doing so is disorienting and takes a moment.
+1. You can pass through walls, doors, and solid objects. Doing so is disorienting and takes a moment. When you Face Danger passing through them, add +1.
 2. You move through solid matter freely and quickly. Add +2 when you Slip Away through obstacles.
-3. You can carry a living person with you through solid matter. The experience is deeply unpleasant for them.
+3. You can carry a living person with you through solid matter, ignoring the disorientation yourself. The experience is deeply unpleasant for them.
 
 **POLTERGEIST**
-1. You can move small objects — doors, latches, papers, phones. Sustained effort raises your Stress by 1.
-2. You can exert real physical force: throw furniture, break glass, restrain a person briefly.
+1. You can move small objects — doors, latches, papers, phones. When you Secure an Advantage that way, add +1. Sustained effort raises your Stress by 1.
+2. You can exert real physical force: throw furniture, break glass, restrain a person briefly. Add +1 to rolls using it.
 3. You can act physically in a Skirmish as though you had a body. Each Skirmish you do this in raises your Stress by 1.
 
 **THE COLD TRUTH**
-1. You can perceive the recent dead in a place, and sense violent deaths that happened there.
-2. You can speak with the recently dead who haven't yet moved on. They answer honestly, though not always usefully.
-3. You can ask a question of the place itself — what happened here, and who was present. The GM answers honestly, in fragments.
+1. You can perceive the recent dead in a place, and sense violent deaths that happened there. When you Gather Information about them, add +1.
+2. You can speak with the recently dead who haven't yet moved on. They answer honestly, though not always usefully. Add +1 to Compel them.
+3. You can ask a question of the place itself — what happened here, and who was present. The GM answers honestly, in fragments. Add +1 to Gather Information that way.
 
 **THE VEIL**
-1. You are invisible to mortals by default and can choose to be seen by specific individuals.
-2. You can appear as you did in life, convincingly enough to fool someone who never knew you were dead.
-3. You can appear to someone at a distance, anywhere you have a connection — a place you died, a person you're tethered to, an object that was yours.
+1. You are invisible to mortals by default and can choose to be seen by specific individuals. When you Slip Away unseen, add +1.
+2. You can appear as you did in life, convincingly enough to fool someone who never knew you were dead. Add +1 to Compel them that way.
+3. You can appear to someone at a distance, anywhere you have a connection — a place you died, a person you're tethered to, an object that was yours. Add +1 to Compel them that way.
 
 **THE HAUNTING**
-1. You can affect the atmosphere of a space — cold, sound, the feeling of being watched.
+1. You can affect the atmosphere of a space — cold, sound, the feeling of being watched. When you Secure an Advantage that way, add +1.
 2. Mortals in a space you're haunting must Face Danger to remain, or leave unsettled and unwilling to return.
 3. You can make a place genuinely uninhabitable, driving out anything living. Doing so raises your Stress by 1.
 
 **THE TETHER'S REACH**
 1. When acting at or near your tether, add +1 to any roll.
-2. You can move instantly to your tether from anywhere in the same city.
+2. You can move instantly to your tether from anywhere in the same city, and add +1 to your first roll on arrival.
 3. You can extend your tether temporarily to a second anchor — a person, a place, an object — gaining its protection for a night.
 
 ### Anchored Powers
 
 **THE GUARDIAN**
 1. When you act to protect the subject of your tether, add +2.
-2. You know instantly when your tether's subject is in danger, wherever they are.
+2. You know instantly when your tether's subject is in danger, wherever they are. Add +1 to the first roll you make toward reaching them.
 3. Once per session, prevent serious harm from reaching them entirely. Raise your Stress by 2.
 
 **THE STILL SELF**
@@ -717,7 +717,7 @@ Death didn't take. Something kept you tethered — unfinished business, a violen
 
 **THE TAKING**
 1. Draining warmth from a living person decreases your Stress by 3 instead of 2, and leaves them exhausted and cold.
-2. You can drain from a distance, without touch, from anyone in the same room.
+2. You can drain from a distance, without touch, from anyone in the same room, and add +1 to Sate the Beast when you do.
 3. You can take something more than warmth — a memory, a skill, a year. You gain it temporarily; they don't get it back.
 
 **WHAT'S LEFT**

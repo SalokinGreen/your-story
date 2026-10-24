@@ -23,7 +23,7 @@ export const BLOOD_AND_BONE_CREATION_STEPS: CreationStep[] = [
   step(
     "archetype",
     "Archetype",
-    "One of the chosen Kind's three Archetypes (the third in B&B — <Kind>: The <Archetype>): how they carry what they are.",
+    "One of the chosen Kind's Archetypes (two in its note; the seven original Kinds have a third in B&B — <Kind>: The <Archetype>): how they carry what they are.",
   ),
   step(
     "stats",

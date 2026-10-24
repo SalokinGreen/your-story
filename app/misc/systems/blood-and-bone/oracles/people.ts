@@ -239,6 +239,38 @@ at most; the tell is never proof on its own.
 5. A cold spot follows them by a step.
 6. No one else remembers them coming in.
 
+### Revenant
+1. Dust on the shoulders of a coat that was brushed an hour ago.
+2. Checks every face in a room once, then stops looking.
+3. A smell of turned earth that scent does not cover.
+4. Gloves, in summer, and a hand kept in a pocket.
+5. Talks about one person or one thing, whatever the subject.
+6. A scar or stitch no one has asked about.
+
+### Changeling
+1. Will not say thank you, and does not like to be thanked.
+2. A small nail, a horseshoe or a key conspicuously absent from their pockets.
+3. Eyes that look a different colour in a photograph.
+4. Never gives a flat refusal; answers a different question instead.
+5. Milk sours on the table where they sit.
+6. Hums a tune no one can name, and stops when asked.
+
+### Doppelgänger
+1. Their smile arrives a half-second after the joke.
+2. Answers to the wrong name before the right one.
+3. Hands that don't match the face: too old, too young, too clean.
+4. Mimics a gesture of whoever spoke last.
+5. Never photographed twice looking the same.
+6. Knows a small family detail, then goes pale at having said it.
+
+### Rusalka
+1. Hair that is damp on a dry night.
+2. Drinks a glass of water slowly, and always asks for a second.
+3. A faint smell of river mud in a warm room.
+4. Their voice carries over water further than it should.
+5. Won't cross a bridge on the downstream side.
+6. Lips a shade too pale, and cold hands that leave damp prints.
+
 Use when a new person enters the scene, when you need a stranger's face,
 or when you want to know what someone is not saying.`,
 };
