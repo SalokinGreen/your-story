@@ -763,6 +763,10 @@ const TOOL_NOUN = String.raw`(?:tools?|tool calls?|function calls?)`;
 const TOOL_NOUN_PHRASE = String.raw`(?:(?:my|the|these|those|our|all|any)\s+)?(?:(?:dice|note|roll|game|state|lore|npc)(?:\s*(?:,|and|or|&)\s*(?:dice|note|roll|game|state|lore|npc))*\s+)?${TOOL_NOUN}`;
 const OUTAGE_STATE = String.raw`(?:unavailable|offline|unresponsive|failing|failed|down(?=\s*(?:[,.;:!?)]|$)|\s+(?:right\s+now|at\s+the\s+moment|for\s+now|currently|on\s+my\s+end))|not\s+(?:responding|working|available|loading|connecting|connected|reachable|accessible|functioning|going\s+through))`;
 const OUTAGE_NEGATED = String.raw`(?:aren['’]?t|isn['’]?t|won['’]?t|can['’]?t|cannot|are\s+not|is\s+not|do\s+not|don['’]?t|did\s+not|didn['’]?t|does\s+not|doesn['’]?t)\s+(?:be\s+)?(?:responding|respond|working|work|available|loading|load|connecting|connected|reachable|accessible|functioning|going\s+through)`;
+// The CLI's own error wording, which the model repeats when a call it made
+// the wrong way is refused ("No such tool available"). Not "no such tool" by
+// itself: that is everyday fiction ("there is no such tool in the shed").
+const NO_SUCH_TOOL = /\bno\s+such\s+tool\s+(?:is\s+)?available\b/i;
 const TOOL_OUTAGE = new RegExp(
   [
     // "my dice and note tools aren't responding", "the tool is unavailable", "tool calls failed"
@@ -772,7 +776,7 @@ const TOOL_OUTAGE = new RegExp(
     // "I don't have access to my tools"
     String.raw`\b(?:don['’]?t|do\s+not)\s+have\s+(?:any\s+|access\s+to\s+)(?:(?:the|my|any)\s+)?(?:(?:dice|note)\s+)?${TOOL_NOUN}\b`,
     // "came back with a 'No such tool available' error" (the 2026-10-24 playtest)
-    String.raw`\bno\s+such\s+tool\b`,
+    NO_SUCH_TOOL.source,
   ].join("|"),
   "i",
 );
@@ -784,6 +788,25 @@ function withoutThinking(text: string): string {
 
 export function claimsToolsUnavailable(narration: string): boolean {
   return TOOL_OUTAGE.test(withoutThinking(narration));
+}
+
+/**
+ * The claim, held to a stricter test for a round later in the turn, whose
+ * prose may be the story itself: "There is no such tool in the shed" or "you
+ * can't use the tools on the bench" must not throw a scene away (engine
+ * review of decision 178). There it counts only as the CLI's error wording
+ * ("No such tool available") or inside an OOC aside in (round brackets),
+ * which is where the 2026-10-24 playtest's stalled setup said it.
+ */
+export function claimsToolsUnavailableLater(narration: string): boolean {
+  const text = withoutThinking(narration);
+  if (NO_SUCH_TOOL.test(text)) return true;
+  return (text.match(/\([^()]*\)/g) ?? []).some((aside) => TOOL_OUTAGE.test(aside));
+}
+
+/** No tool call and no tool result anywhere in the transcript yet. */
+function isFreshTranscript(messages: ChatMessage[]): boolean {
+  return !messages.some((m) => m.role === "tool" || (m.role === "assistant" && (m.tool_calls?.length ?? 0) > 0));
 }
 
 
@@ -828,7 +851,9 @@ async function runRound(
     toolNames.length === 0 ||
     answer.toolCalls.length > 0 ||
     body.toolChoice === "required" ||
-    !claimsToolsUnavailable(answer.narration)
+    !(isFreshTranscript(body.messages)
+      ? claimsToolsUnavailable(answer.narration)
+      : claimsToolsUnavailableLater(answer.narration))
   ) {
     return first;
   }

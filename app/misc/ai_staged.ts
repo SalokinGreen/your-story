@@ -426,7 +426,9 @@ export function formatTimersState(
 
   for (const timer of activeTimers) {
     const statusIcon = timer.status === "paused" ? "⏸️" : "⏰";
-    const advanceNote = timer.autoAdvance ? " (auto)" : " (manual)";
+    // Nothing ticks a timer (status report §6.1), whatever an old save's
+    // autoAdvance says (decision 178).
+    const advanceNote = " (advance it yourself)";
     const visibilityNote = timer.visibility === "hidden" ? " [HIDDEN]" : "";
 
     lines.push(

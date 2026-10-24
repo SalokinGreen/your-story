@@ -452,8 +452,8 @@ describe("the first round of a fresh conversation", () => {
     expect(events.map((e) => e.type)).toEqual(["tool_calls", "done"]);
   });
 
-  it("does not retry an ordinary tool-less round later in the turn", async () => {
-    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: "The door creaks open onto the stair.", tool_calls: [] }) });
+  it("does not retry an ordinary tool-less round later in the turn, even one about tools", async () => {
+    fakeCli.respond = () => ({ lines: fakeCli.structured({ narration: "You can't use the tools on the bench; there is no such tool in the shed.", tool_calls: [] }) });
     const events = await frames(await claudeCliFetch("/api/generate-stream", laterRound()));
     expect(fakeCli.runs).toHaveLength(1);
     expect(events[0]).toMatchObject({ type: "content" });
