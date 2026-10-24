@@ -23,7 +23,7 @@ Bought and used as in B&B — Relics. Assets come in three abilities, bought in 
 **THE STOPPED WATCH**
 1. A pocket watch that stopped at the hour of someone's death. Hold it and add +1 to Face Danger when time matters.
 2. Once per session, take a moment no one else has: a door closes slowly, a blade falls late. Add +1 to your next roll.
-3. Once per session, after a miss, take back the roll and choose a different action. The first result still stands in the fiction.
+3. Once per session, after a miss on an action roll, before any consequence or record, throw it again once and keep the new result. The first throw happened in the fiction and the watch shows it.
 *Cost: using the third ability turns the watch back an hour on your own life. Stress +1.*
 
 **THE KNOTTED CORD**

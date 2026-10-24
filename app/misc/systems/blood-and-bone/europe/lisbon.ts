@@ -56,7 +56,7 @@ each of them loved best, and the ones who answer do not come back.
 - **The Carmo ruins.** A convent church with no roof, left open to the sky
   since the quake. Its nave is the closest thing the Quarter has to a court.
 - **Tram 28, last run.** The tram keeps a driver and a seat for a passenger
-  who is not there. Business gets done in the third carriage.
+  who is not there. Business gets done on the rear bench.
 - **The old cod warehouses at Santos.** The House of Salt Winds keeps its
   strongroom among the salted fish. The smell hides what the vaults hold.
 

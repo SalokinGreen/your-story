@@ -36,7 +36,7 @@ Bought and used as in B&B — Paths. Assets come in three abilities, bought in o
 
 **WAYFARER**
 1. Add +1 to Steel the Resolve or Resist the Hunger when you are on the road, or in a place of worship.
-2. Any parish, hospice or monastery will take you in for a night, and the people there remember you kindly. Recover in one and add +1.
+2. Any parish, hospice or monastery will take you in for a night, and the people there remember you kindly. Recover in one and add +1 to Sate the Beast or Steel the Resolve.
 3. Once per session, walk a long road without sleeping or feeding and arrive unhurt. Stress +1 when you stop.
 
 **BUTCHER**

@@ -250,7 +250,7 @@ export const CREATION_PROMPT_NOTES: BuiltinNote[] = [
 3. Relationships. People sense something's wrong, even if they can't say what.
 4. A private ritual I perform daily, just to keep steady.
 5. My own sense of which face is real anymore.
-6. Very little — starving myself keeps the mask on, whatever it costs elsewhere.
+6. Very little — a steady supply of food keeps the mask on, and I guard it jealously.
 
 **Who do you fear finding out the truth?**
 1. My family. I'd rather die than watch their faces.

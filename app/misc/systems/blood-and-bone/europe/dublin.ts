@@ -50,7 +50,7 @@ forging old debts into the ledger, to turn the Tally Men into a weapon.
   nothing said there is repeated. The Tally Men hold their court in the back.
 - **Glasnevin at night.** The great cemetery on the north side, with its
   round tower and its tunnels. The Ghosts here keep their own election.
-- **Phoenix Park after the gates close.** Seven hundred hectares of grass and
+- **Phoenix Park after the side gates close.** Seven hundred hectares of grass and
   deer in the dark. Packs run here. The Grey Hour has never come into it.
 - **A Georgian house on Merrion Square.** Three floors of drawing rooms and a
   cellar where the debts are paid. A brass plate says "Solicitor."

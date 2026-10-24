@@ -17,7 +17,7 @@ export const BUDAPEST_NOTE: BuiltinNote = {
 and a castle district that went quiet a long time ago and never told
 anyone why. Pest is flat, loud, and young, its ruin bars built in the
 courtyards of buildings nobody bothered to fix. Between them the Danube runs
-fast and cold, and every bridge has been blown up at least once.
+fast and cold, and every bridge standing at the end of the war was blown up.
 
 Underneath Buda, the hot springs. Thermal water has cut caves through the
 hills for longer than there have been people to bathe in it, and the caves

@@ -40,7 +40,7 @@ Any Wendigo may take these.
 **THE LEAN WINTER**
 1. The first foodless dawn after a feed does not advance the Slipping Mask.
 2. The Starving trigger fires one dawn later than it normally would at your Beast level.
-3. Once per session, ignore one foodless dawn entirely. The next dawn counts double: the Slipping Mask rises by 2.
+3. Once per session, ignore one foodless dawn entirely. The next dawn counts double: the Slipping Mask rises by twice your normal foodless-dawn increase (to the meter's cap).
 
 **THE KIND STRANGER**
 1. Mortals who are cold, lost or alone are drawn to trust you. When you Compel one, add +1.

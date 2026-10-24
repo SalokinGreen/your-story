@@ -100,7 +100,7 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 
 **DRIVER**
 1. Add +2 to Slip Away by vehicle.
-2. You have a vehicle you trust, and it's where you left it.
+2. You have a vehicle you trust, and it's where you left it. Add +1 to Face Danger when keeping it running under pressure.
 3. Once per session, get anyone anywhere in the city faster than should be possible.
 
 **SCIENTIST**
@@ -130,9 +130,9 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 *Ground you hold. Somewhere to retreat, recover, and lose.*
 
 **THE APARTMENT**
-1. You have a private residence with no supernatural attention on it. Recover there and add +1.
+1. You have a private residence with no supernatural attention on it. Recover there and add +1 to Sate the Beast or Steel the Resolve.
 2. It's secured — locks, sightlines, an exit that isn't the front door. Add +1 to Face Danger there.
-3. It's genuinely unfindable. Anyone looking must Gather Information twice to locate it at all. Add +1 to Slip Away from it.
+3. It's genuinely unfindable. Anyone looking for it needs two separate leads, each a success, before they find it. Add +1 to Slip Away from it.
 
 **THE BOLT-HOLE**
 1. A concealed space — cellar, crawlspace, sealed room — that no records show exists. Add +1 to Slip Away into it.
@@ -156,8 +156,8 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 
 **THE WARDED HOUSE**
 1. Standing wards turn away mortal attention entirely. Nobody wanders in. Add +1 to Slip Away or hide inside.
-2. The wards bar one Kind of your choice. That Kind must Face Danger to enter.
-3. Nothing supernatural can enter uninvited. Maintaining this adds 1 mark to your Ledger monthly, if you have one.
+2. The wards bar one Kind of your choice. That Kind cannot enter without being invited; a player of that Kind who forces it must Face Danger, and any other creature of it is turned back at the threshold.
+3. Once per session, for a scene, nothing supernatural can enter uninvited. Stress +1.
 
 **THE UNDERGROUND**
 1. You hold territory in tunnels, catacombs, or service ways. Add +1 to move unseen beneath the city.
@@ -165,7 +165,7 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 3. You can reach most of the city without surfacing. Add +1 to Undertake a Journey across it.
 
 **THE CLINIC**
-1. Medical facilities and supplies. Anyone recovering here adds +1.
+1. Medical facilities and supplies. Anyone recovering here adds +1 to Sate the Beast or Steel the Resolve.
 2. A reputation among people who need discretion. They come to you, and they bring information. Add +1 to Gather Information among them.
 3. Once per session, someone's life saved here becomes a debt owed.
 
@@ -185,13 +185,13 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 3. Once per session, the dead here answer a question honestly.
 
 **THE PACK GROUND**
-1. Shared territory. Any packmate recovering here adds +1.
+1. Shared territory. Any packmate recovering here adds +1 to Sate the Beast or Steel the Resolve.
 2. The pack knows instantly when it's trespassed upon. Nothing ambushes you there, and add +1 to Face Danger on it.
 3. Once per session, the pack defends this ground successfully without you needing to be present.
 
 **THE SAFEHOUSE NETWORK**
 1. Multiple small refuges across the city. Once per session, one is nearby.
-2. They're stocked and maintained. Recover at any of them and add +1.
+2. They're stocked and maintained. Recover at any of them and add +1 to Sate the Beast or Steel the Resolve.
 3. Once per session, declare a safehouse exists in a different city entirely.
 
 **THE CHAPEL**
@@ -268,7 +268,7 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 **THE HOUND**
 1. A large, loyal animal. It tracks, warns, and is entirely unafraid of you. Add +1 to Gather Information by tracking.
 2. It senses supernatural presence before you do. Nothing ambushes you.
-3. In a Skirmish, it fights alongside you. Once per fight, gain +1 Advantage from its intervention.
+3. In a Skirmish, it fights alongside you. Once per fight, improve one recorded exchange a step (miss to weak hit, weak hit to strong hit) before you record it.
 
 **THE CHILDE**
 1. A vampire you turned. They act in your interest, mostly. Add +1 to Secure an Advantage through them.
@@ -364,7 +364,7 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 
 **THE SILVER**
 1. Silver weapons or bindings. Werewolf wounds you inflict cannot heal supernaturally.
-2. Enough of it to bind, bar, or fortify. Add +1 to Secure an Advantage against a Werewolf.
+2. Enough of it to bind, bar, or fortify. Add +1 to Secure an Advantage against a Werewolf, and +1 to Skirmish rolls against one while you hold it.
 3. Once per session, silver stops something dead that nothing else would have.
 
 **THE SIGNET**
@@ -381,17 +381,17 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 **THE OLD PHOTOGRAPH**
 1. An image of your mortal life. Holding it steadies you: once per session, ignore a Stress increase.
 2. It reminds you of a specific person. Add +1 to any roll made on their behalf or memory.
-3. Once per session, it anchors you: turn a miss on a Beast or Fading roll into a weak hit.
+3. Once per session, it anchors you: turn a miss on Sate the Beast, Resist the Hunger or Steel the Resolve into a weak hit (not on the Reckoning or the Fading).
 
 **THE WARD-STONE**
 1. A portable ward. Any space you place it in turns away mortal attention. Add +1 to Slip Away in a space it guards.
-2. It bars one Kind you name. That Kind must Face Danger to approach.
+2. It bars one Kind you name. That Kind cannot approach it: a player of that Kind who pushes in must Face Danger, and any other creature of it is turned back.
 3. Once per session, it stops something supernatural entirely, then cracks. Repairing it takes a Rite.
 
 **THE BLADE THAT REMEMBERS**
 1. A weapon that has killed something supernatural. Add +1 against that Kind.
 2. It shows you flashes of what it's done. Add +1 to Gather Information about violence.
-3. Once per session, it acts before you do — an automatic +1 Advantage on the first Skirmish roll.
+3. Once per session, it acts before you do: the first exchange you roll in a Skirmish is improved a step (miss to weak hit, weak hit to strong hit) before you record it.
 
 **THE VESSEL**
 1. A container holding a bound spirit or power. It can be questioned, once per session.
@@ -472,7 +472,7 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 **THE CLAIMING** *(Gargoyle)* — *You mark it, and then it's yours.*
 1. A night's ritual marks territory as yours. Sate the Beast there as though long-established.
 2. Your claim is legible to other supernaturals. They know who holds this ground. Add +1 to Compel them there.
-3. You can claim territory already held by another. Doing so is a declaration of war, and the ground itself sides with the winner.
+3. You can claim territory already held by another. Doing so is a declaration of war, and the ground itself sides with the winner. Add +2 to Compel or Secure an Advantage against the old claimant on that ground.
 
 **THE WINTER FAST** *(Wendigo)* — *You've learned to hold the hunger still.*
 1. A night of ritual fasting halts Stress escalation entirely for the following day.
@@ -490,13 +490,13 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 3. Summon something that should not be summoned. Treat one roll made through its task as a strong hit. Add 4 Ledger marks, and understand it now knows your name.
 
 **THE CONSECRATION** *(Hunter)* — *You make the ground argue on your side.*
-1. A night's work sanctifies a space. Supernatural creatures entering must Face Danger.
+1. A night's work sanctifies a space. Supernatural creatures entering are stopped at the edge unless you let them in; a player character who forces it must Face Danger.
 2. The consecration holds for a month, and you know when it's tested.
 3. Once per session, a consecrated space stops something entirely — the Rite breaks, and the thing does not enter.
 
 **THE ANCHORING** *(Ghost)* — *You tie yourself down harder.*
 1. A ritual reinforcing your tether. The Fading cannot progress for a week.
-2. You may shift your tether to a new object, place, or person. Add +1 to your next Fading roll.
+2. You may shift your tether to a new object, place, or person. Add +1 to the next Steel the Resolve or Resist the Hunger roll that draws on the new tether.
 3. Once per session, anchor another spirit, halting their Fading temporarily.
 
 **THE SEVERING**
@@ -550,13 +550,13 @@ Assets come in three abilities, bought in order: the asset costs 2 XP and gives 
 3. Once per session, permanently take one first-tier ability from a defeated creature's Power. Something of theirs stays in you.
 
 **THE CONFESSION**
-1. Confess honestly to another character. Both of you remove 1 Stress.
-2. The confession creates real intimacy. Raise one Connection's rank.
+1. Once per session, confess honestly to another character. Both of you remove 1 Stress.
+2. Once per session, the confession creates real intimacy: raise the rank of the Connection between you.
 3. Once per session, confess something that should have destroyed a relationship — and it holds instead.
 
 **THE CALLING DUE**
 1. Force a faction or creature to state exactly what you owe them. They must answer honestly. Add +1 to Compel them afterward.
-2. You may pay down a Burden significantly through a single dangerous act.
+2. After a single dangerous act that serves the debt, cancel one named complication of a Burden for the rest of the session.
 3. Once per session, resolve a Burden entirely. What it costs will not be small, and the GM decides it.
 
 **THE LONG NIGHT**

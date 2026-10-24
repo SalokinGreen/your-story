@@ -18,7 +18,7 @@ Stress triggers below are +1 each, once a scene each (key = the trigger's name).
 ## The Kind
 The drowned of rivers and lakes, any gender, who did not go quietly. Bound to one body of water, they sing, lure and drown, and the river takes them back whenever it wishes.
 
-- **Stress Escalation:** Increases when they have gone a night without touching their water, when a lure fails or is refused, or when they hear their own death named aloud.
+- **Stress Escalation:** Increases when they have gone a night without touching their water, when a lure fails or is refused, or when they hear their own death named aloud, or when they go a dawn without touching their water (the Weakness below; one trigger, key "dry").
 - **Recover Move: Sate the Beast** – Requires drawing a life into the water. It need not be a death: a mortal's breath, a vow sworn at the shore, a willing swim.
 - **Progression Triggers (XP):** 1 XP for luring someone to the water's edge unseen; 3 XP for taking a life, breath or vow into the water without a witness; 5 XP for a mortal returning to your water of their own will.
 - **Your Water:** Choose it at creation: a river, a lake or a canal (the Danube, the Vltava, the Vistula). Further from it than a night's walk, the second and third abilities of your Powers do not work.
@@ -34,7 +34,7 @@ The drowned of rivers and lakes, any gender, who did not go quietly. Bound to on
 
 **The Willing Tide** — *Takes breath and vows, not lives, and lets the swimmer go.*
 - Sate the Beast without a death: a strong hit decreases Stress by 2 as normal, and the draw never brings a Mask Slips complication.
-- A death in your water raises your Stress by 2.
+- A death in your water that you witness, sense nearby or cause raises your Stress by 2.
 - **Archetype XP:** 1 XP for a swim shared and ended safely; 3 XP for a vow kept from both sides; 5 XP for a mortal who knows what you are and walks to the shore anyway.
 - **Alternate XP:** 1 XP for returning something the river took; 3 XP for turning a drowning into a rescue; 5 XP for a bridge, quay or ferry that changes because of you.
 - **Stress Relief:** a mortal singing back to you; floating with the current and nowhere to be; a dry day that ends at the water's edge without harm.
@@ -71,8 +71,8 @@ The drowned of rivers and lakes, any gender, who did not go quietly. Bound to on
 
 **RIVER'S GRIP**
 1. When you Face Danger in or beside water, add +1.
-2. In a Skirmish by water, add +1 to your first Action Roll, and you may hold an enemy under for a round: they act at -1 until they get out.
-3. Once per session, drown someone you physically hold in your water: the Skirmish ends in your favour. Raise your Stress by 2.
+2. In a Skirmish by water, add +1 to your first Action Roll, and you may hold an enemy under for a round: add +1 to your next roll against them until they get out (a player held under acts at -1).
+3. Once per session, drown a Troublesome or Dangerous enemy you physically hold in your water: the Skirmish ends in your favour. Against a Formidable or higher one it instead marks their progress track three times (Epic: once). Raise your Stress by 2.
 
 **WET HAIR, WET HANDS**
 1. When you Gather Information by following damp left by someone you have touched, add +1.
@@ -100,7 +100,7 @@ The drowned of rivers and lakes, any gender, who did not go quietly. Bound to on
 
 **THE SECOND BREATH**
 1. A mortal who swims with you cannot drown in your water that night, and when you Sate the Beast on a willing swim, add +1.
-2. When someone you pulled from the water Faces Defeat, a miss counts as a weak hit. Raise your Stress by 1.
+2. When someone you pulled from the water Faces Defeat, a miss counts as a weak hit; for a non-player, they live and you choose the price. Raise your Stress by 1.
 3. Once per session, a swim with you heals one lasting harm a mortal carries. They remember it as a dream.
 
 **THE VOW AT THE SHORE**

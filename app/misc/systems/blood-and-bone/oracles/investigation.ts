@@ -93,7 +93,7 @@ means, and what it costs to follow when the answer is not free.
 15. Something you carry, left behind as collateral.
 16. A Condition, taken on the way in.
 17. Being seen with the wrong company by the right witness.
-18. The answer is free, and wrong, and sounds right.
+18. The answer is free, and wrong, and sounds right (on a miss only; after a strong hit, they learn it was a lie, or the false lead holds a true thread).
 19. Someone else dies if you follow it, and you won't know until after.
 20. Nothing. This time it costs nothing, which should worry you.
 

@@ -88,7 +88,8 @@ enter a scene.
 - **Who can be turned.** Hedwig for money, Szilárd for safety, Marit for
   the letter, Velvet for a promise about the Watching Stone.
 - **Who must not die yet.** Ottilie and Lorenzo hold two Seconds' seats,
-  and a Long Table needs both to sit.
+  and a Long Table on a London–Rome dispute needs both to sit. Any other
+  Long Table needs the Seconds of the cities involved.
 
 Use when the characters need a name, a broker, a courier or a face for a
 power, in any city or on any road.`,

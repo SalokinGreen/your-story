@@ -12,8 +12,8 @@ export const CARPATHIANS_NOTE: BuiltinNote = {
   scope: "The Carpathians",
   content: `# Europe by Night — The Carpathians
 
-**Atmosphere:** A long curved range of forest, three countries wide, with
-the three cities of this book at its edges: Kraków to the northwest,
+**Atmosphere:** A long curved range of forest crossing Central and Eastern Europe, with
+three cities as this book's gateways, at its edges: Kraków to the northwest,
 Budapest to the west, Bucharest to the south. In between it is mostly trees.
 The roads follow rivers, the rivers follow gorges, and a lorry can drive for
 an hour without passing a lit window. Wood smoke in the valleys, bells on the

@@ -46,7 +46,7 @@ Any Ghost may take these.
 **THE ECHO**
 1. You hear the sounds of the last hour in any place you stand: footsteps, voices, a door. When you Secure an Advantage using what you heard (a guard's round, a door's creak), add +1.
 2. When you Gather Information by listening to a place's echoes, add +2.
-3. Once per night, replay a moment from a place's past so loudly that everyone present hears it. Mortals must Face Danger to stay. Raise your Stress by 1.
+3. Once per night, replay a moment from a place's past so loudly that everyone present hears it. Mortal player characters must Face Danger to stay; a mortal non-player flees or freezes, as you choose when you replay it. Raise your Stress by 1.
 
 ## Running the Seeker
 - Ask at creation what they know about their death and what they are sure of that may be wrong. The truth is the GM's secret; write it down before play, as a few facts, each held by a witness, a record or a place.

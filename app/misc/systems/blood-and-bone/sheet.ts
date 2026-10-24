@@ -12,7 +12,7 @@ export const BLOOD_AND_BONE_SHEET_TEMPLATE = `# {{Name | Your character's name |
 **Archetype:** {{Archetype | One of your Kind's Archetypes | The Ripper}}
 **Path:** {{Path | What you were before this (a Path from the book) | Investigator}}
 
-## Stats (each 1-3; assign 3, 2, 2, 1, 1)
+## Stats (at creation each 1-3, assign 3, 2, 2, 1, 1; XP can raise one to 4)
 Nerve {{Nerve | Quickness, guns, keeping your head | 2}} | Heart {{Heart | Resolve, compassion, your hold on your humanity | 2}} | Bone {{Bone | Strength and violence up close | 1}} | Shadow {{Shadow | Moving unseen, lying, hunting from the dark | 3}} | Wits {{Wits | What you know and notice | 1}}
 Adds cap at +2 per roll; the action score caps at 10.
 
@@ -24,6 +24,9 @@ Adds cap at +2 per roll; the action score caps at 10.
 
 ## Connections (Weak, Steady or Strong)
 {{Connections | Two to start: one Steady and one Weak, or two Weak; one line each; separate with semicolons | A friend who asks no questions (Steady); an estranged sibling (Weak)}}
+
+## Permanent Conditions
+{{Permanent Conditions | Lasting injuries that cannot be cleared, each with its scope (-1 to what); they take a slot of the three | None}}
 
 ## Burdens
 {{Burdens | Doomed or Indebted, and who holds it; none to start | None}}

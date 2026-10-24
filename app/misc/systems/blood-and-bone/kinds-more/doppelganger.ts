@@ -25,7 +25,7 @@ A thing that wears stolen faces and lives stolen lives. It has no shape of its o
 
 ## Archetypes
 **The Understudy** — *Takes one life and learns it down to the habits, afraid to lose it.*
-- Sate the Beast within your one chosen life: a weak hit also decreases Stress by 1.
+- Sate the Beast within your one chosen life: a weak hit decreases Stress by 2 instead of 1.
 - Wearing a second face while you hold the first raises your Stress by 1 and ends that bonus until the next night.
 - **Archetype XP:** 1 XP for passing a test only the real person would have passed; 3 XP for protecting the life you wear from a threat meant for the original; 5 XP for being loved by someone who then learns the truth, and staying.
 - **Alternate XP:** 1 XP for learning a habit nobody told you; 3 XP for keeping a promise the original made; 5 XP for the original, found, choosing to let you stay.
