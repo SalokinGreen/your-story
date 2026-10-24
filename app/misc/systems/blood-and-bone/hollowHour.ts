@@ -158,7 +158,7 @@ export function buildHollowHour(packNotes: BuiltinNote[]): BuiltinAdventure {
       "One night in the tunnels: a starving fledgling, a hunter one night behind her, and a city that wants it fixed.",
     description:
       "A Blood & Bone starter. Five bodies in the service tunnels, a Vigil hunter closing in, and an order from above to fix it before the city's Heat reaches 4. There is no clean ending, and every choice shows how the game works: Stress while you work, a fight that should not be a fight, Exposure in every move, and a Beast cost on the easy way out.",
-    author: "Your Story",
+    author: "Endless Adventure",
     tags: ["supernatural", "horror", "one-shot", "Blood & Bone"],
     difficulty: "medium",
     estimatedDuration: "One night (2-3 hours)",

@@ -60,7 +60,7 @@ export function buildGraveWatcher(packNotes: BuiltinNote[]): BuiltinAdventure {
       "A season in a small valley town beside a vast graveyard: coffee, gossip and a radio net, with something counting in the Old Lot.",
     description:
       "A Blood & Bone campaign starter with the Masquerade off. The supernatural is ordinary; the dark that gathers in great old cemeteries is not. You are a Grave Watcher on Tower Nine of the Long Acre, with a roster of eight to play or to fill your team. Slice of life first: the diner, the town meetings, the festivals, who is speaking to whom. The yard is the weather of the place, until it is not. Pre-made Watchers, twenty-five townspeople, a town calendar and a secret that the season is slowly turning toward.",
-    author: "Your Story",
+    author: "Endless Adventure",
     tags: ["supernatural", "slice of life", "campaign", "Blood & Bone"],
     difficulty: "medium",
     estimatedDuration: "A season (many sessions)",

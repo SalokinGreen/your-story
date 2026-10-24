@@ -18,7 +18,7 @@ const AUTH_URL = "https://openrouter.ai/auth";
 const KEY_EXCHANGE_URL = "https://openrouter.ai/api/v1/auth/keys";
 // Prefills the label of the key OpenRouter creates, so the user can tell it
 // apart in their key list - headless/local apps get no app attribution.
-const KEY_LABEL = "Your Story";
+const KEY_LABEL = "Endless Adventure";
 
 function base64Url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))

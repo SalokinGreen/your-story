@@ -184,7 +184,7 @@ export function usePartyHost(opts: UsePartyHostOptions): PartyHostApi {
       if (!isPartyAvailable() && !optsRef.current.bridge) {
         setError({
           code: "UNAVAILABLE",
-          message: "Party mode runs in the Your Story desktop app.",
+          message: "Party mode runs in the Endless Adventure desktop app.",
         });
         return;
       }

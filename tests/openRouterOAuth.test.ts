@@ -39,7 +39,7 @@ describe("buildOpenRouterAuthUrl", () => {
     // Mandatory in headless mode - the code is shown on screen
     expect(url.searchParams.get("code_challenge")).toBe("abc");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
-    expect(url.searchParams.get("key_label")).toBe("Your Story");
+    expect(url.searchParams.get("key_label")).toBe("Endless Adventure");
   });
 });
 

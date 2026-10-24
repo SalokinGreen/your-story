@@ -113,7 +113,7 @@ export function endTurnKeepAlive(
       TurnKeepAlive.notifyReady({
         turnId,
         title: "Your turn is ready",
-        body: storyName?.trim() || "Your Story",
+        body: storyName?.trim() || "Endless Adventure",
       }),
     );
   }
@@ -133,7 +133,7 @@ export function notifyPlayerNeeded(kind: PlayerPause, detail?: string): void {
     kind === "question"
       ? "The GM has a question for you"
       : "The GM needs a roll from you";
-  const body = detail?.trim() ? detail.trim().slice(0, 240) : "Your Story";
+  const body = detail?.trim() ? detail.trim().slice(0, 240) : "Endless Adventure";
   fire("notifyAttention", () =>
     TurnKeepAlive.notifyAttention({ title, body }),
   );

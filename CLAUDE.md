@@ -59,7 +59,7 @@ needs so it does not build on a system that was deleted.
 
 ## What this app is
 
-Your Story is a Next.js 16 (App Router) + React 19 + TypeScript app: an
+Endless Adventure is a Next.js 16 (App Router) + React 19 + TypeScript app: an
 AI-powered, choice-driven interactive fiction / TTRPG platform. An LLM acts
 as a **GM (Game Master)** that narrates and calls tools; a deterministic
 engine on the frontend executes those tools against a single JSON game-state
@@ -1249,7 +1249,7 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   `MainActivity` registers. `app/misc/turnKeepAlive.ts` is called from
   `generateTrackedTurn` in `app/story/page.tsx` with the turn's id: `begin`
   when the turn starts, and `end` only after the turn's final save has
-  resolved, so "ready" means saved. The service posts "Your Story is writing
+  resolved, so "ready" means saved. The service posts "Endless Adventure is writing
   your turn…" while the turn runs. When it finishes, "Your turn is ready" is
   posted only for a turn that succeeded with non-empty prose, was saved and was
   not stopped, and only while the app is in the background. A turn that pauses

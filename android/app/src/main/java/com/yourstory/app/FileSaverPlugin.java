@@ -29,7 +29,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Saves a file the player asked to download straight into the public
- * Downloads folder ("Downloads/Your Story"), with no share sheet. The author
+ * Downloads folder ("Downloads/Endless Adventure"), with no share sheet. The author
  * found the share sheet, which asks where to send the file instead of saving
  * it, "very annoying" on the APK. iOS has no Downloads folder and keeps the
  * share sheet; this plugin is Android only.
@@ -45,7 +45,7 @@ import java.util.concurrent.Executors;
 public class FileSaverPlugin extends Plugin {
 
     private static final String ALIAS_STORAGE = "storage";
-    private static final String FOLDER = "Your Story";
+    private static final String FOLDER = "Endless Adventure";
 
     // The write is kept off the main thread whichever thread the call or the
     // permission callback arrives on.

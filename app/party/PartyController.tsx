@@ -179,7 +179,7 @@ export default function PartyController() {
   if (!token) {
     return (
       <Shell>
-        <h1 className="mt-10 text-2xl font-semibold">Your Story</h1>
+        <h1 className="mt-10 text-2xl font-semibold">Endless Adventure</h1>
         <p className="text-ys-text">
           Scan the QR code on the table&apos;s screen to join. It opens this page with your link.
         </p>
@@ -210,7 +210,7 @@ export default function PartyController() {
       <Shell>
         <h1 className="mt-10 text-2xl font-semibold">Can&apos;t reach the table</h1>
         <div className={`${card} space-y-3 text-ys-text`}>
-          <p>Check that this phone is on the same Wi-Fi as the computer running Your Story.</p>
+          <p>Check that this phone is on the same Wi-Fi as the computer running Endless Adventure.</p>
           <p>
             If the table was closed and opened again, its link has changed: scan the QR code on the
             screen again.
@@ -226,7 +226,7 @@ export default function PartyController() {
   if (!view) {
     return (
       <Shell>
-        <h1 className="mt-10 text-2xl font-semibold">Your Story</h1>
+        <h1 className="mt-10 text-2xl font-semibold">Endless Adventure</h1>
         <p className="text-ys-text">
           {state === "reconnecting" ? "Reconnecting to the table…" : "Joining the table…"}
         </p>

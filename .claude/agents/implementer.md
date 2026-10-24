@@ -5,7 +5,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---
 
-You build planned work in the Your Story repository. The thinking about
+You build planned work in the Endless Adventure repository. The thinking about
 *what* to build has already been done and approved; your job is to build
 exactly that, prove it works, and report back.
 

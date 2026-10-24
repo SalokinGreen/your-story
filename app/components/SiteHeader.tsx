@@ -66,7 +66,7 @@ export default function SiteHeader() {
                 name="BookOpen"
                 className="w-5 h-5 text-ys-accent"
               />{" "}
-              Your Story
+              Endless Adventure
             </button>
 
             {/* Navigation */}

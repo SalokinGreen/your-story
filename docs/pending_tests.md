@@ -10,6 +10,23 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Rebrand to Endless Adventure (decisions 181–182)
+
+Checked on the desktop build: the window title and the page titles read
+Endless Adventure, the installers are named "Endless Adventure_0.1.0_x64…",
+and a profile from before the rename still shows its stories. Needs a device:
+
+- **Windows upgrade over the old install.** Run the new setup.exe on a PC that
+  has "Your Story" installed. Expected: it replaces the old install (the app
+  identifier is unchanged) and the stories are there. Failure looks like: two
+  entries in Apps & features, "Your Story" and "Endless Adventure", side by
+  side (the installer's folder and name come from the product name), with the
+  stories in both because the data folder follows the identifier.
+- **Android update.** Install the new APK over the old one. Expected: an
+  update, not a second app; the launcher label reads Endless Adventure; the
+  stories are there.
+- **iOS.** The home-screen name reads Endless Adventure (no Mac here).
+
 ## 2026-10-24 — Playtest fixes (decision 178)
 
 Needs a real model (the desktop app, the subscription or a key):

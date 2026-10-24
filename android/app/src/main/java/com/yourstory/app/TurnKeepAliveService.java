@@ -104,7 +104,7 @@ public class TurnKeepAliveService extends Service {
     private Notification buildNotification() {
         return new NotificationCompat.Builder(this, CHANNEL_TURN)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Your Story is writing your turn…")
+            .setContentTitle("Endless Adventure is writing your turn…")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

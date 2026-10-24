@@ -122,7 +122,7 @@ export default async function Home() {
         {/* Hero - Static server-rendered */}
         <div className="text-center mb-8">
           <h1 className="text-4xl sm:text-5xl font-bold mb-3 text-ys-accent">
-            Your Story
+            Endless Adventure
           </h1>
           <p className="text-ys-muted text-lg max-w-xl mx-auto mb-6">
             AI-powered interactive fiction where every choice shapes your unique
@@ -265,7 +265,7 @@ export default async function Home() {
             </h3>
             <p className="text-sm text-ys-muted max-w-md mb-4">
               If you believe in what we&apos;re building and want to help keep
-              Your Story alive and growing, consider buying us a coffee!
+              Endless Adventure alive and growing, consider buying us a coffee!
             </p>
             <a
               href="https://ko-fi.com/sgreens"
@@ -284,7 +284,7 @@ export default async function Home() {
         {/* Footer - Static server-rendered */}
         <footer className="text-center pt-4 border-t border-ys-border">
           <p className="text-xs text-ys-muted">
-            © 2026 Your Story • AI-powered interactive fiction
+            © 2026 Endless Adventure • AI-powered interactive fiction
           </p>
           <div className="mt-2 flex justify-center gap-4">
             <Link
