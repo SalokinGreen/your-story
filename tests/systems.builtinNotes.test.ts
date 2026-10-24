@@ -191,6 +191,53 @@ describe("new built-in notes on load", () => {
     return { extra, system: { ...sys, packs: [{ ...rules, notes: [...rules.notes, extra] }, europe] } };
   };
 
+  // E5 §5: a story in another setting (Grave Watcher, the hotel) is given the
+  // Rules notes the pack gains, never Europe by Night's.
+  const grownEurope = () => {
+    const extra = {
+      id: "builtin:blood-and-bone:europe-by-night-new",
+      title: "Europe by Night — New",
+      type: "lore" as const,
+      scope: "cross-europe",
+      content: "x",
+    };
+    return { extra, system: { ...sys, packs: [rules, { ...europe, notes: [...europe.notes, extra] }] } };
+  };
+  const rulesOnlyStory = (setting?: string) => {
+    const story = mockStory({ lore: loreOf(rules.notes.map((n) => n.id)) });
+    story.systemState = {
+      sessionCount: 0,
+      dedupKeys: [],
+      ...(setting ? { setting } : {}),
+    };
+    seedBuiltinNotesOffered(story);
+    return story;
+  };
+
+  it("does not give a story in another setting a new cross-Europe note", () => {
+    const { extra, system } = grownEurope();
+    const story = rulesOnlyStory("grave-watch");
+    expect(pushedBuiltinNotes(sys, "grave-watch").some((n) => n.scope === "cross-europe")).toBe(false);
+    expect(missingBuiltinNotes(story, system)).toEqual([]);
+    expect(addMissingBuiltinNotes(story, [system])).toBe(0);
+    expect(story.lore.some((l) => l.libraryNoteId === extra.id)).toBe(false);
+  });
+
+  it("still gives a story in another setting a new Rules note", () => {
+    const { extra, system } = grownSystem();
+    const story = rulesOnlyStory("last-resort");
+    expect(addMissingBuiltinNotes(story, [system])).toBe(1);
+    expect(story.lore.some((l) => l.libraryNoteId === extra.id)).toBe(true);
+  });
+
+  it("gives a Europe by Night story (setting unset or named) the new cross-Europe note", () => {
+    const { extra, system } = grownEurope();
+    for (const setting of [undefined, "europe-by-night"]) {
+      const story = rulesOnlyStory(setting);
+      expect(missingBuiltinNotes(story, system).map((n) => n.id)).toEqual([extra.id]);
+    }
+  });
+
   it("an old save without the list is given a note the pack gained, once", () => {
     const story = oldSave();
     expect(story.systemState).toBeUndefined();

@@ -241,6 +241,7 @@ The author: "Okay next we need to expand blood and bones by a lot". Blood & Bone
 | 170 | "Is Grave Watcher modern day or a period setting?" | **"Modern-ish, analogue (Recommended)."** Today, but the valley has bad signal: radios, paper logbooks, a pickup, a diner; phones work only in town. |
 | 171 | The author on the first E5 design draft (`docs/bb-starters-design.md`): "Okay like it. Grave Watcher has to be a bit more slice of life, life sim, gilmore girls vibe." | **Grave Watcher is slice of life first.** Most of a session is life in the town (the diner, the regulars, relationships, town meetings, festivals, quick warm talk); the Watch is the job and the yard the weather of the place. The season runs on a town calendar; most radio traffic and most nights are quiet; Unrest climbs slowly with the campaign. The hotel design and the voice samples are liked as they are. |
 | 172 | The author on the second E5 draft: "Add 9 regulars and 35 occasional visitors. And 100 types of people who might be encountered" | **Grave Watcher's town gets three layers of people:** 25 regulars (the 16 in the draft plus 9), NPCs with a running bit each; 35 occasional visitors with a when, in notes the GM reads; and a d100 table of kinds of people one might meet, plus d100 name tables. |
+| 173 | The E5 design (`docs/bb-starters-design.md`, with decisions 171–172) | **"Go"**: build it, in the design's slice order. |
 
 ### Interview — the reading themes reach the whole app (2026-10-23)
 
