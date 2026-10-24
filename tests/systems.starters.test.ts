@@ -20,6 +20,7 @@ import { BLOOD_AND_BONE } from "@/app/misc/systems/blood-and-bone";
 import { BLOOD_AND_BONE_KINDS } from "@/app/misc/systems/blood-and-bone/kindList";
 import { EUROPE_TABLE_FAMILY_IDS } from "@/app/misc/systems/blood-and-bone/starters/shared";
 import {
+  addMissingBuiltinNotes,
   BLOOD_AND_BONE_CORE_ID,
   missingBuiltinNotes,
   seedBuiltinNotesOffered,
@@ -31,6 +32,7 @@ const enc = getEncoding("cl100k_base");
 const tokens = (s: string) => enc.encode(s).length;
 const sys = BLOOD_AND_BONE;
 const core = sys.packs[0].notes.find((n) => n.id === BLOOD_AND_BONE_CORE_ID)!;
+const RULES_TEXT = sys.packs[0].notes.map((n) => n.content).join("\n");
 
 const STARTERS = [
   { id: "builtin:blood-and-bone:grave-watcher", setting: "grave-watch", world: "Unrest", presets: 8 },
@@ -72,13 +74,42 @@ for (const spec of STARTERS) {
       for (const id of ids) expect(europeIds.has(id!), id).toBe(false);
     });
 
-    it("is given no Europe by Night note on load", () => {
-      const story = {
-        ...structuredClone(tpl()),
-        lore: structuredClone(lore()),
-      } as StoryData;
+    it("is given no Europe by Night note on load, now or when the packs grow", () => {
+      const fresh = () =>
+        ({ ...structuredClone(tpl()), lore: structuredClone(lore()) }) as StoryData;
+      // Unseeded (offered = what it holds): nothing of Europe's is missing.
+      expect(missingBuiltinNotes(fresh(), sys)).toEqual([]);
+      // Seeded against today's packs, then the packs gain a cross-Europe note,
+      // a Europe-tagged Rules table and an untagged Rules note: only the last
+      // one arrives.
+      const story = fresh();
       seedBuiltinNotesOffered(story);
-      expect(missingBuiltinNotes(story, sys)).toEqual([]);
+      const [rules, europe] = sys.packs;
+      const grown = {
+        ...sys,
+        packs: [
+          {
+            ...rules,
+            notes: [
+              ...rules.notes,
+              { id: "builtin:blood-and-bone:t-europe", title: "B&B — T Europe", type: "table" as const, content: "x", setting: "europe-by-night" },
+              { id: "builtin:blood-and-bone:t-all", title: "B&B — T All", type: "table" as const, content: "x" },
+            ],
+          },
+          {
+            ...europe,
+            notes: [
+              ...europe.notes,
+              { id: "builtin:blood-and-bone:e-new", title: "Europe by Night — New", type: "lore" as const, content: "x", scope: "cross-europe" },
+            ],
+          },
+        ],
+      };
+      expect(addMissingBuiltinNotes(story, [grown])).toBe(1);
+      const ids = new Set(story.lore.map((l) => l.libraryNoteId));
+      expect(ids.has("builtin:blood-and-bone:t-all")).toBe(true);
+      expect(ids.has("builtin:blood-and-bone:t-europe")).toBe(false);
+      expect(ids.has("builtin:blood-and-bone:e-new")).toBe(false);
       expect(story.systemState?.setting).toBe(spec.setting);
     });
 
@@ -112,7 +143,7 @@ for (const spec of STARTERS) {
       for (const t of tables) expect(checkTableShape(t.title, t.content), t.title).toEqual([]);
     });
 
-    it("offers its roster as presets, each a filled, legal sheet", () => {
+    it("offers its roster as presets, each a filled sheet naming real rules", () => {
       const presets = starter.adventure.presets ?? [];
       expect(presets).toHaveLength(spec.presets);
       expect(tpl().presets).toEqual(presets);
@@ -125,6 +156,21 @@ for (const spec of STARTERS) {
         expect(sheet, p.name).not.toContain("{{");
         const kind = /\*\*Kind:\*\*\s*(.+)/.exec(sheet)?.[1]?.trim();
         expect(BLOOD_AND_BONE_KINDS as readonly string[], `${p.name}: Kind ${kind}`).toContain(kind);
+        // Every field filled with something real from the rules.
+        const field = (k: string) => {
+          const i = sheet.indexOf(`**${k}:**`);
+          return i < 0 ? "" : sheet.slice(i + k.length + 5, sheet.indexOf("\n", i)).trim();
+        };
+        for (const k of ["Archetype", "Path", "Power", "Path ability", "Gear", "Recover move", "Weakness"]) {
+          expect(field(k), `${p.name}: ${k}`).not.toBe("");
+        }
+        const archetype = field("Archetype").replace(/^The /, "").split(/[ (,—]/)[0];
+        expect(RULES_TEXT, `${p.name}: Archetype ${archetype}`).toContain(`**The ${archetype}`);
+        const path = field("Path").split(/[ (,.—]/)[0].toUpperCase();
+        expect(RULES_TEXT, `${p.name}: Path ${path}`).toContain(`**${path}`);
+        const power = field("Power").replace(/\s*\d.*$/, "").replace(/^The /, "").toUpperCase();
+        expect(RULES_TEXT, `${p.name}: Power ${power}`).toContain(power);
+        expect(/## Connections[^\n]*\n\S/.test(sheet), `${p.name}: Connections`).toBe(true);
         const stats = /Nerve\s+(\d)\s*\|\s*Heart\s+(\d)\s*\|\s*Bone\s+(\d)\s*\|\s*Shadow\s+(\d)\s*\|\s*Wits\s+(\d)/.exec(sheet);
         expect(stats, `${p.name}: stats line`).not.toBeNull();
         expect(stats!.slice(1).map(Number).sort().join(""), `${p.name}: stats`).toBe("11223");

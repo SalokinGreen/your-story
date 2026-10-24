@@ -72,7 +72,7 @@ export const GW_REGULARS_NPCS: NPC[] = [
     "june-abernathy",
     "June Abernathy",
     "The Watch's dispatcher in town",
-    "Fifties, headset permanently round her neck, a desk in the back of the sheriff's building with a kettle and a police scanner. Knows everything first and tells it in the order she enjoys.",
+    "Fifties, headset permanently round her neck, a desk upstairs over the town hall with a kettle and a police scanner. Knows everything first and tells it in the order she enjoys.",
     "Your link to the towers and the town. Hears your radio, so hears everything.",
     "allied",
     "the dispatch desk",
@@ -251,7 +251,7 @@ export const GW_REGULARS_NPCS: NPC[] = [
     "Tiny, sharp, in a hat with a pin. Visits each husband weekly, brings each a different flower, and reports to each on the others.",
     "Walks into the yard in daylight and has never been stopped. Lectures the Watch.",
     "friendly",
-    "the Long Acre, Catholic Rise",
+    "the Long Acre, Founders' Plot",
     "🌹",
     "Hollins Ferry",
   ),
@@ -324,11 +324,11 @@ Each: running bit, wants, soft spot, the web, where to find them. Use one a scen
 
 **Arlo Brandt** (right half of the hardware store). Bit: tells why he and Gus stopped speaking, differently every time. Wants: Gus to speak first. Soft spot: keeps Gus's old birthday card in the till. Web: the painted line down the shop floor; the brothers pass messages through Wendell. Find: the shop, weekdays; Thursday evenings at the Low Water.
 
-**Bea Lindqvist** (library, historical society). Bit: answers a question with the book and the page. Wants: the Old Lot's records, which do not exist. Soft spot: has never lent out the town's first ledger. Web: Wendell is her living archive and refuses to be indexed; Sister Agnes corrects her dates. Find: the library; Mondays at the Lamplight with a stack.
+**Bea Lindqvist** (library, historical society). Bit: answers a question with the book and the page. Wants: the Old Lot's records, which do not exist. Soft spot: has never lent out the town's first ledger. Web: Wendell is her living archive and refuses to be indexed; Sister Agnes corrects her dates. Find: the library; Wednesdays at the Lamplight with a stack.
 
 **Celeste Marchetti** (dance teacher). Bit: counts everyone in, out loud, in the street. Wants: the dance marathon to run to dawn this year with no one sitting. Soft spot: has not danced with a partner since her husband, and will not say why. Web: Hank donates the punch; Pastor Hal blesses the floor; Cora sits on the committee. Find: the studio above the bank, evenings.
 
-**Cora Pruitt** (committees). Bit: "I'll just put you down." Wants: a perfect Founders' Day and Walt kept away from the microphone. Soft spot: hid the last Halloween committee's notes because of what they said about the Old Lot. Web: runs Walt; clashes with Marisol over the pie table; Celeste's marathon rival. Find: the Lamplight, second booth, mornings.
+**Cora Pruitt** (committees). Bit: "I'll just put you down." Wants: a perfect Founders' Day and Walt kept away from the microphone. Soft spot: goes vague and changes the subject when anyone asks about last Halloween's committee notes. Web: runs Walt; clashes with Marisol over the pie table; Celeste's marathon rival. Find: the Lamplight, second booth, mornings.
 
 **Desmond Hale** (Vampire, night pharmacist). Bit: says "good morning" at midnight. Wants: Dr. Price's blood-bank arrangement kept quiet and tidy. Soft spot: keeps a photo of the pharmacy's 1974 sign. Web: Dr. Price supplies him; Marisol sends a late coffee he does not drink; Fiona waves from the bakery at 5 a.m. Find: the pharmacy after dark.
 
@@ -368,7 +368,7 @@ Each: running bit, wants, soft spot, the web, where to find them. Use one a scen
 
 **Ingrid Moss** (Witch, apothecary). Bit: "that'll be rue" without being asked. Wants: the Founders' Day wreath contract away from the funeral home's florist cousin. Soft spot: dreams in the yard's old languages. Web: Dr. Price; Fiona buys herbs for the family's moon week; Teddy ordered an odd wreath. Find: the shop; the Catholic Rise at dawn for cuttings.
 
-**June Abernathy** (Watch dispatcher). Bit: "I heard that before you said it." Wants: Tower Six's silence explained. Soft spot: keeps Tower Six's coffee mug washed on her shelf. Web: Eli (the net); Nell (gossip rival); the Sheriff next door; Owen Lister sends flowers she says she hates. Find: the dispatch desk; the net every night.
+**June Abernathy** (Watch dispatcher). Bit: "I heard that before you said it." Wants: Tower Six's silence explained. Soft spot: keeps Tower Six's coffee mug washed on her shelf. Web: Eli (the net); Nell (gossip rival); the Sheriff down the street; Owen Lister sends flowers she says she hates. Find: the dispatch desk; the net every night.
 
 **Lyle Greaves** (funeral director). Bit: fits a quiet joke into every goodbye. Wants: to retire without a bad last funeral. Soft spot: keeps a list of the unclaimed. Web: Teddy, his successor, bought the Hendricks place in cash and does not seem to notice it matters; Pastor Hal; Wendell. Find: Greaves & Sons; the Low Water on the first of the month.
 
@@ -378,13 +378,13 @@ Each: running bit, wants, soft spot, the web, where to find them. Use one a scen
 
 **Owen Lister** (Board inspector). Bit: compliments the logbook, then the Watcher, then asks the hard question. Wants: a clean report and a reason to come back. Soft spot: has never filed a finding against a tower he liked. Web: June; Nell; Sheriff Okafor, who distrusts him politely. Find: the Ferry Motel; the Lamplight on inspection weeks.
 
-**Pearl Whitlock** (91). Bit: gives each husband a different flower and tells him about the others. Wants: a fourth husband, as a joke only she finds funny. Soft spot: knows which of the three she loved. Web: Wendell dug all three graves; Pastor Hal visits her; Tommy carries her bag. Find: the Catholic Rise, Tuesdays, Thursdays, Saturdays.
+**Pearl Whitlock** (91). Bit: gives each husband a different flower and tells him about the others. Wants: a fourth husband, as a joke only she finds funny. Soft spot: knows which of the three she loved. Web: Wendell dug all three graves; Pastor Hal visits her; Tommy carries her bag. Find: the Founders' Plot, Tuesdays, Thursdays, Saturdays.
 
 **Rocco Tanaka** (gas station, tow truck). Bit: oldies on every radio, tells you the year of the song. Wants: Fiona to say yes to dinner. Soft spot: tows the Watch out of the yard in flood season and never charges. Web: Fiona; Eli; Gus (fuel for the hardware van). Find: the gas station; the Lamplight at noon.
 
 **Ruth Okafor, Sheriff.** Bit: "Put it in writing. Short." Wants: no paperwork about the yard. Soft spot: has a drawer of reports she never filed. Web: Walt (permits), June next door, Owen Lister at arm's length. Find: the sheriff's office; the Lamplight, third stool.
 
-**Teddy Vance** (Greaves & Sons). Bit: perfect manners; asks the Watch how the yard "feels". Wants: the Hendricks place finished. Soft spot: the GM decides what the cash is, and what he wants with the old sections. Web: Lyle; Gus (paint); Ingrid (wreath). Find: Greaves & Sons; the yard gate at dusk, alone.
+**Teddy Vance** (Greaves & Sons). Bit: perfect manners; asks the Watch how the yard "feels". Wants: the Hendricks place finished. Soft spot: flinches when anyone mentions the Old Lot, and checks over his shoulder for a car. Web: Lyle; Gus (paint); Ingrid (wreath). Find: Greaves & Sons; the yard gate at dusk, alone.
 
 **Tommy Reyes** (busboy, 17). Bit: knows the Watch's rulebook by heart. Wants: a tower of his own, or a ride in Rocco's truck. Soft spot: his mother thinks he is saving for college. Web: Marisol; Eli teaches him radio. Find: the Lamplight; Eli's shed after school.
 

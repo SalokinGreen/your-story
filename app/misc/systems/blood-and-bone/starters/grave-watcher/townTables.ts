@@ -78,7 +78,7 @@ const GOSSIP = starterNote(
   "table",
   `# Grave Watcher — Gossip going round
 
-What the town is saying. Most of it is wrong and all of it is repeated. Roll once for the story and again for who is telling it.
+What the town is saying. Most of it is wrong and all of it is repeated. Roll once for the story; it is said by whoever is at the Lamplight.
 
 ## The talk of the town (1d20)
 
@@ -101,7 +101,7 @@ What the town is saying. Most of it is wrong and all of it is repeated. Roll onc
 17. The Hendricks place is haunted, say the movers. The movers are not from here.
 18. Nell says the man in room 6 has not left it in nine days, and she is not worried, only curious.
 19. Somebody has been mailing anonymous pies to the Watch. Marisol wants to know who, and why they got her recipe.
-20. Tower Six's lamp was on last night. Nobody is in Tower Six. June says she did not see it. June is lying.
+20. Tower Six's lamp was on last night, at an hour the new man says he was off. June says she did not see it. People have views.
 
 Use when someone in town needs something to say, when a scene needs a rumour to chase, or when a quiet day needs a thread.`,
 );

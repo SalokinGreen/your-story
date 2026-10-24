@@ -84,7 +84,7 @@ export function buildGraveWatcher(packNotes: BuiltinNote[]): BuiltinAdventure {
       systemState: { sessionCount: 0, dedupKeys: [], setting: "grave-watch" },
       meters: [unrest()],
       progressTracks: [
-        createTrack("Watch", "Get through the season", "vow", "extreme"),
+        createTrack("Watch", "Get through the season", "vow", "formidable"),
         createTrack("Watch", "Name the dead of the Old Lot", "vow", "extreme"),
       ],
     },

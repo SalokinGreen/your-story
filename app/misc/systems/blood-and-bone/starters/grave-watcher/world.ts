@@ -9,13 +9,13 @@ import { starterNote } from "../shared";
 
 const RUNNING_IT = `# Grave Watcher — Running it
 
-A season in Hollins Ferry, a valley town beside the Long Acre, a graveyard two hundred thousand graves wide. Slice of life first: a small-town life sim with a graveyard at the end of the road. The talk is quick, warm and funny, and everyone knows everyone's business. The yard is real and dangerous, but it is the weather of the place, not the plot of every scene. If there is no Campaign Plan note yet, read "Grave Watcher — The season" and its secret, write one (medium spine, seven beats, each laid over the town calendar) and call start_game after the setup card.
+A season in Hollins Ferry, a valley town beside the Long Acre, a graveyard two hundred thousand graves wide. Slice of life first: a small-town life sim with a graveyard at the end of the road. The talk is quick, warm and funny, and everyone knows everyone's business. The yard is real and dangerous, but it is the weather of the place, not the plot of every scene. If there is no Campaign Plan note yet, read the secrets "Grave Watcher — The season" (the outline) and "Grave Watcher — The truth of the season's working", write one (medium spine, seven beats, each laid over the town calendar) and call start_game after the setup card.
 
 Rhythm. A day is town: errands, a second job (the Watch pays badly), lunch at the Lamplight, a favour, an argument, a meeting. A night is a watch: a check-in every hour after dark, mostly gossip, jokes, song requests and someone's dog; a logbook line; now and then a call that means going down the ladder. Most nights nothing comes up and the radio talk is the scene. One town event every week or two ("The town calendar"): a social scene first, a yard problem second, sometimes. Never two yard crises in a row. Unrest moves with the campaign beats, not with each night.
 
 Town first. Play the regulars (the NPCs; "Town regulars") as people with a running bit and a want. Bring Connections into scenes often, and give each Watcher a life in town worth losing. Compel, Gather Information and Secure an Advantage do most of the work (winning the argument at the meeting, finding who sent the pie, getting the booth). A good conversation can raise a Connection a rank; a bad one drops it. Stress comes from life too (a fight with your mother counts). Face Danger and the Skirmish moves are for the nights that go wrong. Offer Repair a Bond whenever a day was mostly town.
 
-Masquerade off. The Concord, the Vigil and the Masquerade do not exist here; the Board of Wardens runs the Watch. The core's table list and the Europe sections do not apply: use this story's own tables (names are in "Town regulars" and the visitors notes). Reread three things. Exposure is not used (leave it at 0): Taint takes its place. The Mask Slips becomes The Dark Takes Hold: Taint +1. Heat does not exist here: Unrest (already in Meters & tracks) is the world meter, so do NOT create the City set at setup. The end-of-session reminder's Heat line does not apply: Unrest moves only by the rule below. Clean Up becomes cleansing (salt, running water, a night in town): Taint -1, once a session. Taint +1, once a scene each, for: a miss that touches a working; staying in the yard past dawn; a grave opened by your hand; a Power used in the yard on a miss. Taint 3 the dogs in town will not come near you; 5 the dead start talking to you by name; 6 the yard keeps you. Unrest (world, starts 1): 3 the dead walk on ordinary nights; 4 the county inspector threatens to bring in the Board; 5 the town is in danger; 6 the yard breaks its fences. It rises when a working is left to grow, a grave is robbed or a tower is abandoned; it falls when a working is broken or a section laid quiet.
+Masquerade off. The Concord, the Vigil and the Masquerade do not exist here; the Board of Wardens runs the Watch. The core's table list and the Europe sections do not apply: use this story's own tables (names are in "Town regulars" and the visitors notes). Reread three things. Exposure is not used (leave it at 0): Taint takes its place, and any cost an ability pays in Exposure is paid in Taint instead (the Apostate's marks, for one). The Mask Slips becomes The Dark Takes Hold: Taint +1. Heat does not exist here: Unrest (already in Meters & tracks) is the world meter, so do NOT create the City set at setup. The end-of-session reminder's Heat line does not apply: Unrest moves only by the rule below. Clean Up becomes cleansing (salt, running water, a night in town): Taint -1, once a session. Taint +1, once a scene each, for: a miss that touches a working; staying in the yard past dawn; a grave opened by your hand; a Power used in the yard on a miss. Taint 3 the dogs in town will not come near you; 5 the dead start talking to you by name; 6 the yard keeps you. Unrest (world, starts 1): 3 the dead walk on ordinary nights; 4 the county inspector threatens to bring in the Board; 5 the town is in danger; 6 the yard breaks its fences. It rises when a working is left to grow, a grave is robbed or a tower is abandoned; it falls when a working is broken or a section laid quiet.
 
 Setup for each Watcher: manage_meter create_set "Blood & Bone character" (owner = their name; ignore its Exposure), plus "Witch" for a Witch/Warlock, then manage_meter create with owner their name, meter "Taint", min 0, max 6, value 0, thresholds [{at 3, label "The dogs know", note "Dogs in town will not come near them."}, {at 5, label "Named", note "The dead start talking to them by name."}, {at 6, label "The yard keeps you", note "Take them out of the yard now, or the yard keeps them."}]. Then manage_track create their Vow. Tell a player once: the Watch pays badly, so everyone has a second job. Voice: short lines, warm teasing, a running bit per regular; someone always interrupts; end scenes on a small human beat (a thermos handed up the ladder). Dee Harjo has her own booth at the Lamplight.
 
@@ -23,9 +23,15 @@ The team. Players crew Tower Nine, their headquarters. A roster Watcher a player
 
 Read when needed: "The town calendar" every week; "Hollins Ferry" and "Town regulars" for any scene in town; "The Watch net" for any radio scene; "The Long Acre" before a section is entered; the tables when you need a face, a rumour or a call. Connections are the heart: let a Connection ask for something.`;
 
+const SEASON_PUBLIC = `# Grave Watcher — This season
+
+One season, late September to early May (about thirty-two weeks), in the life of Tower Nine. Mostly town: the calendar sets the pace ("The town calendar"), and a week is a few errands, a meeting, a watch or two. Underneath, the yard is restless. A green light keeps turning up among the graves, Tower Six went quiet last spring, and a newcomer in town has more money than he should. Unrest starts at 1 and moves with what the Watch does.
+
+Two tracks run all season: "Get through the season" (mark it as the calendar passes and as the Watchers show up for the town) and "Name the dead of the Old Lot" (mark it when a name is found, spoken and written down). The season ends on Ferry Day in early May, and what the town does that day is the ending.`;
+
 const SEASON = `# Grave Watcher — The season
 
-The campaign: one season (about thirty weeks, late September to early May) in the life of Tower Nine. Mostly town. Underneath, slowly, a working is growing in the Long Acre, the tower that went quiet last year is not finished with the Watch, and someone in town is making money from a restless yard. A green light keeps showing in the Long Acre (the Tally's keeper looking for a name). It surfaces through town life: the funeral director's new colleague and his cash, the Founders' Day speech that mentions the Old Lot, the dog that will not pass the Lamplight's back door. The radio is the second place it shows. Read the secrets before you write the plan. Unrest starts at 1; the plan raises it a step per beat at most, and the players can hold it back.
+The campaign outline (GM only): one season (about thirty-two weeks, late September to early May) in the life of Tower Nine. Mostly town. Underneath, slowly, a working is growing in the Long Acre, the tower that went quiet last spring is not finished with the Watch, and someone in town is making money from a restless yard. A green light keeps showing in the Long Acre (the Tally's keeper looking for a name). It surfaces through town life: the funeral director's new colleague and his cash, the Founders' Day speech that mentions the Old Lot, the dog that will not pass the Lamplight's back door. The radio is the second place it shows. Read the secrets before you write the plan. Unrest starts at 1; the plan raises it a step per beat at most, and the players can hold it back.
 
 The seven beats (each between the events named; see "The town calendar"):
 
@@ -33,36 +39,36 @@ The seven beats (each between the events named; see "The town calendar"):
 2. First Graves (the Lantern Walk to the dance marathon). Digging is heard at the Old Lot fence; a grave is found open and empty-looking but not empty. The Hendricks place has lights at 3 a.m. Bea Lindqvist mentions that the records of the Old Lot were never filed. Unrest 1 to 2.
 3. The Count (the Halloween committee to All Souls). Names begin to surface: a blank headstone carrying a name by morning, a name said on the radio, a child's chalk on the gate. The November mourners come. A voice on Six's dead channel says all quiet, every night at 2:11.
 4. Who Profits (Thanksgiving to the Christmas pageant). Teddy's hearse is seen on the ferry road. Owen Lister arrives from the Board for a routine inspection and is, unfortunately, charming. Unrest 3: the dead walk on ordinary nights; Pastor Hal asks the Watch for a vigil. A Watcher is offered something to look away.
-5. The Hard Winter (the winter carnival to the Sweetheart Supper). The Drowned Ground freezes and the lights under the ice show. Emmett Roake of Tower Six tells his side of last year. Lyle Greaves confesses what his father told him. The Board talks of condemning the yard. Unrest 4.
+5. The Hard Winter (the winter carnival to the Sweetheart Supper). The Drowned Ground freezes and the lights under the ice show. Emmett Roake of Tower Six tells his side of last spring. Lyle Greaves confesses what his father told him. The Board talks of condemning the yard. Unrest 4.
 6. The Thaw (the budget meeting to the spring cleanup). Mud season opens the ground. A reckoning at the Hendricks cellar and the Old Lot; the buyer behind Teddy is named; Lister has to choose. The count passes fifty. Unrest 5 unless the players have pushed back.
 7. Ferry Day (the anniversary, early May). The count reaches the last name. What the town does that day is the ending: see the secret. Afterwards, one scene of an ordinary morning at the Lamplight, whatever happened.
 
-Tracks: "Get through the season" (Watch, a Formidable vow): mark it as the calendar passes and as the Watchers show up for the town; "Name the dead of the Old Lot" (Watch, Extreme): mark it when a name is found, spoken and written down.
+Tracks (seeded at setup): "Get through the season" (Watch, a Formidable vow): mark it as the calendar passes and as the Watchers show up for the town; "Name the dead of the Old Lot" (Watch, Extreme): mark it when a name is found, spoken and written down.
 
 Who profits. Teddy Vance is not the villain of the piece; he is a nervous man with a debt. His employer is not in town (an out-of-county buyer; the secret says who). Owen Lister is honest and wants the Watch to look good; he is the one who can turn the Board either way. Give the players ways to find each fact more than one way: Marisol's gossip, June's logs, Bea's records, Eli Sandoval's radio logs, Wendell Boone's bench.`;
 
 const CALENDAR = `# Grave Watcher — The town calendar
 
-A season of events, one every week or two. Each is a social scene first (who runs it, who is feuding, who needs a volunteer). Trouble in the yard is optional. Week numbers count from Founders' Day.
+A season of events, one every week or two. Each is a social scene first (who runs it, who is feuding, who needs a volunteer). Trouble in the yard is optional. Weeks run Saturday to Friday, counted from Founders' Day (W1 starts that Saturday; Halloween falls in W5, May 4 in W32).
 
 W1 Founders' Day pancake breakfast, last Saturday of September, on Main Street. Cora Pruitt runs it, Walt gives the speech (it always includes the Old Lot, in a sentence nobody listens to). The Watchers are signed up for the pie table. Yard: nothing, on purpose. A fine day to meet everyone.
-W3 The pumpkin weigh-in, in the Brandt Hardware lot. Gus and Arlo Brandt weigh on opposite scales. Sheriff Okafor is the judge. Yard: Tommy Reyes hears something on the Hill.
-W4 The Lantern Walk, mid-October. The town walks lanterns up the Catholic Rise at dusk and back. Pastor Hal leads, Sister Agnes sings from the dark. Yard: the walk goes into the yard; one lantern too many comes down.
-W5 The dance marathon, twenty-four hours at Celeste Marchetti's studio above the bank, for the fire department's new truck. Couples drop; gossip peaks. Yard: a Watcher cannot be there at 3 a.m. and on the tower; who is covering?
-W6 The Halloween committee meeting. A sore subject: last year's haunted hayride went through the yard's fence. Walt wants a motion, Cora wants a vote, the Watch wants a veto. Yard: no.
-W7 Halloween night. Everyone in costume, every Watcher on a tower or at the candy table. The dead like it too. Yard: busiest night of the autumn; most of it harmless.
-W8 All Souls week. The November mourners come, plus the stranger who leaves flowers on a grave with no name. The Lamplight puts out the long table. Yard: the Old Lot, a name.
-W10 Thanksgiving potluck at St. Bride's. Pearl Whitlock brings the stuffing and a grudge. Hal's sermon runs long. Yard: a quiet watch on a loud night.
-W12 The first snow supper. When the first snow falls Marisol opens the Lamplight free for chowder. Whoever is on tower misses it, and gets a thermos. Yard: footprints in the first snow where nobody walked.
-W14 Tree lighting and the Christmas pageant, at the chapel. The angels are Fiona's loud family. Yard: the choir hears a second choir.
-W15 New Year's Eve at the Low Water. Hank Delgado's one night with a cover charge. The Watch drinks free until eleven. Yard: a resolution, and a break in the fence at midnight.
-W18 The winter carnival: ice fishing on the reservoir, a chili cook-off, a sledding hill (the Children's Hill is off limits). Yard: the Drowned Ground freezes; the lights beneath.
-W20 The Sweetheart Supper, in the church hall, in February. Matchmaking is a contact sport. Yard: someone has left a note on a grave addressed to a Watcher.
-W23 The town budget meeting, March. Two hours on the parking item. Lister is in the back with a clipboard. Yard: the Board's numbers, and Tower Six's budget line.
-W25 The thaw. Mud season, the road to the Rise washed out, the Drowned Ground rising. Rocco tows everyone. Yard: the ground gives up what it held.
-W27 The spring cleanup of the graves. Volunteers in the yard with rakes; Wendell Boone supervises from a lawn chair. Yard: the best cover for a dig, and the best chance to see one.
-W29 The historical society's Ferry Day exhibit, at the library. Bea Lindqvist's annual display of what the town has agreed to remember. Yard: nobody asks why the 1911 case is empty.
-W30 Ferry Day, early May. Not a holiday. The old people light a candle; the town has forgotten why. Yard: the last night of the count.
+W2 The pumpkin weigh-in, in the Brandt Hardware lot. Gus and Arlo Brandt weigh on opposite scales. Sheriff Okafor is the judge. Yard: Tommy Reyes hears something on the Hill.
+W3 The Lantern Walk, mid-October. The town walks lanterns up the Catholic Rise at dusk and back. Pastor Hal leads, Sister Agnes sings from the dark. Yard: the walk goes into the yard; one lantern too many comes down.
+W4 The dance marathon, twenty-four hours at Celeste Marchetti's studio above the bank, for the fire department's new truck. Couples drop; gossip peaks. Yard: a Watcher cannot be there at 3 a.m. and on the tower; who is covering?
+W5 The Halloween committee meeting, on the Monday: the committee always leaves it to the last week. A sore subject: last year's haunted hayride went through the yard's fence. Walt wants a motion, Cora wants a vote, the Watch wants a veto. Yard: no.
+W5 Halloween night, on the Friday. Everyone in costume, every Watcher on a tower or at the candy table. The dead like it too. Yard: busiest night of the autumn; most of it harmless.
+W6 All Souls week, early November. The November mourners come, plus the stranger who leaves flowers on a grave with no name. The Lamplight puts out the long table. Yard: the Old Lot, a name.
+W9 Thanksgiving potluck at St. Bride's. Pearl Whitlock brings the stuffing and a grudge. Hal's sermon runs long. Yard: a quiet watch on a loud night.
+W11 The first snow supper, early December. When the first snow falls Marisol opens the Lamplight free for chowder. Whoever is on tower misses it, and gets a thermos. Yard: footprints in the first snow where nobody walked.
+W13 Tree lighting and the Christmas pageant, at the chapel. The angels are Fiona's loud family. Yard: the choir hears a second choir.
+W14 New Year's Eve at the Low Water. Hank Delgado's one night with a cover charge. The Watch drinks free until eleven. Yard: a resolution, and a break in the fence at midnight.
+W18 The winter carnival, late January: ice fishing on the reservoir, a chili cook-off, a sledding hill (the Children's Hill is off limits). Yard: the Drowned Ground freezes; the lights beneath.
+W21 The Sweetheart Supper, in the church hall, mid-February. Matchmaking is a contact sport. Yard: someone has left a note on a grave addressed to a Watcher.
+W24 The town budget meeting, March. Two hours on the parking item. Lister is in the back with a clipboard. Yard: the Board's numbers, and Tower Six's budget line.
+W26 The thaw, late March. Mud season, the road to the Rise washed out, the Drowned Ground rising. Rocco tows everyone. Yard: the ground gives up what it held.
+W29 The spring cleanup of the graves, mid-April. Volunteers in the yard with rakes; Wendell Boone supervises from a lawn chair. Yard: the best cover for a dig, and the best chance to see one.
+W31 The historical society's Ferry Day exhibit, at the library. Bea Lindqvist's annual display of what the town has agreed to remember. Yard: nobody asks why the 1911 case is empty.
+W32 Ferry Day, May 4. Not a holiday. The old people light a candle; the town has forgotten why. Yard: the last night of the count.
 
 Between them: Sunday service, the Thursday fish fry, the library's story hour, the Tuesday night poker at Brandt Hardware, the bake sale for whatever is broken. Use the weekly shapes to fill a quiet week.`;
 
@@ -141,9 +147,9 @@ The towers (call sign, section watched, usual voice; see "The roster" for who):
 - One: the Founders' Plot and the main gate. Steady, fog-reading.
 - Two: the Catholic Rise. The veteran. Reads the weather like a nature documentary.
 - Three: the Drowned Ground. The reservoir side. Quiet, wet, kind.
-- Four: the east fence line. The chatty one. Runs the fence on full moons.
+- Four: the east fence line. The chatty one. Bram Gale runs the fence line on full moons.
 - Five: the Paupers' Field. The Ghost who stayed.
-- Six: the Old Lot side. Went quiet last year (see below).
+- Six: the Old Lot side. Went quiet last spring (see below).
 - Seven: the Children's Hill. The rookie, on their first season.
 - Eight: the oldest tower, the north ridge. Stone voice, few words.
 - Nine: the players. Headquarters, spare radio, the logbook.
@@ -161,7 +167,7 @@ const WORLD = `# Grave Watcher — The world
 
 The supernatural is ordinary here. Everyone knows the dead do not all stay down and that some of the living are not exactly human. It is on the town form.
 
-Living openly. Kinds in Hollins Ferry have a night-shift card from the county. A Vampire (Desmond Hale) works nights at the pharmacy and eats through the donors' drive (a Thursday arrangement, a fridge, a polite sign). Werewolves lock in a cellar at the bakery on the full moon and are back at the ovens by six. A Ghost sings in the chapel and has asked the town meeting for a vote (denied, then argued over). Gargoyles are listed as historic structures. A Witch runs the apothecary. Hunters are called wardens here and are licensed. Nobody finds it strange; people do find it rude when you stare.
+Living openly. Kinds in Hollins Ferry have a night-shift card from the county. A Vampire (Desmond Hale) works nights at the pharmacy and eats through the donors' drive (a Thursday arrangement, a fridge, a polite sign). Werewolves keep the full moon in two ways: Fiona Gale's family shelter in the bakery cellar and are back at the ovens by six, while Bram Gale, the pack's runner, patrols the east fence line outside the yard with the Watch's blessing. A Ghost sings in the chapel and has asked the town meeting for a vote (denied, then argued over). Gargoyles are listed as historic structures. A Witch runs the apothecary. Hunters are called wardens here and are licensed. Nobody finds it strange; people do find it rude when you stare.
 
 What is not ordinary. Yards. A great old cemetery draws dark magic: enough grief and old burial makes a place a low field the dark pools in. Workings take root. Graves open. Things come up that were never buried. That is why there are towers, a net and a Watch. The county takes it seriously and pays slowly.
 
@@ -179,20 +185,22 @@ The Tally. On the fourth of May, 1911, the excursion steamer Annabel Hollins, ov
 
 It woke because Teddy Vance started digging. The cash that bought the Hendricks place is Ashcombe's advance, carried in a Greaves & Sons deposit bag. He is working for an out-of-county buyer, Ashcombe Holdings, who wants the company strongbox that Amos Greaves buried with the Hollins ledger: it holds the original deed to the whole waterfront and the passenger list. Teddy took the job at Greaves & Sons for access to the Greaves family's old files, and bought the Hendricks place for a base. He digs by night with two hired hands and a small backhoe he calls landscaping. He thinks the only danger is getting caught. Each grave he opens answers the Tally: one name surfaces (a blank headstone, a whisper, a child's chalk). He is picking up Taint. The green light in the yard is Hester's lantern: it walks the graves looking for the next name and goes out when one is found.
 
-The small hooks. Wendell Boone dug in the Old Lot once, as a young man, and found rows of small bones with ferry tags and an iron box under a plain stone; he filled it in and never spoke of it. Cora Pruitt is hiding last year's Halloween committee notes: the hayride crossed the Old Lot fence, Walt signed the permit, and the notes show the fence had been moved in forty feet.
+The small hooks. Wendell Boone dug in the Old Lot once, as a young man, and found rows of small bones with ferry tags and an iron box under a plain stone; he filled it in and never spoke of it. Cora Pruitt is hiding last Halloween's committee notes: the minutes record that the hayride crossed the Old Lot fence, that Walt signed the permit, and that the fence had been moved in forty feet. She hides them to protect Walt, and because the minutes mention the Old Lot. In public she is only evasive.
 
 How it ends. At sixty-three names the dead rise and walk home, to the houses on Main Street they were going to (the old picnic route), and ask for supper. They are not hostile. The yard's fence breaks around them. Three honest endings:
 - Name them: every name written into the town record (Bea Lindqvist's registry and Hal's chapel book), spoken aloud, on Ferry Day. The Tally closes. The cost: the town has to admit it, and Lyle Greaves has to testify.
 - Feed them: Ferry Day as a supper, the whole town at the long table, sixty-three places. It works for a night; the working does not close and next year there is a supper again. A tradition is born.
 - Break it: Ingrid Moss can unmake the working with a cold rite, and the dead are scattered unnamed. Unrest drops. Hester's counting gets one last name: someone who did it.
 
-Teddy: nervous, in debt, decent underneath; he can be turned. Owen Lister: honest; when the Board hears of Ashcombe he will fight. Lyle Greaves: carries his father's confession and the key to the strongbox. The strongbox: in the Old Lot beneath the sexton's own plain stone ("A. G."). Ashcombe wants the land and will send a lawyer, not a gun.`;
+Teddy: nervous, in debt, decent underneath; he can be turned. What the town sees: a polite man with cash, a clean car and an interest in the old sections. He pays for his work out of the Ashcombe advance in the deposit bag, and the strongbox is what he wants from the Old Lot. Owen Lister: honest; when the Board hears of Ashcombe he will fight. Lyle Greaves: carries his father's confession and the key to the strongbox. The strongbox: in the Old Lot beneath the sexton's own plain stone ("A. G."). Ashcombe wants the land and will send a lawyer, not a gun.`;
 
 const SECRET_SIX = `What happened at Tower Six
 
-Last March the crew of Six, Ines Calloway and Pell Garrity, watched the lights at the Hendricks place and went to the Old Lot fence at 2:11 a.m. to see. A fresh-dug grave stood open there, a hole full of dark that sounded, to Pell, like a child. Pell went down. Ines called it in on the radio ("he's in the roll"), and then the channel went quiet. Pell died in the grave and became the Tally's thirty-first name (the count at that point was thirty). Ines, ashamed and afraid, drove out of the valley that dawn and sends Marisol Ochoa a postcard each month with no return address.
+Last March (six months before the season opens) the crew of Six, Ines Calloway and Pell Garrity, watched the lights at the Hendricks place and went to the Old Lot fence at 2:11 a.m. to see. A fresh-dug grave stood open there, a hole full of dark that sounded, to Pell, like a child. Pell went down. Ines called it in on the radio ("he's in the roll"), and then the channel went quiet. Pell died in the grave. He was the great-grandson of Nora Garrity, a passenger, the Tally's thirty-first name of the sixty-three (the count that March stood at thirty), and her open grave called to his blood. His death is not a sixty-fourth name: it is why Nora's is the next to surface. Ines, ashamed and afraid, drove out of the valley that dawn and sends Marisol Ochoa a postcard each month with no return address.
 
 June Abernathy logged the night as radio failure because the Board's regional office told her to: a missing Watcher closes a tower's budget, and the Board was about to cut Six anyway. She has hated herself since. The post was filled in September by Emmett Roake, a Revenant who had his own reasons to come to the Old Lot (the 1911 deckhand who made a promise to a drowning girl, Mina: that her name would be written down). He hears Pell on the dead channel at 2:11 and does not answer; if someone does answer, Pell asks for Ines. The way to close it is to find Ines, or write Pell's name in the town record, or take him home.
+
+June knows more than she says. She saw Six's lamp lit on a night with nobody to light it, and every night since she has logged the 2:11 in a second book she keeps at home. She does not lie to be cruel; she is afraid that saying it would make the Board close Six for good. Ask her gently and she will hand the book over.
 
 Pell is not malevolent. He is a man who kept watch and is still keeping it. The channel can be a source of leads (he knows where the digging is) if the Watchers are kind.`;
 
@@ -252,7 +260,7 @@ Roll 1d20 for a call that means going down the ladder. One per bad night; never 
 19. A Watcher's voice on the radio calling for help from a tower, but they are standing beside you.
 20. Something tall at the edge of the fog waves a long sleeve. Waving back is a mistake.
 
-Use when the night turns. Follow with a Face Danger or a Gather Information, not a fight. Taint on a miss. Resolve it before dawn, or log it and carry it into the town scenes.`;
+Use when the night turns. Follow with a Face Danger or a Gather Information, not a fight. Taint by its triggers (Running it) where a working or the yard is involved, and nothing for an ordinary call. Resolve it before dawn, or log it and carry it into the town scenes.`;
 
 const T_STIRS = `# Grave Watcher — What stirs in the yard
 
@@ -281,7 +289,7 @@ Roll 1d20 for what is actually there when a call goes down. Most of it wants som
 19. A living kid on the Hill who says he is Tommy Reyes's friend. He is not on the town's rolls.
 20. Nothing. A perfectly calm night, stars like salt. The Watcher has an entry to write. This is the loveliest table result.
 
-Use when the call is real and you need a face. Most of these can be talked to. Roll Taint only where the fiction says the yard touched them.`;
+Use when the call is real and you need a face. Most of these can be talked to. If a Taint trigger applies (Running it), manage_meter adjust Taint +1; otherwise nothing.`;
 
 const T_SECTIONS = `# Grave Watcher — Sections and graves
 
@@ -384,8 +392,13 @@ export const GW_WORLD_NOTES: StoryLore[] = [
   starterNote("Grave Watcher — Running it", "dm_instructions", RUNNING_IT, {
     characters: ["Walt Pruitt", "June Abernathy", "Marisol Ochoa"],
   }),
-  starterNote("Grave Watcher — The season", "lore", SEASON, {
-    keys: ["campaign", "season", "beats", "Unrest"],
+  starterNote("Grave Watcher — This season", "lore", SEASON_PUBLIC, {
+    keys: ["season", "this season", "Unrest"],
+  }),
+  starterNote("Grave Watcher — The season", "secret", SEASON, {
+    secret: true,
+    keys: ["campaign", "season", "beats", "outline"],
+    characters: ["Teddy Vance", "Owen Lister", "Emmett Roake"],
   }),
   starterNote("Grave Watcher — The town calendar", "lore", CALENDAR, {
     keys: ["calendar", "Founders' Day", "Lantern Walk", "festival", "event"],

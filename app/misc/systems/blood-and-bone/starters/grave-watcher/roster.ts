@@ -169,7 +169,7 @@ const HOBB = sheet({
   shadow: 1,
   wits: 2,
   stressTriggers:
-    "Exposed to mortals who stare; his disguise slips; the sun begins to rise",
+    "Exposed to mortals; his disguise slips; the sun begins to rise",
   recover:
     "Sate the Beast: protect his territory (the north ridge and what lies under it); a strong hit also removes one Stress from an ally present",
   weakness:
@@ -200,7 +200,7 @@ const CASS = sheet({
   stressTriggers:
     "A hunt goes wrong; she is forced to work with or spare a monster; she sees how close she has come to becoming what she hunts",
   recover:
-    "Steel the Resolve (+Heart or +Wits), or by penance: a small act of amends, which as a Penitent works once a night and on a strong hit takes Stress down by 3",
+    "Steel the Resolve (+Heart or +Wits), or by penance (once a night): a vigil, a debt paid or a hardship the GM names as a real cost, roll +Heart; a strong hit takes Stress down by 3, a weak hit by 1. Stress Relief: a small act of amends nobody will know about, a night of honest work for someone who needs it, or a confession heard in silence",
   weakness: "No supernatural healing and no Sate the Beast shortcut; only time, medicine and other people",
   xp: "Archetype XP",
   connections:
@@ -263,7 +263,7 @@ const EMMETT = sheet({
   connections:
     "June Abernathy (Steady): the only voice on the net that says good night to him; Bea Lindqvist (Weak): lets him read in the back of the library after closing",
   burdens: "None",
-  power: "Dead Man's Patience 1: when he outlasts something (cold, hunger, a long stakeout), add +1",
+  power: "Dead Man's Patience 1: you do not sleep, tire or need to be fed; when he Faces Danger by outlasting something (cold, hunger, a long stakeout), add +1",
   pathAbility: "Sailor 1: Undertake a Journey by water, and Face Danger on a deck or in a swell, add +1",
   otherAssets: "None yet",
   gear: "A slicker that never dries; a coil of rope he knots when thinking; a stub of pencil and a page with one name on it",
@@ -359,7 +359,7 @@ export const GW_PRESETS: Preset[] = [
     "Tower Six. Revenant, Oathkeeper. Took over the post the Watch had written off, and answers the net in two clicks of the mic. Quiet, courteous, damp at the cuffs. Vow: keep a promise made on a boat, long ago. Connection: June Abernathy, who says good night to him on the radio.",
     "Skull",
     EMMETT,
-    "Usual tower: Six (the Old Lot side), which went quiet last year. Vow (Dangerous): keep a promise made on a boat (the GM has the details in the secret). Stress starts at 2.",
+    "Usual tower: Six (the Old Lot side), which went quiet last spring. Vow (Dangerous): keep a promise made on a boat (the GM has the details in the secret). Stress starts at 2.",
   ),
   preset(
     "gw-cass-moreno",
