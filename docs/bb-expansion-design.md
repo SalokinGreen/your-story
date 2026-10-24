@@ -347,3 +347,12 @@ is a prompt to interpret, not a verdict, is a design choice here.
   match as one separator; failing an exact match, the one built-in note whose
   name after " — " equals the request is read (two matches: no guess); a
   "Not found" line lists up to three closest titles by shared words.
+
+### 2026-10-24 (coordinator): labels in a formula stay allowed
+
+The review fix refused anything in a formula the tokenizer could not read,
+which also refused labels the GM writes ("1d6 + 2 (Nerve)", "1d6+2 Shadow"),
+formulas the old parser rolled with the label ignored. Only arithmetic it
+cannot do (`*`, `/`, `×`, `÷`, `^`, `%`) is refused now, with a pointer to
+`calculate`; words and brackets are ignored as before. The d66 refusal and
+the bare `dN` = `1dN` rule are unchanged.

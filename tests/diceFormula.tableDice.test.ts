@@ -32,9 +32,13 @@ describe("table dice", () => {
     expect(validateFormula("1d6").isValid).toBe(true);
   });
 
-  it("refuses what the tokenizer would silently drop", () => {
-    for (const f of ["2d6*2", "1d20 x 2", "1d20/2", "(1d6)"]) {
+  it("refuses arithmetic the tokenizer would silently drop, and keeps labels", () => {
+    for (const f of ["2d6*2", "1d20/2", "1d6*10+1d6"]) {
       expect(validateFormula(f).isValid, f).toBe(false);
+    }
+    // The GM labels its pools; a label is ignored, as it always was.
+    for (const f of ["1d6 + 2 (Nerve)", "1d6+2 Shadow", "(1d6)"]) {
+      expect(validateFormula(f).isValid, f).toBe(true);
     }
     expect(validateFormula("1d20 + 5 - 1d4").isValid).toBe(true);
     expect(validateFormula("4d6kh3!").isValid).toBe(true);

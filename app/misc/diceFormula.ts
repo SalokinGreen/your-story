@@ -144,12 +144,14 @@ export function parseFormula(formula: string): ParsedFormula {
     throw new Error(D66_MESSAGE);
   }
 
-  // Anything the tokenizer cannot account for (a "*", a stray letter) used to
-  // be dropped silently; refuse it so the roll is not something else.
+  // Arithmetic the tokenizer cannot do ("*", "/") used to be dropped silently,
+  // so "1d6*10" rolled as 1d6+10; refuse it. Words and brackets stay allowed:
+  // the GM labels its pools ("1d6+2 (Nerve)") and those are only ignored.
   const residue = cleanFormula.replace(TOKENIZER_PATTERN, "");
-  if (residue) {
+  const arithmetic = residue.match(/[*/×÷^%]/g);
+  if (arithmetic) {
     throw new Error(
-      `Invalid formula: "${formula}" contains "${residue}", which is not dice, a number, + or -`
+      `Invalid formula: "${formula}" uses "${[...new Set(arithmetic)].join("")}"; formula_roll only adds and subtracts dice and numbers (use calculate for the rest)`
     );
   }
 
