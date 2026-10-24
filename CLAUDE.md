@@ -468,7 +468,8 @@ progress, repetition and knowledge notes, the pacing note and the GM tip),
 marked `"turn"`. `generation.ts` marks the last message of each later round's
 request copy `"round"` (`cacheMarks.ts`). A Claude request with tools gets
 `cache_control` on the system message and the last message of each mark kind,
-four at most; the `claude` CLI puts everything up to the `"prefix"` message in
+four at most; the system message and the "prefix" mark live an hour (`ttl: "1h"`,
+decision 186), "turn" and "round" five minutes; the `claude` CLI puts everything up to the `"prefix"` message in
 its system file. **Anything per-turn goes in the live block, never the system
 prompt or the stable block**, and a change to the layout must keep the base
 messages byte-identical across a turn's rounds and everything up to the end

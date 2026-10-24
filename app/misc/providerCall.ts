@@ -748,18 +748,26 @@ function dropMidHistoryPrefills(messages: ChatMessage[]): ChatMessage[] {
 }
 
 /**
- * Claude only: content-part form with a 5-minute cache breakpoint. OpenRouter
- * forwards `cache_control` on a text part to Anthropic; without a breakpoint
- * Claude caches nothing and every GM round pays full input price.
+ * Claude only: content-part form with a cache breakpoint. OpenRouter forwards
+ * `cache_control` on a text part to Anthropic; without a breakpoint Claude
+ * caches nothing and every GM round pays full input price. `ttl: "1h"` keeps
+ * the entry an hour instead of five minutes (writes cost 2x input instead of
+ * 1.25x, reads stay at a tenth).
  */
-function withCacheBreakpoint(content: string): CachedTextPart[] {
-  return [{ type: "text", text: content, cache_control: { type: "ephemeral" } }];
+function withCacheBreakpoint(content: string, ttl?: "1h"): CachedTextPart[] {
+  return [
+    {
+      type: "text",
+      text: content,
+      cache_control: ttl ? { type: "ephemeral", ttl } : { type: "ephemeral" },
+    },
+  ];
 }
 
 interface CachedTextPart {
   type: "text";
   text: string;
-  cache_control: { type: "ephemeral" };
+  cache_control: { type: "ephemeral"; ttl?: "1h" };
 }
 
 /** Shared message-transform logic (prefill stripping, ID normalization, per-message shaping). */
@@ -814,12 +822,19 @@ function buildRequestMessages(
   // next turn), "turn" (end of the action, reused by every round) and "round"
   // (the latest message, reused by the next round). Marks that land on the
   // same message collapse into one.
-  const cacheIndexes = new Set<number>();
+  //
+  // TTLs (the 2026-10-24 Debug Logs): a player who thinks for more than five
+  // minutes between turns found the 5-minute cache gone and paid the 1.25x
+  // write on the whole ~60k-token prefix every turn. The breakpoints reused
+  // across turns - the system message and "prefix" - live an hour; "turn" and
+  // "round", reused only within a turn, keep five minutes. Anthropic requires
+  // 1-hour entries before 5-minute ones, which this order is.
+  const cacheIndexes = new Map<number, "1h" | undefined>();
   if (isClaude && hasTools) {
     for (const kind of ["prefix", "turn", "round"] as const) {
       for (let i = processedMessages.length - 1; i >= 0; i--) {
         if (processedMessages[i].cacheBreakpoint === kind && processedMessages[i].content) {
-          cacheIndexes.add(i);
+          if (!cacheIndexes.has(i)) cacheIndexes.set(i, kind === "prefix" ? "1h" : undefined);
           break;
         }
       }
@@ -829,7 +844,7 @@ function buildRequestMessages(
       processedMessages[0]?.role === "system" &&
       processedMessages[0].content
     ) {
-      cacheIndexes.add(0);
+      cacheIndexes.set(0, "1h");
     }
   }
 
@@ -967,7 +982,7 @@ function buildRequestMessages(
     }
 
     if (cacheIndexes.has(index)) {
-      msg.content = withCacheBreakpoint(msg.content);
+      msg.content = withCacheBreakpoint(msg.content, cacheIndexes.get(index));
     }
     return msg;
   });
@@ -1383,6 +1398,7 @@ export function generateStream(
         let cachedTokens: number | undefined;
         let cacheWriteTokens: number | undefined;
         let streamComplete = false;
+        let finishSeen = false;
 
         const processChunk = (parsed: any) => {
           const delta = parsed.choices?.[0]?.delta;
@@ -1447,7 +1463,17 @@ export function generateStream(
             cacheWriteTokens = cacheUsage.cacheWriteTokens;
           }
 
+          // A finish reason does not end the read: OpenRouter (and the
+          // OpenAI-style APIs asked for include_usage) send the usage - tokens,
+          // cache hits, the billed cost - in a chunk of their own AFTER the
+          // one carrying finish_reason. Stopping at the finish lost it, so a
+          // streamed turn reported 0 tokens and no cost (the 2026-10-24 Debug
+          // Logs). The read now ends on [DONE], the stream closing, or the
+          // usage chunk once the finish has been seen.
           if (finishReason === "stop" || finishReason === "end_turn" || finishReason === "length") {
+            finishSeen = true;
+          }
+          if (finishSeen && parsed.usage) {
             streamComplete = true;
           }
         };
