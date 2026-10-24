@@ -131,14 +131,17 @@ describe("night-ended turn-end check - generateStoryTurn integration", () => {
   it("lets the GM decline: one reminder, then the turn ends", async () => {
     const story = createStory();
     const { result, calls } = await play(story, "I wait", [
-      { content: "Sunrise is hours away, you tell yourself, though the sky lightens." },
-      { content: "It is not dawn yet. The watch goes on, and at sunrise nothing is settled." },
+      // A false alarm: the GM meant a plan, and declines with an empty reply,
+      // as the message asks, so nothing extra reaches the story.
+      { content: "You tell yourself the sun rose on worse nights than this." },
+      { content: "" },
     ]);
     expect(result.success).toBe(true);
     expect(calls).toHaveLength(2);
     expect(reminderCount(calls[1].body)).toBe(1);
     expect(calls[1].body.toolChoice).toBe("auto");
     expect(result.gmResults?.some((r) => r.toolName === "end_session")).toBeFalsy();
+    expect(result.content).toBe("You tell yourself the sun rose on worse nights than this.");
   });
 
   it("does not prompt again after the reminder when the next prose still says dawn", async () => {
@@ -243,6 +246,37 @@ describe("night-ended turn-end check - generateStoryTurn integration", () => {
     expect(calls).toHaveLength(1);
   });
 
+  // Engine review (decision 184): the turn after dawn still talks about the
+  // day; it must not invite a second end_session for the same night.
+  it("does not prompt when the GM's previous turn already ended the session", async () => {
+    const story = createStory();
+    story.scene.parts = [
+      ...(story.scene.parts ?? []),
+      {
+        content: "Dawn. You climb down.",
+        user: false,
+        gmConversation: [
+          { role: "tool", content: "[end_session] [Session 1 ended: dawn]" },
+        ],
+      } as unknown as StoryData["scene"]["parts"][number],
+    ];
+    const { calls } = await play(story, "I sleep until dusk", [
+      { content: "You sleep through the day and wake at first light's opposite, the dusk." },
+    ]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not send the reminder with fewer than three rounds left", async () => {
+    const story = createStory();
+    const { calls } = await play(
+      story,
+      "I keep watch",
+      [{ content: "Dawn breaks over the cemetery." }, { content: "more" }],
+      { ...baseOptions, maxToolLoops: 3 },
+    );
+    expect(calls).toHaveLength(1);
+  });
+
   it("keeps the system prompt and the tool list byte-identical with and without the reminder", async () => {
     const story = createStory();
     const { calls } = await play(story, "I keep watch", [
@@ -257,7 +291,7 @@ describe("night-ended turn-end check - generateStoryTurn integration", () => {
     const m2 = second.messages as Msg[];
     // Everything the first request sent is the unchanged start of the second;
     // the reminder arrives only as appended messages.
-    expect(m2.slice(0, m1.length - 1)).toEqual(m1.slice(0, m1.length - 1));
+    expect(m2.slice(0, m1.length)).toEqual(m1);
     expect(m2[0]).toEqual(m1[0]);
     expect(hasReminder(first)).toBe(false);
     expect(hasReminder(second)).toBe(true);

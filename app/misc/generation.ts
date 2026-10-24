@@ -3352,6 +3352,7 @@ async function generateStoryTurnOnce(
                     },
                     results: gmResults,
                     prompted: turnEndChecksPrompted,
+                    priorParts: storyData.scene?.parts ?? [],
                   })
                 : null;
               // The tool that settles the check must be on this turn's list
@@ -3370,8 +3371,11 @@ async function generateStoryTurnOnce(
                   phrase: pending.match.phrase,
                   round: gmRound,
                 };
-                if (gmRound >= MAX_GM_ROUNDS) {
-                  // No request left to run it in; say so rather than drop it.
+                // Dawn takes several requests (end_session, the Reckoning's
+                // rolls, the meter changes, the prose); with fewer than three
+                // left the session would end without its consequences, so it
+                // is logged instead (engine review, decision 184).
+                if (MAX_GM_ROUNDS - gmRound < 3) {
                   turnEndChecksPrompted.add(pending.check.id);
                   logger.action(
                     `Turn-end check ${pending.check.id} could not run: no rounds left`,

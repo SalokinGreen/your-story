@@ -228,3 +228,24 @@ and the Reckoning rolled in the same turn.
   is in `providerCall.forcedToolChoice.test.ts`, the subscription one in
   `claudeCli.fetch.test.ts`.
 - **Devlog**: the playtest devlog's status note was not touched, as asked.
+
+## After the engine review (2026-10-24)
+
+- **The turn after dawn** no longer prompts: `satisfiedOnLastTurn` skips the
+  check when the GM's previous turn already ran `end_session`, so "I sleep
+  until dusk" cannot invite a second Reckoning for one night.
+- **A decline is an empty reply**: the message asks for nothing at all when
+  it is not dawn, so a false alarm adds no prose to the story.
+- **The exceptions cover every word for the day**: before sunrise, you have
+  until sunrise, sunrise is hours away, not until daybreak, the ship sails at
+  dawn, he died the next day. The question exception is now a future question
+  ("will…?") or the phrase right before its "?", bounded to 80 characters, so
+  "Dawn breaks over Whitechapel, what do you do?" fires and a long
+  unpunctuated run stays fast.
+- **Three rounds left** are needed to send the reminder; with fewer, it is
+  logged, so a session never ends without its Reckoning for lack of rounds.
+- **Replay**: on the desktop build before these refinements, the playtest
+  line ("At dawn I log off, climb down and go to bed. Next morning…") fired
+  the check (Debug Logs: "Turn-end check night-ended… sending the GM back
+  once", source player, "At dawn"), and the GM called `end_session` and rolled
+  the Reckoning in the same turn.

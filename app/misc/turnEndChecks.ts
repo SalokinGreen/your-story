@@ -122,8 +122,37 @@ export function checkSatisfied(
 }
 
 /**
- * The first declared check that crossed, is not satisfied this turn and has
- * not been prompted this turn.
+ * True when the GM's previous turn already ran the check's tool. The turn
+ * after dawn still talks about the day ("I sleep until dusk", "at first
+ * light…"), and without this the reminder would invite a second end_session
+ * and a second Reckoning for one night (engine review, decision 184). The
+ * replayed conversation keeps tool results as text: an executed one starts
+ * "[<tool>]" (generation.ts), a failed one "**ERROR**".
+ */
+export function satisfiedOnLastTurn(
+  check: SystemTurnEndCheck,
+  parts: ReadonlyArray<{
+    user?: boolean;
+    gmConversation?: ReadonlyArray<{ role: string; content?: unknown }>;
+  }>,
+): boolean {
+  const prefix = `[${check.satisfiedBy.toolName}]`;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i];
+    if (part.user) continue;
+    return (part.gmConversation ?? []).some(
+      (m) =>
+        m.role === "tool" &&
+        typeof m.content === "string" &&
+        m.content.startsWith(prefix),
+    );
+  }
+  return false;
+}
+
+/**
+ * The first declared check that crossed, is not satisfied this turn or on
+ * the GM's previous turn, and has not been prompted this turn.
  */
 export function pendingCheck(
   system: Pick<BuiltinSystem, "turnEndChecks"> | undefined,
@@ -131,11 +160,14 @@ export function pendingCheck(
     text: TurnEndText;
     results: readonly TurnEndToolResult[];
     prompted: ReadonlySet<string>;
+    /** The story's parts before this turn, for satisfiedOnLastTurn. */
+    priorParts?: Parameters<typeof satisfiedOnLastTurn>[1];
   },
 ): PendingTurnEndCheck | null {
   for (const check of system?.turnEndChecks ?? []) {
     if (turn.prompted.has(check.id)) continue;
     if (checkSatisfied(check, turn.results)) continue;
+    if (turn.priorParts && satisfiedOnLastTurn(check, turn.priorParts)) continue;
     const match = textCrosses(check, turn.text);
     if (match) return { check, match };
   }

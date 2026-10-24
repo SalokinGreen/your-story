@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   checkSatisfied,
   pendingCheck,
+  satisfiedOnLastTurn,
   splitPlayerLines,
   textCrosses,
 } from "@/app/misc/turnEndChecks";
@@ -240,5 +241,48 @@ describe("a second system runs through the same evaluator", () => {
         prompted: new Set(),
       }),
     ).toBeNull();
+  });
+});
+
+// Engine review of decision 184.
+describe("night-ended check: the review's lines", () => {
+  it.each([
+    "You have until sunrise to find her.",
+    "Get back to the haven before sunrise.",
+    "Sunrise is hours away.",
+    "Hours before first light, the bells start.",
+    "Before the sun rises, you must feed.",
+    "Not until daybreak will the gate open.",
+    "The ship sails at dawn.",
+    "The Concord meets at dawn.",
+    "He died the next day, they say.",
+  ])("does not fire on a dawn still to come: %s", (line) => {
+    expect(crosses(prose(line))).toBe(false);
+  });
+
+  it.each([
+    "Dawn breaks over Whitechapel, grey and cold, what do you do?",
+    "As first light creeps over the rooftops, do you run for the crypt?",
+    "I sleep until sunrise.",
+  ])("fires on a crossing that ends in the GM's hand-off: %s", (line) => {
+    expect(crosses(line.startsWith("I ") ? player(line) : prose(line))).toBe(true);
+  });
+
+  it("stays fast on a long run with no sentence break", () => {
+    const long = "and the fog, ".repeat(800) + "at sunrise?";
+    const t0 = performance.now();
+    textCrosses(NIGHT_ENDED_CHECK, prose(long));
+    expect(performance.now() - t0).toBeLessThan(300);
+  });
+});
+
+describe("satisfiedOnLastTurn", () => {
+  const gm = (content: string) => ({ user: false, gmConversation: [{ role: "tool", content }] });
+  it("sees an executed end_session on the GM's previous turn", () => {
+    expect(satisfiedOnLastTurn(NIGHT_ENDED_CHECK, [gm("[end_session] [Session 1 ended]"), { user: true }])).toBe(true);
+  });
+  it("ignores a failed one, and one from an earlier turn", () => {
+    expect(satisfiedOnLastTurn(NIGHT_ENDED_CHECK, [gm("**ERROR** in end_session: reason missing")])).toBe(false);
+    expect(satisfiedOnLastTurn(NIGHT_ENDED_CHECK, [gm("[end_session] [Session 1 ended]"), { user: true }, gm("[formula_roll] 3")])).toBe(false);
   });
 });
