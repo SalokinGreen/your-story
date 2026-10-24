@@ -21,6 +21,18 @@ import { MOVES_NOTE } from "./moves";
 import { PROGRESS_NOTE } from "./progress";
 import { BLOOD_AND_BONE_SHEET_TEMPLATE } from "./sheet";
 import { TABLE_NOTES } from "./tables";
+import { PEOPLE_NOTE } from "./oracles/people";
+import { NIGHT_NOTE } from "./oracles/night";
+import { PLACES_NOTE } from "./oracles/places";
+import { FACTIONS_NOTE } from "./oracles/factions";
+import { VIGIL_NOTE } from "./oracles/vigil";
+import { MASQUERADE_NOTE } from "./oracles/masquerade";
+import { RUMOURS_NOTE } from "./oracles/rumours";
+import { FEEDING_NOTE } from "./oracles/feeding";
+import { HOOKS_NOTE } from "./oracles/hooks";
+import { OBJECTS_NOTE } from "./oracles/objects";
+import { INVESTIGATION_NOTE } from "./oracles/investigation";
+import { ROADS_NOTE } from "./oracles/roads";
 import { TIME_SKIP_NOTE } from "./timeSkip";
 
 export const BLOOD_AND_BONE_ID = "blood-and-bone";
@@ -34,6 +46,19 @@ const RULES_NOTES: BuiltinNote[] = [
   TIME_SKIP_NOTE,
   CREATION_NOTE,
   ...TABLE_NOTES,
+  // The expansion's table families (E1, decisions 150-159).
+  PEOPLE_NOTE,
+  NIGHT_NOTE,
+  PLACES_NOTE,
+  FACTIONS_NOTE,
+  VIGIL_NOTE,
+  MASQUERADE_NOTE,
+  RUMOURS_NOTE,
+  FEEDING_NOTE,
+  HOOKS_NOTE,
+  OBJECTS_NOTE,
+  INVESTIGATION_NOTE,
+  ROADS_NOTE,
   ...CREATION_PROMPT_NOTES,
 ];
 

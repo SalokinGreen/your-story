@@ -11,6 +11,7 @@ import { ensureStoryDataArrays, stripRemovedFields } from "./storyDataDefaults";
 import { ARCHETYPE_INFO } from "./gmAdvice";
 import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
 import { deleteImagesForStory } from "./imageStore";
+import { seedBuiltinNotesOffered } from "./systems/builtinNotes";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -212,6 +213,8 @@ export async function startAdventureLocally(
       ...(adventure.storyTemplate?.customTables || []).map(customTableToNote),
     ],
   } as unknown as StoryData);
+  // What the author left out of a built-in system's notes stays out.
+  seedBuiltinNotesOffered(newStoryData);
 
   await saveLocalStory(localId, newStoryData);
 
@@ -420,6 +423,7 @@ export async function startFreeformStoryLocally(
     goals: [],
     npcs: [],
   } as unknown as StoryData;
+  seedBuiltinNotesOffered(newStoryData);
 
   await saveLocalStory(localId, newStoryData);
 

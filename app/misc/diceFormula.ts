@@ -106,6 +106,9 @@ const MODIFIER_PATTERN = /^[+-]?\d+$/;
 const TOKENIZER_PATTERN =
   /([+-]?\d+d\d+(?:kh\d+|kl\d+)?!?|\{\{[a-zA-Z_][a-zA-Z0-9_]*\}\}|[+-]?\d+|[+-])/gi;
 
+const D66_MESSAGE =
+  'd66 is two d6 read as tens and ones: roll formula_roll with formulas ["1d6","1d6"], the first die is the tens';
+
 // ============================================
 // PARSER
 // ============================================
@@ -119,8 +122,11 @@ export function parseFormula(formula: string): ParsedFormula {
   const tokens: FormulaToken[] = [];
   const variables: string[] = [];
 
-  // Clean up the formula
-  const cleanFormula = formula.trim().replace(/\s+/g, "");
+  // Clean up the formula. A bare "d20" at the start of a term means "1d20".
+  const cleanFormula = formula
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/(^|[+-])d(?=\d)/gi, "$11d");
 
   if (!cleanFormula) {
     return { tokens: [], raw: formula, variables: [] };
@@ -131,6 +137,22 @@ export function parseFormula(formula: string): ParsedFormula {
 
   if (!matches) {
     throw new Error(`Invalid formula: "${formula}"`);
+  }
+
+  // d66 is two d6 read as tens and ones, not a die with 66 sides.
+  if (/\d+d66(?!\d)/i.test(cleanFormula)) {
+    throw new Error(D66_MESSAGE);
+  }
+
+  // Arithmetic the tokenizer cannot do ("*", "/") used to be dropped silently,
+  // so "1d6*10" rolled as 1d6+10; refuse it. Words and brackets stay allowed:
+  // the GM labels its pools ("1d6+2 (Nerve)") and those are only ignored.
+  const residue = cleanFormula.replace(TOKENIZER_PATTERN, "");
+  const arithmetic = residue.match(/[*/×÷^%]/g);
+  if (arithmetic) {
+    throw new Error(
+      `Invalid formula: "${formula}" uses "${[...new Set(arithmetic)].join("")}"; formula_roll only adds and subtracts dice and numbers (use calculate for the rest)`
+    );
   }
 
   let expectOperator = false;

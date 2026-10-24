@@ -187,7 +187,7 @@ Resist the Hunger: a miss uses the Sate the Beast table.
     title: "B&B — Oracles: complication",
     type: "table",
     tags: ["Blood & Bone","Oracle"],
-    content: `Roll 1d10:
+    content: `Roll 1d20:
 1. A Connection is endangered or compromised.
 2. A witness sees something they shouldn't. Exposure +1.
 3. Your Stress escalates immediately by 1.
@@ -198,6 +198,16 @@ Resist the Hunger: a miss uses the Sate the Beast table.
 8. The situation escalates — more enemies, less time, worse ground.
 9. You succeed, but at a moral cost you'll carry.
 10. Something from your past resurfaces at the worst moment.
+11. Someone you owe finds you, and wants it now.
+12. The location is compromised: a camera, a lock, a watcher.
+13. A rival gets there first and takes what you came for.
+14. A companion's secret comes out, in front of the wrong person.
+15. Hunger spikes. The Beast wants out, and the room is full of people.
+16. The authorities turn up, early and curious.
+17. A lie you told earlier is caught.
+18. Help arrives, and it comes with a price.
+19. The plan works, and exposes someone else instead.
+20. You learn that this was meant to happen, and who arranged it.
 
 Use when a miss has no table of its own, or the situation is stranger than the table covers.`,
   },
@@ -206,7 +216,7 @@ Use when a miss has no table of its own, or the situation is stranger than the t
     title: "B&B — Oracles: scene",
     type: "table",
     tags: ["Blood & Bone","Oracle"],
-    content: `Roll 1d10:
+    content: `Roll 1d20:
 1. Nothing. The quiet is real, and you should use it.
 2. Someone is already here, and they were waiting.
 3. Evidence of something that happened recently.
@@ -217,6 +227,16 @@ Use when a miss has no table of its own, or the situation is stranger than the t
 8. Someone you know, in a context that makes no sense.
 9. The aftermath of violence.
 10. Something wrong that you can't name yet.
+11. A message left for you, by someone who knew you'd come.
+12. A crowd, a party or a vigil, and you are underdressed for it.
+13. A Ghost, aware of you, and not hostile.
+14. A place you feel safe, which is itself suspicious.
+15. A child, alone, with a question.
+16. A door that should be locked and is open.
+17. A Connection in trouble, and not yet asking for help.
+18. The scene has been cleaned. Someone was fast.
+19. A noise from the next room. Then the same noise, from behind you.
+20. Two other parties arrive at once, for opposite reasons.
 
 Use when you do not know what a new scene contains.`,
   },
@@ -225,7 +245,7 @@ Use when you do not know what a new scene contains.`,
     title: "B&B — Oracles: what they want",
     type: "table",
     tags: ["Blood & Bone","Oracle"],
-    content: `Roll 1d10:
+    content: `Roll 1d20:
 1. Money, or its equivalent.
 2. Safety — theirs or someone else's.
 3. Information you have.
@@ -236,6 +256,16 @@ Use when you do not know what a new scene contains.`,
 8. Something destroyed.
 9. A debt paid, in either direction.
 10. Something you'd never guess. Roll twice and combine.
+11. A witness, to something they cannot say aloud.
+12. An apology, from you or from someone you can reach.
+13. A promise kept, and they'll know if it isn't.
+14. A way out of a deal they made.
+15. To be turned, or taken, or changed: to become something else.
+16. A name, or the truth behind a name.
+17. To protect someone you would have wanted to hurt.
+18. A place back: a home, a seat, a title.
+19. A chance to prove themselves, in public.
+20. Nothing you can give. They want to see how you react.
 
 Use when you do not know an NPC's motive.`,
   },

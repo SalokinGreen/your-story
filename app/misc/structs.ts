@@ -594,6 +594,11 @@ export interface SystemState {
   usesSystemTools?: boolean;
   sessionCount: number;
   dedupKeys: MeterDedupKey[];
+  // Built-in note ids the story has been given (it held them, or they were
+  // added when it loaded). A note in this list is never added again, so one
+  // the player deleted stays deleted. Absent on a story saved before the list
+  // existed: the ids it holds then count as offered (builtinNotes.ts).
+  builtinNotesOffered?: string[];
 }
 
 // ============================================

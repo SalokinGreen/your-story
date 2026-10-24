@@ -14,6 +14,12 @@ export interface BuiltinNote {
   tags?: string[];
   keys?: string[];
   visibility?: LoreVisibility;
+  // Which part of a setting the note belongs to: "cross-europe" for notes
+  // every story of the setting uses, else a place name ("London"). A starter
+  // copies only its own place, and a story that loads gains only the notes
+  // scoped "cross-europe" (missingBuiltinNotes). Unset means the note is
+  // not scoped (a rules note).
+  scope?: "cross-europe" | string;
 }
 
 export interface BuiltinPack {

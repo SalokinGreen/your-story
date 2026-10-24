@@ -9,6 +9,7 @@ import type { BuiltinNote } from "../types";
 export const EUROPE_NOTES: BuiltinNote[] = [
   {
     id: "builtin:blood-and-bone:europe-by-night-overview",
+    scope: "cross-europe",
     title: "Europe by Night — Overview",
     type: "lore",
     tags: ["Blood & Bone","Setting"],
@@ -40,6 +41,7 @@ Each city in this book can stand alone or link into any of these — pull whiche
   },
   {
     id: "builtin:blood-and-bone:europe-by-night-london",
+    scope: "London",
     title: "Europe by Night — London",
     type: "lore",
     tags: ["Blood & Bone","Setting"],
@@ -60,6 +62,7 @@ Each city in this book can stand alone or link into any of these — pull whiche
   },
   {
     id: "builtin:blood-and-bone:europe-by-night-paris",
+    scope: "Paris",
     title: "Europe by Night — Paris",
     type: "lore",
     tags: ["Blood & Bone","Setting"],
@@ -80,6 +83,7 @@ Each city in this book can stand alone or link into any of these — pull whiche
   },
   {
     id: "builtin:blood-and-bone:europe-by-night-prague",
+    scope: "Prague",
     title: "Europe by Night — Prague",
     type: "lore",
     tags: ["Blood & Bone","Setting"],
@@ -100,6 +104,7 @@ Each city in this book can stand alone or link into any of these — pull whiche
   },
   {
     id: "builtin:blood-and-bone:europe-by-night-rome",
+    scope: "Rome",
     title: "Europe by Night — Rome",
     type: "lore",
     tags: ["Blood & Bone","Setting"],
@@ -120,6 +125,7 @@ Each city in this book can stand alone or link into any of these — pull whiche
   },
   {
     id: "builtin:blood-and-bone:europe-by-night-berlin",
+    scope: "Berlin",
     title: "Europe by Night — Berlin",
     type: "lore",
     tags: ["Blood & Bone","Setting"],
@@ -140,6 +146,7 @@ Each city in this book can stand alone or link into any of these — pull whiche
   },
   {
     id: "builtin:blood-and-bone:europe-by-night-vienna",
+    scope: "Vienna",
     title: "Europe by Night — Vienna",
     type: "lore",
     tags: ["Blood & Bone","Setting"],

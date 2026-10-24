@@ -10,6 +10,30 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Blood & Bone tables, E1 (decisions 150–159)
+
+Run on the desktop app with the author's go (Claude Haiku subscription,
+high, as Default; Sonnet as Advanced): the starter carries London and the
+overview only; the compact list reaches the GM; after the "roll it rather
+than inventing" line was added, the GM read The night, Places, People and
+Rumours unprompted, rolled d66 as `["1d6","1d6"]` and read 2+2 as 22 and
+1+4 as 14 correctly, and rolled 1d100 for a name (75, Piet Mulder) and used
+it word for word. Still open:
+
+- **Old stories keep their oracles.** In a story made before E1, the three
+  old oracles still read `Roll 1d10:` (held notes are never updated,
+  decision 156), and its core does not carry the new "roll the table" line;
+  the TABLES heading in the live block does. Expected: such a story still
+  uses the new tables when asked for a stranger. Failure looks like: the GM
+  calls `generate_name` instead, as it did before the heading line.
+- **Faithful to the roll.** Once the GM rolled 15 on Weather and light and
+  narrated entries 1 and 14 instead. Watch whether the GM uses the entry the
+  die lands on; if it keeps drifting, the TABLES line should say so.
+- **Not this PR, seen while testing:** a line of the GM's own planning
+  showed in the prose twice ("Before the answer comes, I need to know what
+  it costs you."; "Let the street show you what it is tonight."), from an
+  earlier round's text in a multi-round turn. And the folded work line shows
+  `= **75**` with its markdown asterisks.
 
 ## 2026-10-24 — session zero detail (decision 148)
 

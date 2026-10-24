@@ -1506,6 +1506,46 @@ export function buildLiveBlock(input: LiveBlockInput): string {
   return out;
 }
 
+/**
+ * The title list for one category of notes in the live block (Blood & Bone
+ * expansion E1, design 3.1). A note the story wrote keeps its own line. Notes
+ * that came from a built-in pack (`libraryNoteId` starting "builtin:") are
+ * folded into one line per shared title prefix: the part before " — " said
+ * once, the rest joined with "; " (a title may hold a comma). A pack that
+ * grows to hundreds of notes then costs a few lines, not one per note, and
+ * the line says how to rebuild the exact title. Pure, and per-turn text, so
+ * it belongs in the live block only.
+ */
+export function renderNoteTitleList(
+  notes: { title: string; libraryNoteId?: string }[],
+  noun: string,
+): string {
+  const lines: string[] = [];
+  const groups = new Map<string, string[]>();
+  for (const n of notes) {
+    const sep = n.title.indexOf(" — ");
+    if (!isBuiltinNote(n) || sep <= 0 || sep + 3 >= n.title.length) {
+      lines.push(`- ${n.title}.md`);
+      continue;
+    }
+    const prefix = n.title.slice(0, sep);
+    const list = groups.get(prefix) ?? [];
+    list.push(n.title.slice(sep + 3));
+    groups.set(prefix, list);
+  }
+  for (const [prefix, rest] of groups) {
+    lines.push(
+      `- ${prefix} ${noun} (read_notes "${prefix} — <name>", <name> as listed here): ${rest.join("; ")}`,
+    );
+  }
+  return lines.join("\n");
+}
+
+const isBuiltinNote = (l: { libraryNoteId?: string }) =>
+  typeof l.libraryNoteId === "string" && l.libraryNoteId.startsWith("builtin:");
+const isBuiltinCreationPrompts = (l: { title: string; libraryNoteId?: string }) =>
+  isBuiltinNote(l) && l.title.includes(" — Creation prompts: ");
+
 export function buildGMStagePrompt({
   storyData,
   userChoice,
@@ -1733,61 +1773,62 @@ export function buildGMStagePrompt({
   // Mechanics notes: Titles only (use read_notes to view)
   if (mechanicsLore.length > 0) {
     loreSection += `\n## 📁 GAME MECHANICS (use read_notes to view rules, always read the rules before doing anything with mechanics.)\n`;
-    loreSection += mechanicsLore.map((l) => `- ${l.title}.md`).join("\n");
+    loreSection += renderNoteTitleList(mechanicsLore, "rules");
     loreSection += "\n";
   }
 
   // Folder notes by category: Titles only
   if (noteCategories.npc.length > 0) {
     loreSection += `\n## 👤 NPC NOTES (use read_notes to view, read them for details on NPCs beyond NPC summary.)\n`;
-    loreSection += noteCategories.npc.map((l) => `- ${l.title}.md`).join("\n");
+    loreSection += renderNoteTitleList(noteCategories.npc, "NPC notes");
     loreSection += "\n";
   }
   if (noteCategories.location.length > 0) {
     loreSection += `\n## 📍 LOCATION NOTES (use read_notes to view)\n`;
-    loreSection += noteCategories.location
-      .map((l) => `- ${l.title}.md`)
-      .join("\n");
+    loreSection += renderNoteTitleList(noteCategories.location, "locations");
     loreSection += "\n";
   }
   if (noteCategories.item.length > 0) {
     loreSection += `\n## 🎒 ITEM NOTES (use read_notes to view)\n`;
-    loreSection += noteCategories.item.map((l) => `- ${l.title}.md`).join("\n");
+    loreSection += renderNoteTitleList(noteCategories.item, "items");
     loreSection += "\n";
   }
   if (noteCategories.faction.length > 0) {
     loreSection += `\n## ⚔️ FACTION NOTES (use read_notes to view)\n`;
-    loreSection += noteCategories.faction
-      .map((l) => `- ${l.title}.md`)
-      .join("\n");
+    loreSection += renderNoteTitleList(noteCategories.faction, "factions");
     loreSection += "\n";
   }
   if (noteCategories.event.length > 0) {
     loreSection += `\n## 📜 EVENT NOTES (use read_notes to view)\n`;
-    loreSection += noteCategories.event
-      .map((l) => `- ${l.title}.md`)
-      .join("\n");
+    loreSection += renderNoteTitleList(noteCategories.event, "events");
     loreSection += "\n";
   }
   if (noteCategories.lore.length > 0) {
     loreSection += `\n## 📁 WORLD LORE (use read_notes to view)\n`;
-    loreSection += noteCategories.lore.map((l) => `- ${l.title}.md`).join("\n");
+    loreSection += renderNoteTitleList(noteCategories.lore, "lore");
     loreSection += "\n";
   }
   if (noteCategories.secret.length > 0) {
     loreSection += `\n## 🔒 SECRETS (use read_notes to view)\n`;
-    loreSection += noteCategories.secret
-      .map((l) => `- ${l.title}.md`)
-      .join("\n");
+    loreSection += renderNoteTitleList(noteCategories.secret, "secrets");
     loreSection += "\n";
   }
   // This adventure's random tables. They're notes, so `roll_table` doesn't
-  // touch them - the GM reads one and rolls it with formula_roll.
-  if (noteCategories.table.length > 0) {
-    loreSection += `\n## 🎲 TABLES (use read_notes to view, then roll the die the note names with formula_roll and read off the result)\n`;
-    loreSection += noteCategories.table
-      .map((l) => `- ${l.title}.md`)
-      .join("\n");
+  // touch them - the GM reads one and rolls it with formula_roll. A built-in
+  // pack's character-creation prompts are tables too, but are used while
+  // building a character, not rolled mid-scene, so they get their own label.
+  const creationPromptNotes = noteCategories.table.filter(isBuiltinCreationPrompts);
+  const rollableTables = noteCategories.table.filter(
+    (l) => !isBuiltinCreationPrompts(l),
+  );
+  if (rollableTables.length > 0) {
+    loreSection += `\n## 🎲 TABLES (use read_notes to view, then roll the die the note names with formula_roll and read off the result. When one of these covers what you need, such as a name, a face, a place or a rumour, roll it rather than inventing the answer or calling generate_name)\n`;
+    loreSection += renderNoteTitleList(rollableTables, "tables");
+    loreSection += "\n";
+  }
+  if (creationPromptNotes.length > 0) {
+    loreSection += `\n## 🎭 CHARACTER CREATION PROMPTS (use read_notes to view; for building a character)\n`;
+    loreSection += renderNoteTitleList(creationPromptNotes, "character creation prompts");
     loreSection += "\n";
   }
 
