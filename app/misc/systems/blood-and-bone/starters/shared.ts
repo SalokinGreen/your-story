@@ -9,8 +9,10 @@ import type { BuiltinNote } from "../../types";
 
 /**
  * The twelve E1 table families. They are Europe by Night's (the Concord, the
- * Vigil, the Masquerade, the Hollow Roads, European names and places), so a
- * starter set in its own world leaves them out and brings its own tables.
+ * Vigil, the Masquerade, the Hollow Roads, European names and places): the
+ * Rules pack marks them with that `setting` (blood-and-bone/index.ts), so they
+ * are pushed only to Europe by Night stories and a starter set in its own
+ * world leaves them out and brings its own tables.
  */
 export const EUROPE_TABLE_FAMILY_IDS: ReadonlySet<string> = new Set(
   [
@@ -30,13 +32,13 @@ export const EUROPE_TABLE_FAMILY_IDS: ReadonlySet<string> = new Set(
 );
 
 /**
- * The Rules notes a starter in its own world copies: every unscoped note but
- * the E1 table families. The mechanics, the miss tables, the three oracles and
- * the creation prompts stay.
+ * The Rules notes a starter in its own world copies: every note with no scope
+ * and no setting, so not the E1 table families. The mechanics, the miss
+ * tables, the three oracles and the creation prompts stay.
  */
 export function ownWorldRulesNotes(packNotes: BuiltinNote[]): BuiltinNote[] {
   return packNotes.filter(
-    (n) => n.scope === undefined && !EUROPE_TABLE_FAMILY_IDS.has(n.id),
+    (n) => n.scope === undefined && n.setting === undefined,
   );
 }
 

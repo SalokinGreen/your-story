@@ -563,6 +563,23 @@ export function executeDesignerTools(
 // ============================================
 
 /** Builds the Adventure record that gets persisted and played. */
+/**
+ * The draft's systemState after the inspector's tools switch (decision 79):
+ * `undefined` is Automatic. Only `usesSystemTools` changes; the setting a
+ * built-in starter carries (E5, "grave-watch") is kept, or a copy opened in
+ * the Designer would lose it and its stories would read as Europe by Night.
+ */
+export function withSystemToolsSwitch(
+  current: AdventureDraft["systemState"],
+  usesSystemTools: boolean | undefined,
+): AdventureDraft["systemState"] {
+  const setting = current?.setting;
+  if (usesSystemTools === undefined) {
+    return setting !== undefined ? { setting } : undefined;
+  }
+  return { usesSystemTools, ...(setting !== undefined ? { setting } : {}) };
+}
+
 export function draftToAdventure(draft: AdventureDraft): Partial<Adventure> {
   const storyTemplate: Partial<StoryData> = {
     story_name: draft.title,

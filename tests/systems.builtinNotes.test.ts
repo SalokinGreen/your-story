@@ -230,6 +230,18 @@ describe("new built-in notes on load", () => {
     expect(story.lore.some((l) => l.libraryNoteId === extra.id)).toBe(true);
   });
 
+  it("marks the twelve E1 table families as Europe by Night's, and pushes them only there", () => {
+    const tagged = rules.notes.filter((n) => n.setting === "europe-by-night");
+    expect(tagged).toHaveLength(12);
+    expect(pushedBuiltinNotes(sys, "grave-watch").some((n) => n.setting)).toBe(false);
+    expect(pushedBuiltinNotes(sys).filter((n) => n.setting)).toHaveLength(12);
+    // A story in another setting with no offered list (none today) is still
+    // never given them.
+    const story = mockStory({ lore: loreOf(rules.notes.filter((n) => !n.setting).map((n) => n.id)) });
+    story.systemState = { sessionCount: 0, dedupKeys: [], setting: "grave-watch" };
+    expect(missingBuiltinNotes(story, sys)).toEqual([]);
+  });
+
   it("gives a Europe by Night story (setting unset or named) the new cross-Europe note", () => {
     const { extra, system } = grownEurope();
     for (const setting of [undefined, "europe-by-night"]) {

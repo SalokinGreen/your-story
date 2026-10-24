@@ -9,7 +9,11 @@
 import { describe, expect, it } from "vitest";
 import { getEncoding } from "js-tiktoken";
 import { DM_INSTRUCTIONS_CAP_TOKENS } from "@/app/misc/contextLimits";
-import { adventureToDraft, draftToAdventure } from "@/app/misc/designer_executor";
+import {
+  adventureToDraft,
+  draftToAdventure,
+  withSystemToolsSwitch,
+} from "@/app/misc/designer_executor";
 import { hasPremadeCharacters } from "@/app/misc/presets";
 import type { StoryData } from "@/app/misc/structs";
 import { BLOOD_AND_BONE } from "@/app/misc/systems/blood-and-bone";
@@ -138,6 +142,16 @@ for (const spec of STARTERS) {
     it("keeps its setting through the Designer", () => {
       const back = draftToAdventure(adventureToDraft(starter.adventure));
       expect(back.storyTemplate?.systemState?.setting).toBe(spec.setting);
+    });
+
+    it("keeps its setting when the inspector's tools switch is changed", () => {
+      const draft = adventureToDraft(starter.adventure);
+      for (const v of [true, false, undefined]) {
+        draft.systemState = withSystemToolsSwitch(draft.systemState, v);
+        expect(draft.systemState?.setting).toBe(spec.setting);
+        expect(draft.systemState?.usesSystemTools).toBe(v);
+      }
+      expect(draftToAdventure(draft).storyTemplate?.systemState?.setting).toBe(spec.setting);
     });
   });
 }

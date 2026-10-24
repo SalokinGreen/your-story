@@ -7,7 +7,12 @@
  * Ironsworn and Ironsworn: Starforged engine by Shawn Tomkin (Tomkin Press),
  * licensed under CC BY 4.0, and is not an official Ironsworn product.
  */
-import type { BuiltinNote, BuiltinPack, BuiltinSystem } from "../types";
+import {
+  EUROPE_BY_NIGHT_SETTING,
+  type BuiltinNote,
+  type BuiltinPack,
+  type BuiltinSystem,
+} from "../types";
 import { ASSET_NOTES } from "./assets";
 import { VAMPIRE_COURTIER_NOTE } from "./archetypes/vampire";
 import { GARGOYLE_PILGRIM_NOTE } from "./archetypes/gargoyle";
@@ -46,6 +51,7 @@ import { ALPS_NOTE } from "./europe/alps";
 import { buildHollowHour } from "./hollowHour";
 import { buildGraveWatcher } from "./starters/grave-watcher";
 import { buildLastResort } from "./starters/last-resort";
+import { EUROPE_TABLE_FAMILY_IDS } from "./starters/shared";
 import { KIND_NOTES } from "./kinds";
 import { REVENANT_NOTE } from "./kinds-more/revenant";
 import { REVENANT_PROMPTS_NOTE } from "./kinds-more/revenant-prompts";
@@ -99,7 +105,7 @@ const EUROPE_PACK_NOTES: BuiltinNote[] = [
 
 export const BLOOD_AND_BONE_ID = "blood-and-bone";
 
-const RULES_NOTES: BuiltinNote[] = [
+const ALL_RULES_NOTES: BuiltinNote[] = [
   CORE_NOTE,
   MOVES_NOTE,
   ...KIND_NOTES,
@@ -145,6 +151,12 @@ const RULES_NOTES: BuiltinNote[] = [
   DOPPELGANGER_PROMPTS_NOTE,
   RUSALKA_PROMPTS_NOTE,
 ];
+
+// The E1 table families are Europe by Night's: marked with that setting, they
+// reach only its stories (builtinNotes.ts) and stay out of E5's starters.
+const RULES_NOTES: BuiltinNote[] = ALL_RULES_NOTES.map((n) =>
+  EUROPE_TABLE_FAMILY_IDS.has(n.id) ? { ...n, setting: EUROPE_BY_NIGHT_SETTING } : n,
+);
 
 export const BLOOD_AND_BONE_RULES_PACK: BuiltinPack = {
   id: "blood-and-bone:rules",

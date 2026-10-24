@@ -25,7 +25,7 @@
 import type { StoryData, StoryLore } from "../structs";
 import { BUILTIN_SYSTEMS } from "./index";
 import { resolveSystem } from "./resolve";
-import type { BuiltinNote, BuiltinSystem } from "./types";
+import { EUROPE_BY_NIGHT_SETTING, type BuiltinNote, type BuiltinSystem } from "./types";
 
 /** The core note's id: a story holding it runs the system (design 3.2). */
 export const BLOOD_AND_BONE_CORE_ID = "builtin:blood-and-bone:core";
@@ -47,8 +47,7 @@ function heldIds(story: Pick<StoryData, "lore">): Set<string> {
   return ids;
 }
 
-/** `SystemState.setting` for Europe by Night, the setting an unset field means. */
-export const EUROPE_BY_NIGHT_SETTING = "europe-by-night";
+export { EUROPE_BY_NIGHT_SETTING };
 
 /** Whether a story's setting is Europe by Night: unset is (every story before E5). */
 function inCrossSetting(setting: string | undefined): boolean {
@@ -65,11 +64,13 @@ export function pushedBuiltinNotes(
   setting?: string,
 ): BuiltinNote[] {
   const cross = inCrossSetting(setting);
+  const storySetting = setting ?? EUROPE_BY_NIGHT_SETTING;
   const out: BuiltinNote[] = [];
   for (const pack of system.packs) {
     const isRules = pack.id.endsWith(":rules");
     for (const n of pack.notes) {
       if (PINNED_TYPES.has(n.type)) continue;
+      if (n.setting !== undefined && n.setting !== storySetting) continue;
       if (isRules || (cross && n.scope === CROSS_SETTING_SCOPE)) out.push(n);
     }
   }
