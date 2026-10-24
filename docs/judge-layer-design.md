@@ -1,7 +1,7 @@
 # The judge layer: flag only, and the bugs under it
 
-Status: **design and plan, waiting for the author's approval.** Decisions
-187–188. Source: Codex's review of the judge layer
+Status: **approved (decision 189) and built on 2026-10-24; see "Decisions made
+during implementation" at the bottom.** Decisions 187–188. Source: Codex's review of the judge layer
 (`docs/research/codex-judge-layer-review-2026-10-24.md`), after the author's
 Grave Watcher session on the APK, where the player-agency judge kept
 rewriting ordinary narration the player had already read (decision 185).
@@ -159,3 +159,90 @@ Settings and the work line; the desktop app for one turn of each starter
   off by default.
 - The pre-turn cost estimate's double counting (`turnCostEstimate.ts`):
   noted, not fixed here.
+
+## Decisions made during implementation
+
+2026-10-24, the build of slices 1-5 (decisions 187-189). Where the code
+forced a different shape from the design, or the design left a call open:
+
+1. **`tier_escalation_missed` keeps its heavier-tier full-turn retry, but only
+   as a code path.** §3.4 makes it flag-only by type ("never rewritten, never
+   marked corrected") and removes the toggle from Settings, and §3.8 removes
+   every prose-triggered reroll. Read literally those delete the one retry the
+   tier judge was built for. The code keeps it, unreachable from Settings and
+   from the defaults: it fires only when a config sets the tier flag's
+   `triggersReset` directly, and never on the reword path
+   (`allowMechanicalRetry: false`). The two tool-usage gaps are stricter:
+   `settingsFor` reports them unable to reset whatever a stored config says
+   (`FLAG_ONLY_FLAG_TYPES`). The tier judge's flag still never becomes
+   "corrected" (`rewriteFlaggedNarration` returns null for it). If the author
+   wants the retry deleted outright, it is the `preTurnSnapshot` branch in
+   `generateStoryTurn` plus `observerRetryTier`, and
+   `tests/generation.observerRetry.test.ts` with it.
+2. **A late result is a patch, in a new module `app/misc/backgroundPatch.ts`.**
+   The design names `patchStoryData` (the picture queue's pattern); the page
+   already builds that host inline in `buildImageJobDeps`, so it is extracted
+   as `buildPatchHost()` and shared (`applyStoryPatch`). `generateStoryTurn`
+   no longer writes the background rewrite or the flags into its own
+   `storyData`; it calls `onBackgroundObserverRewrite(patch)`,
+   `onBackgroundObserverFlags(flags, partId)` and
+   `onBackgroundLayersUpdate(delta)`. The memory, director and progress agents
+   still write to the turn's own object (headless callers and the next turn's
+   `lastAssistantPart` read it there); the page gets only the delta, and
+   memory is appended by entry identity so a story whose array already holds
+   the push is not doubled.
+3. **The rewrite carries part id plus a content hash**, using `hashNotes`
+   (campaignPlan.ts). A rewrite whose part still exists but holds different
+   text (the player edited it) is dropped, and logged by the page.
+4. **The outcome judge's prompt was rewritten around tiers**, not just fed new
+   inputs: the old "judge all results together, expect mixed" paragraph and
+   the "mixed" note are gone (they belonged to the turn-wide cap). A bare
+   `calculate` comparison can still be one part of a multi-comparison check;
+   the prompt tells the judge to read the adventure's rules note for that. The
+   flag's severity is always "major" now (it is only acted on if a player opts
+   into rewriting the outcome judge).
+5. **A check function called with no settings runs** (`CHECK_RUNS_BALANCED`:
+   on, sensitivity 5). Whether a check runs at all is decided before it is
+   called, by `settingsFor` in `runObserver`; its own default parameter used
+   to consult `DEFAULT_OBSERVER_SETTINGS` a second time, which would have made
+   every direct call a no-op under the new defaults.
+6. **The settings version is stored inside the synced value** as
+   `observerSettingsVersion: 2` in `observerCheckSettings`, not as a second key
+   (the sync allowlist is per key, and the version has to travel with the
+   settings). An older build reads only the per-type keys and, if it writes the
+   config back, drops the version, so the next read on a newer device resets
+   again. Accepted: it re-applies the safe defaults.
+7. **`GenerateSuccess` gained `finishReason`** (`providerCall.ts`,
+   non-streaming only) so a rewrite cut off at the token limit can be
+   rejected (§3.5). A reply from a path that does not report it is treated as
+   complete.
+8. **The turn lock is `turnInFlight`**, set by `generateTrackedTurn` and
+   cleared in its `finally`, plus a ref for the handlers' guards
+   (`handleCustomInput`, `handleChoiceWithAction`, `handleRetry`,
+   `handleUndo`, the setup-style button). The screen reads
+   `effectiveLoadingStage(loadingStage, turnInFlight)`, so a turn in flight with
+   no stage reads as the story stage. `checkBothComplete` no longer clears
+   `loadingStage` (§3.2). Read-aloud is held for the outer `onComplete` only when
+   `canObserverTriggerReset` is true for the stored settings (it cannot know
+   per turn whether the judge will block, so it holds whenever one could).
+9. **The redaction is a render-time and build-time pass**
+   (`redactForPlayer`): tool results at block construction (live and saved),
+   reasoning text at render. A note of type `secret` read without a hidden
+   visibility carries no marker, so it is redacted by its `(Secret)` header.
+   Raw reasoning that paraphrases a secret without a marker cannot be caught;
+   the folds stay, as the design says.
+10. **The consistency toast is removed from the two flows that had it**
+    (custom input and the reword path); the warnings stay on the part and in the
+    Debug Logs (`generation.ts` already logged them).
+11. **Cost recording** adds `recordUnansweredSideCall`: a call cancelled
+    before it answered, or answered with an unreadable body, is an entry with no
+    tokens, flagged `unpriced` and labelled "cost unknown", so the turn's total
+    reads as a floor. A provider error response (non-2xx) is not recorded: the
+    provider did not bill it.
+12. **Not done, on purpose:** Codex finding 10's correction priority (length
+    before outcome) is moot with at most one rewritable finding acting and is
+    not reordered; `turnCostEstimate.ts` is untouched (§7); the Settings
+    "Rewrite automatically" copy and the cost line were verified by the
+    suite's pure helpers (`observerModeOf`, `countJudgeCalls`) only, not by a
+    browser (no preview in the build session; `pending_tests.md` has the
+    check).

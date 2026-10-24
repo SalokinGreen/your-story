@@ -162,6 +162,12 @@ export interface GenerateSuccess {
   reasoning: string;
   reasoning_details: any[];
   toolCalls: any[];
+  /**
+   * Why the model stopped (`stop`, `length`, ...), when the provider said. The
+   * Observer's rewrite reads it: a reply cut off by the token limit is not a
+   * rewritten narration (judge-layer design 3.5).
+   */
+  finishReason?: string;
   meta: {
     model: string;
     modelName: string;
@@ -1166,6 +1172,9 @@ async function requestNonStreaming(
       reasoning,
       reasoning_details,
       toolCalls: toolCalls || [],
+      ...(aiResponse.choices[0]?.finish_reason
+        ? { finishReason: aiResponse.choices[0].finish_reason }
+        : {}),
       meta: {
         model: config.model,
         modelName: model,

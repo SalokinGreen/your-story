@@ -47,6 +47,48 @@ export interface TimelineBlock {
   hidden?: boolean;
 }
 
+// ---- What the player's view may show of a note the GM read ----------------
+//
+// The folded work line lets a curious player expand each tool result and each
+// reasoning block. A read_notes result for a hidden or secret note carries the
+// note's text (the GM needs it), so expanding the pill used to read the GM's
+// secrets, and the model's reasoning can quote them. The player's view shows
+// the note's title with "(hidden note)" where its text was; the full text stays
+// in the Debug Logs and the context viewer (judge-layer design 4).
+
+/** What replaces a hidden or secret note's text in the player's view. */
+export const HIDDEN_NOTE_PLACEHOLDER = "(hidden note)";
+
+const HIDDEN_LORE_SPAN =
+  /\[\[HIDDEN_LORE:[^\]]*\]\][\s\S]*?\[\[\/HIDDEN_LORE\]\]/g;
+
+// One section of a read_notes result for a note of type "secret": its header
+// line ("\n\n---\n### Title (Secret)") and the body that follows, up to the
+// next section or the closing rule. A secret note carries no HIDDEN_LORE
+// marker unless its visibility is also hidden (then the marker pass above has
+// already replaced it, and the lookahead leaves that header alone).
+const SECRET_NOTE_SECTION =
+  /(\n\n---\n### (?![^\n]*\(hidden note\))[^\n]*\(Secret\)[^\n]*)\n[\s\S]*?(?=\n\n---\n###|\n---$|$)/g;
+
+/**
+ * The text of a tool result or reasoning block as the player may see it.
+ * Anything between [[HIDDEN_LORE]] markers (the marking read_notes puts on
+ * hidden, to-be-revealed and check-per-turn notes) becomes "(hidden note)",
+ * and a read_notes section for a note of type secret loses its body the same
+ * way. Titles stay. Text with neither is unchanged.
+ */
+export function redactForPlayer(text: string, toolName?: string): string {
+  if (!text) return text;
+  let out =
+    text.indexOf("[[HIDDEN_LORE:") === -1
+      ? text
+      : text.replace(HIDDEN_LORE_SPAN, HIDDEN_NOTE_PLACEHOLDER);
+  if (toolName === "read_notes") {
+    out = out.replace(SECRET_NOTE_SECTION, `$1\n${HIDDEN_NOTE_PLACEHOLDER}`);
+  }
+  return out;
+}
+
 let blockIdCounter = 0;
 function nextId(): string {
   blockIdCounter += 1;
@@ -204,8 +246,11 @@ export function toolResultBlock(result: {
     success: result.success,
     // A hidden roll carries no detail either - the pill is skipped at render
     // time, but nothing about the dice should sit in client state waiting to
-    // be surfaced by some future view that forgets to check `hidden`.
-    contextForStory: hidden ? undefined : result.contextForStory,
+    // be surfaced by some future view that forgets to check `hidden`. A note
+    // the GM read is redacted the same way (redactForPlayer).
+    contextForStory: hidden
+      ? undefined
+      : redactForPlayer(result.contextForStory, result.toolName),
     hidden: hidden || undefined,
   };
 }
@@ -432,7 +477,11 @@ export function buildSavedTimeline(
           toolName,
           toolCallId: tc.id,
           success: result?.success,
-          contextForStory: hidden ? undefined : result?.contextForStory,
+          contextForStory: hidden
+            ? undefined
+            : result?.contextForStory === undefined
+              ? undefined
+              : redactForPlayer(result.contextForStory, toolName),
           hidden: hidden || undefined,
         });
       }

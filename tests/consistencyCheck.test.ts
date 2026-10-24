@@ -86,6 +86,54 @@ describe("checkNarrationConsistency", () => {
     expect(warnings).toEqual([]);
   });
 
+  // Codex review: the old match took any active-presence phrase within 60
+  // characters of the name, whoever the subject was.
+  it("does not blame a dead NPC for another character's action in the next sentence", () => {
+    const storyData = createMockStoryData({
+      npcs: [npc({ name: "Marcus", status: "dead" })],
+    });
+    expect(
+      checkNarrationConsistency("Marcus is dead. Ada arrives with the news.", storyData),
+    ).toEqual([]);
+  });
+
+  it("does not blame a dead NPC for another subject in the same sentence", () => {
+    const storyData = createMockStoryData({
+      npcs: [npc({ name: "Marcus", status: "dead" })],
+    });
+    expect(
+      checkNarrationConsistency("Marcus's ring, which Ada hands you, is cold.", storyData),
+    ).toEqual([]);
+  });
+
+  it("does not flag a negated or hypothetical presence", () => {
+    const storyData = createMockStoryData({
+      npcs: [npc({ name: "Marcus", status: "dead" })],
+    });
+    for (const narration of [
+      "Marcus never arrives.",
+      "Marcus will not arrive tonight.",
+      "Marcus won't greet you again.",
+      "If Marcus arrives, he finds nothing.",
+      "You imagine Marcus arrives with the map.",
+      "Never again does Marcus hand you the map.",
+    ]) {
+      expect(checkNarrationConsistency(narration, storyData), narration).toEqual([]);
+    }
+  });
+
+  it("still flags the dead NPC acting in their own clause after an earlier sentence", () => {
+    const storyData = createMockStoryData({
+      npcs: [npc({ name: "Marcus", status: "dead" })],
+    });
+    const warnings = checkNarrationConsistency(
+      "The hall is quiet. Marcus arrives, pale and silent.",
+      storyData,
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].entity).toBe("Marcus");
+  });
+
   it("returns no warnings for empty narration or no tracked NPCs", () => {
     expect(checkNarrationConsistency("", createMockStoryData())).toEqual([]);
     expect(

@@ -11,7 +11,15 @@ import {
   ReasoningEffort,
 } from "@/app/misc/reasoningTiers";
 import { ObserverFlagType } from "@/app/misc/structs";
-import { ObserverCheckSettings } from "@/app/misc/observer";
+import {
+  DEFAULT_OBSERVER_SETTINGS,
+  REWRITABLE_FLAG_TYPES,
+  countJudgeCalls,
+  observerModeOf,
+  observerModePatch,
+  type ObserverCheckSettings,
+  type ObserverMode,
+} from "@/app/misc/observer";
 import {
   ModelEffortOverride,
   SIDE_AGENT_DEFAULT_MODEL_KEY,
@@ -82,7 +90,7 @@ const LAYERS: LayerInfo[] = [
     title: "Adjudication",
     badge: "Layer 5",
     summary:
-      "The Observer reviews each completed turn against rules the GM was already given (player agency, roll-outcome consistency, tool usage) and can force a reset-and-retry on a serious violation. A separate, non-AI consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes.",
+      "The Observer reviews each completed turn against rules the GM was already given. By default it only flags: it never rewrites a turn you may already have read, and it never re-rolls one. Only the roll-outcome check is on; each of the others can be switched on, and the three that judge the prose can be allowed to rewrite it. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
     files: "app/misc/observer.ts, app/misc/consistencyCheck.ts",
     aiDriven: true,
   },
@@ -90,44 +98,56 @@ const LAYERS: LayerInfo[] = [
 
 const OBSERVER_FLAG_INFO: Record<
   ObserverFlagType,
-  { label: string; description: string; llmBacked: boolean }
+  { label: string; description: string; cost: string; llmBacked: boolean }
 > = {
   response_length: {
     label: "Response Length",
     description:
-      "A single turn ran far past the Reply Length setting's usual ceiling (word count, deterministic). If it does, a second AI pass judges whether the length was earned (e.g. a session-zero opening, a big reveal) before flagging it.",
+      "A single turn ran far past the Reply Length setting's usual ceiling (word count, free). When it does, a second AI call judges whether the length was earned (a session-zero opening, a big reveal) before flagging it.",
+    cost: "One AI call, only on a turn that passes the ceiling.",
     llmBacked: false,
   },
   player_agency: {
     label: "Player Agency",
     description:
-      "The GM took a decision away from the player: new meaningful dialogue, a significant choice, or a decided feeling. Narrating your character carrying out what you said is fine.",
+      "The GM took a decision away from the player: new meaningful dialogue, a significant choice, or a decided feeling. Narrating your character carrying out what you said is fine. It sees only the current action, not earlier consent, so it can misjudge.",
+    cost: "One AI call on every turn.",
     llmBacked: true,
   },
   outcome_narration_mismatch: {
     label: "Outcome/Narration Mismatch",
     description:
-      "The narration contradicts the mechanical result (success/failure) of the last roll made this turn.",
+      "The narration contradicts the outcome the engine decided for a roll or check this turn (a strong hit, a weak hit, a miss, a true or false comparison). Each result is judged on its own.",
+    cost: "One AI call, only on a turn with a roll or check result.",
     llmBacked: true,
   },
   missing_oracle_or_table: {
     label: "Missing Oracle/Table",
     description:
-      "An uncertain outcome or random flavor was decided narratively instead of via fate_question/roll_table.",
+      "An uncertain outcome or random flavor was decided narratively instead of via fate_question/roll_table. Flag only: words cannot fix a tool that did not run.",
+    cost: "One AI call on every turn, shared with Missing Scene Increment.",
     llmBacked: true,
   },
   missing_scene_increment: {
     label: "Missing Scene Increment",
     description:
-      "The narration moved to a clearly new scene without calling increment_scene.",
+      "The narration moved to a clearly new scene without calling increment_scene. Flag only: words cannot fix a tool that did not run.",
+    cost: "One AI call on every turn, shared with Missing Oracle/Table.",
     llmBacked: true,
   },
   tier_escalation_missed: {
     label: "Tier Escalation Missed",
     description:
-      "This turn's own complexity/stakes called for a higher reasoning tier than it ran at, and the GM never self-escalated. Unlike the other resettable flags, this can't be fixed by rewriting the narration - a reset forces the retry onto a higher tier.",
+      "This turn's own complexity or stakes called for a higher reasoning tier than it ran at. Flag only: a rewrite adds no reasoning.",
+    cost: "One AI call on every turn below the top tier.",
     llmBacked: true,
   },
+};
+
+const OBSERVER_MODE_LABELS: Record<ObserverMode, string> = {
+  off: "Off",
+  flag: "Flag",
+  rewrite: "Rewrite automatically",
 };
 
 const OBSERVER_FLAG_ORDER: ObserverFlagType[] = [
@@ -378,7 +398,7 @@ export function SideAgentPickers({
       <StageOverrideCard
         icon="ShieldCheck"
         title="Observer"
-        description="Reviews each completed turn for rule violations. Applies to all of the LLM-backed checks below; the response-length check is free and doesn't use a model."
+        description="Reviews each completed turn for rule violations. Applies to every check below that makes an AI call (the response-length word count itself is free, but its follow-up judge call is not), and to a rewrite if you allow one."
         override={observerModelOverride}
         onChange={handleObserverModelChange}
         customModels={customModels}
@@ -416,10 +436,20 @@ export default function ArchitectureSettingsTab() {
     setObserverSettingsState(getObserverSettings());
   };
 
+  // Compared against each type's OWN default: the old test assumed every
+  // default was enabled with resets on, so the pristine configuration looked
+  // customised once the defaults became flag-only.
   const anyObserverOverride = OBSERVER_FLAG_ORDER.some((type) => {
     const s = observerSettings[type];
-    return s.enabled !== true || s.triggersReset !== true || s.sensitivity !== 5;
+    const d = DEFAULT_OBSERVER_SETTINGS[type];
+    return (
+      s.enabled !== d.enabled ||
+      s.triggersReset !== d.triggersReset ||
+      s.sensitivity !== d.sensitivity
+    );
   });
+  const judgeCalls = countJudgeCalls(observerSettings);
+  const judgeCallTotal = judgeCalls.always + judgeCalls.sometimes;
 
   return (
     <div className="space-y-6">
@@ -511,10 +541,17 @@ export default function ArchitectureSettingsTab() {
             )}
           </div>
           <p className="text-xs text-ys-muted">
-            Per-check controls: turn a check off entirely, decide whether a
-            &ldquo;major&rdquo; instance of it is allowed to reset the turn
-            and force a retry, and how readily it flags something in the
-            first place.
+            Each check is Off, or Flag (a note in the turn&rsquo;s details and a
+            heads-up to the GM next turn; the text you read never changes). The
+            three that judge the prose can also Rewrite automatically, which
+            changes text you may already have read; you can undo a revision on
+            its turn. Nothing here ever re-rolls a turn.
+          </p>
+          <p className="text-xs text-ys-muted">
+            Cost now:{" "}
+            {judgeCallTotal === 0
+              ? "no judge calls."
+              : `up to ${judgeCallTotal} extra AI call${judgeCallTotal === 1 ? "" : "s"} per turn (${judgeCalls.always} on every turn, ${judgeCalls.sometimes} only when there is something to judge)${judgeCalls.rewrites ? ", plus a rewrite call when one fires" : ""}.`}
           </p>
           <div className="space-y-2">
             {OBSERVER_FLAG_ORDER.map((type) => {
@@ -527,31 +564,57 @@ export default function ArchitectureSettingsTab() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm text-ys-text">{info.label}</span>
-                    <Toggle
-                      checked={settings.enabled}
-                      onChange={(enabled) =>
-                        handleFlagPatch(type, { enabled })
-                      }
-                    />
+                    <div
+                      role="group"
+                      aria-label={`${info.label} mode`}
+                      className="flex rounded-lg border border-ys-border overflow-hidden"
+                    >
+                      {(["off", "flag", "rewrite"] as ObserverMode[])
+                        .filter(
+                          (mode) =>
+                            mode !== "rewrite" ||
+                            REWRITABLE_FLAG_TYPES.has(type),
+                        )
+                        .map((mode) => {
+                          const active = observerModeOf(settings) === mode;
+                          return (
+                            <button
+                              key={mode}
+                              type="button"
+                              aria-pressed={active}
+                              title={
+                                mode === "rewrite"
+                                  ? "Rewrite automatically: changes text you may already have read"
+                                  : undefined
+                              }
+                              onClick={() =>
+                                handleFlagPatch(type, observerModePatch(mode))
+                              }
+                              className={`px-2 py-1 text-xs transition-colors ${
+                                active
+                                  ? "bg-ys-accent text-ys-on-accent"
+                                  : "text-ys-muted hover:text-ys-text"
+                              }`}
+                            >
+                              {OBSERVER_MODE_LABELS[mode]}
+                            </button>
+                          );
+                        })}
+                    </div>
                   </div>
                   <p className="text-xs text-ys-muted">
                     {info.description}
                   </p>
+                  <p className="text-[10px] text-ys-muted">{info.cost}</p>
                   {settings.enabled && (
                     <>
-                      <label className="flex items-center justify-between gap-2 text-xs text-ys-muted">
-                        <span>Allow this check to reset the turn</span>
-                        <input
-                          type="checkbox"
-                          checked={settings.triggersReset}
-                          onChange={(e) =>
-                            handleFlagPatch(type, {
-                              triggersReset: e.target.checked,
-                            })
-                          }
-                          className="accent-ys-accent w-4 h-4"
-                        />
-                      </label>
+                      {REWRITABLE_FLAG_TYPES.has(type) &&
+                        settings.triggersReset && (
+                          <p className="text-[10px] text-ys-warning">
+                            Rewrites automatically: changes text you may
+                            already have read.
+                          </p>
+                        )}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-ys-muted">

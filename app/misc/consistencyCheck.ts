@@ -18,7 +18,18 @@
  * the client, so by the time a full-text check could run, the player has
  * already seen the prose. Run this after streaming completes and attach the
  * result to the turn for display/debugging (ScenePart.consistencyWarnings)
- * and as an eval-harness metric, not as a live generation gate.
+ * and as an eval-harness metric, not as a live generation gate. Its findings
+ * go to the Debug Logs and the turn's details; the page shows no toast for
+ * them (judge-layer design 3.10): a name-matching heuristic is not worth
+ * interrupting the reader for.
+ *
+ * The match is deliberately narrow (Codex review, finding on
+ * consistencyCheck.ts:49). It used to take any active-presence phrase within
+ * 60 characters after the name, whoever the subject was, however the sentence
+ * ended and whether or not it was negated, so "Marcus is dead. Ada arrives
+ * with the news." and "Marcus never arrives." both warned. Now the phrase has
+ * to sit in the name's own clause, with no other subject between them and no
+ * negation or past/hypothetical marker in front of it.
  */
 
 import { StoryData, ConsistencyWarning } from "./structs";
@@ -28,6 +39,17 @@ import {
   ACTIVE_PRESENCE_PHRASES,
   CONTRADICTION_WINDOW_CHARS,
 } from "./compaction";
+
+/** Where a clause ends: a sentence stop, a dash, or ", and/but/while ...". */
+const CLAUSE_END =
+  /[.!?;:\n—–]|,\s+(?:and|but|while|as|so|then|yet|though|although)\b/;
+
+/** Words that make "Marcus ... arrives" a denial, a memory or a maybe, not a presence. */
+const NOT_PRESENT_MARKERS =
+  /\b(?:never|not|no longer|nor|neither|without|cannot|if|unless|until|once|used to|formerly|would|could|might|may|hardly|barely|remember(?:s|ed)?|recall(?:s|ed)?|imagine[sd]?|hoped?|wish(?:es|ed)?|dreams?|dreamt|had|died|was killed|years ago|long ago)\b|n['’]t\b/i;
+
+/** Another proper noun between the name and the phrase is the phrase's real subject. */
+const OTHER_SUBJECT = /\b[A-Z][a-z]+/;
 
 export function checkNarrationConsistency(
   narration: string,
@@ -43,27 +65,49 @@ export function checkNarrationConsistency(
   for (const npc of deadOrGoneNpcs) {
     if (countNameMentions(narration, npc.name) === 0) continue;
 
-    const lowerNarration = narration.toLowerCase();
     const namePattern = new RegExp(`\\b${escapeRegExp(npc.name)}\\b`, "gi");
     let match: RegExpExecArray | null;
     while ((match = namePattern.exec(narration)) !== null) {
-      const windowStart = match.index;
+      const afterName = match.index + npc.name.length;
       const windowEnd = Math.min(
         narration.length,
-        match.index + npc.name.length + CONTRADICTION_WINDOW_CHARS
+        afterName + CONTRADICTION_WINDOW_CHARS
       );
-      const window = lowerNarration.slice(windowStart, windowEnd);
+
+      // The name's own clause: cut the window at the first clause end.
+      let window = narration.slice(afterName, windowEnd);
+      const end = window.search(CLAUSE_END);
+      if (end >= 0) window = window.slice(0, end);
+      const lowerWindow = window.toLowerCase();
+
+      // What came before the name in the same clause ("Never does Marcus ...").
+      const before = narration.slice(0, match.index);
+      const clauseStart = Math.max(
+        before.lastIndexOf("."),
+        before.lastIndexOf("!"),
+        before.lastIndexOf("?"),
+        before.lastIndexOf(";"),
+        before.lastIndexOf("\n")
+      );
+      const lead = before.slice(clauseStart + 1);
+
       const hitPhrase = ACTIVE_PRESENCE_PHRASES.find((phrase) =>
-        window.includes(phrase)
+        lowerWindow.includes(phrase)
       );
-      if (hitPhrase) {
-        warnings.push({
-          type: "status_contradiction",
-          entity: npc.name,
-          detail: `"${npc.name}" is tracked as ${npc.status}, but the narration describes them with an active-presence phrase ("${hitPhrase}").`,
-        });
-        break; // one warning per entity is enough signal
+      if (!hitPhrase) continue;
+
+      const between = window.slice(0, lowerWindow.indexOf(hitPhrase));
+      if (NOT_PRESENT_MARKERS.test(lead) || NOT_PRESENT_MARKERS.test(between)) {
+        continue;
       }
+      if (OTHER_SUBJECT.test(between)) continue;
+
+      warnings.push({
+        type: "status_contradiction",
+        entity: npc.name,
+        detail: `"${npc.name}" is tracked as ${npc.status}, but the narration describes them with an active-presence phrase ("${hitPhrase}").`,
+      });
+      break; // one warning per entity is enough signal
     }
   }
 

@@ -10,6 +10,56 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — The judge layer: flag only (decisions 187–189)
+
+Built and covered by the suite against scripted providers and pure functions;
+never seen on a screen or against a real model (the build session had neither
+the app nor a key, and a played turn spends the author's):
+
+- **One desktop turn of each starter, defaults untouched.** Delete the stored
+  `observerCheckSettings` first (or let the one-time reset do it: Debug Logs
+  should show "Observer settings reset to the flag-only defaults" once), then
+  play a turn of each starter (the Grave Watcher among them, Claude Haiku as
+  GM). Expected: **no rewrite ever appears** - the text you read does not change
+  after it streams, there is no "Narration revised" toast, no "Undo revision"
+  label, and no "GM response was reset" toast. In the Debug Logs the only
+  Observer call is the `outcome_narration_mismatch judge`, and only on a turn
+  with a roll (`action_roll`, `progress_roll`, a challenge result or a
+  `calculate` comparison). Failure looks like: a "player_agency judge" or
+  "response_length judge" call, or a "Narration rewrite" call, in the cost
+  breakdown.
+- **A reversed roll shows the outcome flag.** In a Blood & Bone story, get an
+  `action_roll` that comes back a miss and make the narration describe a clean
+  success (for instance by typing "I vault the wall" after a miss, or by
+  editing the next prompt). Expected: the turn gets a "GM response flagged"
+  toast naming the miss, `observerFlags` on the turn in the context viewer, and
+  a "Observer: turn flagged (background, non-blocking)" Debug Logs line - and the
+  prose is untouched. A weak hit narrated with a cost must NOT be flagged.
+- **A hidden note read shows "(hidden note)".** Make the GM `read_notes` a note
+  whose visibility is hidden (or whose type is secret), then open the turn's
+  folded work line and expand the read_notes pill. Expected: the note's title and
+  "(hidden note)", not its text. The Debug Logs and the context viewer still
+  show the full text. Check an ordinary note in the same call still shows its
+  text.
+- **Settings.** Settings -> Architecture -> Observer Checks: each check reads
+  Off / Flag (and "Rewrite automatically" on the three prose checks), the cost
+  line counts the calls ("up to 1 extra AI call per turn" by default), "Reset
+  all to defaults" is hidden on a pristine config, and switching Player Agency
+  to Rewrite automatically shows the warning line and a cost line that adds a
+  rewrite call.
+- **Opt in, once, to the old behaviour.** Switch Response Length to Rewrite
+  automatically and send a deliberately long turn. Expected: the composer stays
+  locked until the judge has decided (no second action can be sent while it
+  does), read-aloud starts only after the final text, and a rewrite - if the
+  judge keeps the flag - shows "Narration revised" and an "Undo revision" on
+  that exact turn (tap the turn, even after a newer one exists). A rewrite
+  that comes back as a refusal or cut off leaves the original text and
+  attaches the flag; it never rolls the turn back or re-rolls the dice.
+- **Stop during a judge.** With a judge on, press Stop while "Thinking" shows
+  after the prose has streamed. Expected: the turn is cancelled (the usual
+  Stop revert), no later rewrite or reroll lands, and the cost panel shows the
+  cancelled call as "cost unknown".
+
 ## 2026-10-24 — System turn-end checks / the dawn check (decisions 183–184)
 
 Built and covered by the suite against a scripted provider; never run against

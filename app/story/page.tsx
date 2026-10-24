@@ -64,7 +64,21 @@ import {
   type ImageJobState,
 } from "../misc/imageJobs";
 import { getImageSettings } from "../misc/imageSettings";
-import { applyStoryPatch } from "../misc/imagePatcher";
+import { applyStoryPatch, type PatchHost } from "../misc/imagePatcher";
+import {
+  applyBackgroundFlags,
+  applyBackgroundLayersDelta,
+  applyBackgroundRewrite,
+  backgroundRewriteTarget,
+  type BackgroundLayersDelta,
+  type BackgroundRewritePatch,
+} from "../misc/backgroundPatch";
+import { getObserverSettings } from "../misc/layerSettings";
+import {
+  effectiveLoadingStage,
+  isTurnLocked,
+  shouldHoldNarrationForJudge,
+} from "./turnLock";
 import { cancelImageJobsForTurn } from "../misc/imageJobs";
 import { pickImageProvider } from "../misc/imageProvider";
 import {
@@ -301,92 +315,6 @@ function handleObserverReset(
   );
 }
 
-// Fired via GenerationCallbacks.onBackgroundObserverRewrite - the observer
-// ran in the background (generateStoryTurn deferred it because no check
-// could plausibly fire, see observer.ts's plausibleResetFlagTypes), found a
-// major violation anyway, and rewrote the narration after the player already
-// had control. generateStoryTurn has already patched the scene part itself,
-// so this only re-renders, persists, and tells the player - which matters
-// more here than on the blocking path, since the text they were reading just
-// changed under them.
-//
-// setStoryText is deliberately conditional on this still being the newest
-// part: that state drives TTS and the composer's view of "the current
-// response", and a late rewrite landing after the player has already taken
-// another turn must not drag those back to an older one.
-function handleBackgroundObserverRewrite(
-  storyData: StoryData,
-  flags: ObserverFlag[],
-  triggeringFlag: ObserverFlag,
-  rewrittenNarration: string,
-  partIndex: number,
-  setStoryText: (text: string) => void,
-  setStoryData: (data: StoryData) => void,
-  saveProgress: (data: StoryData, immediate?: boolean) => void,
-  addNotification: (
-    message: string,
-    type: "success" | "failure" | "info" | "warning",
-  ) => void,
-) {
-  if (partIndex === storyData.scene.parts.length - 1) {
-    setStoryText(rewrittenNarration);
-  }
-  setStoryData({ ...storyData });
-  saveProgress(storyData, true);
-
-  logger.action("Observer rewrote narration in the background", {
-    type: triggeringFlag.type,
-    detail: triggeringFlag.detail,
-    partIndex,
-    totalFlags: flags.length,
-  });
-
-  addNotification(
-    `Narration revised: ${triggeringFlag.detail} Use "Undo revision" to keep the original.`,
-    "warning",
-  );
-}
-
-// Fired via GenerationCallbacks.onBackgroundObserverFlags - the observer ran
-// in the background (see above) and found flags that it could NOT fix by
-// rewriting: minor ones, a tier_escalation_missed (only a full-turn retry
-// fixes that, which the background pass never does), or a major one whose
-// rewrite call failed. storyData.scene.parts was already patched in place by
-// generateStoryTurn itself (same object reference), so this just needs to
-// re-render/persist/notify - mirrors the observerFlags branch inside
-// onComplete below, just arriving later.
-function handleBackgroundObserverFlags(
-  storyData: StoryData,
-  flags: ObserverFlag[],
-  setStoryData: (data: StoryData) => void,
-  saveProgress: (data: StoryData, immediate?: boolean) => void,
-  addNotification: (
-    message: string,
-    type: "success" | "failure" | "info" | "warning",
-  ) => void,
-) {
-  setStoryData({ ...storyData });
-  saveProgress(storyData, true);
-  addNotification(
-    `GM response flagged: ${flags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
-    "warning",
-  );
-}
-
-// Fired via GenerationCallbacks.onBackgroundLayersUpdate once the
-// fire-and-forget memory agent/director assistant/story progress observer
-// wave (and the observer itself, when deferred) finishes - they mutate
-// storyData in place rather than returning anything, so this just
-// re-renders/persists whatever they wrote.
-function handleBackgroundLayersUpdate(
-  storyData: StoryData,
-  setStoryData: (data: StoryData) => void,
-  saveProgress: (data: StoryData, immediate?: boolean) => void,
-) {
-  setStoryData({ ...storyData });
-  saveProgress(storyData, true);
-}
-
 // Layer 5 hardening: fired via GenerationCallbacks.onObserverRewrite when
 // rewriteFlaggedNarration (observer.ts) successfully rewrote a flagged
 // turn's narration in place. Unlike handleObserverReset above, the turn's
@@ -592,6 +520,11 @@ function StoryPageContent() {
   // The StoryData object a turn in flight is mutating (see imagePatcher.ts),
   // false-ish between turns; and whether this page is still on screen.
   const turnLiveRef = useRef<StoryData | null>(null);
+  // True from the start of a turn until its outer onComplete has run (see
+  // turnLock.ts). The ref is for guards that must see it synchronously; the
+  // state is what the screen renders from.
+  const turnInFlightRef = useRef(false);
+  const [turnInFlight, setTurnInFlight] = useState(false);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -626,6 +559,10 @@ function StoryPageContent() {
     ...args: Parameters<typeof generateStoryTurn>
   ) {
     turnLiveRef.current = args[0];
+    // The authoritative lock (turnLock.ts): held until generateStoryTurn has
+    // returned, past the outer onComplete, so no stage callback releases it.
+    turnInFlightRef.current = true;
+    setTurnInFlight(true);
     // A banner never survives a new turn.
     setInterruptedTurn(null);
     interruptedTurnIdRef.current = null;
@@ -680,6 +617,8 @@ function StoryPageContent() {
       if (liveTurnRef.current?.turnId === turnId) liveTurnRef.current = null;
       turnLiveRef.current = null;
       turnSaveRef.current = null;
+      turnInFlightRef.current = false;
+      setTurnInFlight(false);
       endTurnKeepAlive(turnId, outcome, args[0].story_name);
     }
   }
@@ -765,6 +704,11 @@ function StoryPageContent() {
   const [loadingStage, setLoadingStage] = useState<
     "gm" | "story" | "choices" | null
   >(null);
+  // What the screen and the guards use (turnLock.ts): a turn in flight with no
+  // stage reported - the choices call done, a blocking judge still deciding -
+  // still locks the composer.
+  const shownLoadingStage = effectiveLoadingStage(loadingStage, turnInFlight);
+  const turnLocked = isTurnLocked({ loading, loadingStage, turnInFlight });
   // Narrower than loadingStage: true as soon as the CURRENT storyText is
   // finalized, even while tools/choices are still generating in the
   // background afterward. loadingStage stays "story" through that whole
@@ -1002,7 +946,7 @@ function StoryPageContent() {
   const party = usePartyHost({
     storyData,
     setStoryData,
-    turnBusy: loading || !!loadingStage,
+    turnBusy: turnLocked,
     submitTurn: (text, speakerIds, kind) =>
       storyData
         ? handleCustomInput(text, undefined, speakerIds, kind)
@@ -1869,53 +1813,117 @@ function StoryPageContent() {
 
   // ---- Pictures made in play (imageJobs.ts, docs/image-generation-design.md) ----
 
+  // ---- The background wave's late results (backgroundPatch.ts) ----------
+  //
+  // A judge's rewrite, the flags it could not fix, and what the memory,
+  // director and progress layers changed all arrive after the player has the
+  // turn, often after the next one has started. Each is a patch applied to the
+  // CURRENT story (never a captured whole-story object) and only where the
+  // part it names, by id, still exists holding the text it read.
+
+  function patchCurrentStory(fn: (sd: StoryData) => StoryData): void {
+    applyStoryPatch(buildPatchHost(), fn);
+  }
+
+  function handleBackgroundObserverRewrite(patch: BackgroundRewritePatch): void {
+    if (!mountedRef.current) {
+      // The page is gone: the stored story takes the patch, if it still fits.
+      patchCurrentStory((sd) => applyBackgroundRewrite(sd, patch));
+      return;
+    }
+    const current = turnLiveRef.current ?? storyDataRef.current;
+    const target = current ? backgroundRewriteTarget(current, patch) : null;
+    if (!target) {
+      logger.action("Observer rewrite dropped: its turn changed or is gone", {
+        partId: patch.partId,
+        type: patch.flag.type,
+      });
+      return;
+    }
+    patchCurrentStory((sd) => applyBackgroundRewrite(sd, patch));
+    // The screen's current narration and choices follow only the newest turn.
+    if (target === "newest") {
+      setStoryText(patch.narration);
+      if (patch.choices) setChoices({ choices: patch.choices });
+    }
+    logger.action("Observer rewrote narration in the background", {
+      type: patch.flag.type,
+      detail: patch.flag.detail,
+      partId: patch.partId,
+      totalFlags: patch.allFlags.length,
+    });
+    addNotification(
+      `Narration revised: ${patch.flag.detail} Use "Undo revision" on that turn to keep the original.`,
+      "warning",
+    );
+  }
+
+  function handleBackgroundObserverFlags(
+    flags: ObserverFlag[],
+    partId: string,
+  ): void {
+    patchCurrentStory((sd) => applyBackgroundFlags(sd, partId, flags));
+    addNotification(
+      `GM response flagged: ${flags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+      "warning",
+    );
+  }
+
+  function handleBackgroundLayersUpdate(delta: BackgroundLayersDelta): void {
+    patchCurrentStory((sd) => applyBackgroundLayersDelta(sd, delta));
+  }
+
+  // How a result that settles after its turn writes to the story (three paths,
+  // imagePatcher.ts): into the running turn's own object, into state plus a
+  // save, or, once this page is gone, into the stored story. Pictures and the
+  // background wave's late results (rewrites, flags, memory) share it, so none
+  // of them ever republishes or saves an object it captured earlier.
+  function buildPatchHost(): PatchHost {
+    // Captured now: this closure outlives the page when a story is left while
+    // a picture paints or a judge decides.
+    const patchStoryId = storyDbId;
+    return {
+      getLive: () => turnLiveRef.current,
+      getState: () => storyDataRef.current,
+      setState: (next) => {
+        storyDataRef.current = next;
+        setStoryData(next);
+      },
+      save: (next) => saveProgress(next),
+      isMounted: () => mountedRef.current,
+      patchStored: (patch) => {
+        if (!patchStoryId) return;
+        void (async () => {
+          try {
+            const { getLocalStory, saveLocalStory } = await import(
+              "@/app/misc/localStoryManager"
+            );
+            const stored = await getLocalStory(patchStoryId);
+            if (!stored) return;
+            const next = patch(stored.storyData);
+            if (next !== stored.storyData) {
+              await saveLocalStory(patchStoryId, next);
+            }
+          } catch (error) {
+            logger.error("Could not file a late result on the stored story", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })();
+      },
+    };
+  }
+
   // What the picture queue needs from this page. Pictures settle after the turn
   // that asked for them, so a job reads and writes the LATEST StoryData through
   // the ref and saves what it changed.
   function buildImageJobDeps(): ImageJobDeps {
-    // Captured now: this closure outlives the page when a story is left while a
-    // picture paints.
-    const patchStoryId = storyDbId;
+    const host = buildPatchHost();
     return {
       keys: { falKey, deepInfraKey: deepinfraKey, openRouterKey },
       getSettings: getImageSettings,
       getStoryData: () => storyDataRef.current,
-      // Three paths (imagePatcher.ts): into the running turn's own object, into
-      // state plus a save, or, once this page is gone, into the stored story.
-      patchStoryData: (fn) =>
-        applyStoryPatch(
-          {
-            getLive: () => turnLiveRef.current,
-            getState: () => storyDataRef.current,
-            setState: (next) => {
-              storyDataRef.current = next;
-              setStoryData(next);
-            },
-            save: (next) => saveProgress(next),
-            isMounted: () => mountedRef.current,
-            patchStored: (patch) => {
-              if (!patchStoryId) return;
-              void (async () => {
-                try {
-                  const { getLocalStory, saveLocalStory } = await import(
-                    "@/app/misc/localStoryManager"
-                  );
-                  const stored = await getLocalStory(patchStoryId);
-                  if (!stored) return;
-                  const next = patch(stored.storyData);
-                  if (next !== stored.storyData) {
-                    await saveLocalStory(patchStoryId, next);
-                  }
-                } catch (error) {
-                  logger.error("Could not file a picture on the stored story", {
-                    error: error instanceof Error ? error.message : String(error),
-                  });
-                }
-              })();
-            },
-          },
-          fn,
-        ),
+      patchStoryData: (fn) => applyStoryPatch(host, fn),
       onSettled: (_jobId: string, state: ImageJobState, req: ImageJobRequest) => {
         // A scene picture's card shows its own failure; a portrait has no card.
         if (req.target.kind === "scenePart") return;
@@ -2279,7 +2287,7 @@ function StoryPageContent() {
   // The strip's two buttons: one host-owned step that sets setup.mode and sends
   // the player line, through the same path typed input takes.
   function handleChooseSetupStyle(mode: "quick" | "full"): void {
-    if (loading || netSession?.role === "guest") return;
+    if (turnInFlightRef.current || loading || netSession?.role === "guest") return;
     void handleCustomInput(
       SETUP_STYLE_LINES[mode],
       undefined,
@@ -2304,6 +2312,10 @@ function StoryPageContent() {
     setupMode?: "quick" | "full",
   ) {
     if (!storyData) return;
+    // One turn at a time, held until the outer onComplete (turnLock.ts): an
+    // action sent while a blocking judge decides could be discarded by its
+    // rollback.
+    if (turnInFlightRef.current) return;
 
     const modeToSet =
       netSession?.role === "guest"
@@ -2541,9 +2553,13 @@ function StoryPageContent() {
       let toolsComplete = true;
       let choicesComplete = !storyData.autoGenerateChoices;
 
+      const holdNarrationForJudge = shouldHoldNarrationForJudge(
+        getObserverSettings(),
+      );
       const checkBothComplete = () => {
-        if (toolsComplete && choicesComplete) {
-          setLoadingStage(null);
+        // Stage callbacks never release the turn lock (turnLock.ts): the outer
+        // onComplete does, after a blocking judge has decided.
+        if (toolsComplete && choicesComplete && !holdNarrationForJudge) {
           setStoryTextReady(true);
         }
       };
@@ -2756,8 +2772,10 @@ function StoryPageContent() {
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
             // Narration itself is done - unlock TTS now rather than waiting
-            // for the tools/choices phase below to also finish.
-            setStoryTextReady(true);
+            // for the tools/choices phase below to also finish. Unless a judge
+            // may still rewrite it: then read-aloud waits for the outer
+            // onComplete (turnLock.ts shouldHoldNarrationForJudge).
+            if (!holdNarrationForJudge) setStoryTextReady(true);
 
             // Tools and choices run in parallel after story - no separate loading stage
             logger.ai_response("Story narration complete (custom input)", {
@@ -2853,37 +2871,9 @@ function StoryPageContent() {
               addNotification,
             );
           },
-          onBackgroundObserverFlags: (flags) => {
-            handleBackgroundObserverFlags(
-              storyData,
-              flags,
-              setStoryData,
-              saveProgress,
-              addNotification,
-            );
-          },
-          onBackgroundObserverRewrite: (
-            flags,
-            triggeringFlag,
-            rewrittenNarration,
-            original,
-            partIndex,
-          ) => {
-            handleBackgroundObserverRewrite(
-              storyData,
-              flags,
-              triggeringFlag,
-              rewrittenNarration,
-              partIndex,
-              setStoryText,
-              setStoryData,
-              saveProgress,
-              addNotification,
-            );
-          },
-          onBackgroundLayersUpdate: () => {
-            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
-          },
+          onBackgroundObserverFlags: handleBackgroundObserverFlags,
+          onBackgroundObserverRewrite: handleBackgroundObserverRewrite,
+          onBackgroundLayersUpdate: handleBackgroundLayersUpdate,
           onComplete: (result) => {
             if (result.meta.totalTokenCost) {
               addNotification(
@@ -2940,10 +2930,9 @@ function StoryPageContent() {
                 ...storyData.scene.parts[lastIdx],
                 consistencyWarnings: result.scenePart.consistencyWarnings,
               };
-              addNotification(
-                `Possible inconsistency: ${result.scenePart.consistencyWarnings[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
-                "warning",
-              );
+              // No toast: a deterministic name-matching check is diagnostic
+              // (judge-layer design 3.10). The warning stays on the part for
+              // the context viewer and went to the Debug Logs when it fired.
             }
 
             // Layer 5 observer flags (see observer.ts) that survived to this
@@ -3144,9 +3133,13 @@ function StoryPageContent() {
     let toolsComplete = true; // Tools already ran inside the GM stage before this point - no separate async tools stage to wait on; onToolsComplete is dead code (see generation.ts)
     let choicesComplete = !storyData.autoGenerateChoices;
 
+    const holdNarrationForJudge = shouldHoldNarrationForJudge(
+      getObserverSettings(),
+    );
     const checkBothComplete = () => {
-      if (toolsComplete && choicesComplete) {
-        setLoadingStage(null);
+      // Stage callbacks never release the turn lock (turnLock.ts): the outer
+      // onComplete does, after a blocking judge has decided.
+      if (toolsComplete && choicesComplete && !holdNarrationForJudge) {
         setStoryTextReady(true);
       }
     };
@@ -3325,8 +3318,10 @@ function StoryPageContent() {
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
             // Narration itself is done - unlock TTS now rather than waiting
-            // for the tools/choices phase below to also finish.
-            setStoryTextReady(true);
+            // for the tools/choices phase below to also finish. Unless a judge
+            // may still rewrite it: then read-aloud waits for the outer
+            // onComplete (turnLock.ts shouldHoldNarrationForJudge).
+            if (!holdNarrationForJudge) setStoryTextReady(true);
 
             logger.ai_response(`Story narration complete (${opts.logLabel})`, {
               length: content.length,
@@ -3423,37 +3418,9 @@ function StoryPageContent() {
               addNotification,
             );
           },
-          onBackgroundObserverFlags: (flags) => {
-            handleBackgroundObserverFlags(
-              storyData,
-              flags,
-              setStoryData,
-              saveProgress,
-              addNotification,
-            );
-          },
-          onBackgroundObserverRewrite: (
-            flags,
-            triggeringFlag,
-            rewrittenNarration,
-            original,
-            partIndex,
-          ) => {
-            handleBackgroundObserverRewrite(
-              storyData,
-              flags,
-              triggeringFlag,
-              rewrittenNarration,
-              partIndex,
-              setStoryText,
-              setStoryData,
-              saveProgress,
-              addNotification,
-            );
-          },
-          onBackgroundLayersUpdate: () => {
-            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
-          },
+          onBackgroundObserverFlags: handleBackgroundObserverFlags,
+          onBackgroundObserverRewrite: handleBackgroundObserverRewrite,
+          onBackgroundLayersUpdate: handleBackgroundLayersUpdate,
           onComplete: (result) => {
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
               const currentChapter = storyData.chapters.length;
@@ -3549,6 +3516,7 @@ function StoryPageContent() {
     playerComment?: string,
   ) {
     if (!storyData) return;
+    if (turnInFlightRef.current) return;
 
     let choice: Choice | undefined;
     if (actionChoice) {
@@ -4018,7 +3986,7 @@ function StoryPageContent() {
   }
 
   async function handleRetry() {
-    if (!storyData || loading) return;
+    if (!storyData || loading || turnInFlightRef.current) return;
 
     //CheckiflastpartisanAIresponse
     const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
@@ -4230,9 +4198,13 @@ function StoryPageContent() {
     let toolsComplete = true; // Tools already ran inside the GM stage before this point - no separate async tools stage to wait on; onToolsComplete is dead code (see generation.ts)
     let choicesComplete = !storyData.autoGenerateChoices;
 
+    const holdNarrationForJudge = shouldHoldNarrationForJudge(
+      getObserverSettings(),
+    );
     const checkBothComplete = () => {
-      if (toolsComplete && choicesComplete) {
-        setLoadingStage(null);
+      // Stage callbacks never release the turn lock (turnLock.ts): the outer
+      // onComplete does, after a blocking judge has decided.
+      if (toolsComplete && choicesComplete && !holdNarrationForJudge) {
         setStoryTextReady(true);
       }
     };
@@ -4314,6 +4286,10 @@ function StoryPageContent() {
           abortSignal: generationAbortRef.current.signal,
           imageJobDeps: buildImageJobDeps(),
           scenePartId: partialPart.id,
+          // The saved conversation's tools already ran and their effects are
+          // in this story; an Observer reset here may only rewrite prose,
+          // never run the tools again (judge-layer design 3.3).
+          allowMechanicalRetry: false,
         },
         {
           onStoryReasoning: (delta, fullReasoning) => {
@@ -4349,8 +4325,10 @@ function StoryPageContent() {
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
             // Narration itself is done - unlock TTS now rather than waiting
-            // for the tools/choices phase below to also finish.
-            setStoryTextReady(true);
+            // for the tools/choices phase below to also finish. Unless a judge
+            // may still rewrite it: then read-aloud waits for the outer
+            // onComplete (turnLock.ts shouldHoldNarrationForJudge).
+            if (!holdNarrationForJudge) setStoryTextReady(true);
 
             // Tools and choices run in parallel after story - no separate loading stage
             logger.ai_response("Story narration complete (retry)", {
@@ -4446,37 +4424,9 @@ function StoryPageContent() {
               addNotification,
             );
           },
-          onBackgroundObserverFlags: (flags) => {
-            handleBackgroundObserverFlags(
-              storyData,
-              flags,
-              setStoryData,
-              saveProgress,
-              addNotification,
-            );
-          },
-          onBackgroundObserverRewrite: (
-            flags,
-            triggeringFlag,
-            rewrittenNarration,
-            original,
-            partIndex,
-          ) => {
-            handleBackgroundObserverRewrite(
-              storyData,
-              flags,
-              triggeringFlag,
-              rewrittenNarration,
-              partIndex,
-              setStoryText,
-              setStoryData,
-              saveProgress,
-              addNotification,
-            );
-          },
-          onBackgroundLayersUpdate: () => {
-            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
-          },
+          onBackgroundObserverFlags: handleBackgroundObserverFlags,
+          onBackgroundObserverRewrite: handleBackgroundObserverRewrite,
+          onBackgroundLayersUpdate: handleBackgroundLayersUpdate,
           onComplete: (result) => {
             // Check for chapter completion
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
@@ -4535,10 +4485,9 @@ function StoryPageContent() {
                 ...storyData.scene.parts[lastIdx],
                 consistencyWarnings: result.scenePart.consistencyWarnings,
               };
-              addNotification(
-                `Possible inconsistency: ${result.scenePart.consistencyWarnings[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
-                "warning",
-              );
+              // No toast: a deterministic name-matching check is diagnostic
+              // (judge-layer design 3.10). The warning stays on the part for
+              // the context viewer and went to the Debug Logs when it fired.
             }
 
             // Layer 5 observer flags (see observer.ts) that survived to this
@@ -4611,7 +4560,7 @@ function StoryPageContent() {
   }
 
   async function handleUndo() {
-    if (!storyData || loading) return;
+    if (!storyData || loading || turnInFlightRef.current) return;
 
     // An Observer revision is the newest thing that happened to this turn, so
     // Undo peels that off first: one click puts the GM's original draft back,
@@ -4711,10 +4660,15 @@ function StoryPageContent() {
   // word. Restores the prose, the choices parsed from it, and the GM history
   // together, since the rewrite changed all three. Reached through the normal
   // Undo button (handleUndo), not a button of its own.
-  async function restoreObserverOriginal() {
-    if (!storyData || loading || loadingStage) return;
+  //
+  // `partIndex` is the turn to restore (default: the latest). A background
+  // rewrite lands on the turn it judged, which may no longer be the newest, so
+  // the restore is attached to that exact turn (judge-layer design 4).
+  async function restoreObserverOriginal(partIndex?: number) {
+    if (!storyData || turnLocked || turnInFlightRef.current) return;
 
-    const lastIdx = storyData.scene.parts.length - 1;
+    const lastIdx =
+      partIndex ?? storyData.scene.parts.length - 1;
     const lastPart = lastIdx >= 0 ? storyData.scene.parts[lastIdx] : undefined;
     const original = lastPart?.observerRewriteOriginal;
     if (!lastPart || !original) {
@@ -4744,15 +4698,18 @@ function StoryPageContent() {
     };
 
     const restoredPart = storyData.scene.parts[lastIdx];
-    setStoryText(restoredPart.content);
-    if (restoredPart.choices) {
-      setChoices({ choices: restoredPart.choices });
-      setInput(
-        restoredPart.choices.reduce(
-          (acc, choice) => ({ ...acc, [choice.text]: false }),
-          {} as Record<string, boolean>,
-        ),
-      );
+    // The screen's current narration and choices follow only the newest turn.
+    if (lastIdx === storyData.scene.parts.length - 1) {
+      setStoryText(restoredPart.content);
+      if (restoredPart.choices) {
+        setChoices({ choices: restoredPart.choices });
+        setInput(
+          restoredPart.choices.reduce(
+            (acc, choice) => ({ ...acc, [choice.text]: false }),
+            {} as Record<string, boolean>,
+          ),
+        );
+      }
     }
     setStoryData({ ...storyData });
 
@@ -5093,7 +5050,7 @@ function StoryPageContent() {
             choices={choices}
             input={input}
             loading={loading}
-            loadingStage={loadingStage}
+            loadingStage={shownLoadingStage}
             storyTextReady={storyTextReady}
             handleChoice={handleChoice}
             handleSelect={handleSelect}
@@ -5107,6 +5064,7 @@ function StoryPageContent() {
             onDismissInterrupted={handleDismissInterrupted}
             canRetry={canRetry}
             onUndo={handleUndo}
+            onUndoRevision={(partIndex) => void restoreObserverOriginal(partIndex)}
             canUndo={canUndo}
             onStop={handleStop}
             onEdit={handleEdit}

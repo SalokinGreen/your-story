@@ -26,6 +26,7 @@ import { getModelConfig } from "@/app/misc/ai_prices";
 import { NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import type { MemoryEntry, StoryData } from "@/app/misc/structs";
+import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
 
 const MISTRAL_KEY = "mistral-test-key";
 const ZAI_KEY = "zai-test-key";
@@ -248,6 +249,9 @@ describe("side calls forward every provider key", () => {
         replyLength: "medium",
         customMaxContext: 8000,
         mistralKey: MISTRAL_KEY,
+        // The judges are off by default (decision 187); this suite is about
+        // which model they run on when a player has them on.
+        observerSettings: LEGACY_OBSERVER_SETTINGS,
       },
       {},
     );
