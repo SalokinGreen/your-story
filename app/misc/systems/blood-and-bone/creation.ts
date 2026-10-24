@@ -4,6 +4,7 @@
  * (docs/blood-and-bone/rulebook.md). Not copied from any other product
  * (decision 3).
  */
+import { kindsInWords } from "./kindList";
 import type { BuiltinNote } from "../types";
 
 export const CREATION_NOTE: BuiltinNote = {
@@ -59,7 +60,7 @@ Separately, you all pulled a thread. The threads led to the same place, and now 
 - **Cohorts break.** If the premise stops being true in the fiction, say so at the table and choose a new one, or let the group fracture. A Cohort collapsing is a good arc, not a failure.
 
 # The steps
-Pick one Kind: Vampire, Gargoyle, Wendigo, Werewolf, Witch/Warlock, Hunter, or Ghost. This decides your Stress Escalation triggers, your Recover Move, your Progression Triggers, and your Weakness (see the Kind's note).
+Pick one Kind: ${kindsInWords()}. This decides your Stress Escalation triggers, your Recover Move, your Progression Triggers, and your Weakness (see the Kind's note).
 
 Then pick one of that Kind's two Archetypes (in the Kind's note). Your Archetype doesn't change what you are — it changes how you carry it, bending your Sate the Beast outcomes, your Stress triggers, or both. Everything else you build branches off these two choices.
 

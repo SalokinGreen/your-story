@@ -5,8 +5,10 @@
  * the Vows and Conditions are progress tracks, so none of them is written
  * into the sheet's text (design 5.9).
  */
+import { BLOOD_AND_BONE_KINDS } from "./kindList";
+
 export const BLOOD_AND_BONE_SHEET_TEMPLATE = `# {{Name | Your character's name | Unnamed}}
-**Kind:** {{Kind | Vampire, Gargoyle, Wendigo, Werewolf, Witch/Warlock, Hunter or Ghost | Vampire}}
+**Kind:** {{Kind | ${BLOOD_AND_BONE_KINDS.join(", ")} | Vampire}}
 **Archetype:** {{Archetype | One of your Kind's two Archetypes | The Ripper}}
 **Path:** {{Path | What you were before this (a Path from the book) | Investigator}}
 

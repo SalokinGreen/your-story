@@ -13,15 +13,9 @@
  *  - the miss tables and creation prompts (a "Roll 1d6" lead, their own
  *    layout), which are left to their own tests.
  */
-export const KINDS = [
-  "Vampire",
-  "Gargoyle",
-  "Wendigo",
-  "Werewolf",
-  "Witch/Warlock",
-  "Hunter",
-  "Ghost",
-];
+import { BLOOD_AND_BONE_KINDS } from "@/app/misc/systems/blood-and-bone/kindList";
+
+export const KINDS: readonly string[] = BLOOD_AND_BONE_KINDS;
 
 import { rollFormula } from "../../app/misc/diceFormula";
 

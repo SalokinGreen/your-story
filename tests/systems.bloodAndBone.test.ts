@@ -3,6 +3,7 @@
  * titles, the references the core makes, the originality guard, and the core's
  * tool recipes run against the real engine.
  */
+import { BLOOD_AND_BONE_KINDS } from "@/app/misc/systems/blood-and-bone/kindList";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { createElement } from "react";
@@ -335,7 +336,7 @@ describe("the notes follow the decided rules", () => {
       allNotes
         .filter((n) => n.title.startsWith("B&B — Creation prompts: "))
         .map((n) => n.title.replace("B&B — Creation prompts: ", "")),
-    ).toEqual(["Vampire", "Gargoyle", "Wendigo", "Werewolf", "Witch/Warlock", "Hunter", "Ghost"]);
+    ).toEqual([...BLOOD_AND_BONE_KINDS]);
   });
 });
 
