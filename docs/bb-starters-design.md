@@ -1,7 +1,7 @@
 # Blood & Bone E5: two campaign starters, Grave Watcher and a haunted hotel
 
 Status: **design, waiting for the author's approval.** Nothing is built.
-Decisions 163–171 (the interview of 2026-10-24, and the author's note on the first draft). The expansion roadmap is
+Decisions 163–172 (the interview of 2026-10-24, and the author's notes on the first drafts). The expansion roadmap is
 `docs/bb-expansion-design.md` §6 (E5: "Starters, built on everything above").
 This document replaces that row's "three or four new ones in different cities"
 with the two the author asked for.
@@ -185,19 +185,37 @@ the radio.
 
 - **The campaign note** gives the GM the season for its seven-beat plan, laid
   over the calendar: each beat names the town events it falls between.
-- **The town is the biggest part of the material**: about **sixteen
-  regulars** with a running bit each (the diner's owner, who refuses to put
-  Wi-Fi in; the town selectman, who runs every meeting like a war; the
-  dispatcher, who knows everything first; the funeral director; the
-  sheriff; the hardware store's two feuding brothers; the dance teacher; the
-  town's one Vampire, who runs the night shift at the pharmacy; the
-  ghost who still sings at the chapel; the Board's inspector, who comes up
-  from the county and is, unfortunately, charming), a map of the town's
-  places, and a calendar note.
+- **The town is the biggest part of the material** (decision 172): three
+  layers of people, so the town feels full and the GM never has to invent a
+  face from nothing.
+  - **Twenty-five regulars**, the cast: people the Watchers see every week,
+    each an NPC with a running bit, a want and a relationship to the Watch
+    (the diner's owner, who refuses to put in Wi-Fi; the town selectman, who
+    runs every meeting like a war; the dispatcher, who knows everything
+    first; the funeral director; the sheriff; the hardware store's two
+    feuding brothers; the dance teacher; the town's one Vampire, who runs the
+    night shift at the pharmacy; the ghost who still sings at the chapel; the
+    Board's inspector, who comes up from the county and is, unfortunately,
+    charming; and fifteen more). They are the starter's NPCs and a "Town
+    regulars" note the GM reads.
+  - **Thirty-five occasional visitors**: people who turn up every few weeks
+    or once a season (the travelling knife-sharpener, the mourners who come
+    every November, the county librarian's bookmobile, the woman who sells
+    honey at the festivals, the college kids who come to see the yard on a
+    dare, a Watcher from another yard on leave). A line or two each, with a
+    when ("every second Tuesday", "at the first snow") so the calendar can
+    bring them in. Two notes, "Occasional visitors" A–Q and R–Z, to stay
+    under the read cap; they become NPCs only when the GM brings one in.
+  - **A hundred kinds of people you might meet** (d100): a table of types,
+    not named people, for the stranger at the gas station or the face in the
+    crowd at the Lantern Walk: "a hearse driver on his lunch break", "a
+    Werewolf family on a road trip, all asleep in the van but the dad", "a
+    retired Watcher who still checks the sky at dusk". The GM rolls, names
+    the person (or rolls the Names table) and plays them.
 - **Tables** (the starter's own; the Europe-flavoured E1 tables are left out,
   §5): Town today (d20: what is happening on Main Street), Who's at the diner
   (d20), Gossip going round (d20), The radio net tonight (d20, mostly not
-  monsters), Calls on the radio (d20, the ones that are), What stirs in the
+  monsters), Calls on the radio (d20, the ones that are), People you might meet (d100, above), Names (d100 first names, d100 family names), What stirs in the
   yard (d20), Sections and graves (d20 + a d66 of inscriptions), Weather and
   the fog (d20).
 - **Unrest climbs slowly**: it starts at 1 and moves with the campaign, not
@@ -305,7 +323,7 @@ setting.
 
 | | notes | tokens (estimate) |
 |---|---|---|
-| Grave Watcher: Running it, campaign, the calendar, the yard, the tower, the town and its places, the net, roster, 8 tables, 2 secrets, ~16 town NPCs, 8 presets | ~20 | ~19,000 |
+| Grave Watcher: Running it, campaign, the calendar, the yard, the tower, the town and its places, the net, roster, town regulars, two visitor notes, 10 tables (two d100), 2 secrets, 25 regular NPCs, 8 presets | ~25 | ~28,000 |
 | The hotel: Running it, campaign, hotel, town, residents, family, 5 tables, 2 secrets, ~12 NPCs, 5 presets | ~14 | ~13,000 |
 
 Every note under the 2,500-token read cap; each Running-it note plus the core
