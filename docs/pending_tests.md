@@ -10,6 +10,22 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-24 — Blood & Bone new Kinds and Powers (E4, decisions 160–161)
+
+Needs a real model:
+
+- **A new Kind in session zero.** Start a Blood & Bone story, step by step,
+  and ask to play a Rusalka. Expected: the Kind question offers all eleven
+  Kinds; the GM reads `B&B — Rusalka` and `B&B — Creation prompts: Rusalka`,
+  asks where her water is, and offers the Drowner and the Willing Tide. Failure
+  looks like: the GM saying the Kind does not exist (a story made before E4
+  holds the old creation note listing seven Kinds; the Kind notes still arrive
+  on load).
+- **A Power's first ability used in play.** With a Vampire who has Blood
+  Scent, ask the GM to track someone by blood. Expected: the GM applies the
+  ability's add (+1 or +2 by the ability) to the roll. Failure looks like: the
+  GM treating the Power as permission only, with no add.
+
 ## 2026-10-24 — Blood & Bone tables, E1 (decisions 150–159)
 
 Run on the desktop app with the author's go (Claude Haiku subscription,

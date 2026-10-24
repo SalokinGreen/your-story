@@ -679,7 +679,15 @@ report's §11.3. The ones that shape play:
   (People, The night, Places, The Concord and the factions, The Vigil and
   hunters, The Masquerade, Rumours, Feeding and hunger, Hooks, Objects and
   relics, Investigation, The Hollow Roads), one note each with 3–6 sub-tables,
-  and grows the three older oracles from d10 to d20. A sub-table names its die
+  and grows the three older oracles from d10 to d20. E4 adds four Kinds
+  (decision 160: Revenant, Changeling, Doppelgänger, Rusalka; `kinds-more/`,
+  a Kind note and a creation-prompts table each, no new meter sets); the Kind
+  list lives once in `kindList.ts` (`BLOOD_AND_BONE_KINDS`), read by the sheet
+  template, the creation note, the core's index and `tests/helpers/tableShape.ts`,
+  so a per-Kind table must list every Kind. Decision 161: every ability of
+  every Power gives a mechanical edge (an add, a better outcome, a penalty
+  ignored), never a permission alone; the seven original Kinds' Powers were
+  rewritten to it. A sub-table names its die
   in its heading: `(1d6)`, `(1d20)`, `(1d100)`, `(1d6, on the Kind's list)` or
   `(d66: roll ["1d6","1d6"], first die is the tens)`. `tests/helpers/tableShape.ts`
   (`checkTableShape`) checks every table note in the packs against those forms
