@@ -62,7 +62,7 @@ Separately, you all pulled a thread. The threads led to the same place, and now 
 # The steps
 Pick one Kind: ${kindsInWords()}. This decides your Stress Escalation triggers, your Recover Move, your Progression Triggers, and your Weakness (see the Kind's note).
 
-Then pick one of that Kind's two Archetypes (in the Kind's note). Your Archetype doesn't change what you are — it changes how you carry it, bending your Sate the Beast outcomes, your Stress triggers, or both. Everything else you build branches off these two choices.
+Then pick one of that Kind's Archetypes (two in the Kind's note; each of the seven original Kinds has a third in B&B — <Kind>: The <Archetype>, which also adds two Kind Powers). Your Archetype doesn't change what you are — it changes how you carry it, bending your Sate the Beast outcomes, your Stress triggers, or both. Everything else you build branches off these two choices.
 
 ### Step 2 — Assign Your Stats
 

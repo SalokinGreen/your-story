@@ -86,10 +86,15 @@ describe("the registry", () => {
     for (const n of rules.notes) expect(n.scope, n.title).toBeUndefined();
     const scopes = europe.notes.map((n) => n.scope);
     expect(scopes.every((x) => typeof x === "string")).toBe(true);
-    expect(scopes.filter((x) => x === "cross-europe")).toHaveLength(1);
-    expect(europe.notes.find((n) => n.scope === "cross-europe")?.title).toBe(
+    // The overview and E2's three continent notes reach every story.
+    expect(
+      europe.notes.filter((n) => n.scope === "cross-europe").map((n) => n.title).sort(),
+    ).toEqual([
       "Europe by Night — Overview",
-    );
+      "Europe by Night — Powers of the continent",
+      "Europe by Night — The Hollow Roads",
+      "Europe by Night — Who's who",
+    ]);
     for (const n of europe.notes.filter((x) => x.scope !== "cross-europe")) {
       expect(n.title, n.title).toContain(n.scope!);
     }

@@ -667,7 +667,7 @@ report's §11.3. The ones that shape play:
   ending `:rules`: a ≤3,000-token `dm_instructions` core the GM carries every
   round, the rest read on demand, including the miss tables, oracles and
   table families as `table` notes; *Europe by Night*, id ending `:europe`: an
-  overview and six cities), the starter *The Hollow Hour*, the
+  overview, seventeen cities, three wild places and three continent notes), the starter *The Hollow Hour*, the
   sheet template and four meter sets (character, Witch, Wendigo, City). The
   text is original, condensed from the author's `docs/blood-and-bone/rulebook.md`
   and credited to the Ironsworn engine under CC BY 4.0. A note keeps its
@@ -679,7 +679,12 @@ report's §11.3. The ones that shape play:
   (People, The night, Places, The Concord and the factions, The Vigil and
   hunters, The Masquerade, Rumours, Feeding and hunger, Hooks, Objects and
   relics, Investigation, The Hollow Roads), one note each with 3–6 sub-tables,
-  and grows the three older oracles from d10 to d20. E4 adds four Kinds
+  and grows the three older oracles from d10 to d20. E3 adds a third
+  Archetype for each of the seven original Kinds, in its own note `B&B — <Kind>: The <Archetype>`
+  (`archetypes/`: the Courtier, Pilgrim, Shepherd, Hound, Apostate, Penitent,
+  Seeker) with two Archetype Powers and two more Kind Powers, and five
+  `B&B — More <Assets>` notes (`assets-more/`, six assets each); the creation
+  note, the `archetype` step hint and the sheet say the seven original Kinds have three. E4 adds four Kinds
   (decision 160: Revenant, Changeling, Doppelgänger, Rusalka; `kinds-more/`,
   a Kind note and a creation-prompts table each, no new meter sets); the Kind
   list lives once in `kindList.ts` (`BLOOD_AND_BONE_KINDS`), read by the sheet
@@ -702,8 +707,15 @@ report's §11.3. The ones that shape play:
   A story started from an adventure or starter is seeded with every id it
   would be given (`seedBuiltinNotesOffered`). The additions are not saved on
   load; they persist with the story's next save. A pack note's `scope` is a
-  city's name, or `cross-europe` (only the overview has it so far); the cities
-  are not pushed. `buildHollowHour` copies the Rules pack, the cross-Europe
+  city's or region's name, or `cross-europe` (the overview and E2's *The Hollow
+  Roads*, *Powers of the continent* and *Who's who*); cities and regions are
+  not pushed. E2 (`app/misc/systems/blood-and-bone/europe/`, one file per note,
+  gathered into `EUROPE_PACK_NOTES` in `blood-and-bone/index.ts`) adds eleven
+  cities in the depth of the approved Budapest sample (Budapest, Edinburgh,
+  Dublin, Amsterdam, Stockholm, Lisbon, Marseille, Venice, Naples, Kraków,
+  Bucharest), the three wild places (the Carpathians, the Highlands and
+  islands, the Alps and the Black Forest) and the three continent notes, and
+  deepens the original six in `europe.ts` in place (ids unchanged). `buildHollowHour` copies the Rules pack, the cross-Europe
   notes and London (`HOLLOW_HOUR_CITY`) only.
   `tests/systems.bloodAndBone.test.ts` holds the token budgets and runs the
   core's recipes against the engine.

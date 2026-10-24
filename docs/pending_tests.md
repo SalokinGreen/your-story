@@ -26,6 +26,32 @@ Needs a real model:
   ability's add (+1 or +2 by the ability) to the roll. Failure looks like: the
   GM treating the Power as permission only, with no add.
 
+## 2026-10-24 — Blood & Bone character options (E3)
+
+Needs a real model:
+
+- **A third Archetype in session zero.** Start a Blood & Bone story, step by
+  step, and pick a Vampire. Expected: the archetype question offers three
+  options, the Courtier among them, with what each does in play, and the GM
+  read `B&B — Vampire: The Courtier` to describe it. Failure looks like: only
+  the two Archetypes from the Kind note (the GM did not open the new note;
+  a story made before E3 holds the old creation note, which says two).
+- **A new asset bought with XP.** In play, spend 2 XP on a Path from
+  `B&B — More Paths`. Expected: the GM reads that note and writes the first
+  ability onto the sheet.
+
+## 2026-10-24 — Europe by Night, deeper (E2)
+
+Checked in the browser preview: a *Hollow Hour* story from 2026-10-23 gains
+the three continent notes (and E1's twelve tables) on opening, and no new city.
+Needs a real model:
+
+- **The GM uses a city.** In a story set in London, travel ("I take the night
+  train to Edinburgh"). Expected: the GM reads *Europe by Night — Edinburgh*
+  if the story holds it, or the overview's "where to read more" list tells it
+  the city lives in the library (it is not pushed); it then plays the
+  Closemen or Tollhouse Court rather than inventing a faction.
+
 ## 2026-10-24 — Blood & Bone tables, E1 (decisions 150–159)
 
 Run on the desktop app with the author's go (Claude Haiku subscription,
