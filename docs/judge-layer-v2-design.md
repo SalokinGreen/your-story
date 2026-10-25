@@ -3,7 +3,7 @@
 **Status:** design, revised after Codex's review
 ([`research/codex-campaign-judges-review-2026-10-25.md`](research/codex-campaign-judges-review-2026-10-25.md);
 its findings are answered in §11), for the author's go. Not approved for building.
-Decisions 220–221 (the judges on, output held; on branch `claude/judges-on`)
+Decisions 220–221, 237 and 240 (the judges on, output held; on branch `claude/judges-on`)
 and 226–229 (`docs/decisions.md`). Research:
 [`research/ai-supervision-2026-10-25.md`](research/ai-supervision-2026-10-25.md)
 and [`research/campaign-and-judges-audit-2026-10-25.md`](research/campaign-and-judges-audit-2026-10-25.md).
@@ -102,14 +102,87 @@ for the measurements (§7).
   family the player has a key for) runs only before a rewrite. With no other
   family available, a rewrite-eligible flag stays a flag.
 
-## 4. The prompts
+## 4. The prompts (decision 238)
 
-Every judge prompt follows one shape:
-1. **The principle**, one or two sentences.
-2. **One good example and one bad one**, short and original.
-3. **The facts**, numbered.
-4. **The narration.**
-5. **Reasoning first**, then `{severity: none | minor | major, evidence: "<quote>", fix: "<one line>"}`.
+Every judge, re-ask and rewrite prompt is written to the rules of a
+prompt-engineering note the author shared, by Wes Brown, measured on
+decision-chain prompts run twenty times per test. The rules below are
+summarised here. Each comes with what it changes in this layer.
+
+**What code decides and what the model decides.** Code supplies the facts
+whole and checks every answer it can check (rungs 0–1). The model is never
+asked to count, compare numbers, or confirm membership in a list. The model is
+asked only what is a reading of language.
+
+**A rule is a decision chain, never a pattern with exceptions.** Each judge's
+rubric is numbered questions, asked in causal order, each with its arms. A
+fact the verdict depends on is asked before the verdict. The agency judge, for
+example, becomes:
+1. What did the player declare? Write it as `DECLARED`.
+2. Quote each span of the narration where the player character speaks,
+   chooses, feels, or acts. Write them as `SPANS`.
+3. For each span: is it the declared action, or a step it plainly implies?
+   - YES: fine.
+   - NO: continue.
+4. Is it new dialogue, a significant choice, a decided feeling, or a new
+   action?
+   - YES: a violation, with that span as its evidence.
+   - NO: fine.
+
+Today's agency prompt (`observer.ts`) is a "fine" list and a "violation"
+list, the pattern-with-exceptions shape the note measured as firing on the
+pattern before the condition is checked.
+
+**The facts come before the verdict, each in its own named field.** The JSON
+puts the facts first and the verdict last:
+`{ declared, spans, reasoning, severity, evidence, fix }`.
+Today's judges write the verdict first (`{"violation": …, "reason": …}`),
+which commits the model before it reasons.
+
+**Every reasoning line states what the input shows, then the answer.** A line
+reads "the narration has her say 'I'll do it', which the player did not
+declare: VIOLATION", never "VIOLATION, because…".
+
+**Worked examples are minimal pairs.** Each judge carries two examples with
+the same surface and opposite verdicts:
+- "you take the ladder, rung by rung" after "I climb down": fine;
+- "you take the ladder and tell her you'll stay" after "I climb down": a
+  violation.
+
+Each example's lines are in its own words, never one formula repeated. The
+examples are invented, never taken from a player's story.
+
+**A rewrite writes its plan first.** The rewrite prompt asks for a fix plan
+before any prose. Each entry gives the quoted span, the finding and the
+replacement text. Then a separator, then the rewritten narration. In the
+note's measurements, rewrites alone fixed about 40% of flagged patterns, and
+a plan written first made the rewrite follow it. The plan is checked by code:
+every quoted span exists in the original. The rewrite is checked against the
+plan.
+
+**A re-ask carries the exact repair.** "The goblin had 3 hearts and a strong
+hit does 2: call `manage_meter` adjust Hearts −2 on Goblin champion", never
+"the damage looks wrong". Where the valid choices are not already in the
+prompt, the re-ask lists them.
+
+**Prompts describe the thing, never its history.** No decision numbers, dates
+or "used to" in any prompt or tool description. Rationale stays in code
+comments.
+
+**No newline mid-sentence** in any prompt string, worked-example lines most of
+all.
+
+**Never truncate a judge's input.** When a turn's facts would be too many for
+one call, the call's scope narrows (fewer judges per call) instead of a list
+being cut.
+
+**Testing (with §7).** A judge is tested by its behaviour on the labelled set,
+never by its text:
+- each case runs many times, at the temperature the judge ships with, and the
+  result is a count such as "3 failing runs of 20";
+- a fix's target case must fall, and no other case may rise beyond noise;
+- a fixture's nouns come from a domain the real turns never use;
+- a reproduction case uses the real turn's recorded inputs.
 
 Evidence must be a quote from the narration. A verdict with no quote is
 treated as none, which cuts false positives.

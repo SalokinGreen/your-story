@@ -402,4 +402,6 @@ The author: "I also want us to look in depth at campaign setup, the whole format
 | 234 | "Which model family confirms a rewrite before it happens?" | **"Let the player pick."** A picker under Settings → AI → Advanced, GLM 5.3 by default. |
 | 235 | "Should a pacing note ever reach the player?" | **"GM only (Recommended)."** |
 | 236 | "What next?" | **"Codex review, then plans (Recommended)."** |
+| 238 | The author shared a friend's agentic-coding material (a turn-completion auditor, a markdown auditor, and a prompt-engineering note by Wes Brown): "Maybe we can use some of this?" Asked which practices to adopt. | **"Judge prompts by his rules (Recommended)."** The judge, re-ask and rewrite prompts follow the note: decision chains instead of fine/violation lists, facts before the verdict in named fields, minimal-pair examples, a fix plan before every rewrite, re-asks that carry the exact repair, the labelled set run many times per case with counts reported (`judge-layer-v2-design.md` §4). |
+| 239 | (same question) | **"GM prompt audit."** Audit the GM's own system prompt, the session-zero block, the tool descriptions and the gate messages against the same rules, as its own design. Not chosen: the turn-completion hook; the trimmed markdown auditor. |
 
