@@ -394,5 +394,5 @@ The author: "I also want us to look in depth at campaign setup, the whole format
 | 226 | "Which direction for the judge layer?" | **"Facts first, then judges (Recommended)."** Deterministic checks on engine facts first, cheap LLM judges with rubrics and examples for what code cannot see, and a rewrite always handed the specific facts it must match. |
 | 227 | "Which new checks should the judge layer grow?" | **All four:** world consistency, secret leaks, rules adherence, pacing and spotlight. |
 | 228 | "Should judges use more than one model family?" | **"One cheap judge, panel for rewrites (Recommended)."** Haiku judges every turn; before a rewrite, a second judge from another family must agree. |
-| 229 | "How do we know a judge actually helps?" | **"Player signals only."** Count Undo revision, Retry and Feedback per judge in the app; no labelled test set. |
+| 229 | "How do we know a judge actually helps?" | **"Labelled turn set (Recommended)."** A set of real turns from the author's Debug Logs and story exports, each labelled good or with the problem it has, and a runner that scores every judge on it; each run costs model calls on the author's key, so it waits for the author's go. (The author first clicked "Player signals only" by accident and asked again: "Last question I clicked by accident".) |
 
