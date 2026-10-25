@@ -1,0 +1,38 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "oracle-fate-question-consulted",
+  "published": true,
+  "note": "The GM asked the oracle first; the narration follows its answer.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [
+    {
+      "toolName": "fate_question",
+      "toolCallId": "o1",
+      "success": true,
+      "contextForStory": "[Fate question: Is the door locked? -> YES]",
+      "result": {
+        "type": "fate_question",
+        "question": "Is the door locked?",
+        "answer": "yes"
+      }
+    }
+  ],
+  "playerLine": "I try the door at the end of the passage.",
+  "narration": "You put your weight to the handle. It will not give: locked, and the lock is an old one, the keyhole rimmed in green.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

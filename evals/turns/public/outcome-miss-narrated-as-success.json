@@ -1,0 +1,56 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "outcome-miss-narrated-as-success",
+  "published": true,
+  "note": "A MISS on the climb; the narration gets the character over the wall.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [
+    {
+      "toolName": "action_roll",
+      "toolCallId": "r1",
+      "success": false,
+      "contextForStory": "[Action roll - climb the seawall: score 6 against 7 and 9 -> MISS]",
+      "result": {
+        "type": "action_roll",
+        "statName": "Nerve",
+        "statValue": 2,
+        "adds": 0,
+        "addsApplied": 0,
+        "penalty": 0,
+        "actionDie": 4,
+        "challengeDice": [
+          7,
+          9
+        ],
+        "score": 6,
+        "capped": false,
+        "outcome": "miss",
+        "match": false
+      }
+    }
+  ],
+  "playerLine": "I climb the seawall before the patrol comes round.",
+  "narration": "Your fingers find the ledge and you haul yourself over the top in one smooth pull. On the far side the stones are dry and the patrol's lantern is still a long way off.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "outcome",
+      "severity": "major",
+      "span": "you haul yourself over the top in one smooth pull"
+    }
+  ]
+}

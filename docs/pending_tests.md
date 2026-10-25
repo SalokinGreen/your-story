@@ -10,6 +10,40 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Judge layer J4: the labelled set and its runner
+
+The format, the scoring, the runner (against a mocked provider), the exporter and
+the deterministic rung-1 checks over the 45 published turns are covered by
+`tests/judges.eval*.test.ts`. The script's plan, run and export paths were driven
+by hand with the provider replaced by a stub (`--go` against a fake `fetch`, no
+real call). Nothing below was run against a real model: every run costs the
+author's money and waits for their go.
+
+- **A real scored run.** Put a provider key in `.env.eval` at the repository root
+  (`OPENROUTER_API_KEY=...`; the judges run on Claude Haiku 5.5), then
+  `node scripts/eval-judges.mjs` first: it prints "45 judge turns (45
+  published), 20 runs each, combined and split form" and a call range, and makes
+  no call. Then `node scripts/eval-judges.mjs --go --runs 5` (roughly 900 to
+  5,000 calls at 20 runs; start with 5). Expected: a table per form with
+  precision (any/major), recall, false-flag rate and "N of M runs" counts per
+  judge, the cost line, "combined against split", and
+  `Wrote evals/results.json`. Failure looks like: "No provider key" (the file is
+  missing or misnamed), every judge showing "n/a" precision and `unreadable`
+  runs equal to all runs (the key or model is wrong; read the Debug Logs-style
+  warnings on stderr), or p50 of 0 ms (nothing was called).
+- **The labels are the author's call.** The 45 turns were invented and the labels
+  drafted by Claude (`"labelStatus": "drafted"`). Read the turns whose result
+  surprises you and set `"checked"` once you agree; a judge's score is only as
+  good as the labels it is scored on.
+- **First real turns.** Export one of your own turns with
+  `node scripts/export-eval-turn.mjs story.json --id <name> --out <private folder>`,
+  open the file, add its labels, and run `--only <name> --runs 3`. Expected: the
+  draft has `labels: []` and `published: false`; the script refuses to write a
+  draft into `evals/turns/public/`.
+- **Windows and `vite` load.** The script loads the app's TypeScript through
+  Vite's SSR loader; it was run here on Windows with Node 24 and Vite 8. If it
+  fails with a module error on your machine, say which module.
+
 ## 2026-10-25 — Campaign slice 6: the player's view
 
 A worker without a display built this; the panel is covered by render tests

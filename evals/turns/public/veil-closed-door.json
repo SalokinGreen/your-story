@@ -1,0 +1,72 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "veil-closed-door",
+  "published": true,
+  "note": "A veil on romance; the door closes and the scene cuts away.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": [],
+    "campaign": {
+      "version": 1,
+      "factions": [],
+      "fronts": [],
+      "clocks": [],
+      "people": [],
+      "secrets": [],
+      "locations": [],
+      "endStates": [],
+      "safety": {
+        "lines": [],
+        "veils": [
+          {
+            "id": "v1",
+            "text": "Romantic scenes happen off screen",
+            "keywords": [
+              "bed",
+              "kiss"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": [],
+    "campaign": {
+      "version": 1,
+      "factions": [],
+      "fronts": [],
+      "clocks": [],
+      "people": [],
+      "secrets": [],
+      "locations": [],
+      "endStates": [],
+      "safety": {
+        "lines": [],
+        "veils": [
+          {
+            "id": "v1",
+            "text": "Romantic scenes happen off screen",
+            "keywords": [
+              "bed",
+              "kiss"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "toolResults": [],
+  "playerLine": "I go upstairs with Corvin.",
+  "narration": "Corvin pulls the door to behind you, and the latch drops into its cradle. The candle on the landing gutters once. Down in the common room, the fiddler starts a slower tune.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

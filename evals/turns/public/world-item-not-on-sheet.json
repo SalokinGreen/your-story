@@ -1,0 +1,122 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "world-item-not-on-sheet",
+  "published": true,
+  "note": "The sheet lists a knife and rope; the narration has a pistol.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [
+      {
+        "id": "n6",
+        "name": "Jory",
+        "description": "Jory, known on the quay.",
+        "role": "local",
+        "status": "alive",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": [],
+    "campaign": {
+      "version": 1,
+      "factions": [],
+      "fronts": [],
+      "clocks": [],
+      "people": [],
+      "secrets": [],
+      "locations": [
+        {
+          "id": "loc2",
+          "name": "Salt Quay",
+          "features": [
+            "stacked crates"
+          ],
+          "npcIds": [
+            "n6"
+          ]
+        }
+      ],
+      "endStates": []
+    },
+    "lore": [
+      {
+        "title": "Character: Wren",
+        "content": "Wren. Carries: a short knife, forty feet of rope, a tin whistle. No firearms.",
+        "type": "character_sheet",
+        "enabled": true,
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": []
+      }
+    ]
+  },
+  "storyAfter": {
+    "npcs": [
+      {
+        "id": "n6",
+        "name": "Jory",
+        "description": "Jory, known on the quay.",
+        "role": "local",
+        "status": "alive",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": [],
+    "campaign": {
+      "version": 1,
+      "factions": [],
+      "fronts": [],
+      "clocks": [],
+      "people": [],
+      "secrets": [],
+      "locations": [
+        {
+          "id": "loc2",
+          "name": "Salt Quay",
+          "features": [
+            "stacked crates"
+          ],
+          "npcIds": [
+            "n6"
+          ]
+        }
+      ],
+      "endStates": []
+    },
+    "lore": [
+      {
+        "title": "Character: Wren",
+        "content": "Wren. Carries: a short knife, forty feet of rope, a tin whistle. No firearms.",
+        "type": "character_sheet",
+        "enabled": true,
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": []
+      }
+    ]
+  },
+  "toolResults": [],
+  "playerLine": "I stand in the doorway of the Salt Quay warehouse and see who is inside.",
+  "narration": "The Salt Quay warehouse is dim and smells of brine. Jory is sitting on a crate, picking at his thumbnail, and his eyes widen when he sees the pistol you draw from your coat and level at his chest.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": [
+      "Jory"
+    ]
+  },
+  "labels": [
+    {
+      "judge": "world_consistency",
+      "severity": "major",
+      "span": "the pistol you draw from your coat and level at his chest"
+    }
+  ]
+}

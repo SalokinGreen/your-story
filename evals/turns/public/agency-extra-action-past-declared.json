@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "agency-extra-action-past-declared",
+  "published": true,
+  "note": "The declared question becomes a purchase and a boarding.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I ask the ferryman what the crossing costs.",
+  "narration": "The ferryman does not look up from the knot he is working. \"Three coppers for a person, five for a person with opinions,\" he says. You count out five coppers, hand them over, and step onto the wet planks of the ferry before he has finished speaking.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "agency",
+      "severity": "major",
+      "span": "You count out five coppers, hand them over, and step onto the wet planks of the ferry"
+    }
+  ]
+}

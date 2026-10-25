@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "agency-decided-feeling-and-act",
+  "published": true,
+  "note": "The narration decides what the character feels and does with the letter.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I look at the letter.",
+  "narration": "The paper is thin, folded in thirds, the ink bled at one corner as though it had been carried through rain. It begins with your name. You feel a rush of guilt and decide to burn it in the stove before anyone can read it, holding it over the flame until the corner curls black.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "agency",
+      "severity": "major",
+      "span": "You feel a rush of guilt and decide to burn it in the stove"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "tier-bridge-and-parley",
+  "published": true,
+  "note": "A multi-step gamble with consequences that chain.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I cut the rope bridge while the patrol is crossing, then shout for the captain to parley.",
+  "narration": "The blade parts the last strands and the bridge drops away in a long hiss of rope. The patrol's cries go down with it, and then there is only the wind and the far-off captain, a small dark shape on the opposite ledge, who has stopped moving.",
+  "replyLength": "medium",
+  "tierUsed": 1,
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "tier_gap",
+      "severity": "major",
+      "span": "I cut the rope bridge while the patrol is crossing, then shout for the captain to parley"
+    }
+  ]
+}
