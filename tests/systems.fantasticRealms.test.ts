@@ -53,7 +53,7 @@ describe("Fantastic Realms content", () => {
     const ids = allNotes.map((n) => n.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(id.startsWith("builtin:fantastic-realms:"), id).toBe(true);
-    expect((sys as unknown as { coreNoteId: string }).coreNoteId).toBe("builtin:fantastic-realms:core");
+    expect(sys.coreNoteId).toBe("builtin:fantastic-realms:core");
   });
 
   it("scopes the whole world pack to the crossroads and the rules to nothing", () => {
@@ -91,7 +91,7 @@ describe("Fantastic Realms content", () => {
   });
 
   it("gives each realm a rest condition", () => {
-    const rests = (sys as unknown as { rests: Record<string, string> }).rests;
+    const rests = sys.rests ?? {};
     expect(Object.keys(rests).sort()).toEqual(["aurelane", "gloamreach", "larkenfell"]);
     for (const note of REALM_NOTES) expect(note.content).toContain("**Rest:**");
   });
@@ -101,8 +101,13 @@ describe("Fantastic Realms content", () => {
     const linked = new Set(lore.map((l) => l.libraryNoteId).filter(Boolean));
     expect(linked.has("builtin:fantastic-realms:core")).toBe(true);
     expect(linked.has("builtin:fantastic-realms:character-creation")).toBe(true);
+    // Every realm travels with the story: the loader cannot add one later,
+    // since a starter's story is seeded as already offered them.
+    for (const realm of ["aurelane", "larkenfell", "gloamreach"]) {
+      expect(linked.has(`builtin:fantastic-realms:realm-${realm}`)).toBe(true);
+    }
     expect(starter.id.startsWith("builtin:fantastic-realms:")).toBe(true);
-    const state = tpl.systemState as unknown as Record<string, unknown>;
+    const state = tpl.systemState!;
     expect(state.systemId).toBe("fantastic-realms");
     expect(state.setting).toBe("crossroads");
     expect(tpl.sessionZeroActive).toBe(true);

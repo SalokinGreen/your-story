@@ -935,6 +935,7 @@ const OUTCOME_BEARING_TOOL_NAMES = new Set([
   "record_challenge_result",
   "action_roll",
   "ask_for_roll",
+  "feat_roll",
 ]);
 
 /**
@@ -6749,15 +6750,32 @@ async function executeInitiativeRoll(
     plan.push({ name, edges });
   }
   let faces: number[];
-  try {
-    const rolled = await rollFormulasMaybePhysical(
-      plan.map(() => "1d6"),
-      { reason: "Initiative" },
-      interaction
-    );
-    faces = rolled.map((r) => flattenRolls(r.rolls)[0]);
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : "The dice could not be rolled");
+  if (params.dice !== undefined) {
+    if (storyData.diceMode !== "manual") {
+      return fail(
+        `"dice" is only for manual dice mode, where the player reports their physical roll. Leave it out and the engine rolls.`
+      );
+    }
+    const d = params.dice;
+    const ok =
+      Array.isArray(d) &&
+      d.length === plan.length &&
+      d.every((f) => typeof f === "number" && Number.isInteger(f) && f >= 1 && f <= 6);
+    if (!ok) {
+      return fail(`dice must be ${plan.length} faces (1-6), one per hero in order`);
+    }
+    faces = [...d];
+  } else {
+    try {
+      const rolled = await rollFormulasMaybePhysical(
+        plan.map(() => "1d6"),
+        { reason: "Initiative" },
+        interaction
+      );
+      faces = rolled.map((r) => flattenRolls(r.rolls)[0]);
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : "The dice could not be rolled");
+    }
   }
   const rows = plan.map((p, i) => ({
     hero: p.name,
@@ -6921,9 +6939,13 @@ function executeTakeRest(
   if (off) return off;
   const system = resolveSystem(storyData).system;
   const rests = system?.rests ?? {};
-  const realmArg = typeof params.realm === "string" ? params.realm.trim() : "";
-  if (realmArg && Object.keys(rests).length > 0 && !(realmArg in rests)) {
-    return fail(`Unknown realm "${realmArg}". Realms: ${Object.keys(rests).join(", ")}`);
+  // The notes write realms capitalised ("Aurelane") and the rests are keyed
+  // in lower case: match loosely, and only on the map's own keys.
+  const realmArg =
+    typeof params.realm === "string" ? normalizeKey(params.realm) : "";
+  const knowsRealm = (key: string) => Object.prototype.hasOwnProperty.call(rests, key);
+  if (realmArg && Object.keys(rests).length > 0 && !knowsRealm(realmArg)) {
+    return fail(`Unknown realm "${params.realm}". Realms: ${Object.keys(rests).join(", ")}`);
   }
   const picked = frSelectHeroes(storyData, params.heroes);
   if ("error" in picked) return fail(picked.error);
@@ -6952,7 +6974,7 @@ function executeTakeRest(
     rested.push(who);
   }
   storyData.meters = meters;
-  const condition = realm ? rests[realm] : undefined;
+  const condition = realm && knowsRealm(realm) ? rests[realm] : undefined;
   let ctx = `[Rest: ${rested.join(", ")} rested. Every heart is healed${healed.length > 0 ? ` (${healed.join(", ")})` : ""} and every feat is un-burned.]`;
   if (condition) {
     ctx += `\n[Rest condition in ${realm}: ${condition} Whether the fiction allows it is your call.]`;

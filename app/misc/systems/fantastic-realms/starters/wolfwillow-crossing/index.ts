@@ -26,25 +26,22 @@ Nothing is wrong yet. There is a bed to find, a supper to eat, and a story to te
 
 /**
  * `packNotes` is the rules pack plus the world pack, in that order. The
- * starter copies the rules, the Crossroads overview, Larkenfell and the
- * tables; the other realms are given on load (builtinNotes.ts).
+ * starter copies all of it: the rules, the Crossroads overview, every realm
+ * and the tables, so the heroes can travel. They cannot be left to the loader:
+ * a story started from an adventure is seeded as already offered every note
+ * it would be given (seedBuiltinNotesOffered), so a realm not copied here
+ * would never arrive. The GM sees the realms by title and reads them on demand.
  */
 export function buildWolfwillowCrossing(packNotes: BuiltinNote[]): BuiltinAdventure {
-  const copied = packNotes.filter(
-    (n) =>
-      n.scope === undefined ||
-      n.id === "builtin:fantastic-realms:crossroads" ||
-      n.id === "builtin:fantastic-realms:realm-larkenfell" ||
-      n.type === "table",
-  );
+  const copied = packNotes;
   const lore: StoryLore[] = [...copied.map(builtinToLore), ...WOLFWILLOW_NOTES];
 
-  const systemState = {
+  const systemState: SystemState = {
     sessionCount: 0,
     dedupKeys: [],
     systemId: "fantastic-realms",
     setting: "crossroads",
-  } as SystemState; // systemId arrives with the engine slice (structs.ts).
+  };
 
   const adventure: Partial<Adventure> = {
     title: "Wolfwillow Crossing",

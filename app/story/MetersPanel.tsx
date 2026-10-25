@@ -217,9 +217,9 @@ export default function MetersPanel({
   ]) {
     if (!owners.includes(o)) owners.push(o);
   }
-  // A hero with feats but no meters yet still gets a column, under their key.
-  for (const [key] of featHeroes) {
-    if (!owners.some((o) => normalizeKey(o) === key)) owners.push(key);
+  // A hero with feats but no meters yet still gets a column, under their name.
+  for (const [key, hero] of featHeroes) {
+    if (!owners.some((o) => normalizeKey(o) === key)) owners.push(hero.name ?? key);
   }
 
   return (

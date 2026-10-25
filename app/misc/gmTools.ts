@@ -623,6 +623,8 @@ export interface FeatRollParams {
 
 export interface InitiativeRollParams {
   heroes: { hero: string; edge_feats?: string[] }[];
+  /** Manual dice mode only: the d6 each hero reported, in the order of `heroes`. */
+  dice?: number[];
 }
 
 export interface AwardXpParams {
@@ -2040,6 +2042,11 @@ const initiativeRollTool: ToolSchema = {
             },
             required: ["hero"],
           },
+        },
+        dice: {
+          type: "array",
+          items: { type: "integer" },
+          description: "Manual dice mode only: each hero's reported d6, in order.",
         },
       },
       required: ["heroes"],

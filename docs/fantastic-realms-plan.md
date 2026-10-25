@@ -298,3 +298,9 @@ original, with no names or text from the inspirations (decision 3).
 - **`formatHeroFeatsState`** is joined onto the meters section of the live block rather than getting its own `LiveBlockInput` field.
 - **`MetersPanel`** takes a `heroFeats` prop, passed by `lore.tsx`.
 
+### 2026-10-25, slice 6 (this session)
+
+- **The starter copies every realm.** The content brief had it copy Larkenfell only and leave Aurelane and Gloamreach to the loader. The browser check showed they never arrive: `seedBuiltinNotesOffered` marks every note a starter's story would be given as already offered. `buildWolfwillowCrossing` now copies the whole world pack, and the content test checks all three realms.
+- **The engine tests swap their stand-in system into the registered one's slot** for the run and put the real one back, since the stand-in's meters and rests are what they assert.
+- **The `engine-review` agent's findings, all fixed:** `take_rest` now matches a realm loosely (the notes write "Aurelane", the rests are keyed "aurelane") and only on the map's own keys; **`end_session` joins Fantastic Realms' tools** (its reminder, the session count and `once_per: "session"` meter limits all run through it; the tool budget still holds) and the core says to call it; a `feat_roll` miss is no longer logged as a failed tool (`OUTCOME_BEARING_TOOL_NAMES`); `initiative_roll` takes reported faces in manual dice mode; the Designer's draft carries `systemState.systemId` both ways and through the tools switch; the Meters panel heads a feats-only hero by name.
+

@@ -54,13 +54,7 @@ export const FANTASTIC_REALMS_CROSSROADS_PACK: BuiltinPack = {
   notes: FANTASTIC_REALMS_WORLD_NOTES,
 };
 
-/**
- * The fields below `tools` do not exist on BuiltinSystem in this branch yet
- * (the systems plumbing slice adds `tools`, `coreNoteId`, `defaultSetting`,
- * `crossSettingScope`, `stepHints` and `rests`). The type assertion lets this
- * object compile now; remove it once types.ts has them.
- */
-export const FANTASTIC_REALMS = {
+export const FANTASTIC_REALMS: BuiltinSystem = {
   id: FANTASTIC_REALMS_ID,
   title: "Fantastic Realms",
   description:
@@ -85,10 +79,13 @@ export const FANTASTIC_REALMS = {
     "initiative_roll",
     "award_xp",
     "take_rest",
+    // The session count, the "once per session" meter limits and the reminder
+    // above all run through end_session.
+    "end_session",
   ],
   coreNoteId: FANTASTIC_REALMS_CORE_ID,
   defaultSetting: CROSSROADS_SCOPE,
   crossSettingScope: CROSSROADS_SCOPE,
   stepHints: { history: FANTASTIC_REALMS_HISTORY_HINT },
   rests: FANTASTIC_REALMS_RESTS,
-} as BuiltinSystem;
+};

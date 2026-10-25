@@ -50,7 +50,7 @@ Each hero has meters: Hearts (3 to start), Level and XP.
 - At 0 hearts a foe is beaten, or flees or yields if its nature allows. After the first round, go back to ordinary turn-taking and move the spotlight.
 
 ## 7. Rests
-One kind of rest, and the realm sets the condition. Aurelane: a few hours. Larkenfell: a night by a fire with a full meal. Gloamreach: weeks somewhere safe. When the fiction allows it, call take_rest with realm (and heroes, if not everyone present). It heals every heart and un-burns every feat for each hero who takes part, and it returns the realm's condition as a reminder. Whether the fiction allows the rest is your call. Hearts do not come back any other way.
+One kind of rest, and the realm sets the condition. Aurelane: a few hours. Larkenfell: a night by a fire with a full meal. Gloamreach: weeks somewhere safe. When the fiction allows it, call take_rest with realm (and heroes, if not everyone present). It heals every heart and un-burns every feat for each hero who takes part, and it returns the realm's condition as a reminder. Whether the fiction allows the rest is your call. Hearts do not come back any other way. When a session ends, call end_session.
 
 ## 8. XP and levels
 Call award_xp with amount and source (a short name: "Goblin ambush", "Barrow silver"). Every hero present gets the full amount, no splitting. A source a hero already had is refused, so a foe or a treasure is never counted twice. Amounts: a foe beaten is the XP printed on its stat line (DC x 50 for a mook, x 200 for a champion, x 1,000 for a legend); a treasure its printed XP, roughly its worth in gold; a finished quest 500 to 2,000.

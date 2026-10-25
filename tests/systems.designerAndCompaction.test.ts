@@ -4,6 +4,7 @@ import {
   createEmptyDraft,
   draftToAdventure,
   summarizeDraft,
+  withSystemToolsSwitch,
 } from "@/app/misc/designer_executor";
 import {
   buildDesignerMessages,
@@ -22,6 +23,19 @@ describe("the Designer and systems", () => {
     expect(adventureToDraft(adventure).systemState).toEqual({ usesSystemTools: true });
     const off = draftToAdventure({ ...draft, systemState: { usesSystemTools: false } });
     expect(adventureToDraft(off).systemState?.usesSystemTools).toBe(false);
+  });
+
+  // Engine review finding 5: a copy opened in the Designer keeps the system it
+  // was made for, even if it later imports another system's notes.
+  it("round-trips the recorded system through a draft and the tools switch", () => {
+    const draft = adventureToDraft({
+      title: "Wolfwillow",
+      storyTemplate: { systemState: { systemId: "fantastic-realms", setting: "crossroads", sessionCount: 0, dedupKeys: [] } },
+    } as never);
+    expect(draft.systemState?.systemId).toBe("fantastic-realms");
+    expect(draftToAdventure(draft).storyTemplate?.systemState?.systemId).toBe("fantastic-realms");
+    expect(withSystemToolsSwitch(draft.systemState, true)?.systemId).toBe("fantastic-realms");
+    expect(withSystemToolsSwitch(draft.systemState, undefined)?.systemId).toBe("fantastic-realms");
   });
 
   it("leaves systemState out when it was never set", () => {

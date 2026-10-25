@@ -48,11 +48,22 @@ const FR: BuiltinSystem = {
   rests: { meadow: "A few hours.", marsh: "Weeks, somewhere safe." },
 };
 
+// The stand-in takes the registered system's place for these tests (its own
+// meters and rests are what they assert), and the real one comes back after.
+let registered: BuiltinSystem | undefined;
+let slot = -1;
 beforeAll(() => {
-  BUILTIN_SYSTEMS.push(FR);
+  slot = BUILTIN_SYSTEMS.findIndex((s) => s.id === FR.id);
+  if (slot >= 0) {
+    registered = BUILTIN_SYSTEMS[slot];
+    BUILTIN_SYSTEMS[slot] = FR;
+  } else {
+    BUILTIN_SYSTEMS.push(FR);
+  }
 });
 afterAll(() => {
-  BUILTIN_SYSTEMS.splice(BUILTIN_SYSTEMS.indexOf(FR), 1);
+  if (registered) BUILTIN_SYSTEMS[slot] = registered;
+  else BUILTIN_SYSTEMS.splice(BUILTIN_SYSTEMS.indexOf(FR), 1);
 });
 
 function frStory(overrides: Partial<StoryData> = {}): StoryData {
@@ -298,6 +309,19 @@ describe("feat_roll", () => {
 });
 
 describe("initiative_roll", () => {
+  // Engine review finding 4: in manual dice mode the player reports the faces.
+  it("takes the reported faces in manual mode, one per hero, and checks them", async () => {
+    const s = await brynStory();
+    const out = await run(s, "initiative_roll", {
+      heroes: [{ hero: "Bryn", edge_feats: ["Quick"] }],
+      dice: [5],
+    });
+    expect(out.result.success).toBe(true);
+    expect(out.result.contextForStory).toContain("Bryn 6");
+    expect((await run(s, "initiative_roll", { heroes: [{ hero: "Bryn" }], dice: [7] })).result.success).toBe(false);
+    expect((await run(s, "initiative_roll", { heroes: [{ hero: "Bryn" }], dice: [3, 4] })).result.success).toBe(false);
+  });
+
   it("rolls one d6 per hero, plus one per edge feat", async () => {
     vi.spyOn(Math, "random").mockReturnValueOnce(0.5).mockReturnValueOnce(0.2); // 4, then 2
     const s = await brynStory(frStory());
@@ -391,6 +415,16 @@ describe("take_rest", () => {
     expect(out.story.systemState!.fantasticRealms!.realm).toBe("marsh");
     expect((out.result.result as GMTakeRestResult).condition).toBe("Weeks, somewhere safe.");
     expect(out.result.contextForStory).toContain("Weeks, somewhere safe.");
+  });
+
+  // Engine review finding 1: the notes write realms capitalised.
+  it("matches a realm however it is capitalised, and only the map's own names", async () => {
+    const s = await brynStory();
+    const out = await run(s, "take_rest", { realm: "Marsh" });
+    expect(out.result.success).toBe(true);
+    expect(out.story.systemState!.fantasticRealms!.realm).toBe("marsh");
+    expect(out.result.contextForStory).toContain("Weeks, somewhere safe.");
+    expect((await run(s, "take_rest", { realm: "constructor" })).result.success).toBe(false);
   });
 
   it("refuses an unknown realm and says when none is recorded", async () => {
