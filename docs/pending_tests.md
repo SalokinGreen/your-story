@@ -10,6 +10,29 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Session zero hands back; the output-cap retry (decisions 195–196)
+
+Covered by the suite against scripted rounds; not played against a real model
+(that spends the author's key):
+
+- **A quick Blood & Bone setup on the APK or desktop, defaults untouched**
+  (Response Length 8,000, Advanced on Claude Sonnet 5.5). Pick Quick setup,
+  answer the setting/tone/kind question. Expected: the same turn goes on to
+  write the sheet, or ends on a line such as "Next up: your character sheet.
+  Anything you want me to know before I write it? Or just say go on." - never
+  "(Let's finish setting up first: …)". If the Debug Logs show "GM stage round
+  N finish diagnostic" with `truncatedAtCap: true`, the next line should be
+  "GM stage round cut off at the output cap with nothing usable - asking again
+  at a higher cap", and the following round's `maxTokensCap` should be 16,000.
+  Failure looks like: two `truncatedAtCap: true` rounds in a row both at
+  8,000, or the hand-back line on every setup turn with the sheet never
+  written (then the cap is not the cause: send the Debug Logs). **The
+  unverified premise:** Claude is sent only `reasoning.effort`, and if
+  OpenRouter turns `xhigh` into a fixed share of `max_tokens`, doubling the cap
+  doubles the thinking too, and the retry round is cut off again (a second
+  `truncatedAtCap: true` at 16,000). Then the fix is a lower setup effort or a
+  larger Response Length, not this retry.
+
 ## 2026-10-24 — Feedback in the app (decisions 190–194)
 
 Run locally against `wrangler dev` with a local D1, from the web preview and a

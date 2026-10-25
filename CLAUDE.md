@@ -1014,8 +1014,19 @@ tool, with `tool_choice: "required"` unless the model rejects a forced choice
 (Qwen 3.8, `gmModelRejectsForcedToolChoice`). Claude and Z.ai are downgraded to
 `auto` in `providerCall.ts`, so for them the message is the only forcing.
 - **No fail-open.** After 2 re-prompts the turn ends on
-  `setupEngineLine(next)`, "(Let's finish setting up first: next is …)", with
-  no narration. The round-limit path has the same guard.
+  `setupEngineLine(next)`, with no narration. Since decision 195 that line
+  hands the floor back: "Next up: your character sheet. Anything you want me
+  to know before I write it? Or just say go on." The round-limit path has the
+  same guard.
+- **A round cut off at the output cap** (finish reason `length`) with no words
+  and no finished tool call is asked again once per turn at double the cap,
+  which then holds for the turn (`roundCutOffEmpty`, decision 196). It is not
+  a gate prompt and not a round. It applies on every turn, not only setup:
+  Claude's thinking counts against `max_tokens`, so at `xhigh` it could spend
+  the whole Response Length before writing the sheet. The two caps are
+  compared as sent (`sentMaxTokens`, after the 4,096 thinking floor), so no
+  twin request is paid for; the input budget still reserves only the 1x cap,
+  and the `claude` CLI path reports no finish reason, so it never retries.
 - **No narration stage** while session zero is on and `start_game` has not
   succeeded. The turn's text is the GM's own prose, or the engine line when
   the gate gave up or the text is empty.
@@ -1465,7 +1476,8 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 210 files and 3,410 tests (2026-10-24, after feedback;
+- `tests/` — Vitest, 211 files and 3,418 tests (2026-10-25, after feedback
+  and the session-zero hand-back; earlier 210 files and 3,410 after feedback;
   the counts were run). Earlier: 203 files and 3,228 tests (after the judge
   layer), 195 files and 3,032 tests (after Blood &
   Bone E1), 193 files and 3,000 tests (2026-10-24, after session

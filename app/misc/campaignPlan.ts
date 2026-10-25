@@ -430,14 +430,21 @@ export function getSetupProgress(
 /** How many times the setup gate re-prompts one turn before ending it. */
 export const MAX_SETUP_PROMPTS = 2;
 
-/** What the player reads for a step, in the engine line. */
-const SETUP_STEP_LABEL: Record<SetupStep, string> = {
-  concept: "a few questions about the game",
-  interview: "the next setup question",
-  character: "the character sheet",
-  campaign: "the campaign plan",
-  confirm: "your OK on the setup card",
-  start_game: "starting the game",
+/**
+ * What the player reads for a step, in the engine line: the step, and an
+ * invitation to say something about it first (decision 195).
+ */
+const SETUP_STEP_HANDBACK: Record<SetupStep, string> = {
+  concept:
+    "Next up: a few questions about the game. Anything you want to tell me first?",
+  interview:
+    "Next up: the next setup question. Anything you want to tell me first?",
+  character:
+    "Next up: your character sheet. Anything you want me to know before I write it?",
+  campaign:
+    "Next up: the campaign plan. Anything you'd like in it before I write it?",
+  confirm: "Next up: the setup card, for your OK. Anything to change first?",
+  start_game: "Everything's set.",
 };
 
 /**
@@ -481,16 +488,23 @@ export function setupGateMessage(
  */
 export const SETUP_CARD_HANDED_BACK_LINE = "(What would you like to change?)";
 
-/** The line a session-zero turn ends with when the gate's prompts ran out. */
+/**
+ * The line a session-zero turn ends with when the GM had nothing valid to
+ * say: the gate's prompts ran out, the round limit hit, or the text was
+ * empty. It hands the floor back with the next step named, so any reply,
+ * "go on" included, starts the next turn of setup (decision 195).
+ */
 export function setupEngineLine(
   next: SetupStep | null,
   creation?: CreationProgress,
 ): string {
   const m = next === "interview" ? creation?.missing[0] : undefined;
-  const what = m
-    ? describeMissing(m)
+  const line = m
+    ? `Next up: ${describeMissing(m)}. Anything you want to tell me first?`
     : next
-      ? SETUP_STEP_LABEL[next]
-      : "the setup";
-  return `(Let's finish setting up first: next is ${what}.)`;
+      ? SETUP_STEP_HANDBACK[next]
+      : "Let's finish setting up.";
+  return next === "start_game"
+    ? `${line} Say go on and we'll start.`
+    : `${line} Or just say go on.`;
 }

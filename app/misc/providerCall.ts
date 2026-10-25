@@ -382,6 +382,19 @@ function reasoningCannotBeTurnedOff(
 const ALWAYS_THINKING_MIN_MAX_TOKENS = 4096;
 
 /**
+ * The max_tokens a request for `modelKey` actually goes out with: `maxTokens`,
+ * raised to ALWAYS_THINKING_MIN_MAX_TOKENS where that floor applies. The GM
+ * loop compares these, not the raw caps, before asking a cut-off round again
+ * (decision 196), so a raise the floor swallows is not paid for twice.
+ */
+export function sentMaxTokens(modelKey: string, maxTokens: number): number {
+  const config = getModelConfig(modelKey);
+  return reasoningCannotBeTurnedOff(config, config.provider as Provider)
+    ? Math.max(maxTokens, ALWAYS_THINKING_MIN_MAX_TOKENS)
+    : maxTokens;
+}
+
+/**
  * Z.ai's general chat-completions endpoint - the only Z.ai URL this app
  * calls. The Coding Plan's endpoints (`/api/coding/paas/v4`, `/api/anthropic`)
  * are for Z.ai's supported coding tools only (decision 18), and the desktop

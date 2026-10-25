@@ -186,7 +186,7 @@ describe("a setup turn shows only its latest words", () => {
 
     // Round 1 asks; rounds 2-4 are empty: two re-prompts, then the engine line.
     expect(gmStageCalls()).toHaveLength(4);
-    expect(result.content).toBe("(Let's finish setting up first: next is Tone.)");
+    expect(result.content).toBe("Next up: Tone. Anything you want to tell me first? Or just say go on.");
     expect(result.content).not.toContain("Step one");
     expect(rec.storyComplete).toEqual([result.content]);
     expect(s.sessionZeroActive).toBe(true);
@@ -427,7 +427,7 @@ describe("a Retry in session zero", () => {
       cb,
     );
 
-    expect(result.content).toBe("(Let's finish setting up first: next is Setting.)");
+    expect(result.content).toBe("Next up: Setting. Anything you want to tell me first? Or just say go on.");
   });
 
   it("a conversation that started the game through the card is narrated, not held", async () => {

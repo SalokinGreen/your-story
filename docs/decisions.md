@@ -360,3 +360,12 @@ The author asked for image generation in play, through fal.ai, with an image too
 | 192 | "Where should players be able to give feedback?" | **All four:** on a turn, on a system or starter, in the menu / Settings, and after a session. |
 | 193 | "How do you want to read it?" | **"A private page (Recommended)."** Behind a secret the author keeps. |
 | 194 | The revised feedback design (`docs/feedback-design.md`, after Codex's review) moved storage from the Worker's KV to Cloudflare D1, cut the contact field and made the turn attachment an allowlist the player previews. | **"Build it."** The revised design is approved as written, D1 included; it revises decision 190's "in its KV". |
+
+### Session zero stopping between steps (2026-10-25)
+
+The author, with a screenshot and the GM context of a quick Blood & Bone setup: "It just keeps stopping after every set up step. It should go on or ask the player something like 'Now it's time for your character, anything you want to tell me before?'" The context showed each setup turn doing real work (questions, notes read, creation prompts rolled), then a round with no words and no tool call, twice re-prompted, ending on "(Let's finish setting up first: next is the character sheet.)"; a later round's `create_note` for the plan was cut off at the token limit.
+
+| # | question | decision |
+|---|---|---|
+| 195 | "When the GM goes quiet between setup steps, what should the player see instead of the dead-end '(Let's finish setting up first…)' line?" | **"A hand-back question (Recommended)."** The engine line names the next step and gives the floor back: "Next up: your character sheet. Anything you want me to know before I write it? Or just say go on." Any reply continues setup. Rejected: re-prompting until the step is done; both. |
+| 196 | "How should a round cut off at the output limit (nothing left to write) be handled?" | **"Retry with a bigger cap (Recommended)."** A GM round with finish reason `length`, no visible words and no tool call whose arguments finished is asked again once per turn at double the cap (up to the model's maximum), which then holds for the rest of the turn. It does not count against the setup gate's re-prompts or the round limit, and applies to every turn. Rejected: a bigger cap in session zero only; lower effort in session zero. |
