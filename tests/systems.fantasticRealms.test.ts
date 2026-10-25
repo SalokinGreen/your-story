@@ -65,7 +65,7 @@ describe("Fantastic Realms content", () => {
 
   it("makes every table pass the shape check", () => {
     const tables = allNotes.filter((n) => n.type === "table");
-    expect(tables.length).toBe(4);
+    expect(tables.length).toBe(7);
     for (const t of tables) expect(checkTableShape(t.title, t.content), t.title).toEqual([]);
   });
 
@@ -73,8 +73,7 @@ describe("Fantastic Realms content", () => {
     expect(REALM_NOTES.length).toBe(3);
     for (const note of REALM_NOTES) {
       const lines = note.content.split("\n").filter((l) => l.startsWith("**") && l.includes(" — DC "));
-      expect(lines.length, note.title).toBeGreaterThanOrEqual(6);
-      expect(lines.length, note.title).toBeLessThanOrEqual(8);
+      expect(lines.length, note.title).toBe(12);
       for (const l of lines) {
         const m = FOE_LINE.exec(l);
         expect(m, l).not.toBeNull();

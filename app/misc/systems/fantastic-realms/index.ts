@@ -28,7 +28,7 @@ import {
 } from "./sheet";
 import { buildWolfwillowCrossing } from "./starters/wolfwillow-crossing";
 import { CROSSROADS_NOTE, CROSSROADS_SCOPE } from "./world/crossroads";
-import { FANTASTIC_REALMS_RESTS, REALM_NOTES } from "./world/realms";
+import { FANTASTIC_REALMS_RESTS, REALM_NOTES, REALM_TABLE_NOTES } from "./world/realms";
 import { TABLE_NOTES } from "./world/tables";
 
 export const FANTASTIC_REALMS_ID = "fantastic-realms";
@@ -52,6 +52,7 @@ export const FANTASTIC_REALMS_RULES_NOTES: BuiltinNote[] = [
 export const FANTASTIC_REALMS_WORLD_NOTES: BuiltinNote[] = [
   CROSSROADS_NOTE,
   ...REALM_NOTES,
+  ...REALM_TABLE_NOTES,
   ...TABLE_NOTES,
 ];
 
@@ -69,7 +70,7 @@ export const FANTASTIC_REALMS_CROSSROADS_PACK: BuiltinPack = {
   systemId: FANTASTIC_REALMS_ID,
   title: "Fantastic Realms — The Crossroads",
   description:
-    "A world of realms with different rules, meeting at the Waymeet: bright Aurelane, folk Larkenfell and grim Gloamreach, with their people, places, troubles and foes, and tables for names, foes, treasure and the road.",
+    "A world of realms with different rules, meeting at the Waymeet: bright Aurelane, folk Larkenfell and grim Gloamreach, with their people, places, troubles, local magic and callings, twelve foes each, and tables for miscasts, names, foes, treasure and the road.",
   notes: FANTASTIC_REALMS_WORLD_NOTES,
 };
 
