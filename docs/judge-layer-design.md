@@ -1,5 +1,18 @@
 # The judge layer: flag only, and the bugs under it
 
+> **Update 2026-10-25 (decisions 220–221).** The flag-only defaults of §2 were
+> revised: every judge is on, the three prose judges rewrite, settings version
+> 3. A rewrite never replaces text the player has seen: while a judge may
+> rewrite, the turn is **held** (`holdLiveText`, `heldTurnOutput.ts`) and
+> released once after the judging, with the phases "Writing…", "Checking the
+> turn…" and "Revising…" on the work line. The background wave no longer
+> rewrites, so §3.1's rewrite patch (`applyBackgroundRewrite`) is gone; flags,
+> memory, director and progress deltas still land by id. **Known gap:**
+> `player_agency` has no free pre-signal, so `plausibleResetFlagTypes` never
+> lists it; it is judged in the background wave and is therefore flagged, not
+> rewritten. Making it plausible would put a judge call in front of every
+> turn; that call is the author's.
+
 Status: **approved (decision 189) and built on 2026-10-24; see "Decisions made
 during implementation" at the bottom.** Decisions 187–188. Source: Codex's review of the judge layer
 (`docs/research/codex-judge-layer-review-2026-10-24.md`), after the author's

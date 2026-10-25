@@ -1,7 +1,7 @@
 // How a late result from a turn's background wave lands on the story
 // (judge-layer design 3.1, Codex review finding 1).
 //
-// The background wave (the Observer's rewrite and flags, the Memory Keeper, the
+// The background wave (the Observer's flags, the Memory Keeper, the
 // Director Assistant, the Story Progress Observer) finishes after the player
 // has the turn, and often after the next one has started. It used to write
 // into the StoryData object it captured and hand the page that whole object to
@@ -18,15 +18,9 @@
 // Nothing here ever saves, or returns, a captured whole-story object.
 
 import { hashNotes } from "./campaignPlan";
-import {
-  reconcileGmConversationAfterRewrite,
-  reconcileGmThinkingAfterRewrite,
-} from "./observer";
 import type {
-  Choice,
   MemoryEntry,
   ObserverFlag,
-  ObserverRewriteOriginal,
   ScenePart,
   StoryData,
 } from "./structs";
@@ -57,88 +51,6 @@ export function valueChanged(snapshot: string, current: unknown): boolean {
 
 function isGmPart(part: ScenePart | undefined): part is ScenePart {
   return Boolean(part && !part.user && part.role === "assistant");
-}
-
-// ---- A rewrite the player did not wait for ---------------------------------
-
-export interface BackgroundRewritePatch {
-  /** The part the judge read. */
-  partId: string;
-  /** hashNarration of the content the judge read; the rewrite lands only on that text. */
-  expectedHash: string;
-  narration: string;
-  flag: ObserverFlag;
-  /** Every flag the background pass found, the rewritten one included (for the log and the toast). */
-  allFlags: ObserverFlag[];
-  /** The flags that stay on the turn once the rewritten one is taken out. */
-  survivingFlags: ObserverFlag[];
-  original: ObserverRewriteOriginal;
-  /** Choices re-derived from the new text; applied only while the part is still the newest. */
-  choices?: Choice[];
-}
-
-/**
- * Where the patch would land in `story`: "newest" (the latest part, so the
- * screen's current narration and choices follow it), "older" (an earlier turn),
- * or null (the part is gone or no longer holds the text the judge read).
- */
-export function backgroundRewriteTarget(
-  story: Pick<StoryData, "scene">,
-  patch: Pick<BackgroundRewritePatch, "partId" | "expectedHash">,
-): "newest" | "older" | null {
-  const parts = story.scene?.parts ?? [];
-  const index = findPartIndexById(story, patch.partId);
-  if (index < 0) return null;
-  const part = parts[index];
-  if (!isGmPart(part)) return null;
-  if (hashNarration(part.content) !== patch.expectedHash) return null;
-  return index === parts.length - 1 ? "newest" : "older";
-}
-
-/**
- * The story with the rewrite applied to its part, or the same object when the
- * patch no longer fits (the turn was undone, edited, or retried since).
- */
-export function applyBackgroundRewrite(
-  story: StoryData,
-  patch: BackgroundRewritePatch,
-): StoryData {
-  const target = backgroundRewriteTarget(story, patch);
-  if (!target) return story;
-  const index = findPartIndexById(story, patch.partId);
-  const part = story.scene.parts[index];
-  const rewritten: ScenePart = {
-    ...part,
-    content: patch.narration,
-    // Same history reconciliation the blocking path does, so the next turn
-    // replays the corrected prose plus why it was corrected, not the draft the
-    // observer rejected.
-    gmConversation: reconcileGmConversationAfterRewrite(
-      part.gmConversation,
-      patch.narration,
-      patch.flag,
-    ),
-    gmThinking: reconcileGmThinkingAfterRewrite(
-      part.gmThinking,
-      patch.narration,
-      patch.flag,
-    ),
-    // Choices belong to the turn the player is looking at. Re-derived choices
-    // for an earlier turn would swap out options for a turn already answered.
-    ...(target === "newest" && patch.choices && { choices: patch.choices }),
-    correctedObserverFlags: [patch.flag],
-    observerRewriteOriginal: patch.original,
-    observerFlags: patch.survivingFlags.length
-      ? patch.survivingFlags
-      : undefined,
-  };
-  return {
-    ...story,
-    scene: {
-      ...story.scene,
-      parts: story.scene.parts.map((p, i) => (i === index ? rewritten : p)),
-    },
-  };
 }
 
 // ---- Flags the background pass could not fix --------------------------------

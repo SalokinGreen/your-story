@@ -10,6 +10,29 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Judges on, turns held (decisions 220–221)
+
+Built and unit-tested (the held turn's callbacks, the phases, the rewrite
+released once, the Stop); not played on the APK or against a real model:
+
+- **A turn appears only after it is checked.** On the Android app, play a
+  turn with the default Observer settings. Expected: the work line reads
+  "Writing…" (or "Thinking…" while a thought streams), then "Checking the
+  turn…", and the turn's text appears all at once; nothing streams in word by
+  word and read-aloud starts only when it appears. Failure looks like: prose
+  streaming in before "Checking the turn…", or text that changes after it was
+  shown.
+- **A long turn comes back shortened.** Set Response Length to short and play
+  until a turn runs well over the ceiling. Expected: "Revising…" shows, the
+  shortened text appears, the turn's actions offer "Undo revision", and Undo
+  puts the long first draft back. Failure looks like: the long text shown
+  first, or no Undo revision.
+- **Flag-only judges still stream.** In Settings, set every judge to Flag.
+  Expected: the next turn streams live as before, with no "Checking the turn…".
+- **The agency judge flags, but does not rewrite.** `player_agency` is judged in
+  the background wave, which no longer rewrites, so a turn that speaks for the
+  player gets a flag in its details and a toast, not a revision.
+
 ## 2026-10-25 — Starters welcome you in (decisions 197–200)
 
 Seen in the browser preview (the welcome first, the opening not shown); not

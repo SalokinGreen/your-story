@@ -43,7 +43,10 @@ import {
   OutcomeTier,
   OutcomeVerdict,
 } from "../app/misc/observer";
-import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import {
+  LEGACY_OBSERVER_SETTINGS,
+  FLAG_ONLY_OBSERVER_SETTINGS,
+} from "./helpers/observerSettings";
 import type {
   ObserverFlag,
   GMConversationMessage,
@@ -2311,35 +2314,39 @@ describe("reconcileGmThinkingAfterRewrite", () => {
 });
 
 describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
-  it("is flag only by default: nothing rewrites or rerolls on its own (decision 187)", () => {
-    // No check is allowed to correct a turn.
+  it("has every judge on; the three prose judges rewrite, the rest flag (decision 220)", () => {
     for (const type of Object.keys(DEFAULT_OBSERVER_SETTINGS) as Array<
       keyof typeof DEFAULT_OBSERVER_SETTINGS
     >) {
-      expect(DEFAULT_OBSERVER_SETTINGS[type].triggersReset).toBe(false);
+      expect(DEFAULT_OBSERVER_SETTINGS[type].enabled).toBe(true);
     }
-    // Only the outcome judge is on, at sensitivity 2.
-    expect(DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch).toEqual({
+    expect(DEFAULT_OBSERVER_SETTINGS.response_length).toEqual({
       enabled: true,
-      triggersReset: false,
-      sensitivity: 2,
+      triggersReset: true,
+      sensitivity: 5,
     });
     expect(DEFAULT_OBSERVER_SETTINGS.player_agency).toEqual({
-      enabled: false,
-      triggersReset: false,
+      enabled: true,
+      triggersReset: true,
       sensitivity: 3,
     });
+    expect(DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch).toEqual({
+      enabled: true,
+      triggersReset: true,
+      sensitivity: 2,
+    });
     for (const type of [
-      "response_length",
       "missing_oracle_or_table",
       "missing_scene_increment",
       "tier_escalation_missed",
     ] as const) {
-      expect(DEFAULT_OBSERVER_SETTINGS[type].enabled).toBe(false);
+      expect(DEFAULT_OBSERVER_SETTINGS[type].triggersReset).toBe(false);
       expect(DEFAULT_OBSERVER_SETTINGS[type].sensitivity).toBe(5);
     }
-    // ...so by default no turn ever waits on a judge that could change it.
-    expect(canObserverTriggerReset(undefined)).toBe(false);
+    // ...so a turn can wait on a judge that may rewrite it.
+    expect(canObserverTriggerReset(undefined)).toBe(true);
+    // The decision 187 table is still reachable, and cannot rewrite.
+    expect(canObserverTriggerReset(FLAG_ONLY_OBSERVER_SETTINGS)).toBe(false);
   });
 
   it("is frozen, and settingsFor hands out copies so no caller can change it", () => {
@@ -2347,15 +2354,15 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
     expect(Object.isFrozen(DEFAULT_OBSERVER_SETTINGS.player_agency)).toBe(true);
 
     const copy = settingsFor(undefined, "player_agency");
-    copy.enabled = true;
+    copy.enabled = false;
     copy.sensitivity = 9;
-    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.enabled).toBe(false);
+    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.enabled).toBe(true);
     expect(DEFAULT_OBSERVER_SETTINGS.player_agency.sensitivity).toBe(3);
-    expect(settingsFor(undefined, "player_agency").enabled).toBe(false);
+    expect(settingsFor(undefined, "player_agency").enabled).toBe(true);
 
     const fresh = cloneDefaultObserverSettings();
-    fresh.response_length.enabled = true;
-    expect(DEFAULT_OBSERVER_SETTINGS.response_length.enabled).toBe(false);
+    fresh.response_length.enabled = false;
+    expect(DEFAULT_OBSERVER_SETTINGS.response_length.enabled).toBe(true);
   });
 
   it("falls back to defaults when no settings object is provided", () => {
@@ -2366,19 +2373,19 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
 
   it("merges a partial override with that type's defaults", () => {
     const merged = settingsFor(
-      { player_agency: { enabled: true } } as any,
+      { player_agency: { enabled: false } } as any,
       "player_agency",
     );
-    expect(merged.enabled).toBe(true);
+    expect(merged.enabled).toBe(false);
     // Fields the override didn't specify still fall back to the default.
-    expect(merged.triggersReset).toBe(false);
+    expect(merged.triggersReset).toBe(true);
     expect(merged.sensitivity).toBe(3);
   });
 
   it("does not let an override for one type leak into another", () => {
-    const settings = { response_length: { enabled: true } } as any;
-    expect(settingsFor(settings, "response_length").enabled).toBe(true);
-    expect(settingsFor(settings, "player_agency").enabled).toBe(false);
+    const settings = { response_length: { enabled: false } } as any;
+    expect(settingsFor(settings, "response_length").enabled).toBe(false);
+    expect(settingsFor(settings, "player_agency").enabled).toBe(true);
     expect(settingsFor(settings, "outcome_narration_mismatch").enabled).toBe(true);
   });
 
@@ -2386,6 +2393,9 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
     const stored = {
       missing_oracle_or_table: { enabled: true, triggersReset: true, sensitivity: 9 },
       missing_scene_increment: { enabled: true, triggersReset: true, sensitivity: 9 },
+      response_length: { enabled: false },
+      player_agency: { enabled: false },
+      outcome_narration_mismatch: { enabled: false },
     } as any;
     for (const type of ["missing_oracle_or_table", "missing_scene_increment"] as const) {
       expect(FLAG_ONLY_FLAG_TYPES.has(type)).toBe(true);
@@ -2404,13 +2414,18 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
   });
 
   it("counts the calls the enabled judges can add, for the cost line", () => {
-    // Defaults: the outcome judge only, and only on a turn with a ruling.
+    // Defaults: every judge on and the prose judges rewrite.
     expect(countJudgeCalls(cloneDefaultObserverSettings())).toEqual({
+      always: 3,
+      sometimes: 2,
+      rewrites: true,
+    });
+    // The flag-only table: the outcome judge only, and only on a turn with a ruling.
+    expect(countJudgeCalls(FLAG_ONLY_OBSERVER_SETTINGS)).toEqual({
       always: 0,
       sometimes: 1,
       rewrites: false,
     });
-    // Every judge on: the oracle and scene judges share one call.
     expect(countJudgeCalls(LEGACY_OBSERVER_SETTINGS)).toEqual({
       always: 3,
       sometimes: 2,
@@ -2419,7 +2434,7 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
   });
 });
 
-describe("runObserver with the default settings", () => {
+describe("runObserver with the flag-only settings (decision 187's table)", () => {
   const originalFetch = global.fetch;
 
   afterEach(() => {
@@ -2432,6 +2447,7 @@ describe("runObserver with the default settings", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const flags = await runObserver({
+      settings: FLAG_ONLY_OBSERVER_SETTINGS,
       narration: Array(400).fill("word").join(" "),
       playerChoice: "I draw my sword",
       replyLength: "medium",
@@ -2454,6 +2470,7 @@ describe("runObserver with the default settings", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const flags = await runObserver({
+      settings: FLAG_ONLY_OBSERVER_SETTINGS,
       narration: "You clear the gap cleanly.",
       playerChoice: "I jump",
       rollResults: [verdict("action_roll", "miss", "MISS")],
@@ -2463,10 +2480,12 @@ describe("runObserver with the default settings", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(flags.map((f) => f.type)).toEqual(["outcome_narration_mismatch"]);
-    // Flag only: never reset-eligible under the defaults.
+    // Flag only: never reset-eligible under this table.
     expect(
       flags.some(
-        (f) => f.severity === "major" && settingsFor(undefined, f.type).triggersReset,
+        (f) =>
+          f.severity === "major" &&
+          settingsFor(FLAG_ONLY_OBSERVER_SETTINGS, f.type).triggersReset,
       ),
     ).toBe(false);
   });
@@ -2474,6 +2493,7 @@ describe("runObserver with the default settings", () => {
   it("is not plausible-to-reset on any turn, so the player never waits on a judge", () => {
     expect(
       plausibleResetFlagTypes({
+        settings: FLAG_ONLY_OBSERVER_SETTINGS,
         narration: Array(400).fill("word").join(" "),
         rollResults: [verdict("action_roll", "miss", "MISS")],
         tierUsed: 0,

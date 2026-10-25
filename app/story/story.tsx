@@ -40,13 +40,10 @@ import {
   GMTurn,
   PlayerLine,
   TurnActions,
+  TURN_PHASE_LABELS,
   type ReasoningTierDisplay,
+  type TurnPhase,
 } from "./StoryTurn";
-import { canObserverTriggerReset } from "../misc/observer";
-import {
-  getObserverSettings,
-  LAYER_SETTINGS_CHANGED_EVENT,
-} from "../misc/layerSettings";
 import { type ResolvedTier } from "../misc/reasoningTiers";
 import { useBackHandler } from "@/app/misc/useBackHandler";
 import { PLAYER_TEXT_COLOR } from "../misc/multiplayer/palette";
@@ -153,6 +150,9 @@ interface StoryProps {
   // generation.ts:onReasoningTierResolved. Rendered as a small "T{n}" badge
   // at the end of the turn's work line, like the saved per-turn badge.
   liveReasoningTier?: ResolvedTier | null;
+  // Where a held turn is (generation.ts onTurnPhase, decision 221): shown on
+  // the live work line while the turn's text is held for the judges.
+  turnPhase?: TurnPhase | null;
   // Re-measure the page's keyboard-aware viewport height (see page.tsx) -
   // called on composer focus/blur since iOS can scroll/resize the visual
   // viewport asynchronously, after the initial resize event.
@@ -634,6 +634,7 @@ export default function Story({
   liveGMEntries,
   liveNarrationText,
   liveReasoningTier,
+  turnPhase,
   myPlayerId,
   remoteActivity,
   onLocalActivity,
@@ -682,20 +683,6 @@ export default function Story({
   });
   const [isHovering, setIsHovering] = React.useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // Whether the Observer's current settings make an automatic reset-and-
-  // retry possible at all (see observer.ts's canObserverTriggerReset) - used
-  // to warn the player, while narration is streaming, that this response
-  // isn't final yet. Re-read on the same change event ArchitectureSettingsTab
-  // fires when the player edits these settings mid-session.
-  const [observerCanReset, setObserverCanReset] = React.useState(() =>
-    canObserverTriggerReset(getObserverSettings()),
-  );
-  useEffect(() => {
-    const update = () => setObserverCanReset(canObserverTriggerReset(getObserverSettings()));
-    window.addEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
-    return () => window.removeEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
-  }, []);
 
   // Set when the Observer rewrote the latest turn and the GM's original draft
   // is still stored on the part (ScenePart.observerRewriteOriginal). On the
@@ -1366,24 +1353,11 @@ export default function Story({
                       }
                     : undefined
                 }
+                phaseLabel={turnPhase ? TURN_PHASE_LABELS[turnPhase] : undefined}
                 mentionMatcher={mentionMatcher}
                 onMentionClick={handleMentionClick}
               />
             )}
-
-            {/* Reset warning: the Observer (observer.ts) reviews narration
-                only after it finishes streaming, and can silently discard and
-                regenerate it if flagged - jarring if the player has no idea
-                that's possible. Only shown while narration is actually
-                streaming, and only when the current settings make a reset
-                possible at all. */}
-            {loadingStage === "story" &&
-              observerCanReset &&
-              !storyData.sessionZeroActive && (
-                <p className="text-xs text-ys-muted italic">
-                  Not final yet - the Observer may flag and rewrite this response. Don&apos;t get too attached.
-                </p>
-              )}
           </div>
         </div>
 

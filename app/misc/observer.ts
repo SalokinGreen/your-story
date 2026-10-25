@@ -7,12 +7,13 @@
  * warning. This module is the judge counterpart - it reviews a completed GM
  * turn for violations of rules the GM was already given.
  *
- * BY DEFAULT IT ONLY FLAGS (decision 187, docs/judge-layer-design.md). Nothing
- * here rewrites or rerolls a turn on its own: only the outcome-mismatch judge
- * is on, and its finding is a flag in the turn's details. A player can switch
- * each judge on in Settings, and the three that judge the prose
- * (REWRITABLE_FLAG_TYPES) can be allowed to rewrite it automatically - which
- * changes text the player may already have read. When that is on, a "major"
+ * EVERY JUDGE IS ON BY DEFAULT (decision 220, revising 187's flag-only
+ * defaults; docs/judge-layer-design.md). The three that judge the prose
+ * (REWRITABLE_FLAG_TYPES) rewrite a flagged turn automatically, the other three
+ * flag. A rewrite never replaces text the player has seen: generateStoryTurn
+ * holds the turn's output until the judging is done (decision 221,
+ * heldTurnOutput.ts), and the background wave only flags. Nothing rerolls a
+ * turn on its own. A "major"
  * flag can make generateStoryTurn (generation.ts) call rewriteFlaggedNarration
  * below: the GM is shown the exact narration it wrote and the specific reason
  * it was flagged, and rewrites just the prose - dice rolls/tool calls/state
@@ -30,10 +31,9 @@
  *   deterministic signals - the word count, which tier the turn used and
  *   whether the engine ruled on a check. A turn where none of them could
  *   produce a reset-eligible flag hands control straight back to the player
- *   and gets judged in generateStoryTurn's background wave instead. With the
- *   default settings no turn is ever plausible, so no turn ever waits. See
- *   that function's comment for why player_agency is deliberately not on the
- *   list.
+ *   and gets judged in generateStoryTurn's background wave instead, which
+ *   only flags. See that function's comment for why player_agency is
+ *   deliberately not on the list (so it is never rewritten).
  * - Suspension (observerSuspensionReason): session zero - a brand-new story
  *   up to and including the turn that calls start_game - is never judged.
  *   Setup turns legitimately run long and legitimately propose character
@@ -321,12 +321,11 @@ export function canObserverTriggerReset(
  * any regex standing in for it would be wrong in both directions. Listing it
  * here would mean "always plausible", which is exactly the always-block
  * behavior this function exists to end - so agency violations are caught by
- * the background pass instead, which can still rewrite, just after the player
- * already has control.
+ * the background pass instead, which only flags (decision 221: it no longer
+ * rewrites, because the player already has the turn).
  *
  * Erring toward NOT listing a type is safe: a missed one still gets judged in
- * the background wave and can still be rewritten there. The only thing lost
- * is the guarantee that the player never reads the flagged draft.
+ * the background wave, as a flag. What is lost is the automatic rewrite.
  */
 export function plausibleResetFlagTypes(params: {
   narration: string;

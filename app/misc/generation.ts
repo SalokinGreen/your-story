@@ -28,11 +28,10 @@ import {
   ObserverRewriteOriginal,
   SceneImageRef,
 } from "@/app/misc/structs";
+import { createHeldTurnOutput } from "@/app/misc/heldTurnOutput";
 import {
   BackgroundLayersDelta,
-  BackgroundRewritePatch,
   findPartIndexById,
-  hashNarration,
   isEmptyLayersDelta,
   snapshotValue,
   valueChanged,
@@ -347,6 +346,11 @@ export interface GenerationOptions {
   // a spent resource a second time. That path passes false, and a reset there
   // can only rewrite prose.
   allowMechanicalRetry?: boolean;
+  // Set internally by generateStoryTurn (decision 221): when a judge may
+  // rewrite the turn, the live text callbacks (onGMContent,
+  // onLiveNarrationUpdate) stay silent so the player never sees prose that a
+  // rewrite later replaces. Reasoning and tool results keep flowing.
+  holdLiveText?: boolean;
   // Set internally by generateStoryTurn from imageJobDeps and the image
   // settings (see imageJobs.ts ImageToolContext): the GM is offered
   // generate_image only when this is present and enabled.
@@ -478,20 +482,15 @@ export interface GenerationCallbacks {
   // the current story (backgroundPatch.ts), never on a captured whole-story
   // object, and never by array position.
   onBackgroundObserverFlags?: (flags: ObserverFlag[], partId: string) => void;
-  // The background pass's counterpart to onObserverRewrite: the observer ran
-  // after the turn had already completed, flagged it as a major violation
-  // (the player turned automatic rewriting on for that judge), and wrote a
-  // corrected narration. generateStoryTurn does NOT write it anywhere. It hands
-  // over a patch naming the part by id and the content the judge read by hash,
-  // and the page applies it to the current story only if that part still exists
-  // holding that content (applyBackgroundRewrite). A turn the player has since
-  // undone, edited or retried is left alone.
-  //
-  // There is deliberately no background counterpart to onObserverReset. A
-  // full-turn reset rolls storyData back to a pre-turn snapshot and re-rolls
-  // the dice, which is not something that can happen behind a player who has
-  // already read the turn and possibly acted on it.
-  onBackgroundObserverRewrite?: (patch: BackgroundRewritePatch) => void;
+  // Where a held turn is (decision 221): "writing" while the GM and narrator
+  // work, "checking" while the judges read the finished text, "revising" while
+  // a rewrite is made. Fires only when the turn's text is being held back
+  // (a judge may rewrite); the page shows it on the live work line.
+  onTurnPhase?: (phase: "writing" | "checking" | "revising") => void;
+  // There is deliberately no background counterpart to onObserverRewrite or
+  // onObserverReset (decision 221): a rewrite happens before the player sees
+  // the turn or not at all, and a full-turn reset re-rolls the dice, which
+  // cannot happen behind a player who has already read the turn.
   // Fired once the fire-and-forget background wave (memory agent, director
   // assistant, story progress observer) finishes. The delta is what those
   // layers changed, to be folded into the CURRENT story by the page; a wave
@@ -950,17 +949,32 @@ export async function generateStoryTurn(
   const repetitionNote: string | undefined = lastAssistantPart?.repetitionNote;
   const knowledgeNote: string | undefined = lastAssistantPart?.knowledgeNote;
   let resetAttempts = 0;
+  // Explicit caller-supplied settings win; otherwise fall back to the user's
+  // stored Architecture-tab config (DEFAULT_OBSERVER_SETTINGS, decision 220).
+  // Read once per turn, before the loop, because the hold below depends on it.
+  const observerSettings = options.observerSettings ?? getObserverSettings();
+  // Decision 221: when a judge may rewrite this turn, the player never sees,
+  // hears or is sent text a rewrite could replace. The live callbacks stay
+  // silent (holdLiveText) and the narration callbacks queue in `held` until the
+  // judging is done; the text is then released once, rewritten or not. Not in
+  // session zero, which has its own buffering (the setup gate), and not when
+  // every judge can only flag, where text streams live as before.
+  const holdTurnText =
+    !storyData.sessionZeroActive && canObserverTriggerReset(observerSettings);
+  const held = holdTurnText ? createHeldTurnOutput(callbacks) : null;
   // Set only when a tier_escalation_missed flag forces a full-turn retry
   // (see below) - floors the retry's GM-stage starting tier so the forced
   // escalation isn't immediately undone by the normal turn-to-turn decay.
   let forcedStartingTier: number | undefined;
 
   while (true) {
+    if (held) callbacks.onTurnPhase?.("writing");
     const result = await generateStoryTurnOnce(
       storyData,
       userChoice,
       {
         ...options,
+        holdLiveText: holdTurnText,
         observerNote,
         storyProgressNote,
         repetitionNote,
@@ -975,7 +989,7 @@ export async function generateStoryTurn(
         precomputedGMConversation:
           resetAttempts === 0 ? options.precomputedGMConversation : undefined,
       },
-      callbacks,
+      held ? held.callbacks : callbacks,
     );
 
     // Only a turn with actual narration is worth reviewing - an empty
@@ -986,6 +1000,10 @@ export async function generateStoryTurn(
       result.meta.costTurnId = costTurnId;
       const emptyTurnReport = logTurnCost(costTurnId, "final");
       if (emptyTurnReport) recordTurnCostCalibration(emptyTurnReport);
+      if (held) {
+        held.release();
+        held.flushChoices();
+      }
       callbacks.onComplete?.(result);
       return result;
     }
@@ -1020,10 +1038,6 @@ export async function generateStoryTurn(
       abortSignal: options.abortSignal,
     };
 
-    // Explicit caller-supplied settings win; otherwise fall back to the
-    // user's stored Architecture-tab config (defaults to
-    // DEFAULT_OBSERVER_SETTINGS, reproducing pre-existing behavior).
-    const observerSettings = options.observerSettings ?? getObserverSettings();
     const observerModelOverride = getObserverModelOverride();
     // The narration voice's effort (decision 53), read once beside its model
     // above. Deliberately NOT on sideCallApiOptions: that bag is spread under
@@ -1340,6 +1354,7 @@ export async function generateStoryTurn(
 
     let flags: ObserverFlag[] = [];
     if (resetPossible) {
+      if (held) callbacks.onTurnPhase?.("checking");
       try {
         flags = await runObserver({
           narration: result.content,
@@ -1429,6 +1444,7 @@ export async function generateStoryTurn(
           detail: majorFlag.detail,
           attempt: resetAttempts,
         });
+        if (held) callbacks.onTurnPhase?.("revising");
 
         // Reached only for a flag type the player allowed to correct the turn
         // (the defaults allow none, decision 187). A prose complaint gets a
@@ -1558,6 +1574,10 @@ export async function generateStoryTurn(
               majorFlag,
             ),
           };
+          // The held text is released as the rewrite, before the page is told
+          // about the revision, so the page's part exists when it is patched
+          // (and the original draft was never shown). Decision 221.
+          held?.release(rewrittenNarration);
           callbacks.onObserverRewrite?.(
             flags,
             majorFlag,
@@ -1566,8 +1586,14 @@ export async function generateStoryTurn(
           );
 
           // Choices were parsed from the flagged narration - regenerate them
-          // off the corrected text (see regenerateChoicesFor above).
+          // off the corrected text (see regenerateChoicesFor above). The
+          // queued first-draft choices are dropped when that works, and shown
+          // (stale, as before) when it does not.
           const rewrittenChoices = await regenerateChoicesFor(rewrittenNarration);
+          if (held) {
+            if (rewrittenChoices) held.dropChoices();
+            else held.flushChoices();
+          }
           if (rewrittenChoices) {
             result.choices = rewrittenChoices;
             result.scenePart = {
@@ -1646,6 +1672,8 @@ export async function generateStoryTurn(
           }
 
           observerNote = majorFlag.correctivePrompt;
+          // The discarded attempt's held text is never shown.
+          held?.discard();
           // The discarded attempt's pictures are for narration nobody will
           // read: drop the queued ones and abort the one painting.
           cancelImageJobsForTurn(costTurnId, "gm");
@@ -1657,6 +1685,14 @@ export async function generateStoryTurn(
       if (flags.length > 0) {
         result.scenePart = { ...result.scenePart, observerFlags: flags };
       }
+    }
+
+    // The judging is done (or was never needed): release whatever is still
+    // held, once. A rewrite already released its own text above; this is then
+    // a no-op for the story and a flush for choices a failed regeneration left.
+    if (held) {
+      held.release();
+      held.flushChoices();
     }
 
     // Everything past this point is best-effort side-channel work that
@@ -1708,119 +1744,13 @@ export async function generateStoryTurn(
               },
             );
 
-            // A major flag found back here is the same violation it would
-            // have been had it blocked - the only thing that changed is that
-            // the player already has the turn. If the player turned automatic
-            // rewriting on for that judge it still gets the targeted rewrite
-            // (observer.ts's rewriteFlaggedNarration), but the result is a
-            // PATCH for the page to apply to the current story, never a write
-            // into this turn's captured object (backgroundPatch.ts).
-            //
-            // Two of the blocking path's moves are not available here. The
-            // full-turn reset is out: rolling storyData back and re-rolling the
-            // dice underneath a player who has already read the turn would be
-            // far worse than the flag it fixes. And only a prose type can be
-            // rewritten (REWRITABLE_FLAG_TYPES): a missing tool call or a
-            // too-low tier is not something words fix.
-            let survivingFlags = backgroundFlags;
-            const majorFlag = backgroundFlags.find(
-              (f) =>
-                f.severity === "major" &&
-                REWRITABLE_FLAG_TYPES.has(f.type) &&
-                settingsFor(observerSettings, f.type).triggersReset,
-            );
-
-            // The id of the part the judge read and the hash of its content
-            // then: the only things a late result may be applied against.
+            // The background wave never rewrites (decision 221): the player
+            // already has the turn, and text they have read is not replaced
+            // behind them. A flag found back here is advisory, on the turn's
+            // details. A turn a judge could have rewritten waited for it
+            // instead (see the hold in generateStoryTurn).
+            const survivingFlags = backgroundFlags;
             const judgedPartId = result.scenePart.id ?? scenePartId;
-            const judgedHash = hashNarration(result.content);
-
-            if (majorFlag && resetAttempts < MAX_OBSERVER_RESETS) {
-              let rewrittenNarration: string | null = null;
-              try {
-                rewrittenNarration = await rewriteFlaggedNarration({
-                  narration: result.content,
-                  playerChoice: playerLine,
-                  gmStoryContext: result.gmStoryContext,
-                  flag: majorFlag,
-                  replyLength: options.replyLength,
-                  storytellerMode: options.storytellerMode,
-                  characterContext: observerCharacterContext,
-                  conversationMessages: result.gmPromptMessages,
-                  narrationThoughts: result.narrationThoughts,
-                  deAiifyWords: options.deAiifyWords,
-                  apiOptions: observerRewriteApiOptions,
-                });
-              } catch (rewriteError) {
-                if (isAbortError(rewriteError)) throw rewriteError;
-                logger.action(
-                  "Background observer rewrite call failed, leaving the flag advisory",
-                  {
-                    error:
-                      rewriteError instanceof Error
-                        ? rewriteError.message
-                        : String(rewriteError),
-                  },
-                );
-              }
-
-              if (rewrittenNarration && options.abortSignal?.aborted) {
-                rewrittenNarration = null;
-              }
-
-              if (rewrittenNarration) {
-                resetAttempts++;
-                logger.action(
-                  "Background observer rewrote the narration after the turn completed",
-                  { type: majorFlag.type, detail: majorFlag.detail },
-                );
-
-                const rewriteOriginal: ObserverRewriteOriginal = {
-                  content: result.content,
-                  flag: majorFlag,
-                  gmConversation: result.scenePart.gmConversation,
-                  gmThinking: result.scenePart.gmThinking,
-                  choices: result.choices,
-                };
-
-                survivingFlags = backgroundFlags.filter((f) => f !== majorFlag);
-
-                // Choices come back as data (notifyUi false) and ride in the
-                // patch; the page writes them only if the part is still the
-                // newest when the patch lands - re-checked there, after this
-                // await, by part id (finding 7). None at all when Suggested
-                // Choices are off.
-                const rewrittenChoices = await regenerateChoicesFor(
-                  rewrittenNarration,
-                  false,
-                );
-
-                // Keep the returned result in step with what the player will
-                // see - callers hold onto it (the eval harness reads
-                // result.content as "what the player saw").
-                result.content = rewrittenNarration;
-                result.scenePart = {
-                  ...result.scenePart,
-                  content: rewrittenNarration,
-                  correctedObserverFlags: [majorFlag],
-                  observerRewriteOriginal: rewriteOriginal,
-                };
-                if (rewrittenChoices) result.choices = rewrittenChoices;
-
-                if (!options.abortSignal?.aborted) {
-                  callbacks.onBackgroundObserverRewrite?.({
-                    partId: judgedPartId,
-                    expectedHash: judgedHash,
-                    narration: rewrittenNarration,
-                    flag: majorFlag,
-                    allFlags: backgroundFlags,
-                    survivingFlags,
-                    original: rewriteOriginal,
-                    choices: rewrittenChoices ?? undefined,
-                  });
-                }
-              }
-            }
 
             if (survivingFlags.length > 0 && !options.abortSignal?.aborted) {
               callbacks.onBackgroundObserverFlags?.(survivingFlags, judgedPartId);
@@ -2468,6 +2398,12 @@ async function generateStoryTurnOnce(
         // back. After start_game the intro is the story and streams as usual.
         const setupTextHeld = () =>
           sessionZeroTurn && !startGameSucceededThisTurn;
+        // Decision 221: the live text callbacks are also silent when the turn
+        // is held for the judges (options.holdLiveText). This gates ONLY the
+        // callbacks; the "latest words only" clearing of session zero keys on
+        // setupTextHeld alone and must not apply to a held turn.
+        const liveTextHeld = () =>
+          options.holdLiveText === true || setupTextHeld();
         // The turn ends on the engine line: nothing the GM wrote this turn is
         // narrated, shown as thinking, or left on a replayed assistant message.
         const discardHeldSetupProse = () => {
@@ -2732,7 +2668,7 @@ async function generateStoryTurnOnce(
             }
             if (event.type === "content" && event.content) {
               gmContent += event.content;
-              if (!setupTextHeld()) {
+              if (!liveTextHeld()) {
                 // Stream GM content to callback for real-time display
                 callbacks.onGMContent?.(event.content, gmContent);
                 // Same accumulation gmFinalStoryContent uses below, computed
