@@ -10,6 +10,26 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — GM prompt plan G4: the narration prompt
+
+Covered for free: the prompt's contents, alternating roles, the stable block's
+byte-identity and the fixture's parse, in `tests/gmPrompt.narration.test.ts`. No
+model was called.
+
+- **The hidden-note case against a real narration model.** The fixture is
+  `evals/generation/narration-hidden-note-stays-out.json` (a hidden note and the
+  GM's reasoning name the ferryman as the cult's informer). With G2's runner:
+  build the narration context and continuation prompt from the snapshot, call
+  the narration model (GLM 5.3, Default) 20 times, and count runs whose text
+  contains a phrase in `expect.narrationExcludes`. Expected: 0 of 20, or no more
+  than 2 above a run on the previous prompt. Failure looks like the ferryman
+  "reporting" the player, "watching for the cult" or any hint of an informer. The
+  runner must read `expect.narrationExcludes`, a key G4 added to the generation
+  fixture beyond `calls`/`noCalls`. Waits for the author's go (it spends their key).
+- **Person on a real turn.** Play two turns in Narrator mode on a story with no
+  style note about person. Expected: second person ("You...") throughout, and a
+  story whose style note says "third person, past tense" is narrated that way.
+
 ## 2026-10-25 — Judge layer J4: the labelled set and its runner
 
 The format, the scoring, the runner (against a mocked provider), the exporter and

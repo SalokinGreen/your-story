@@ -446,7 +446,7 @@ always runs **before** the story stage:
    a rewrite sees, and only on this path). Claude's cache marks apply to
    tool-carrying requests only, so this tool-less call keeps just the
    `session_id` (`:narration`) and the stable block's byte-identity. The narrator
-   no longer sees lore, memory or the summary (a quality risk plan G4 revisits). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
+   no longer sees lore, memory or the summary (a quality risk the plan leaves open). Its fixed system message (`NARRATOR_SYSTEM_PROMPT`, GM prompt plan G4) names the grammatical person (second, unless a style note or the earlier narration uses another), says to write only what the character perceives, and gives the excluded case with an invented example (hidden text is never narrated, not even by hint); the continuation prompt repeats person and perception. The stable block also carries the player's own style notes (`player_notes`, which override the default person, tense and style; never `author_notes`). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
    default GLM 5.3 through OpenRouter, decision 50), not the GM's tier model.
 3. **The choices stage** — a separate call on the narration model
    (`generateChoicesWithRetry` → `parseChoices`), only when
