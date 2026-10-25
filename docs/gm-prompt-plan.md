@@ -268,3 +268,10 @@ revised section, with the "beyond noise" rule there.
   narration must not contain) with `noCalls: []`. The format type in
   `evalFormat.ts` was not edited (G2 owns the runner); the runner must read the
   new key. The live run is owed (`docs/pending_tests.md`).
+- **Player notes (coordinator's fix).** `story.player_notes` (Settings default
+  notes, copied into each story) now joins the narration context's stable block
+  under "The player's own style notes (these override your defaults for person,
+  tense and style)", through `stripHiddenLoreContent`; the system message says
+  they override the default person. `author_notes` (the Designer's private GM
+  notes) are deliberately not carried. Rewrites get both, as they continue the
+  same context.

@@ -31,7 +31,7 @@ describe("the narrator's system message", () => {
   });
 
   it("lets a style note or the earlier narration set another person", () => {
-    expect(NARRATOR_SYSTEM_PROMPT).toMatch(/style note that names another person/);
+    expect(NARRATOR_SYSTEM_PROMPT).toMatch(/style notes? that name another person or tense override/);
     expect(NARRATOR_SYSTEM_PROMPT).toMatch(/Earlier in the story/);
   });
 });
@@ -78,6 +78,40 @@ describe("the narration request", () => {
     expect(a[0].content).toBe(b[0].content);
     expect(a[1].content).toBe(b[1].content);
     expect(a[1].cacheBreakpoint).toBe("prefix");
+  });
+});
+
+describe("the player's own style notes", () => {
+  const withNotes = (): StoryData =>
+    ({
+      ...story(),
+      player_notes: "Always write in first person. CANARY_PLAYER_NOTE",
+      author_notes: "CANARY_AUTHOR_NOTE the ferryman is the informer",
+    }) as StoryData;
+
+  it("reach the narration request and the rewrite context, author notes do not", () => {
+    const ctx = buildNarrationContext({ playerLine: "I wave", results: [] }, withNotes());
+    const all = ctx.map((m) => m.content).join("\n");
+    expect(all).toContain("CANARY_PLAYER_NOTE");
+    expect(all).toContain("Always write in first person");
+    expect(all).not.toContain("CANARY_AUTHOR_NOTE");
+    // In the stable (cached) block, so it is byte-stable across turns.
+    expect(ctx[1].content).toContain("CANARY_PLAYER_NOTE");
+    const next = buildNarrationContext({ playerLine: "I run", results: [] }, withNotes());
+    expect(next[1].content).toBe(ctx[1].content);
+    // A rewrite appends to the same context.
+    const rewrite = appendToLastUser(ctx, "Rewrite this.");
+    expect(rewrite.map((m) => m.content).join("\n")).toContain("CANARY_PLAYER_NOTE");
+    expectAlternatingRoles(rewrite);
+  });
+
+  it("are said to override the default person, and strip hidden spans", () => {
+    expect(NARRATOR_SYSTEM_PROMPT).toMatch(/player's own style notes/);
+    const ctx = buildNarrationContext(
+      { playerLine: "x", results: [] },
+      { ...story(), player_notes: "Plain. [[HIDDEN_LORE:A]]SECRETBIT[[/HIDDEN_LORE]]" } as StoryData,
+    );
+    expect(ctx[1].content).not.toContain("SECRETBIT");
   });
 });
 
