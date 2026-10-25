@@ -847,7 +847,9 @@ export const AI_MODELS = {
   // https://deepinfra.com/pricing, and each model's page): prices are the
   // standard tier per 1M tokens, the window is the page's context length, and
   // every entry carries DeepInfra's "Function" tag. Max output is stated on
-  // no page but Gemma 3's, so the caps are this app's own. Retired here:
+  // no page but Gemma 3's, so the caps are this app's own.
+  // GLM 5.3 is DeepInfra's fp4 listing; GLM-5.3-Flash is left out (its page
+  // says nothing about thinking). Retired here:
   // Kimi-K2-Thinking and MiniMax-M2 (gone from DeepInfra), Phi 4 (no tool
   // calling), and DeepSeek V3.1, Qwen3 32B and Qwen3 30B A3B (superseded);
   // LEGACY_MODEL_KEY_ALIASES keeps a saved choice of each working.
@@ -938,6 +940,28 @@ export const AI_MODELS = {
     weaknesses: [],
     description:
       "GLM 4.6 via DeepInfra. Good for creative writing, with tool use and a 200k window.",
+    bannerUrl: undefined,
+  },
+  // GLM-5.3, fp4 (https://deepinfra.com/zai-org/GLM-5.3, read 2026-10-25):
+  // $0.563 / $2.50, cached $0.125, the price DeepInfra charges now under a
+  // "38% off" label; its list price is $0.90 / $4.00 / $0.20. It always
+  // thinks, at max by default, so providerCall.ts sends it reasoning_effort.
+  "DeepInfra GLM 5.3": {
+    name: "DeepInfra GLM 5.3",
+    original_model: "zai-org/GLM-5.3",
+    model: "zai-org/GLM-5.3",
+    maxTokens: 1048576,
+    maxOutputTokens: 32000,
+    provider: "deepinfra",
+    supportsToolCalling: true,
+    inputPrice: 0.563,
+    outputPrice: 2.5,
+    cachedInputPrice: 0.125,
+    finetunes: [],
+    strengths: ["reasoning", "creative", "tool calling", "long context"],
+    weaknesses: ["always thinks", "promotional price"],
+    description:
+      "Z.ai's GLM-5.3 via DeepInfra, the same model as the app's default GM. Always reasons; 1M-token window. Priced at DeepInfra's current discount.",
     bannerUrl: undefined,
   },
   "DeepInfra Qwen3.6 35B A3B": {

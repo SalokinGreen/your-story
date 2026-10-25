@@ -395,7 +395,10 @@ function alwaysThinks(config: Pick<AIModelConfig, "provider" | "model">, provide
   return (
     isAnthropicViaOpenRouter(config) ||
     provider === "zai" ||
-    (provider === "openrouter" && config.model.toLowerCase().startsWith("z-ai/glm-5.3"))
+    (provider === "openrouter" && config.model.toLowerCase().startsWith("z-ai/glm-5.3")) ||
+    // DeepInfra's GLM-5.3 (https://deepinfra.com/zai-org/GLM-5.3, read
+    // 2026-10-25): no way to turn thinking off, and max effort by default.
+    (provider === "deepinfra" && config.model.toLowerCase() === "zai-org/glm-5.3")
   );
 }
 
@@ -514,6 +517,19 @@ function applyReasoningEffort(
   // onto those three and thinking is turned on explicitly. "none" runs at low,
   // and so does a call with no effort (the same backstop): Z.ai's default is
   // max.
+  // DeepInfra's GLM-5.3 takes the same reasoning_effort low, high or max as
+  // Z.ai's, and defaults to max when it is left out (its model page), so it is
+  // always sent: "none", "low" and a missing effort run at low.
+  if (provider === "deepinfra" && thinksAlways) {
+    requestBody.reasoning_effort =
+      reasoningEffort === "xhigh"
+        ? "max"
+        : reasoningEffort === "normal" || reasoningEffort === "high"
+          ? "high"
+          : "low";
+    return;
+  }
+
   if (provider === "zai") {
     requestBody.thinking = { type: "enabled" };
     requestBody.reasoning_effort =
