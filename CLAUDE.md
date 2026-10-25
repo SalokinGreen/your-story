@@ -1074,6 +1074,14 @@ tag), `burden` ("none" counts; its hint says to state the starting Stress),
 mode chosen (an old save, a bare story), none. `creationTotal()` counts the
 table steps once and each player step once per player who needs it. A player
 with a pre-made sheet (`premadeFor`) is skipped for the player steps.
+- **Kinds and the fields code sets** (gm-prompt-plan slice 3): every step
+  has `kind` (`"choice"` or `"creative"`, optional, default choice, read through
+  `stepKind`; creative is the player's own words: the shared world and self
+  steps, every Fantastic Realms step, Blood & Bone's vow, connections and gear).
+  `prepareSetupQuestions` (`gmExecutor.ts`, from `executeAskQuestion`) sets
+  `allow_custom: true` on an item tagged with a creative step, and in full mode
+  refuses the call (`success: false`, nothing asked) when the first item under a
+  known tag has no `intro`.
 - **Recording** (`recordCreationSteps`, `gmExecutor.ts`, run by
   `executeAskQuestion` in session zero). A tag counts only if it is a step of
   this story (an unknown tag is ignored and the result lists the valid ones),
@@ -1125,19 +1133,24 @@ not done (`interview`, `concept`, `character`, `campaign`, `confirm`,
 (`ai_staged.ts`) is the only setup text, in the **live block** (the cache
 rule). It replaces `freshStorySetupBlock`, `sessionZeroStartGameReminder`,
 `setupOverdueBlock` and `buildSheetTemplateBlock`, which still fire outside
-session zero. It holds, in order: the checklist, the next step with its tools,
-the rule that the GM does not narrate until `start_game` succeeds, the mode's
-lines, the creation rules, the CAMPAIGN guide (`campaignSetupGuide`: the seven
+session zero. It holds, in order (reference first, the next step last; slice 3
+of `docs/gm-prompt-plan.md`): the checklist, the step list, the system's
+creation rules note, the setup reference, the sheet template, the CAMPAIGN guide
+(`campaignSetupGuide`: the seven
 styles until one is chosen, then the style's expected parts with what is built
 and what is not, the clock triggers that suit it, the `campaign` tool's parts
-and the lines-and-veils hint), the sheet template, the setup reference, and after
-6 setup questions (`SETUP_QUESTION_NUDGE_AT`) a nudge to propose. The checklist
+and the lines-and-veils hint), the rule that the GM does not narrate until
+`start_game` succeeds, the mode's lines, the asking rules (tagging, the one
+batching chain by scope, intro; `creationRules`), after
+6 setup questions (`SETUP_QUESTION_NUDGE_AT`) a nudge to propose, and last the
+one next-step pair (`setupNextStep` and `creationNextStep`). The checklist
 gains a "Setup steps (n/m asked and answered)" row when the mode requires steps,
 and the block lists each required step per player with ✓ (covered), → (next) or
 · (still to come). The creation rules say to tag every covering item with
-`setup_step`. In full mode they add: table and world steps may share a call,
-character steps go one per call, always an `intro`, options that say what they
-do in play, 2–4 suggestions and `allow_custom` on creative steps, and
+`setup_step`. In full mode they add one batching chain by scope (a table step
+may share a call with other table steps, a player step is asked alone), an
+`intro` the engine requires, options that say what they
+do in play, 2–4 suggestions (the engine sets `allow_custom` on creative steps), and
 `target_player_name` on every player-step item. In full mode the nudge is
 replaced by "every step is covered: write the sheet and build the campaign" (quick mode
 keeps the nudge at 6).
@@ -1296,7 +1309,7 @@ checkboxes and a Done button in `AskQuestionModal.tsx`. The answer item carries
 `selectedLabels`. The executor (`gmExecutor.ts`) and the party host
 (`partyHost.ts`) keep only offered labels, once each, in option order, and the
 GM's line reads `→ "A", "C"`. Any custom text the player typed is kept
-alongside the picks (the modal offers the box only when `allow_custom` is set). `selectedLabels` is honoured only on a multi-select
+alongside the picks (the box shows unless the question sets `allow_custom: false`; in session zero a creative step's items are always given it, `prepareSetupQuestions`). `selectedLabels` is honoured only on a multi-select
 question. The phone protocol caps picks at 4 (`PARTY_MAX_PICKS`). Couch
 `target_player_name` routing is unchanged.
 

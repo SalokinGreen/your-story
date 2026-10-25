@@ -21,6 +21,18 @@ export interface CreationStep {
   scope: "table" | "player";
   /** One line: what to ask and what it needs. Original words. */
   hint: string;
+  /**
+   * "creative": the answer is the player's own words, so the engine always
+   * allows a custom answer (executeAskQuestion sets allow_custom). "choice":
+   * a pick from the system's own lists. Optional; absent reads as "choice"
+   * (gm-prompt-plan slice 3).
+   */
+  kind?: "choice" | "creative";
+}
+
+/** The step's kind, with the default for a step that names none. */
+export function stepKind(step: Pick<CreationStep, "kind">): "choice" | "creative" {
+  return step.kind ?? "choice";
 }
 
 /** The player id used for solo play in `setup.covered.players`. */
@@ -36,6 +48,7 @@ const COHORT_STEP: CreationStep = {
   label: "Why you are together",
   group: "table",
   scope: "table",
+  kind: "creative",
   hint: "Ask the whole table why these characters stay together: a shared threat, an organisation, found family, paid work, or their own idea.",
 };
 
@@ -45,6 +58,7 @@ const WORLD_STEPS: CreationStep[] = [
     label: "Setting",
     group: "world",
     scope: "table",
+    kind: "creative",
     hint: "Where and when it is set: the city or region, the era, the feel of the place.",
   },
   {
@@ -52,6 +66,7 @@ const WORLD_STEPS: CreationStep[] = [
     label: "Tone",
     group: "world",
     scope: "table",
+    kind: "creative",
     hint: "The mood they want (horror, intrigue, action, romance, tragedy...). Multi-select; their own words welcome.",
   },
   {
@@ -59,6 +74,8 @@ const WORLD_STEPS: CreationStep[] = [
     label: "Style",
     group: "world",
     scope: "table",
+    // A choice: the record takes one of seven fixed styles.
+    kind: "choice",
     hint: 'The shape of the campaign, which decides what you build: sandbox, adventure path, mystery, horror, episodic, slice of life or solo/oracle. Offer the ones that fit the setting with a line each on how they play, then record the pick with the campaign tool (part "style").',
   },
   {
@@ -66,6 +83,7 @@ const WORLD_STEPS: CreationStep[] = [
     label: "Tone, lines and veils",
     group: "world",
     scope: "table",
+    kind: "creative",
     hint: 'Tone words (2-4), then lines (never shown in the story) and veils (may happen, but off screen). Ask plainly, with examples; "none" is a real answer. Record with the campaign tool: part "pitch" (tone), part "safety" (lines and veils, empty lists for none).',
   },
   {
@@ -73,6 +91,7 @@ const WORLD_STEPS: CreationStep[] = [
     label: "Campaign",
     group: "world",
     scope: "table",
+    kind: "creative",
     hint: "The kind of campaign: what they want to face, and roughly how long it should run.",
   },
 ];
@@ -83,6 +102,7 @@ const SELF_STEPS: CreationStep[] = [
     label: "Name and look",
     group: "self",
     scope: "player",
+    kind: "creative",
     hint: "Their name, how they look and how they carry themselves. Offer suggestions.",
   },
   {
@@ -90,6 +110,7 @@ const SELF_STEPS: CreationStep[] = [
     label: "History",
     group: "self",
     scope: "player",
+    kind: "creative",
     hint: "Three questions under this one tag: what they were before, the moment things changed, who knows and how that went.",
   },
   {
@@ -97,6 +118,7 @@ const SELF_STEPS: CreationStep[] = [
     label: "Drives",
     group: "self",
     scope: "player",
+    kind: "creative",
     hint: "What they want, and what they fear. Offer suggestions.",
   },
 ];
@@ -110,6 +132,7 @@ const CAMPAIGN_REVIEW_STEP: CreationStep = {
   label: "Review the campaign",
   group: "world",
   scope: "table",
+  kind: "creative",
   hint: 'This adventure ships with a built campaign (read it with the campaign tool). Tell the player in a few lines only what their characters could know at the start: the pitch and tone, the places, the factions by name and any clock marked visible. Never read out or hint at secrets, dooms, portents, what a person hides, or what a front is really about. Ask what they would change, and apply it with the campaign tool (edit, add or remove); "nothing" is a real answer. Do not rebuild it.',
 };
 
@@ -143,6 +166,7 @@ const ABILITIES_STEP: CreationStep = {
   label: "Abilities",
   group: "character",
   scope: "player",
+  kind: "choice",
   hint: "What they can do, drawn from the mechanics note: strengths, skills or powers it names.",
 };
 

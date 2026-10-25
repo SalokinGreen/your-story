@@ -57,12 +57,12 @@ describe("the tagging rule and the step list", () => {
     expect(quick).toContain("- tone: ·");
     expect(quick).toContain("NEXT STEP TO ASK: setting");
     // Quick setup is not walked step by step.
-    expect(quick).not.toContain("asked one at a time");
+    expect(quick).not.toContain("Batching, by scope");
     expect(quick).toContain("MODE: quick setup");
 
     const full = buildSessionZeroBlock(story({ mode: "full" }));
     expect(full).toContain("TAGGING");
-    expect(full).toContain("asked one at a time");
+    expect(full).toContain("Batching, by scope");
   });
 
   it("full mode lists every step with ✓, → and · and the next step's hint", () => {
@@ -81,7 +81,7 @@ describe("the tagging rule and the step list", () => {
     // The rules for asking.
     expect(block).toContain("Always give `intro`");
     expect(block).toContain("2-4 options whose descriptions say what each does in play");
-    expect(block).toContain("2-4 suggestions and set allow_custom true");
+    expect(block).toContain("the engine always allows a custom answer");
     expect(block).toContain("Do not write the sheet or the plan");
   });
 

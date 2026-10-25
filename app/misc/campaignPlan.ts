@@ -620,7 +620,7 @@ export function setupGateMessage(
       if (!m) {
         return `${head} Next step: ask the player the next setup question with ask_question, tagged with its setup_step.`;
       }
-      return `${head} Next step: ask ${describeMissing(m)} with ask_question, tagged setup_step "${m.step.id}"${m.player && opts.multiPlayer ? ` and target_player_name "${m.player}"` : ""}. ${m.step.hint} Do not call confirm_setup yet.`;
+      return `${head} Next step: ask ${describeMissing(m)} with ask_question, tagged setup_step "${m.step.id}"${m.player && opts.multiPlayer ? ` and target_player_name "${m.player}"` : ""}, with an intro. ${m.step.hint} Do not call confirm_setup yet.`;
     }
     case "concept":
       return `${head} Next step: ask the player your setup questions with ask_question (their answers set the concept), then continue.`;

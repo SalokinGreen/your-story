@@ -10,6 +10,29 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — GM prompt plan, slice 3 (session zero's block)
+
+- **The behavioural case has no runner yet.** G2's generation runner was not on
+  master when slice 3 landed, so
+  `evals/generation/setup-full-one-player-step-per-call.json` is written in J4's
+  generation format (`kind: "generation"`) and only checked to parse
+  (`tests/gmPrompt.slice3.test.ts`). When the runner lands, run it 20 times on
+  GLM 5.3 (Default) and Claude Sonnet 5.5 (Advanced) with the author's go: every
+  run should call `ask_question` once with items under a single `setup_step`
+  (one of name_look, history, drives), an `intro` on it, and no `create_note`,
+  `confirm_setup` or `start_game`. The runner must read the fixture's
+  `expectArguments` key (the format has no field for argument checks yet). The
+  case rises beyond noise when its failing runs rise by more than 2 of 20 on two
+  runs. Failure looks like two player-step tags in one call (the engine records
+  neither and says "Ask one setup step at a time") or an `ask_question` refused
+  for a missing intro.
+- **A real full-mode setup in the app** (author's keys): start a Blood & Bone
+  adventure with "Step by step". Every question should show its intro above the
+  options, and the creative ones (setting, tone, vow, connections, gear, name and
+  look, history, drives) should show the custom-answer box even if the model did
+  not ask for it. A model that omits an intro gets an error result and asks
+  again; a loop of refusals would show as the turn ending on the engine line.
+
 ## 2026-10-25 — GM prompt plan G4: the narration prompt
 
 Covered for free: the prompt's contents, alternating roles, the stable block's
