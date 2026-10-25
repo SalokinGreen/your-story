@@ -1137,7 +1137,7 @@ ${rewriteRules}`;
 // A reply that talks ABOUT the rewrite instead of being it. The rewrite prompt
 // says "output only the corrected narration", and a model that refuses, or
 // introduces its work, is not writing narration.
-const REWRITE_META_OPENERS =
+export const REWRITE_META_OPENERS =
   /^\s*(?:i(?:'m| am)?\s+(?:sorry|unable|not able)|i\s+(?:can(?:no|')t|won't|will not)|sorry[,.!]|as an ai\b|here(?:'s| is| are)\s+(?:the |a |your )?(?:rewritten|revised|corrected|updated|fixed|new)\b|sure[,!.]|certainly[,!.]|of course[,!.]|(?:the )?(?:rewritten|revised|corrected) (?:narration|version|text)\b|note:)/i;
 
 export type RewriteValidation =

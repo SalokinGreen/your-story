@@ -366,3 +366,22 @@ runs rise by more than 2 of 20 on two separate runs.
 10. **Refused re-ask calls are hidden**: not pushed to `gmResults`, not sent to
     `onGMToolResult`, but their `[ERROR]` tool messages still go to the provider.
     (They are tracked in a `WeakSet`, `isReaskRefused`.)
+
+### 2026-10-25 — re-check of J1 (four fixes, branch `claude/judges-j1-fixes`)
+
+1. **No empty assistant message.** In a worded re-ask reply, a draft message
+   with no tool calls whose prose goes is removed from the conversation; one
+   with tool calls keeps them and its reasoning and loses only prose. The
+   re-ask rounds' own preambles around tool calls are stripped the same way
+   (`ReaskState.askIndex` marks where the re-ask message sits).
+2. **Only the answering round is story.** The turn's text is rebuilt from the
+   prose-only round that answered; an introduction or refusal
+   (`REWRITE_META_OPENERS`, now exported, not `validateRewriteResponse` whole:
+   its "unchanged" rule is wrong here because the message allows "reply with
+   the same text") gives the draft back and drops that answer message.
+3. **Refused calls stay hidden after a reload.** The refusal text now carries
+   `REASK_REFUSAL_TAG`; `buildSavedTimeline` skips any call whose tool message
+   carries it. No new field on the part.
+4. **A migrated record no longer disables the clock counter.** The record-level
+   `origin === "migrated"` return is gone; migrated-timer and manual-only
+   clocks are still filtered per clock.

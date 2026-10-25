@@ -92,6 +92,7 @@ import {
   extractOutcomeVerdicts,
   isAbortError,
   REWRITABLE_FLAG_TYPES,
+  REWRITE_META_OPENERS,
   ObserverSettings,
   extractGmReasoning,
 } from "@/app/misc/observer";
@@ -249,9 +250,9 @@ export function mergeRefusedDiceCalls(
         command: tc.function.name,
       },
       contextForStory:
-        why === "pause"
-          ? `[ERROR] ${tc.function.name} was not run: this is a re-ask inside the turn, and it never stops to ask the player. Use what you have.`
-          : `[ERROR] ${tc.function.name} was not run: this turn's dice are already thrown, and a re-ask never rolls or draws again. Use the result you have.`,
+        why === "pause" /* both texts carry REASK_REFUSAL_TAG, which the saved timeline hides */
+          ? `[ERROR] ${tc.function.name} was not run (re-ask refusal): this is a re-ask inside the turn, and it never stops to ask the player. Use what you have.`
+          : `[ERROR] ${tc.function.name} was not run (re-ask refusal): this turn's dice are already thrown, and a re-ask never rolls or draws again. Use the result you have.`,
     };
     REASK_REFUSED.add(refused);
     return refused;
@@ -2919,30 +2920,79 @@ async function generateStoryTurnOnce(
           stash: { thinking: string[]; accumulated: string[]; context: string[] };
           /** The assistant messages that carried the draft (a prose re-ask). */
           draftHistory: number[];
+          /** Where the re-ask message sits in the conversation. */
+          askIndex: number;
         } | null = null;
         // The re-ask round's outcome, settled on the first prose-only round
         // after it (or at the loop's end). A prose re-ask (a line) replaces the
         // draft when it answered with words and gives it back when it did not;
         // a tools-only re-ask (a damage contract) keeps the draft and drops the
         // acknowledgement the GM wrote around its tool calls.
-        const resolveReask = (visibleNow: string) => {
+        const resolveReask = (visibleIn: string, rawAnswer = "") => {
           const r = reask;
           if (!r || r.resolved) return;
           r.resolved = true;
+          // Only the prose-only round that answered counts as the new passage;
+          // an introduction or refusal ("Here is the revised passage:") is no
+          // answer, and the draft comes back.
+          const visibleNow =
+            visibleIn && !REWRITE_META_OPENERS.test(visibleIn) ? visibleIn : "";
+          if (visibleIn && !visibleNow) {
+            logger.action("Rung 2 re-ask: the reply was an introduction or refusal - keeping the draft", {
+              reply: visibleIn.slice(0, 120),
+            });
+            // The answering message itself leaves the conversation too.
+            const last = conversationHistory[conversationHistory.length - 1];
+            if (last?.role === "assistant" && !last.tool_calls?.length) {
+              conversationHistory.pop();
+            }
+          }
           if (r.replacesProse) {
             if (visibleNow) {
-              // The new words replace the draft span: the draft's rounds keep
-              // their reasoning and tool calls but no longer carry prose, so
-              // the saved conversation and later rounds read the new passage
-              // once.
-              for (const i of r.draftHistory) {
+              // The new words replace the draft span. A draft message that
+              // carried tool calls keeps them and its reasoning but loses its
+              // prose; one that was prose only has nothing left to say and
+              // leaves the conversation (an empty assistant message is
+              // rejected by some providers). The re-ask rounds' own
+              // preambles around their calls go the same way, so the new
+              // passage is the only prose.
+              const drop = new Set<number>();
+              const strip = (i: number) => {
                 const m = conversationHistory[i];
-                if (m?.role !== "assistant") continue;
-                if (extractVisibleText(m.content || "") === "") continue;
+                if (m?.role !== "assistant") return;
+                if (extractVisibleText(m.content || "") === "") return;
+                if (!m.tool_calls?.length) {
+                  drop.add(i);
+                  return;
+                }
                 const reasoning = extractGmReasoning(m.content);
                 m.content = reasoning
                   ? `<thinking>\n${reasoning}\n</thinking>`
                   : "";
+              };
+              for (const i of r.draftHistory) strip(i);
+              if (r.askIndex >= 0) {
+                for (let i = r.askIndex + 1; i < conversationHistory.length - 1; i++) {
+                  strip(i);
+                }
+              }
+              [...drop].sort((a, b) => b - a).forEach((i) => {
+                conversationHistory.splice(i, 1);
+              });
+              // The turn's text is the answering round alone.
+              gmThinking.length = Math.min(gmThinking.length, r.before.thinking);
+              gmAccumulatedStory.length = Math.min(
+                gmAccumulatedStory.length,
+                r.before.accumulated,
+              );
+              allGMContextParts.length = Math.min(
+                allGMContextParts.length,
+                r.before.context,
+              );
+              if (rawAnswer.trim()) {
+                gmThinking.push(rawAnswer);
+                gmAccumulatedStory.push(rawAnswer.trim());
+                allGMContextParts.push(rawAnswer);
               }
             } else {
               // No words came back: the draft stands, and so does nothing the
@@ -3993,7 +4043,7 @@ async function generateStoryTurnOnce(
             // A re-ask armed in an earlier round is answered by this prose-only
             // round: settle it before any gate looks at the stores.
             if (reask && !reask.resolved) {
-              resolveReask(extractVisibleText(content).trim());
+              resolveReask(extractVisibleText(content).trim(), content);
             }
 
             // Session zero's setup gate (docs/session-zero-design.md 3.6).
@@ -4300,6 +4350,7 @@ async function generateStoryTurnOnce(
                   after,
                   stash: { thinking: [], accumulated: [], context: [] },
                   draftHistory: [],
+                  askIndex: -1,
                 };
                 if (plan.replacesProse) {
                   // The whole unreleased span is the draft: set it aside (it
@@ -4324,6 +4375,7 @@ async function generateStoryTurnOnce(
                     round: gmRound,
                   });
                 }
+                reask.askIndex = conversationHistory.length;
                 conversationHistory.push({ role: "user", content: plan.message });
                 forceToolChoiceNextRound = "auto";
                 continue gmRoundLoop;

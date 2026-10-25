@@ -557,7 +557,11 @@ describe("engine-review fixes", () => {
 
   it("leaves migrated and manual-only clocks out of the clock-idle counter", () => {
     const n = PACING_CLOCK_IDLE_TURNS - 1;
-    expect(hasClockHit(withClocks([baseClock], "migrated"), n)).toBe(false);
+    // A migrated record that has gained an auto-ticking clock counts again.
+    expect(hasClockHit(withClocks([baseClock], "migrated"), n)).toBe(true);
+    expect(
+      hasClockHit(withClocks([{ ...baseClock, migratedFromTimerId: "t1" }], "migrated"), n),
+    ).toBe(false);
     expect(hasClockHit(withClocks([{ ...baseClock, migratedFromTimerId: "t1" }]), n)).toBe(false);
     expect(hasClockHit(withClocks([{ ...baseClock, triggers: ["manual"] }]), n)).toBe(false);
   });
