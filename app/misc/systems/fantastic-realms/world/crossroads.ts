@@ -24,12 +24,15 @@ The world is not one land but many realms, and they do not run on the same rules
 - A hero keeps everything when they cross: feats, hearts, burned feats, gear, friends. What changes is the realm. Its tone, its dangers and its **rest rule** apply from the moment they step off the Thin Mile.
 - A road can be walked both ways. A traveller who turns back at the Thin Mile arrives at the Waymeet by nightfall.
 - Folk from one realm are strange to another. A knight of Aurelane in Gloamreach is a rumour with a horse. A farmer of Larkenfell in Aurelane is a wonder at court. Use the difference for jokes, trouble and friendships.
-- Magic is a feat in every realm, but it feels different: bright and public in Aurelane, quiet and neighbourly in Larkenfell, costly and whispered in Gloamreach.
+- Magic is a feat in every realm, but it feels different: bright and public in Aurelane, quiet and neighbourly in Larkenfell, costly and whispered in Gloamreach, tide-work in Thornmere, hammered into metal in Emberhold, and sung on the wind in the Hollow Sky.
 
-## The three realms
+## The six realms
 - **Aurelane**, a bright, heroic realm of sun-lit cities, banners, tourneys and dragons who keep their word. Tone: swashbuckling and hopeful. Rest: **a few hours.**
 - **Larkenfell**, a folk frontier of farms, woods, rivers and old barrows, where neighbours matter more than kings. Tone: homely, brave and funny, with real teeth in the dark. Rest: **a night by a fire with a full meal.**
 - **Gloamreach**, a grim realm of ash, fog, plague and long memory. Tone: dark, costly and quiet, where small kindnesses count. Rest: **weeks, somewhere safe.**
+- **Thornmere**, a drowned kingdom of fen-cities on piles and causeways, all mist, bells and long memories. Tone: eerie, courteous and sorrowful. Rest: **a dry night under a roof.**
+- **Emberhold**, a volcanic realm of forge-halls and glass roads, where every guild is a family and every favour is a debt. Tone: proud, hot-tempered and craft-mad. Rest: **a day at a forge-hall's hearth.**
+- **The Hollow Sky**, cloud-islands joined by rope-bridges under a slow ring of light called the sky-wheel. Tone: airy, daring and a little dizzy. Rest: **one turn of the sky-wheel, about six hours** (realm id hollow-sky).
 
 When the heroes rest, call take_rest with the realm they are in: it names the condition, and the fiction decides whether they have it. A hero cannot rest in the Thin Mile or at the Waymeet's well; there is always someone watching.
 

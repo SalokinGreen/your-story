@@ -58,15 +58,16 @@ describe("BUILTIN_NOTE_HISTORY", () => {
   });
 
   it("records the older core and creation note beside the current one", () => {
-    expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id]).toHaveLength(3);
+    expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id]).toHaveLength(4);
     expect(BUILTIN_NOTE_HISTORY[CREATION_NOTE.id]).toHaveLength(2);
     expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id][0]).not.toBe(hashNoteContent(CORE_NOTE.content));
   });
 
-  it("records the first-release core, the pre-E2 core and the current core in order", () => {
+  it("records the first-release core, the pre-E2 core, the E2 core and the current core in order", () => {
     expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id]).toEqual([
       hashNoteContent(FIRST_RELEASE_CORE.content),
       hashNoteContent(PRE_E2_CORE.content),
+      "8e99123080ad9c73-8778",
       hashNoteContent(CORE_NOTE.content),
     ]);
     expect(hashNoteContent(FIRST_RELEASE_CORE.content)).toBe("85639573ad5c6de4-7118");

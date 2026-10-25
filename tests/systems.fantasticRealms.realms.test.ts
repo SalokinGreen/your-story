@@ -27,9 +27,12 @@ const LOCAL_CALLINGS: Record<string, string[]> = {
   aurelane: ["Herald", "Dragon-Sworn"],
   larkenfell: ["Reeve", "Barrow-Warden"],
   gloamreach: ["Lamplighter", "Penitent"],
+  thornmere: ["Fen-Pilot", "Bell-Diver"],
+  emberhold: ["Forgewright", "Ash-Delver"],
+  "hollow-sky": ["Sky-Rigger", "Cloud-Reader"],
 };
 
-describe("the original realms, grown", () => {
+describe("the realms, grown", () => {
   it("keeps the realm ids and adds a tables note per realm to the world pack", () => {
     expect(REALM_NOTES.map((n) => n.id)).toEqual(
       REALM_IDS.map((r) => `builtin:fantastic-realms:realm-${r}`),
@@ -82,9 +85,9 @@ describe("the original realms, grown", () => {
   it("gives every tables note a d12 miscast, a d20 treasure and a d20 road table that pass the shape check", () => {
     for (const note of REALM_TABLE_NOTES) {
       expect(checkTableShape(note.title, note.content), note.title).toEqual([]);
-      expect(note.content).toMatch(/## \w+ miscasts \(1d12\)/);
-      expect(note.content).toMatch(/## \w+ treasure \(1d20\)/);
-      expect(note.content).toMatch(/## On the road in \w+ \(1d20\)/);
+      expect(note.content).toMatch(/## [\w ]+ miscasts \(1d12\)/);
+      expect(note.content).toMatch(/## [\w ]+ treasure \(1d20\)/);
+      expect(note.content).toMatch(/## On the road in [\w ]+ \(1d20\)/);
       // Treasure carries its XP on every row.
       const treasure = note.content.split("## ").find((s) => / treasure /.test(s.split("\n")[0]))!;
       const rows = treasure.split("\n").filter((l) => /^\d+\. /.test(l));
@@ -106,26 +109,33 @@ describe("the original realms, grown", () => {
     expect(treasure.content).toContain("## Items with a quality (1d12)");
     expect(treasure.content).toContain("## Great finds (1d10)");
     const foes = world.find((n) => n.id.endsWith("table-foes"))!;
-    expect(foes.content.match(/\(1d12\)/g)).toHaveLength(3);
+    expect(foes.content.match(/\(1d12\)/g)).toHaveLength(6);
   });
 
   it("appends the new hash to each changed note's history and keeps the earlier ones", () => {
+    // Shipped by E3 (the first entry), changed again by E4 (the third).
     const earlier: Record<string, string> = {
-      "builtin:fantastic-realms:realm-aurelane": "464ff896bea4e4ea-3148",
-      "builtin:fantastic-realms:realm-larkenfell": "5eaf1f7bfa2b00a6-3366",
-      "builtin:fantastic-realms:realm-gloamreach": "2684b4fcedef4aa7-3173",
       "builtin:fantastic-realms:magic": "a896c79a9cb30da8-5742",
       "builtin:fantastic-realms:callings": "f15cd47a0320d7d3-5395",
       "builtin:fantastic-realms:travel": "013120c154eb0e9c-2586",
       "builtin:fantastic-realms:table-foes": "63b4d6dd61c07f6b-1475",
-      "builtin:fantastic-realms:table-treasure": "8b887815664544c0-1830",
     };
+    const all = world.concat(FANTASTIC_REALMS.packs[0].notes);
     for (const [id, old] of Object.entries(earlier)) {
       const list = BUILTIN_NOTE_HISTORY[id];
       expect(list[0], id).toBe(old);
-      const note = world.concat(FANTASTIC_REALMS.packs[0].notes).find((n) => n.id === id)!;
+      const note = all.find((n) => n.id === id)!;
       expect(list[list.length - 1], id).toBe(hashNoteContent(note.content));
-      expect(list.length, id).toBe(2);
+      expect(list.length, id).toBe(3);
+    }
+    // The original three realm notes did not change in E4.
+    for (const r of ["aurelane", "larkenfell", "gloamreach"]) {
+      expect(BUILTIN_NOTE_HISTORY[`builtin:fantastic-realms:realm-${r}`], r).toHaveLength(2);
+    }
+    // The new realms start a history of one.
+    for (const r of ["thornmere", "emberhold", "hollow-sky"]) {
+      expect(BUILTIN_NOTE_HISTORY[`builtin:fantastic-realms:realm-${r}`], r).toHaveLength(1);
+      expect(BUILTIN_NOTE_HISTORY[`builtin:fantastic-realms:realm-${r}-tables`], r).toHaveLength(1);
     }
   });
 });
