@@ -398,4 +398,8 @@ Design: [`fantastic-realms-design.md`](fantastic-realms-design.md).
 | 209 | "What does a new level give?" | **"A new feat (Recommended)."** |
 | 210 | "What should the first release hold?" | **"Rules + a world + 1 starter (Recommended)."** |
 | 211 | "What should the first world be like?" | **"Many realms, many rests (Recommended)."** A crossroads of realms with different rest rules: a bright heroic realm, a folk frontier, a grim realm. |
+| 212 | The design's open points, as questions. "How does a foe's initiative work, since foes don't roll?" | **"DC + edge words (Recommended)."** |
+| 213 | "Is this XP scale right? Foes give DC × 50 (mook), × 200 (champion), × 1,000 (legend); treasure about its worth in gold; a finished quest 500–2,000." | **"Yes (Recommended)."** |
+| 214 | "Do levels ever raise a hero's maximum hearts?" | **"Every 3rd level."** Levels 3, 6, 9… also give +1 maximum heart. Rejected: never; a feat that is a heart. |
+| 215 | "Should the system's description name its inspirations?" | **"Yes, 'inspired by' (Recommended)."** |
 

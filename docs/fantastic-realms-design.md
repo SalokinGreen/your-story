@@ -1,7 +1,7 @@
 # Fantastic Realms — design
 
 **Status:** design, for the author's review. Not approved for building yet.
-Decisions 201–211 (`docs/decisions.md`). The implementation plan (files,
+Decisions 201–215 (`docs/decisions.md`). The implementation plan (files,
 signatures and slice order) is a second document, written after this one is
 approved (`workflow.md` Phase 3).
 
@@ -139,21 +139,21 @@ goes first:
   plus one per magnitude.
 - **The foe's actions are the costs of the heroes' misses and weak hits.**
 
-Engine combat (`start_combat`) stays off, as in Blood & Bone. *(The foe's
-initiative number is the one rule here the author did not give; it is this
-design's proposal, see §9.)*
+Engine combat (`start_combat`) stays off, as in Blood & Bone. The foe's
+initiative number is decision 212.
 
 ### 2.7 Experience and levels
 
 **Earning XP** (decision 208). Treasure, enemies and quests each carry an XP
 value:
-- **Foes:** the XP is written on each foe in the world notes. Proposed scale:
-  DC × 50 for a mook, × 200 for a champion, × 1,000 for a legend.
+- **Foes:** the XP is written on each foe in the world notes: DC × 50 for a
+  mook, × 200 for a champion, × 1,000 for a legend (decision 213).
 - **Treasure:** a find's XP is written on it, roughly its worth in gold.
-- **Quests:** a finished quest gives a lump (proposed: 500 to 2,000).
+- **Quests:** a finished quest gives 500 to 2,000.
 
 The GM awards XP when a foe is beaten, a treasure is gathered or a quest is
-done. The scale is the world's to tune, and §9 lists it.
+done. At this scale level 2 comes after roughly one adventure; it can be tuned
+after playtesting.
 
 **Levelling.** Going from level N to N + 1 costs **(N + 1) × 1,000 XP**, and
 the counter resets. So level 2 costs 2,000 XP, then level 3 costs 3,000 more.
@@ -163,6 +163,8 @@ the counter resets. So level 2 costs 2,000 XP, then level 3 costs 3,000 more.
   play, and the GM offers it from what happened ("Dragon-Scarred",
   "Friend of the Deep King"). The player may instead sharpen an existing feat
   into a bigger phrase.
+- **Every third level** (3, 6, 9…) also gives **+1 maximum heart**
+  (decision 214). `award_xp` reports it and raises the Hearts meter's cap.
 
 ### 2.8 Starting heroes
 
@@ -278,8 +280,8 @@ implementation plan picks.)*
 
 **`manage_meter`** (existing) keeps the Hearts, XP and Level meters. The
 system's meter set is "Fantastic Realms hero": Hearts 0–3, Level from 1, and
-XP from 0. A level-up can raise a hero's maximum hearts if a later rule wants
-that.
+XP from 0. On every third level `award_xp` raises the Hearts cap by one
+(decision 214).
 
 **State:** burned feats live in `systemState` per hero, beside Blood & Bone's
 existing `dedupKeys`. They are not stored in the sheet note, so the GM cannot
@@ -340,14 +342,20 @@ The mechanics here are the author's own combination of ideas (dice pools from
 descriptive words, d6 hits against a target, burning a feat). Game mechanics
 are not covered by copyright, and no text is copied from the inspirations.
 Unlike Blood & Bone, Fantastic Realms is not built on an SRD, so it owes no
-credit line. An "inspired by" line in the description is a courtesy, and the
-author's call.
+credit line. As a courtesy, the system's description says "Inspired by EZD6,
+Stonetop, Tiny RPG, Mythic Bastion Land and Legends of the Mist"
+(decision 215).
 
-## 9. Open points for the author's review
+## 9. Settled in review
 
-- **The foe initiative proposal** (§2.6): the foe's DC plus its edge words.
-- **The XP scale** (§2.7): foes at DC × 50 / 200 / 1,000, treasure at its
-  worth, quests at 500–2,000. Level 2 then comes after roughly one adventure.
-- **Whether a level ever raises the maximum hearts** (proposed: no, feats
-  only, per decision 209).
-- **Whether the "inspired by" line goes in the system's description.**
+The four points this design proposed are settled:
+
+| # | Decision |
+|---|---|
+| 212 | Foe initiative is the foe's DC plus its edge words. |
+| 213 | The XP scale stands. |
+| 214 | Every third level gives +1 maximum heart. |
+| 215 | The description carries the "inspired by" line. |
+
+Nothing is open. The next step is the author's "build it", then the
+implementation plan.
