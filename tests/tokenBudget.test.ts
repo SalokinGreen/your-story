@@ -9,7 +9,13 @@
  * history was sent at 1.9x what a prose-counting window saw before T1.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { buildGMStagePrompt } from "@/app/misc/ai_staged";
+import {
+  buildGMStagePrompt,
+  renderThreadsSection,
+  THREADS_SECTION_CAP_TOKENS,
+  THREAD_DESCRIPTION_CAP_CHARS,
+} from "@/app/misc/ai_staged";
+import { estimateTokens } from "@/app/misc/tokenCounter";
 import {
   DESIGN_FIXTURE,
   appendTurn,
@@ -131,4 +137,36 @@ describe("the design's four-round turn", () => {
     const unkeyed = await runRecordedTurnWithResult(story, { rounds: designTurnRounds() });
     for (const r of unkeyed.requests) expect(r.body.cacheKey).toBeUndefined();
   }, LONG);
+});
+
+describe("the active-threads section", () => {
+  it("stays under its cap with fifteen long threads, main first, and counts what it left out", () => {
+    const sentence = "The harbour watch keeps a second ledger that nobody is meant to see. ";
+    const threads = Array.from({ length: 15 }, (_, i) => ({
+      id: `t${i}`,
+      title: `Thread ${i}`,
+      description: sentence.repeat(60),
+      status: "active" as const,
+      createdAt: 0,
+      priority: (i === 14 ? "main" : "background") as "main" | "background",
+    }));
+    const section = renderThreadsSection(threads);
+    expect(estimateTokens(section)).toBeLessThanOrEqual(THREADS_SECTION_CAP_TOKENS);
+    const lines = section.split("\n");
+    expect(lines[1]).toContain("[main] Thread 14");
+    expect(lines[1]).toContain("(cut for length)");
+    expect(lines[1]).toContain("ledger that nobody is meant to see. …");
+    expect(lines[1].length).toBeLessThan(THREAD_DESCRIPTION_CAP_CHARS + 80);
+    const shown = lines.filter((l) => /^- \[/.test(l)).length;
+    const overflow = section.match(/… (\d+) more active threads? not shown/);
+    expect(shown + (overflow ? Number(overflow[1]) : 0)).toBe(15);
+  });
+
+  it("keeps a short description whole", () => {
+    const out = renderThreadsSection([
+      { id: "a", title: "A", description: "Short one.", status: "active", priority: "side", createdAt: 0 },
+    ]);
+    expect(out).toContain("- [side] A: Short one.");
+    expect(out).not.toContain("cut for length");
+  });
 });

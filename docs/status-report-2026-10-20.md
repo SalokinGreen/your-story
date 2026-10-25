@@ -637,6 +637,13 @@ Found 2026-10-22; verified in the code.
   TYPES table, the comments, the `LoreType` comment and the Designer's
   `alwaysOn`/`keys` descriptions to match.
 
+> **Update 2026-10-25 (GM prompts, slice 1):** the prompt no longer claims rules
+> notes are pinned. The NOTE TYPES table drops its "always loaded" marks and one
+> line names the pinned types from `PINNED_NOTE_TYPES` (`ai_staged.ts`), the
+> constant the prompt builder pins by, saying `mechanics` is listed by title and
+> read with `read_notes`. The `alwaysOn`/`keys` descriptions in the Designer's
+> tools are still to correct.
+
 ### 6.16 Hidden note text reaches the narrator: the stripper is never called
 
 **Severity: medium (a secret-keeping guarantee that isn't there).** Found

@@ -208,6 +208,8 @@ export const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "formula_roll",
   "opposed_formula",
   "fate_question",
+  // The roll gate's message names it (gateMessages.ts), so Gemini must have it.
+  "gm_roll",
   // Required alongside the dice tools, not optional: they report numbers and
   // `calculate` is the only thing that turns those into a pass/fail verdict.
   "calculate",

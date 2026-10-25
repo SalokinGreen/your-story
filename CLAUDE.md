@@ -383,8 +383,11 @@ always runs **before** the story stage:
    looped through the provider and `executeGMTools()` (`gmExecutor.ts`, which
    works on a `structuredClone` and hands state tools to
    `toolExecutor.executeTools`) until the model stops calling tools or hits
-   `maxToolLoops` (default 10). The roll gate (M2), the plan gate and, in session zero, the setup gate can force
-   `tool_choice: "required"`. After those, a system's **turn-end checks** run
+   `maxToolLoops` (default 10). The plan gate and, in session zero, the setup gate can force
+   `tool_choice: "required"`. The roll gate (M2) sends `rollGateMessage(offeredTools)`
+   (`gateMessages.ts`: it names the roll and oracle tools this story is offered, points at
+   the action the player declared this turn, and lets the GM decline) with an explicit
+   `tool_choice: "auto"`. After those, a system's **turn-end checks** run
    (decision 183, `docs/dawn-gate-design.md`): when a turn ends on prose and
    the turn's words (the GM's visible prose, or any one player line) cross a
    line the system declared and no executed result of the check's tool exists
@@ -1068,8 +1071,10 @@ or plan `create_note` / `edit_note` that changed the setup hashes; or a
 successful start (`start_game`, or a card OK that started the game). An
 approval whose start was refused (`approved` with `started: false`) is a
 violation even though approval is progress, because the setup is not finished. On a violation the turn's round is taken back out of every store
-it reached, and the GM gets `setupGateMessage(next)` with the next step and its
-tool, with `tool_choice: "required"` unless the model rejects a forced choice
+it reached, and the GM gets `setupGateMessage(next, creation, { cause, rejected, multiPlayer })`:
+the cause (`classifySetupRejection`: `prose_question`, `prose_note` or `nothing`), the
+rejected text quoted back in whole sentences, `target_player_name` only when several
+players are at the table, then the next step and its tool, with `tool_choice: "required"` unless the model rejects a forced choice
 (Qwen 3.8, `gmModelRejectsForcedToolChoice`). Claude and Z.ai are downgraded to
 `auto` in `providerCall.ts`, so for them the message is the only forcing.
 - **No fail-open.** After 2 re-prompts the turn ends on

@@ -17,8 +17,8 @@ import { setSlotOverride } from "@/app/misc/reasoningTiers";
 import { CAMPAIGN_SPINE_BEATS, setupEngineLine } from "@/app/misc/campaignPlan";
 import type { StoryData, StoryLore } from "@/app/misc/structs";
 
-const GATE_TEXT = "Setup is not finished and this turn has not moved it forward";
-const M2_TEXT = "This scene requires a roll before the turn can end";
+const GATE_TEXT = "Next step:";
+const M2_TEXT = "This scene is contested";
 const PLAN_TEXT = "write the next beat before the turn can end";
 
 function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
@@ -605,7 +605,9 @@ describe("outside session zero the gates are unchanged", () => {
     await generateStoryTurn(story, "attack", baseOptions, {});
 
     const calls = gmStageCalls();
-    expect(calls).toHaveLength(3);
+    // Round 2 is the prompted round; with no tool call it is a decline, so
+    // the gate does not ask a second time.
+    expect(calls).toHaveLength(2);
     expect(hasUser(calls[1], M2_TEXT)).toBe(true);
     expect(hasUser(calls[1], GATE_TEXT)).toBe(false);
   });
