@@ -958,9 +958,13 @@ report's §11.3. The ones that shape play:
   (`buildPlayerView`) gives a seated party phone the same projection, shown in
   a collapsed "Campaign" section; and the online host's snapshot carries
   `guestCampaignRecord(record)` (`campaign/guestView.ts`, rebuilt from the
-  projection, so secrets, dooms, portents, people, hidden clocks, beats and end
-  states are empty on a guest). Every other part of the §6.12 leak (secret and
-  `gm_plan` notes, the rest of `StoryData`) is unchanged.
+  projection, so the guest's `campaign` field holds no secret, doom, portent,
+  person, hidden clock, beat or end state). That closes the record field only:
+  every scene part's `gmConversation` (the GM's `campaign` calls and reads),
+  its reasoning and `scene.summary` still go to guests whole and can hold the
+  same secrets, as do secret and `gm_plan` notes and the rest of `StoryData`
+  (§6.12). A guest's setup strip reads the rebuilt record, so in session zero
+  its Campaign and Start ticks can lag the host's; it is read-only.
 - `manage_timer` — countdown timers. **On a story with no campaign record,
   `auto_advance` timers never tick (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
   behind `end_gm_thinking`) and was deleted on 2026-10-23 (decision 128).
