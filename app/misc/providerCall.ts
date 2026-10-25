@@ -198,6 +198,12 @@ export interface GenerateError {
  * We keep only the most essential GM tools.
  */
 export const GOOGLE_ESSENTIAL_TOOLS = new Set([
+  // Fantastic Realms (systems/fantastic-realms): offered only to its stories
+  "manage_feats",
+  "feat_roll",
+  "initiative_roll",
+  "award_xp",
+  "take_rest",
   // Core rolling
   "formula_roll",
   "opposed_formula",

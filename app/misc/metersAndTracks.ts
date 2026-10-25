@@ -258,6 +258,31 @@ export function setMeterFloor(
   return { meter: next, change: buildChange(next, before, after, target, 0) };
 }
 
+/**
+ * Moves a meter's `max` (the outer bound `cap` may reach), e.g. Fantastic
+ * Realms' Hearts when a hero gains a maximum heart. Refuses a max below the
+ * floor. With `raiseCap` the cap moves with the max; otherwise the cap is
+ * only pulled down if the new max is below it. The value is clamped; nothing
+ * else changes.
+ */
+export function setMeterMax(
+  meter: Meter,
+  max: number,
+  opts: { raiseCap?: boolean } = {},
+): { meter: Meter; change: MeterChange } {
+  const target = requireInt(max, `${meter.name}: max`);
+  if (target < meter.floor) {
+    throw new MeterError(
+      `${meter.name}: max ${target} is below its floor ${meter.floor}.`,
+    );
+  }
+  const cap = opts.raiseCap ? target : Math.min(meter.cap, target);
+  const before = meter.value;
+  const after = clamp(before, meter.floor, cap);
+  const next = { ...meter, max: target, cap, value: after };
+  return { meter: next, change: buildChange(next, before, after, target, 0) };
+}
+
 /** The highest threshold with at <= value, if any. */
 export function currentThreshold(meter: Meter): MeterThreshold | undefined {
   let found: MeterThreshold | undefined;

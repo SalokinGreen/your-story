@@ -729,6 +729,9 @@ const ROLL_OR_ORACLE_TOOL_NAMES = new Set([
   // The system's own roll (Ironsworn-style); without it the M2 gate would
   // demand another roll after every action roll in a skirmish.
   "action_roll",
+  // Fantastic Realms' own roll, and its initiative.
+  "feat_roll",
+  "initiative_roll",
   // manage_track's progress_roll, as named by rollAwareToolName (gmExecutor.ts).
   "progress_roll",
 ]);

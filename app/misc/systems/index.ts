@@ -5,6 +5,7 @@
 import type { LibraryNote } from "../localNotesLibraryManager";
 import type { LocalAdventure } from "../localAdventureManager";
 import { BLOOD_AND_BONE } from "./blood-and-bone";
+import { FANTASTIC_REALMS } from "./fantastic-realms";
 import type {
   BuiltinAdventure,
   BuiltinNote,
@@ -19,7 +20,9 @@ export type {
   BuiltinSystem,
 } from "./types";
 
-export const BUILTIN_SYSTEMS: BuiltinSystem[] = [BLOOD_AND_BONE];
+// Blood & Bone first: with no recorded system, a story holding both cores
+// resolves to it (docs/fantastic-realms-design.md 5.1).
+export const BUILTIN_SYSTEMS: BuiltinSystem[] = [BLOOD_AND_BONE, FANTASTIC_REALMS];
 
 export function isBuiltinId(id: string | undefined): boolean {
   return typeof id === "string" && id.startsWith("builtin:");

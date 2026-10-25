@@ -467,6 +467,7 @@ export default function LorePage(props: LorePageProps) {
       <div className={selectedLore ? "hidden lg:block empty:hidden" : "empty:hidden"}>
         <MetersPanel
           meters={storyData.meters}
+          heroFeats={storyData.systemState?.fantasticRealms?.heroes}
           progressTracks={storyData.progressTracks}
           activeChallenge={storyData.activeChallenge}
         />

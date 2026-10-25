@@ -767,6 +767,37 @@ report's §11.3. The ones that shape play:
   `night-ended` (`blood-and-bone/turnEndChecks.ts`). `GenerateRequestBody.toolChoice`
   now also takes `"auto"`, which every provider honours (Google's unset
   default is still `required`).
+- **Fantastic Realms is the second default system** (decisions 201–219,
+  `docs/fantastic-realms-design.md`, plan `docs/fantastic-realms-plan.md`;
+  `app/misc/systems/fantastic-realms/`). Words are power: a hero is a concept
+  and feats, the pool is 1d6 + one per feat that applies, each die that
+  equals or beats the DC (2–6) is a success, and 0/1/2/3+ successes are miss,
+  weak hit, hit, strong hit (+1 magnitude per success past 3). Burning a feat
+  is one sure success plus its die, then the feat is out until a rest. Three
+  hearts; only players roll (a foe is a stat line: DC with its words counted,
+  words, hearts, XP); a foe's turn is a threat the targeted heroes answer;
+  damage weak 1 / hit 1 / strong 2 +1 per magnitude; XP to every hero present,
+  each source once, level N→N+1 costs (N+1)×1,000, a feat per level and +1 max
+  heart every third. **Systems now declare their tools** (`BuiltinSystem.tools`;
+  `resolveSystem(...).tools` is the GM's system list, Blood & Bone's four
+  unchanged and the legacy tools-on switch still giving them) **and a story
+  records its system** (`systemState.systemId`, `recordSystemId` at story start
+  and on load once the core is held), so imported or deleted notes never switch
+  a campaign. Its tools: `manage_meter` (the "Fantastic Realms hero" set: Hearts,
+  Level, XP), `manage_feats` (stable feat ids, so a burn survives a rename),
+  `feat_roll` (the dice paths of `action_roll`, burns recorded only on a
+  completed roll, a refusal is an engine error), `initiative_roll`, `award_xp`
+  (the only writer of Level and XP; `setMeterMax` grows Hearts and moves the XP
+  max) and `take_rest` (heals, un-burns, returns the realm's rest rule from
+  `BuiltinSystem.rests`). The hero state is `systemState.fantasticRealms`,
+  shown in the live block (`formatHeroFeatsState`) and as feat chips on the
+  Meters panel; the outcome judge reads `feat_roll` (a `"hit"` tier). The note
+  loader follows each system's `coreNoteId`, `defaultSetting` and
+  `crossSettingScope`, and shared setup steps take `stepHints`. The world is the
+  Crossroads (Aurelane, Larkenfell, Gloamreach, each with its own rest); the
+  starter is *Wolfwillow Crossing*, an arrival in a Larkenfell village on
+  Lantern Eve, which copies every realm (a starter's story is seeded as already
+  offered every note, so the loader would never add one).
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9
   chaos factor) and the 45 **built-in** Mythic element tables. The
   adventure's own tables are `StoryLore` notes with `type: "table"` that name
@@ -1436,7 +1467,7 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 ## Directory map
 
 - `app/misc/systems/` — the built-in default systems registry
-  (`BUILTIN_SYSTEMS`, holding Blood & Bone in `blood-and-bone/`), `resolveSystem()`, the
+  (`BUILTIN_SYSTEMS`: Blood & Bone in `blood-and-bone/`, then Fantastic Realms in `fantastic-realms/`), `resolveSystem()`, the
   `BuiltinSystem` shapes, and the converters the library uses
   (`builtinPackToLibraryNotes`, `builtinAdventureToLocal`). Built-ins live
   in memory and are never stored; `app/story/MetersPanel.tsx` is the

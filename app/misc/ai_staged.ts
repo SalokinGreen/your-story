@@ -27,8 +27,8 @@ import {
   type SetupProgress,
 } from "@/app/misc/campaignPlan";
 import { cleanString } from "@/app/misc/textUtils";
-import { currentThreshold, filledBoxes } from "@/app/misc/metersAndTracks";
-import { resolveSystem, SYSTEM_TOOL_NAMES } from "@/app/misc/systems/resolve";
+import { currentThreshold, filledBoxes, normalizeKey } from "@/app/misc/metersAndTracks";
+import { resolveSystem } from "@/app/misc/systems/resolve";
 import {
   getCreationProgress,
   getRequiredSteps,
@@ -510,6 +510,39 @@ export function formatMetersAndTracksState(
       `${kind}: ${t.name} (${t.owner}) - ${t.rank}, ${boxes} box${boxes === 1 ? "" : "es"}${extra > 0 ? ` + ${extra} tick${extra === 1 ? "" : "s"}` : ""}`,
     );
   }
+  return lines.join("\n");
+}
+
+/**
+ * Fantastic Realms: each hero's feats, burned ones marked, and the realm. A
+ * hero's name is spelled as their meters spell it. Empty for every story
+ * without hero state, so it appears only in a Fantastic Realms story. Lives
+ * in the live block with the meters (the cache rule).
+ */
+export function formatHeroFeatsState(
+  storyData: Pick<StoryData, "meters" | "systemState">,
+): string {
+  const fr = storyData.systemState?.fantasticRealms;
+  const keys = fr ? Object.keys(fr.heroes ?? {}) : [];
+  if (!fr || (keys.length === 0 && !fr.realm)) return "";
+  const lines: string[] = ["## 🛡️ HEROES' FEATS"];
+  for (const key of keys) {
+    const hero = fr.heroes[key];
+    const name =
+      hero.name ??
+      (storyData.meters ?? []).find(
+        (m) => normalizeKey(m.owner) === key && m.name === "Hearts",
+      )?.owner ??
+      key;
+    const feats =
+      hero.feats.length > 0
+        ? hero.feats
+            .map((f) => (f.burned ? `${f.wording} (burned)` : f.wording))
+            .join(", ")
+        : "none yet";
+    lines.push(`${name} — feats: ${feats}`);
+  }
+  if (fr.realm) lines.push(`Realm: ${fr.realm}`);
   return lines.join("\n");
 }
 
@@ -1872,7 +1905,12 @@ export function buildGMStagePrompt({
 
   // Meters, tracks and the active challenge: shown whenever there is
   // something to show, whether or not the system tools are offered.
-  const metersSection = formatMetersAndTracksState(storyData);
+  const metersSection = [
+    formatMetersAndTracksState(storyData),
+    formatHeroFeatsState(storyData),
+  ]
+    .filter(Boolean)
+    .join("\n");
   const challengeSection = formatActiveChallengeState(storyData.activeChallenge);
 
   // Pending random events and director moves - must be surfaced here (the
@@ -2353,7 +2391,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     ...(manualDiceMode ? ["ask_for_roll"] : []),
     // Meters, tracks, sessions and action rolls: only for stories that use a
     // system (decision 79), so other adventures do not pay for four schemas
-    ...(resolveSystem(storyData).usesSystemTools ? SYSTEM_TOOL_NAMES : []),
+    ...resolveSystem(storyData).tools,
     // Pause and ask the player(s) a predefined-choice + free-text question
     "ask_question",
     // Report a resolved check against the active challenge (rolls nothing)

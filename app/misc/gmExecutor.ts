@@ -25,7 +25,23 @@ import {
   Meter,
   ProgressTrack,
   SystemState,
+  MeterSet,
+  FantasticRealmsState,
+  FantasticRealmsHero,
+  HeroFeat,
 } from "./structs";
+import {
+  FALLBACK_HERO_SET,
+  HERO_SET_NAME,
+  applyXp,
+  countSuccesses,
+  foeDamage,
+  levelCost,
+  normaliseFeat,
+  resultFor,
+  tierWord,
+  type FeatTier,
+} from "./systems/fantastic-realms/engine";
 import {
   ACTION_ADDS_CAP,
   MeterError,
@@ -46,6 +62,7 @@ import {
   resolveAgainstChallengeDice,
   setMeterCap,
   setMeterFloor,
+  setMeterMax,
   setMeterValue,
   type MeterChange,
   type RollOutcome,
@@ -84,6 +101,11 @@ import {
   ManageTrackAction,
   EndSessionParams,
   ActionRollParams,
+  ManageFeatsParams,
+  FeatRollParams,
+  InitiativeRollParams,
+  AwardXpParams,
+  TakeRestParams,
   // Combat tools
   StartCombatParams,
   AddCombatantParams,
@@ -244,6 +266,11 @@ export interface GMToolResult {
     | GMManageTrackResult
     | GMEndSessionResult
     | GMActionRollResult
+    | GMManageFeatsResult
+    | GMFeatRollResult
+    | GMInitiativeRollResult
+    | GMAwardXpResult
+    | GMTakeRestResult
     // Combat results
     | GMStartCombatResult
     | GMAddCombatantResult
@@ -689,6 +716,52 @@ export interface GMActionRollResult {
   owner?: string;
 }
 
+export interface GMManageFeatsResult {
+  type: "manage_feats";
+  hero: string;
+  action: "add" | "rename" | "remove";
+  feats: { id: string; wording: string; burned: boolean }[];
+}
+
+export interface GMFeatRollResult {
+  type: "feat_roll";
+  hero: string;
+  feats: string[];
+  burned?: string;
+  dc: number;
+  dice: number[];
+  /** Successes counted, the burned feat's sure success included. */
+  successes: number;
+  outcome: FeatTier;
+  magnitude: number;
+}
+
+export interface GMInitiativeRollResult {
+  type: "initiative_roll";
+  rolls: { hero: string; die: number; edges: string[]; total: number }[];
+}
+
+export interface GMAwardXpResult {
+  type: "award_xp";
+  amount: number;
+  source: string;
+  credited: string[];
+  refused: string[];
+  levelUps: {
+    hero: string;
+    level: number;
+    levelsGained: number[];
+    heartsGained: number;
+  }[];
+}
+
+export interface GMTakeRestResult {
+  type: "take_rest";
+  rested: string[];
+  realm?: string;
+  condition?: string;
+}
+
 export interface GMTriggerTimerResult {
   type: "trigger_timer";
   timer: string;
@@ -862,6 +935,7 @@ const OUTCOME_BEARING_TOOL_NAMES = new Set([
   "record_challenge_result",
   "action_roll",
   "ask_for_roll",
+  "feat_roll",
 ]);
 
 /**
@@ -1303,6 +1377,32 @@ export async function executeGMTools(
             modified,
             interaction
           );
+          break;
+        // Fantastic Realms tools
+        case "manage_feats":
+          result = executeManageFeats(call.id, params as ManageFeatsParams, modified);
+          break;
+        case "feat_roll":
+          result = await executeFeatRoll(
+            call.id,
+            params as FeatRollParams,
+            modified,
+            interaction
+          );
+          break;
+        case "initiative_roll":
+          result = await executeInitiativeRoll(
+            call.id,
+            params as InitiativeRollParams,
+            modified,
+            interaction
+          );
+          break;
+        case "award_xp":
+          result = executeAwardXp(call.id, params as AwardXpParams, modified);
+          break;
+        case "take_rest":
+          result = executeTakeRest(call.id, params as TakeRestParams, modified);
           break;
         // NPC management tools
         case "add_npc":
@@ -6357,6 +6457,542 @@ async function executeActionRoll(
       move: params.move,
       owner: params.owner,
     } as GMActionRollResult,
+    contextForStory: ctx,
+  };
+}
+
+// ============================================
+// FANTASTIC REALMS TOOL EXECUTION
+// docs/fantastic-realms-design.md section 5.2; arithmetic in
+// systems/fantastic-realms/engine.ts
+// ============================================
+
+function frFail(toolName: string, toolCallId: string, message: string): GMToolResult {
+  return systemErrorResult(toolName, toolCallId, message);
+}
+
+/** The tools the story's resolved system offers; a Fantastic Realms tool in any other story is refused. */
+function frNotOffered(
+  toolName: string,
+  toolCallId: string,
+  storyData: StoryData
+): GMToolResult | null {
+  if (resolveSystem(storyData).tools.includes(toolName)) return null;
+  return frFail(toolName, toolCallId, `${toolName} is not part of this story's system`);
+}
+
+function frState(storyData: StoryData): FantasticRealmsState {
+  const sys = ensureSystemState(storyData);
+  if (!sys.fantasticRealms || typeof sys.fantasticRealms.heroes !== "object") {
+    sys.fantasticRealms = { ...sys.fantasticRealms, heroes: {} };
+  }
+  return sys.fantasticRealms;
+}
+
+function frHeroName(params: { hero?: unknown }): string {
+  return typeof params.hero === "string" ? params.hero.trim() : "";
+}
+
+/** A hero's name as the meters spell it, else the key. */
+function frDisplayName(storyData: StoryData, key: string): string {
+  const named = storyData.systemState?.fantasticRealms?.heroes?.[key]?.name;
+  if (named) return named;
+  const m = (storyData.meters ?? []).find(
+    (x) => normalizeKey(x.owner) === key && x.name === "Hearts"
+  );
+  return m?.owner ?? key;
+}
+
+function frFeatList(hero: FantasticRealmsHero): string {
+  return hero.feats.length > 0
+    ? hero.feats.map((f) => (f.burned ? `${f.wording} (burned)` : f.wording)).join(", ")
+    : "none yet";
+}
+
+/** The hero set the system carries by name, else the plan's definition. */
+function frHeroSet(storyData: StoryData): MeterSet {
+  const sets = resolveSystem(storyData).meterSets;
+  return (
+    sets.find((s) => normalizeKey(s.name) === normalizeKey(HERO_SET_NAME)) ??
+    FALLBACK_HERO_SET
+  );
+}
+
+function executeManageFeats(
+  toolCallId: string,
+  params: ManageFeatsParams,
+  storyData: StoryData
+): GMToolResult {
+  const fail = (m: string) => frFail("manage_feats", toolCallId, m);
+  const off = frNotOffered("manage_feats", toolCallId, storyData);
+  if (off) return off;
+  const name = frHeroName(params);
+  if (!name) return fail(`manage_feats needs "hero"`);
+  const feat = typeof params.feat === "string" ? params.feat.trim() : "";
+  if (!feat) return fail(`manage_feats needs "feat"`);
+  const key = normalizeKey(name);
+  const state = frState(storyData);
+  const existing = state.heroes[key];
+  const match = (w: string) => normaliseFeat(w);
+
+  let hero: FantasticRealmsHero;
+  let line: string;
+  if (params.action === "add") {
+    hero = existing ?? { name, feats: [], rewards: [] };
+    if (!hero.name) hero = { ...hero, name };
+    if (!match(feat)) return fail(`A feat needs words`);
+    if (hero.feats.some((f) => match(f.wording) === match(feat))) {
+      return fail(`${name} already has the feat "${feat}"`);
+    }
+    const n =
+      hero.feats.reduce((mx, f) => Math.max(mx, Number(/(\d+)$/.exec(f.id)?.[1] ?? 0)), 0) + 1;
+    hero = { ...hero, feats: [...hero.feats, { id: `feat-${n}`, wording: feat, burned: false }] };
+    line = `${name} gained the feat "${feat}"`;
+  } else if (params.action === "rename" || params.action === "remove") {
+    if (!existing) {
+      return fail(`${name} has no feats recorded. Add them with manage_feats first.`);
+    }
+    const target = existing.feats.find((f) => match(f.wording) === match(feat));
+    if (!target) {
+      return fail(`${name} has no feat "${feat}". Feats: ${frFeatList(existing)}`);
+    }
+    if (params.action === "remove") {
+      hero = { ...existing, feats: existing.feats.filter((f) => f.id !== target.id) };
+      line = `${name} lost the feat "${target.wording}"`;
+    } else {
+      const next = typeof params.new_wording === "string" ? params.new_wording.trim() : "";
+      if (!match(next)) return fail(`rename needs "new_wording"`);
+      if (existing.feats.some((f) => f.id !== target.id && match(f.wording) === match(next))) {
+        return fail(`${name} already has the feat "${next}"`);
+      }
+      hero = {
+        ...existing,
+        feats: existing.feats.map((f) => (f.id === target.id ? { ...f, wording: next } : f)),
+      };
+      line = `${name}'s feat "${target.wording}" is now "${next}"${target.burned ? " (still burned)" : ""}`;
+    }
+  } else {
+    return fail(`manage_feats action must be add, rename or remove`);
+  }
+  state.heroes[key] = hero;
+  return {
+    toolName: "manage_feats",
+    toolCallId,
+    success: true,
+    result: {
+      type: "manage_feats",
+      hero: name,
+      action: params.action,
+      feats: hero.feats.map((f) => ({ ...f })),
+    } as GMManageFeatsResult,
+    contextForStory: `[Feats: ${line}. ${name}'s feats: ${frFeatList(hero)}]`,
+  };
+}
+
+/**
+ * Resolves the named feats against a hero's list: each must be one of the
+ * hero's, unburned and named once. Returns the matched feats or a message.
+ */
+function frResolveFeats(
+  hero: FantasticRealmsHero,
+  who: string,
+  named: unknown
+): { feats: HeroFeat[] } | { error: string } {
+  if (!Array.isArray(named) || named.some((f) => typeof f !== "string")) {
+    return { error: `"feats" must be a list of feat wordings` };
+  }
+  const out: HeroFeat[] = [];
+  for (const w of named as string[]) {
+    const f = hero.feats.find((x) => normaliseFeat(x.wording) === normaliseFeat(w));
+    if (!f) return { error: `${who} has no feat "${w}". Feats: ${frFeatList(hero)}` };
+    if (f.burned) {
+      return { error: `${who}'s feat "${f.wording}" is burned and adds nothing until a rest` };
+    }
+    if (out.some((x) => x.id === f.id)) {
+      return { error: `The feat "${f.wording}" is named twice; each feat counts once per roll` };
+    }
+    out.push(f);
+  }
+  return { feats: out };
+}
+
+async function executeFeatRoll(
+  toolCallId: string,
+  params: FeatRollParams,
+  storyData: StoryData,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
+  const fail = (m: string) => frFail("feat_roll", toolCallId, m);
+  const off = frNotOffered("feat_roll", toolCallId, storyData);
+  if (off) return off;
+  const name = frHeroName(params);
+  if (!name) return fail(`feat_roll needs "hero"`);
+  const state = frState(storyData);
+  const key = normalizeKey(name);
+  const hero = state.heroes[key];
+  if (!hero) {
+    return fail(`${name} has no feats recorded. Add them with manage_feats first.`);
+  }
+  const dc = params.dc;
+  if (typeof dc !== "number" || !Number.isInteger(dc) || dc < 2 || dc > 6) {
+    return fail(`dc must be a whole number from 2 to 6 (DC 1 needs no roll: it happens, as a hit)`);
+  }
+  const resolved = frResolveFeats(hero, name, params.feats ?? []);
+  if ("error" in resolved) return fail(resolved.error);
+  const used = resolved.feats;
+  let burned: HeroFeat | undefined;
+  if (params.burn !== undefined && params.burn !== null && String(params.burn).trim() !== "") {
+    burned = used.find((f) => normaliseFeat(f.wording) === normaliseFeat(String(params.burn)));
+    if (!burned) {
+      return fail(
+        used.length === 0
+          ? `Nothing to burn: the roll names no feats, and the base die cannot be burned`
+          : `"${params.burn}" must be one of the feats in this roll to be burned`
+      );
+    }
+  }
+
+  const poolSize = 1 + used.length;
+  let dice: number[];
+  if (params.dice !== undefined) {
+    if (storyData.diceMode !== "manual") {
+      return fail(
+        `"dice" is only for manual dice mode, where the player reports their physical roll. Leave it out and the engine rolls.`
+      );
+    }
+    const d = params.dice;
+    if (
+      !Array.isArray(d) ||
+      d.length !== poolSize ||
+      d.some((x) => typeof x !== "number" || !Number.isInteger(x) || x < 1 || x > 6)
+    ) {
+      return fail(`dice must be ${poolSize} faces (1-6), one per die in the pool`);
+    }
+    dice = [...d];
+  } else {
+    try {
+      const [r] = await rollFormulasMaybePhysical(
+        [`${poolSize}d6`],
+        { reason: params.reason || "Feat roll" },
+        interaction
+      );
+      dice = flattenRolls(r.rolls);
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : "The dice could not be rolled");
+    }
+  }
+
+  const rolled = countSuccesses(dice, dc);
+  const successes = rolled + (burned ? 1 : 0);
+  const result = resultFor(successes);
+  // The burn is recorded only now that the faces exist.
+  if (burned) {
+    const burnedId = burned.id;
+    state.heroes[key] = {
+      ...hero,
+      feats: hero.feats.map((f) => (f.id === burnedId ? { ...f, burned: true } : f)),
+    };
+  }
+  const word = tierWord(result.tier) + (result.magnitude > 0 ? ` +${result.magnitude}` : "");
+  const pool = used.length > 0 ? ` (${used.map((f) => f.wording).join(", ")})` : "";
+  let ctx = `[Feat roll - ${name}${pool} DC ${dc}: ${poolSize}d6 [${dice.join(", ")}] → ${rolled} ${rolled === 1 ? "success" : "successes"}${burned ? ` + burned ${burned.wording} (1 sure success) = ${successes}` : ""} → ${word}]`;
+  if (burned) ctx += `\n[Burned: ${burned.wording} adds nothing until a rest]`;
+  if (result.tier !== "miss") {
+    const dmg = foeDamage(result);
+    ctx += `\n[If this struck a foe: it loses ${dmg} ${dmg === 1 ? "heart" : "hearts"}]`;
+  }
+  ctx += `\n[Reason: ${params.reason}]`;
+  return {
+    toolName: "feat_roll",
+    toolCallId,
+    // Like action_roll, success carries the outcome: a miss is a failed check.
+    success: result.tier !== "miss",
+    result: {
+      type: "feat_roll",
+      hero: name,
+      feats: used.map((f) => f.wording),
+      burned: burned?.wording,
+      dc,
+      dice,
+      successes,
+      outcome: result.tier,
+      magnitude: result.magnitude,
+    } as GMFeatRollResult,
+    contextForStory: ctx,
+  };
+}
+
+async function executeInitiativeRoll(
+  toolCallId: string,
+  params: InitiativeRollParams,
+  storyData: StoryData,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
+  const fail = (m: string) => frFail("initiative_roll", toolCallId, m);
+  const off = frNotOffered("initiative_roll", toolCallId, storyData);
+  if (off) return off;
+  const entries = Array.isArray(params.heroes) ? params.heroes : [];
+  if (entries.length === 0) return fail(`initiative_roll needs at least one hero`);
+  const state = frState(storyData);
+  const plan: { name: string; edges: string[] }[] = [];
+  for (const e of entries) {
+    const name = frHeroName(e);
+    if (!name) return fail(`every initiative entry needs a "hero"`);
+    const edgeNames = e.edge_feats ?? [];
+    let edges: string[] = [];
+    if (edgeNames.length > 0) {
+      const hero = state.heroes[normalizeKey(name)];
+      if (!hero) return fail(`${name} has no feats recorded. Add them with manage_feats first.`);
+      const r = frResolveFeats(hero, name, edgeNames);
+      if ("error" in r) return fail(r.error);
+      edges = r.feats.map((f) => f.wording);
+    }
+    plan.push({ name, edges });
+  }
+  let faces: number[];
+  if (params.dice !== undefined) {
+    if (storyData.diceMode !== "manual") {
+      return fail(
+        `"dice" is only for manual dice mode, where the player reports their physical roll. Leave it out and the engine rolls.`
+      );
+    }
+    const d = params.dice;
+    const ok =
+      Array.isArray(d) &&
+      d.length === plan.length &&
+      d.every((f) => typeof f === "number" && Number.isInteger(f) && f >= 1 && f <= 6);
+    if (!ok) {
+      return fail(`dice must be ${plan.length} faces (1-6), one per hero in order`);
+    }
+    faces = [...d];
+  } else {
+    try {
+      const rolled = await rollFormulasMaybePhysical(
+        plan.map(() => "1d6"),
+        { reason: "Initiative" },
+        interaction
+      );
+      faces = rolled.map((r) => flattenRolls(r.rolls)[0]);
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : "The dice could not be rolled");
+    }
+  }
+  const rows = plan.map((p, i) => ({
+    hero: p.name,
+    die: faces[i],
+    edges: p.edges,
+    total: faces[i] + p.edges.length,
+  }));
+  const lines = rows.map(
+    (r) =>
+      `[Initiative: ${r.hero} ${r.total} (d6 ${r.die}${r.edges.length > 0 ? ` + ${r.edges.length} for ${r.edges.join(", ")}` : ""})]`
+  );
+  lines.push(
+    `[Foes' numbers are their DC + 1 per edge word, no roll. Highest goes first; ties go to the heroes.]`
+  );
+  return {
+    toolName: "initiative_roll",
+    toolCallId,
+    success: true,
+    result: { type: "initiative_roll", rolls: rows } as GMInitiativeRollResult,
+    contextForStory: lines.join("\n"),
+  };
+}
+
+/** The heroes a call names (default all) as keys, or a message. */
+function frSelectHeroes(
+  storyData: StoryData,
+  named: unknown
+): { keys: string[] } | { error: string } {
+  const all = Object.keys(frState(storyData).heroes);
+  if (named === undefined || named === null) {
+    return all.length > 0
+      ? { keys: all }
+      : { error: `No heroes are recorded yet. Add their feats with manage_feats first.` };
+  }
+  if (!Array.isArray(named) || named.some((n) => typeof n !== "string")) {
+    return { error: `"heroes" must be a list of names` };
+  }
+  const keys: string[] = [];
+  for (const n of named as string[]) {
+    const k = normalizeKey(n);
+    const hasMeters = (storyData.meters ?? []).some((m) => normalizeKey(m.owner) === k);
+    if (!all.includes(k) && !hasMeters) {
+      return {
+        error: `Unknown hero "${n}". Heroes: ${all.map((x) => frDisplayName(storyData, x)).join(", ") || "none"}`,
+      };
+    }
+    if (!keys.includes(k)) keys.push(k);
+  }
+  return keys.length > 0 ? { keys } : { error: `"heroes" is empty` };
+}
+
+function executeAwardXp(
+  toolCallId: string,
+  params: AwardXpParams,
+  storyData: StoryData
+): GMToolResult {
+  const fail = (m: string) => frFail("award_xp", toolCallId, m);
+  const off = frNotOffered("award_xp", toolCallId, storyData);
+  if (off) return off;
+  const amount = params.amount;
+  if (typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
+    return fail(`amount must be a positive whole number`);
+  }
+  const source = typeof params.source === "string" ? params.source.trim() : "";
+  if (!source) return fail(`award_xp needs a "source" (the foe, treasure or quest)`);
+  const picked = frSelectHeroes(storyData, params.heroes);
+  if ("error" in picked) return fail(picked.error);
+
+  const state = frState(storyData);
+  const set = frHeroSet(storyData);
+  const lines: string[] = [];
+  const credited: string[] = [];
+  const refused: string[] = [];
+  const levelUps: GMAwardXpResult["levelUps"] = [];
+  let meters: Meter[] = storyData.meters ?? [];
+  const rewardsAfter: Record<string, FantasticRealmsHero> = {};
+
+  try {
+    for (const key of picked.keys) {
+      const hero = state.heroes[key] ?? { feats: [], rewards: [] };
+      const who = frDisplayName(storyData, key);
+      if (hero.rewards.some((r) => normaliseFeat(r) === normaliseFeat(source))) {
+        refused.push(who);
+        continue;
+      }
+      // Create the hero set if missing, as create_set does.
+      const { created } = createMeterSet(set, who, meters);
+      if (created.length > 0) meters = [...meters, ...created];
+      const level = findMeter(meters, who, "Level");
+      const xp = findMeter(meters, who, "XP");
+      const hearts = findMeter(meters, who, "Hearts");
+      if (!level || !xp || !hearts) {
+        return fail(`${who} lacks a Level, XP or Hearts meter; the "${set.name}" set makes them`);
+      }
+      const out = applyXp(level.value, xp.value, amount);
+      let nextXp = setMeterMax(xp, levelCost(out.level), { raiseCap: true }).meter;
+      nextXp = setMeterValue(nextXp, out.xp).meter;
+      const nextLevel = setMeterValue(level, out.level).meter;
+      let nextHearts = hearts;
+      for (let i = 0; i < out.heartLevels.length; i++) {
+        nextHearts = setMeterMax(nextHearts, nextHearts.max + 1, { raiseCap: true }).meter;
+        nextHearts = adjustMeter(nextHearts, 1).meter;
+      }
+      meters = meters.map((m) =>
+        m.id === xp.id ? nextXp : m.id === level.id ? nextLevel : m.id === hearts.id ? nextHearts : m
+      );
+      rewardsAfter[key] = { ...hero, rewards: [...hero.rewards, source] };
+      credited.push(who);
+      let line = `${who}: +${amount} XP (${source}) → level ${out.level}, ${out.xp}/${nextXp.max} XP`;
+      if (out.levelsGained.length > 0) {
+        line += `. ${out.levelsGained.length === 1 ? `Level ${out.levelsGained[0]} reached` : `Levels ${out.levelsGained.join(", ")} reached`}. Offer ${out.levelsGained.length === 1 ? "a new feat" : `${out.levelsGained.length} new feats`}`;
+        if (out.heartLevels.length > 0) {
+          line += `. +${out.heartLevels.length} maximum heart${out.heartLevels.length === 1 ? "" : "s"} (now ${nextHearts.value}/${nextHearts.max})`;
+        }
+      }
+      lines.push(`[XP: ${line}]`);
+      levelUps.push({
+        hero: who,
+        level: out.level,
+        levelsGained: out.levelsGained,
+        heartsGained: out.heartLevels.length,
+      });
+    }
+  } catch (e) {
+    if (e instanceof MeterError) return fail(e.message);
+    throw e;
+  }
+  if (credited.length === 0) {
+    return fail(
+      `"${source}" was already credited to ${refused.join(", ")}; a source counts once per hero`
+    );
+  }
+  storyData.meters = meters;
+  Object.assign(state.heroes, rewardsAfter);
+  if (refused.length > 0) {
+    lines.push(`[XP: refused for ${refused.join(", ")}: "${source}" was already credited to them]`);
+  }
+  return {
+    toolName: "award_xp",
+    toolCallId,
+    success: true,
+    result: {
+      type: "award_xp",
+      amount,
+      source,
+      credited,
+      refused,
+      levelUps,
+    } as GMAwardXpResult,
+    contextForStory: lines.join("\n"),
+  };
+}
+
+function executeTakeRest(
+  toolCallId: string,
+  params: TakeRestParams,
+  storyData: StoryData
+): GMToolResult {
+  const fail = (m: string) => frFail("take_rest", toolCallId, m);
+  const off = frNotOffered("take_rest", toolCallId, storyData);
+  if (off) return off;
+  const system = resolveSystem(storyData).system;
+  const rests = system?.rests ?? {};
+  // The notes write realms capitalised ("Aurelane") and the rests are keyed
+  // in lower case: match loosely, and only on the map's own keys.
+  const realmArg =
+    typeof params.realm === "string" ? normalizeKey(params.realm) : "";
+  const knowsRealm = (key: string) => Object.prototype.hasOwnProperty.call(rests, key);
+  if (realmArg && Object.keys(rests).length > 0 && !knowsRealm(realmArg)) {
+    return fail(`Unknown realm "${params.realm}". Realms: ${Object.keys(rests).join(", ")}`);
+  }
+  const picked = frSelectHeroes(storyData, params.heroes);
+  if ("error" in picked) return fail(picked.error);
+
+  const state = frState(storyData);
+  if (realmArg) state.realm = realmArg;
+  const realm = state.realm;
+  let meters: Meter[] = storyData.meters ?? [];
+  const rested: string[] = [];
+  const healed: string[] = [];
+  for (const key of picked.keys) {
+    const who = frDisplayName(storyData, key);
+    const hero = state.heroes[key];
+    if (hero) {
+      state.heroes[key] = {
+        ...hero,
+        feats: hero.feats.map((f) => (f.burned ? { ...f, burned: false } : f)),
+      };
+    }
+    const hearts = findMeter(meters, who, "Hearts");
+    if (hearts) {
+      const next = setMeterValue(hearts, hearts.cap).meter;
+      meters = meters.map((m) => (m.id === hearts.id ? next : m));
+      healed.push(`${who} ${next.value}/${next.cap}`);
+    }
+    rested.push(who);
+  }
+  storyData.meters = meters;
+  const condition = realm && knowsRealm(realm) ? rests[realm] : undefined;
+  let ctx = `[Rest: ${rested.join(", ")} rested. Every heart is healed${healed.length > 0 ? ` (${healed.join(", ")})` : ""} and every feat is un-burned.]`;
+  if (condition) {
+    ctx += `\n[Rest condition in ${realm}: ${condition} Whether the fiction allows it is your call.]`;
+  } else if (realm) {
+    ctx += `\n[Realm: ${realm}]`;
+  } else {
+    ctx += `\n[No realm is recorded; name it with the realm argument so its rest condition can be checked.]`;
+  }
+  return {
+    toolName: "take_rest",
+    toolCallId,
+    success: true,
+    result: {
+      type: "take_rest",
+      rested,
+      realm,
+      condition,
+    } as GMTakeRestResult,
     contextForStory: ctx,
   };
 }

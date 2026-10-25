@@ -207,6 +207,8 @@ const DICE_TOOLS = [
   "calculate",
   "record_challenge_result",
   "action_roll",
+  "feat_roll",
+  "initiative_roll",
 ];
 
 /**

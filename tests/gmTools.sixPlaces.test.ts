@@ -14,12 +14,15 @@ import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { TOOL_LABELS } from "@/app/misc/gmToolLabels";
 import { GOOGLE_ESSENTIAL_TOOLS } from "@/app/misc/providerCall";
 import type { StoryData } from "@/app/misc/structs";
+import { BUILTIN_SYSTEMS } from "@/app/misc/systems";
+import type { BuiltinSystem } from "@/app/misc/systems/types";
 import { warmTokenizer } from "./helpers/turnHarness";
 
 vi.setConfig({ testTimeout: 120_000 });
 
+// (take_rest was removed with the legacy rest system and came back in 2026-10 as
+// Fantastic Realms' own tool, so it is no longer on this list.)
 const REMOVED_TOOLS = [
-  "take_rest",
   "request_continuation",
   "end_gm_thinking",
   "reaction_check",
@@ -64,9 +67,30 @@ function offered(storyData: StoryData, imageToolAvailable = false): string[] {
 // switch (Manual Dice Mode, a system story, pictures).
 let whitelist: Set<string>;
 
+// Fantastic Realms is registered in slice 6; until then a stand-in with its
+// tool list lets the whitelist see its five tools.
+const FR_STAND_IN: BuiltinSystem = {
+  id: "fantastic-realms",
+  title: "Fantastic Realms (test stand-in)",
+  description: "",
+  packs: [],
+  starters: [],
+  meterSets: [],
+  tools: ["manage_meter", "manage_feats", "feat_roll", "initiative_roll", "award_xp", "take_rest"],
+};
+
 beforeAll(async () => {
   await warmTokenizer();
+  const registered = BUILTIN_SYSTEMS.some((s) => s.id === FR_STAND_IN.id);
+  if (!registered) BUILTIN_SYSTEMS.push(FR_STAND_IN);
+  const frOffered = offered(
+    story({
+      systemState: { systemId: "fantastic-realms", sessionCount: 0, dedupKeys: [] },
+    } as Partial<StoryData>),
+  );
+  if (!registered) BUILTIN_SYSTEMS.splice(BUILTIN_SYSTEMS.indexOf(FR_STAND_IN), 1);
   whitelist = new Set([
+    ...frOffered,
     ...offered(story()),
     ...offered(story({ diceMode: "manual" } as Partial<StoryData>)),
     ...offered(
