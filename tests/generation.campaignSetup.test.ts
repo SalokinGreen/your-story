@@ -97,4 +97,37 @@ describe("setup gate and the campaign tool", () => {
     expect(result.content).toBe("Horror, then.");
     expect(story.campaign?.style).toBe("horror");
   });
+
+  it("a write to a migrated record, before any style, is progress", async () => {
+    const story = sessionZeroStory();
+    story.campaign = {
+      version: 1,
+      origin: "migrated",
+      factions: [],
+      fronts: [],
+      clocks: [
+        { id: "t1", name: "Doom", segments: 4, filled: 2, triggers: ["manual"], visible: true, paused: false, crossed: [], migratedFromTimerId: "t1" },
+      ],
+      people: [],
+      secrets: [],
+      locations: [],
+      endStates: [],
+    };
+    const { fetchMock, gmStageCalls } = createMockGMFetch([
+      {
+        toolCalls: [
+          { name: "campaign", arguments: { action: "add", part: "pitch", data: { premise: "A drowned village", tone: ["eerie"] } } },
+        ],
+      },
+      { content: "Noted. What style do you want?" },
+    ]);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await generateStoryTurn(story, "go", baseOptions, callbacks);
+
+    const calls = gmStageCalls();
+    expect(calls).toHaveLength(2);
+    for (const c of calls) expect(hasUser(c, GATE_TEXT)).toBe(false);
+    expect(story.campaign?.pitch?.premise).toBe("A drowned village");
+  });
 });

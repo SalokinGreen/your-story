@@ -4220,6 +4220,9 @@ function executeStartGame(
     record && record.origin !== "migrated"
       ? campaignWarnings(record).filter((w) => !w.startsWith("No style set"))
       : [];
+  // All of it is GM guidance, so none of it rides in contextForStory, which
+  // the narrator's allowlist passes through for start_game.
+  const gmWarnings = [styleWarning, ...authoringWarnings].filter(Boolean);
 
   return {
     toolName: "start_game",
@@ -4237,9 +4240,9 @@ function executeStartGame(
         ? ` The adventure's author wrote the opening scene; play it after the briefing, keeping its place, time and people, adapted to the character(s) you built:
 ${opening}`
         : ""
-    }${styleWarning ? ` ${styleWarning}` : ""}]`,
-    ...(authoringWarnings.length > 0
-      ? { gmOnlyContext: `[Campaign prep: ${authoringWarnings.join(" ")}]` }
+    }]`,
+    ...(gmWarnings.length > 0
+      ? { gmOnlyContext: `[Campaign prep: ${gmWarnings.join(" ")}]` }
       : {}),
   };
 }

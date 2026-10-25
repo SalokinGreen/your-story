@@ -278,7 +278,8 @@ describe("start_game", () => {
     expect(out.results[0].success).toBe(true);
     expect(out.modifiedStoryData.sessionZeroActive).toBe(false);
     // A mystery also expects secrets, a front and end states: named as parts only.
-    const text = out.results[0].contextForStory;
+    const text = out.results[0].gmOnlyContext ?? "";
+    expect(out.results[0].contextForStory).not.toContain("Prep warning");
     expect(text).toContain("Prep warning: a mystery campaign also expects");
     expect(text).toContain("secrets with clues");
     expect(text).toContain("a front with a clock");
@@ -398,7 +399,8 @@ describe("confirm_setup with a record and no plan note", () => {
     expect(out.modifiedStoryData.setup?.approval?.campaignHash).toBe(
       hashCampaignRecord(out.modifiedStoryData.campaign!),
     );
-    expect(out.results[0].contextForStory).toContain("Prep warning");
+    expect(out.results[0].gmOnlyContext).toContain("Prep warning");
+    expect(out.results[0].contextForStory).not.toContain("Prep warning");
   });
 
   it("shows both a plan note and a record when the story has both", async () => {
@@ -553,5 +555,32 @@ describe("the setup strip", () => {
     expect(item.done).toBe(true);
     expect(item.noteTitle).toBeUndefined();
     expect(state.awaitingApproval).toBe(true);
+  });
+});
+
+describe("engine-review fixes", () => {
+  it("the campaign step warns that a plan note is shown whole on the card", () => {
+    const block = buildSessionZeroBlock(story());
+    expect(block).toContain("the player sees that note in full on the card");
+    expect(block).toContain("truths, secrets and endings go in the record");
+    expect(block).toContain("`secret` note");
+  });
+
+  it("a migrated record has a campaign hash, and a change to it changes the hash", () => {
+    const migrated: CampaignRecord = {
+      ...emptyCampaign(),
+      origin: "migrated",
+      clocks: [clock({ migratedFromTimerId: "t1" })],
+    };
+    const s = story({ campaign: migrated });
+    const before = currentSetupHashes(s).campaignHash;
+    expect(before).toBeTruthy();
+    const edited = structuredClone(s);
+    edited.campaign!.clocks[0].name = "Renamed";
+    expect(currentSetupHashes(edited).campaignHash).not.toBe(before);
+    // Play state alone does not.
+    const ticked = structuredClone(s);
+    ticked.campaign!.clocks[0].filled = 2;
+    expect(currentSetupHashes(ticked).campaignHash).toBe(before);
   });
 });

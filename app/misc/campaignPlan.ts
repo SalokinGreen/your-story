@@ -298,8 +298,8 @@ export function hashCampaignRecord(record: CampaignRecord): string {
 
 /**
  * The hashes of the current sheet(s), plan note and campaign record, as
- * `setup.approval` stores them. `campaignHash` is present only for a real
- * record (not one the timer migration made), so an approval on a story with a
+ * `setup.approval` stores them. `campaignHash` is present whenever the
+ * story has a record (any origin), so an approval on a story with a
  * plan note and no record is exactly what it was before the record existed.
  */
 export function currentSetupHashes(story: StoryData): {
@@ -312,7 +312,9 @@ export function currentSetupHashes(story: StoryData): {
     sheetHash: hashNotes(sheets),
     planHash: hashNotes(plan ? [plan] : []),
   };
-  if (story.campaign && story.campaign.origin !== "migrated") {
+  // Whatever its origin: a write to a migrated record before it has a style
+  // is setup progress too (the hash ignores play state).
+  if (story.campaign) {
     hashes.campaignHash = hashCampaignRecord(story.campaign);
   }
   return hashes;

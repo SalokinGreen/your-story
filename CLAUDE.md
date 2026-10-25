@@ -1019,7 +1019,7 @@ not done (`interview`, `concept`, `character`, `campaign`, `confirm`,
 - **Approved:** `approval` is set and its hashes match the current sheet(s),
   plan note and campaign record (`currentSetupHashes`, `hashNotes`: a stable
   FNV-1a string hash, no crypto API). `campaignHash` (`hashCampaignRecord`) is
-  the third hash, present only when the story has a real record; it covers the
+  the third hash, present whenever the story has a campaign record (any origin); it covers the
   whole record, secrets and dooms included, minus play state (a clock's fill
   and crossed portents, found clues, revealed secrets, `paused`). Any later
   edit cancels the approval.
