@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "length-earned-explanation",
+  "published": true,
+  "note": "The player asked how a rite works; a long answer is the work.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "How does the lamp-warding rite work, and what are my options?",
+  "narration": "Old Sefa lays it out the way a sailor lays out a knot. The rite needs three things: oil from a lamp that has burned through a full night, a thread from something you have lost at sea, and a name spoken aloud at the moment the flame is pinched out. The oil you can take from the lighthouse tonight. The thread is harder; she says a torn sail would do, or a sleeve from a drowned man's coat, if you know where one is kept. The name is your choice, and it matters: a living name protects that person for a season, a dead name quiets that ghost for good, and your own name only protects you if you give up something you carry. So there are three paths. You can gather the oil and the sail and warn the keeper, which is slow and safe. You can steal the coat from the chapel, which is quick and ugly. Or you can skip the thread and let the rite take something of yours in its place.",
+  "replyLength": "short",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

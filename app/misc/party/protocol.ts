@@ -7,6 +7,7 @@
 // stay free of runtime imports from the rest of the app: types only.
 
 import type { PlayerArchetype } from "../structs";
+import type { PublicCampaignView } from "../campaign/publicView";
 
 export const PARTY_PROTOCOL_VERSION = 1;
 
@@ -152,6 +153,9 @@ export interface PlayerView {
   choices: string[];
   requests: PartyRequestView[];
   narration: string;
+  // The player's view of the campaign (publicCampaignView): null when the story has
+  // no record, and for a phone without a seat.
+  campaign: PublicCampaignView | null;
   // Only for a phone that hasn't taken a seat yet.
   join: PartyJoinOptions | null;
 }

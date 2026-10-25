@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "oracle-invented-locked-door",
+  "published": true,
+  "note": "A door nobody described is decided locked, with no oracle.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I try the door at the end of the passage.",
+  "narration": "You put your weight to the handle. It turns, but the door is locked, and the lock is an old one, the keyhole rimmed in green.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "oracle_gap",
+      "severity": "minor",
+      "span": "the door is locked"
+    }
+  ]
+}

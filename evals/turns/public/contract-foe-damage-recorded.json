@@ -1,0 +1,93 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "contract-foe-damage-recorded",
+  "published": true,
+  "note": "The same hit, with the Hearts change recorded.",
+  "labelStatus": "drafted",
+  "systemId": "fantastic-realms",
+  "storyBefore": {
+    "npcs": [],
+    "meters": [
+      {
+        "id": "ash-wolf::hearts",
+        "owner": "Ash Wolf",
+        "name": "Hearts",
+        "min": 0,
+        "max": 3,
+        "cap": 3,
+        "floor": 0,
+        "value": 3
+      }
+    ]
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": [
+      {
+        "id": "ash-wolf::hearts",
+        "owner": "Ash Wolf",
+        "name": "Hearts",
+        "min": 0,
+        "max": 3,
+        "cap": 3,
+        "floor": 0,
+        "value": 2
+      }
+    ]
+  },
+  "toolResults": [
+    {
+      "toolName": "feat_roll",
+      "toolCallId": "f1",
+      "success": true,
+      "contextForStory": "[Feat roll - Ayla vs the Ash Wolf, DC 3 -> HIT]",
+      "result": {
+        "type": "feat_roll",
+        "hero": "Ayla",
+        "feats": [
+          "Sword"
+        ],
+        "dc": 3,
+        "dice": [
+          4,
+          5
+        ],
+        "successes": 2,
+        "outcome": "hit",
+        "magnitude": 0,
+        "target": "Ash Wolf"
+      }
+    },
+    {
+      "toolName": "manage_meter",
+      "toolCallId": "m1",
+      "success": true,
+      "contextForStory": "[Meter Ash Wolf Hearts 3 -> 2]",
+      "result": {
+        "type": "manage_meter",
+        "action": "adjust",
+        "owner": "Ash Wolf",
+        "meter": "Hearts",
+        "change": {
+          "before": 3,
+          "after": 2,
+          "requested": -1,
+          "clampedBy": 0,
+          "crossedUp": [],
+          "crossedDown": []
+        }
+      }
+    }
+  ],
+  "playerLine": "I swing at the Ash Wolf.",
+  "narration": "Ayla's blade comes round in a flat bright arc and catches the wolf across the shoulder. It yelps and backs toward the treeline, ash falling from its coat in grey puffs.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [],
+  "rung1Expect": []
+}

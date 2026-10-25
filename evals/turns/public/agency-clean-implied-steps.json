@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "agency-clean-implied-steps",
+  "published": true,
+  "note": "The declared action and the steps it plainly implies.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I climb down.",
+  "narration": "You take the ladder rung by rung, the wood damp under your palms, and drop the last foot to the cellar floor. Dust lifts and settles. Somewhere ahead, water drips on stone.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

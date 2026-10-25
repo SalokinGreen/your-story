@@ -2200,7 +2200,7 @@ export interface ObserverParams {
  * judges, the background wave the rest, so each judge runs once per turn.
  *
  * The per-judge calls this replaced are runObserverSplit below, kept for the
- * eval runner's comparison (slice J4 will add scripts/eval-judges.mjs; it does not exist yet) and never
+ * eval runner's comparison (scripts/eval-judges.mjs, judges/evalRunner.ts) and never
  * reachable from Settings.
  */
 /** What the combined call (and the confirming judge after it) reads of a turn. */

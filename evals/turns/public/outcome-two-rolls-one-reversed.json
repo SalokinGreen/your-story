@@ -1,0 +1,79 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "outcome-two-rolls-one-reversed",
+  "published": true,
+  "note": "Two rulings: the first honoured, the second reversed.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [
+    {
+      "toolName": "action_roll",
+      "toolCallId": "r1",
+      "success": true,
+      "contextForStory": "[Action roll - pick the lock: score 9 against 6 and 8 -> HIT]",
+      "result": {
+        "type": "action_roll",
+        "statName": "Nerve",
+        "statValue": 2,
+        "adds": 0,
+        "addsApplied": 0,
+        "penalty": 0,
+        "actionDie": 4,
+        "challengeDice": [
+          7,
+          9
+        ],
+        "score": 6,
+        "capped": false,
+        "outcome": "hit",
+        "match": false
+      }
+    },
+    {
+      "toolName": "action_roll",
+      "toolCallId": "r2",
+      "success": false,
+      "contextForStory": "[Action roll - outrun the guard: score 5 against 8 and 9 -> MISS]",
+      "result": {
+        "type": "action_roll",
+        "statName": "Nerve",
+        "statValue": 2,
+        "adds": 0,
+        "addsApplied": 0,
+        "penalty": 0,
+        "actionDie": 4,
+        "challengeDice": [
+          7,
+          9
+        ],
+        "score": 6,
+        "capped": false,
+        "outcome": "miss",
+        "match": false
+      }
+    }
+  ],
+  "playerLine": "I pick the lock and then outrun the guard.",
+  "narration": "The lock turns over smoothly and the door swings in. You bolt through the yard, the guard's boots hammering behind you, and take the corner so wide that he never gets a hand on you. By the time you reach the alley his shouting is a long way back.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "outcome",
+      "severity": "major",
+      "span": "take the corner so wide that he never gets a hand on you"
+    }
+  ]
+}

@@ -17,6 +17,7 @@ import {
 } from "@/app/misc/party/partyHost";
 import type { StoryData, StoryLore } from "@/app/misc/structs";
 import { BLOOD_AND_BONE } from "@/app/misc/systems/blood-and-bone";
+import { publicCampaignView } from "@/app/misc/campaign/publicView";
 
 const TOKEN = "t";
 
@@ -60,13 +61,42 @@ const FORBIDDEN = {
   judgeFinding: "LEAK_JUDGE_FINDING",
   summary: "LEAK_SCENE_SUMMARY",
   apiKey: "sk-or-v1-LEAKEDKEY",
-  // The campaign record (slice 3): nothing in it reaches a phone until the
-  // player's view (slice 6) projects it.
+  // The campaign record: only publicCampaignView's fields (the CAMPAIGN_OK
+  // strings below) reach a phone; a canary sits in every other field.
   campaignSecret: "LEAK_CAMPAIGN_SECRET",
+  campaignTruth: "LEAK_CAMPAIGN_TRUTH",
+  campaignKeyPhrase: "LEAK_CAMPAIGN_KEYPHRASE",
   campaignDoom: "LEAK_CAMPAIGN_DOOM",
-  campaignLine: "LEAK_CAMPAIGN_LINE",
-  campaignClock: "LEAK_CAMPAIGN_CLOCK",
+  campaignDanger: "LEAK_CAMPAIGN_DANGER",
+  campaignImpulse: "LEAK_CAMPAIGN_IMPULSE",
+  campaignPortent: "LEAK_CAMPAIGN_PORTENT",
+  campaignLineKeyword: "LEAK_CAMPAIGN_LINE_KEYWORD",
+  campaignClock: "LEAK_CAMPAIGN_HIDDEN_CLOCK",
+  campaignCancelledClock: "LEAK_CAMPAIGN_CANCELLED_CLOCK",
+  campaignOnFill: "LEAK_CAMPAIGN_ONFILL",
   campaignPerson: "LEAK_CAMPAIGN_PERSON",
+  campaignVoice: "LEAK_CAMPAIGN_VOICE",
+  campaignFactionGoal: "LEAK_CAMPAIGN_FACTION_GOAL",
+  campaignMethods: "LEAK_CAMPAIGN_METHODS",
+  campaignUnfoundClue: "LEAK_CAMPAIGN_UNFOUND_CLUE",
+  campaignClueWhere: "LEAK_CAMPAIGN_CLUE_WHERE",
+  campaignBeatTitle: "LEAK_CAMPAIGN_BEAT_TITLE",
+  campaignBeatSummary: "LEAK_CAMPAIGN_BEAT_SUMMARY",
+  campaignEnd: "LEAK_CAMPAIGN_END_STATE",
+};
+
+// What the campaign's player view is meant to show.
+const CAMPAIGN_OK = {
+  premise: "CAMPAIGN_PREMISE_OK",
+  tone: "CAMPAIGN_TONE_OK",
+  line: "CAMPAIGN_LINE_OK",
+  veil: "CAMPAIGN_VEIL_OK",
+  faction: "CAMPAIGN_FACTION_OK",
+  front: "CAMPAIGN_FRONT_OK",
+  stake: "CAMPAIGN_STAKE_OK",
+  clock: "CAMPAIGN_CLOCK_OK",
+  clue: "CAMPAIGN_CLUE_OK",
+  location: "CAMPAIGN_LOCATION_OK",
 };
 
 const MARA_SHEET = "MARA_SHEET_OK";
@@ -141,48 +171,94 @@ function story(): StoryData {
     campaign: {
       version: 1,
       style: "mystery",
-      pitch: { premise: FORBIDDEN.campaignSecret, tone: [FORBIDDEN.campaignSecret] },
+      pitch: { premise: CAMPAIGN_OK.premise, tone: [CAMPAIGN_OK.tone] },
       safety: {
-        lines: [{ id: "saf_a", text: FORBIDDEN.campaignLine, keywords: [FORBIDDEN.campaignLine] }],
-        veils: [],
+        lines: [{ id: "saf_a", text: CAMPAIGN_OK.line, keywords: [FORBIDDEN.campaignLineKeyword] }],
+        veils: [{ id: "saf_b", text: CAMPAIGN_OK.veil, keywords: [FORBIDDEN.campaignLineKeyword] }],
       },
-      factions: [{ id: "fac_a", name: FORBIDDEN.campaignSecret, goal: FORBIDDEN.campaignSecret }],
+      factions: [
+        {
+          id: "fac_a",
+          name: CAMPAIGN_OK.faction,
+          goal: FORBIDDEN.campaignFactionGoal,
+          methods: FORBIDDEN.campaignMethods,
+        },
+      ],
       fronts: [
         {
           id: "frt_a",
-          name: FORBIDDEN.campaignDoom,
-          dangers: [],
-          portents: [],
+          name: CAMPAIGN_OK.front,
+          dangers: [{ name: FORBIDDEN.campaignDanger, impulse: FORBIDDEN.campaignImpulse }],
+          portents: [{ at: 2, text: FORBIDDEN.campaignPortent }],
           doom: FORBIDDEN.campaignDoom,
-          stakes: [FORBIDDEN.campaignDoom],
+          stakes: [CAMPAIGN_OK.stake],
           status: "active",
         },
       ],
       clocks: [
         {
           id: "clk_a",
-          name: FORBIDDEN.campaignClock,
+          name: CAMPAIGN_OK.clock,
           segments: 6,
           filled: 1,
           triggers: ["scene"],
+          onFill: FORBIDDEN.campaignOnFill,
           visible: true,
           paused: false,
           crossed: [],
         },
+        {
+          id: "clk_h",
+          name: FORBIDDEN.campaignClock,
+          segments: 4,
+          filled: 3,
+          triggers: ["scene"],
+          onFill: FORBIDDEN.campaignOnFill,
+          visible: false,
+          paused: false,
+          crossed: [],
+        },
+        {
+          id: "clk_c",
+          name: FORBIDDEN.campaignCancelledClock,
+          segments: 4,
+          filled: 0,
+          triggers: ["manual"],
+          visible: true,
+          paused: true,
+          cancelled: true,
+          crossed: [],
+        },
       ],
-      people: [{ npcId: "x", want: FORBIDDEN.campaignPerson, secret: FORBIDDEN.campaignPerson }],
+      people: [
+        {
+          npcId: "x",
+          want: FORBIDDEN.campaignPerson,
+          secret: FORBIDDEN.campaignPerson,
+          voice: FORBIDDEN.campaignVoice,
+        },
+      ],
       secrets: [
         {
           id: "sec_a",
           title: FORBIDDEN.campaignSecret,
-          truth: FORBIDDEN.campaignSecret,
-          keyPhrases: [],
-          revealed: false,
-          clues: [{ id: "clu_a", text: FORBIDDEN.campaignSecret, found: true }],
+          truth: FORBIDDEN.campaignTruth,
+          keyPhrases: [FORBIDDEN.campaignKeyPhrase],
+          revealed: true,
+          clues: [
+            { id: "clu_a", text: CAMPAIGN_OK.clue, where: FORBIDDEN.campaignClueWhere, found: true },
+            { id: "clu_b", text: FORBIDDEN.campaignUnfoundClue, found: false },
+          ],
         },
       ],
-      locations: [],
-      endStates: [{ id: "end_a", text: FORBIDDEN.campaignSecret }],
+      locations: [{ id: "loc_a", name: CAMPAIGN_OK.location, features: [], npcIds: [] }],
+      beats: {
+        list: [
+          { id: "bt_a", title: FORBIDDEN.campaignBeatTitle, summary: FORBIDDEN.campaignBeatSummary, status: "current" },
+        ],
+        currentId: "bt_a",
+      },
+      endStates: [{ id: "end_a", text: FORBIDDEN.campaignEnd }],
     },
   } as unknown as StoryData;
 }
@@ -230,6 +306,7 @@ const ALLOWED_KEYS = [
   "choices",
   "requests",
   "narration",
+  "campaign",
   "join",
 ].sort();
 
@@ -303,6 +380,26 @@ describe("buildPlayerView: the redaction boundary", () => {
     expect(views.mara.choices).toEqual(["Climb the tower", "Wait"]);
     expect(views.mara.requests).toEqual([]);
     expect(json).not.toContain("TOM_ROLL");
+  });
+
+  it("gives a seated phone the campaign's player view and nothing else of the record", () => {
+    for (const view of [views.mara, views.tom]) {
+      const json = JSON.stringify(view.campaign);
+      for (const ok of Object.values(CAMPAIGN_OK)) expect(json, ok).toContain(ok);
+      // The projection is exactly publicCampaignView's, no more.
+      expect(view.campaign).toEqual(publicCampaignView(story().campaign!));
+      // The hidden clock and the cancelled one are not listed.
+      expect(view.campaign?.clocks.map((c) => c.name)).toEqual([CAMPAIGN_OK.clock]);
+      expect(view.campaign?.known).toEqual([CAMPAIGN_OK.clue]);
+    }
+  });
+
+  it("gives a phone without a seat no campaign, and a story without a record none", () => {
+    expect(views.lobby.campaign).toBeNull();
+    const bare = story();
+    delete bare.campaign;
+    expect(buildPlayerView(s, bare, "mara", 0).campaign).toBeNull();
+    expect(buildPlayerView(s, null, "mara", 0).campaign).toBeNull();
   });
 
   it("prefers the sheet a player owns over the title convention", () => {

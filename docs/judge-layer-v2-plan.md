@@ -570,3 +570,68 @@ block, `parseFixPlan`, `planFollowed`, `recheckRewrite`), `judges/publicView.ts`
 8. **Known limit, no code:** Undo of a secret-leak or lines-and-veils rewrite puts
    the leaked text back on the host. It can happen only when the player set those
    judges to Rewrite, and it is the player's own click.
+
+### 2026-10-25 — slice 4 (J4), the labelled set and its runner
+
+Built on `claude/judges-j4`. Files: `judges/evalFormat.ts` (the versioned fixture,
+`parseFixture`, `judgeInputsOf`, `observerParamsFor`), `judges/evalScore.ts`
+(counts, rates, noise rule, cost table), `judges/evalRunner.ts` (`runFixtureOnce`,
+`runEval`, `buildReport`, `formatReport`, `estimateCalls`), `judges/evalExport.ts`,
+`scripts/eval-judges.mjs`, `scripts/export-eval-turn.mjs`, `scripts/eval-lib.mjs`,
+`scripts/load-ts.mjs`, `evals/README.md`, `evals/turns/public/` (45 turns).
+
+- **The scripts load TypeScript through Vite's SSR loader.** Node cannot import the
+  app's `.ts` (path alias, extensionless imports) and the repository has no `tsx`.
+  Vite is already installed with Vitest, so `scripts/load-ts.mjs` starts a
+  middleware-mode server and calls `ssrLoadModule`; nothing was added to
+  `package.json`. `NEXT_PUBLIC_STANDALONE=true` is set first, so `providerFetch`
+  calls the provider in-process (there is no Next server behind a script).
+- **No call without `--go`.** The plan says every run waits for the author's go;
+  the script makes that structural: with no `--go` it validates every turn and
+  prints the turn count and a call range, then exits. `--go` with no key in
+  `.env.eval` or the environment also exits. The call range is exact for the
+  combined form (`planCalls` over `selectJudges`) and an upper bound of five per
+  run for the split form.
+- **Scoring unit and definitions** are in the header of `evalScore.ts`: one judge
+  on one turn on one run; a flag is minor or major (`any`) or major only (`major`,
+  the severity that rewrites); a flag whose quote does not overlap a labelled span
+  is both a false positive and a miss; "unknown" and "did not run" are misses on a
+  labelled turn. A split flag has no quote, so the label alone locates it.
+  Precision is reported at both thresholds; "ships flag-only" uses `major` against
+  0.7 (decision 233's rule). `JUDGE_DEFAULT_OVERRIDES` itself is slice 5: the
+  runner prints the verdict, a human updates the table.
+- **Label status.** Added `labelStatus: "drafted" | "checked"` to the format (the
+  plan says Claude drafts and the author checks; the file should say which). All
+  45 are "drafted". Added `systemId` so the deterministic test can load a
+  built-in system's event contracts (two Fantastic Realms turns), and
+  `rung1Expect` for the deterministic assertions.
+- **The 45 published turns are invented, not from the author's logs.** The plan's
+  first 30 to 50 are the author's Grave Watcher, Wolfwillow and Blood & Bone play;
+  this session had no access to those logs and must not invent that they exist.
+  The set is written originally (a fishing-harbour world of the session's own),
+  covers every judge with problem and good turns (counts in the
+  session report) and the adversarial cases the plan names, and marks them `published:
+  true` because nothing in them is from play. The author's own turns arrive
+  through the exporter, one approved turn at a time (decision 233). The tests
+  require between 30 and 50 files, at least one problem turn and five good turns
+  per judge, and that every labelled judge is one the combined call would
+  actually select on that turn (so a label is never a recall miss the set built
+  in).
+- **Cost by turn kind is the judging subset.** The runner judges; it neither
+  confirms nor rewrites, so its kinds are clean, flagged, split, failed and
+  no_call, not the plan's confirmed and rewritten. "Discarded cost" is not
+  separate: nothing here is discarded. Timeouts have no kind: the provider call's
+  own failure shows as `failed`. Cache hits come from the ledger's
+  `cachedTokens`.
+- **A private turn is counted, never named** in `evals/results.json`
+  (`buildReport` drops its per-turn cases), so the file is safe to commit.
+- **Exporter limits.** A story export holds the end state, so `storyBefore` is a
+  copy of it; a part saved before typed results were kept (`gmToolCalls`) yields
+  text-only tool results (no typed ruling for the outcome judge until the author
+  adds one). A Debug Logs export has no turn structure and is not an input.
+- **Generation fixtures** (`kind: "generation"`) are defined, validated and
+  written by nothing yet: G2 and G5 own their runner. `eval-judges.mjs` skips them.
+- **Not done:** a real run (waits for the author's go; `docs/pending_tests.md`);
+  `engine-review` (no agent tool in this session). The runner is not engine code
+  (`app/misc/` judges only; nothing in the app imports the eval files), but it
+  reads `runCombinedJudges`, `runObserverSplit` and `judgeTurnFor` from the engine.

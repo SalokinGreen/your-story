@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "length-short-and-plain",
+  "published": true,
+  "note": "A short answer to a short action.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I light the lantern.",
+  "narration": "The wick catches on the second strike. A small yellow room opens around you: crates, a coil of rope, the pale curve of the hull.",
+  "replyLength": "short",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

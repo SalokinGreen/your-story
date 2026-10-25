@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "oracle-invented-guards",
+  "published": true,
+  "note": "Whether anyone is in the guardroom is decided by narration alone.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I listen at the guardroom door. Is anyone inside?",
+  "narration": "Through the planks you catch the clack of dice and a low, sour laugh. Two guards, by the sound of it, and neither in a hurry.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "oracle_gap",
+      "severity": "minor",
+      "span": "Two guards, by the sound of it, and neither in a hurry"
+    }
+  ]
+}

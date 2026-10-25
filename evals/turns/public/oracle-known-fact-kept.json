@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "oracle-known-fact-kept",
+  "published": true,
+  "note": "The player tries a door they locked themselves.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I try the cellar door I locked an hour ago.",
+  "narration": "The handle turns a quarter inch and stops. The door stays shut, exactly as you left it, the key cold in your pocket.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

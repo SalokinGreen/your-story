@@ -1,0 +1,50 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "outcome-hit-with-added-cost",
+  "published": true,
+  "note": "A HIT with a complication added on top; the goal is still reached.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [
+    {
+      "toolName": "action_roll",
+      "toolCallId": "r1",
+      "success": true,
+      "contextForStory": "[Action roll - take the manifest: score 9 against 6 and 8 -> HIT]",
+      "result": {
+        "type": "action_roll",
+        "statName": "Nerve",
+        "statValue": 2,
+        "adds": 0,
+        "addsApplied": 0,
+        "penalty": 0,
+        "actionDie": 4,
+        "challengeDice": [
+          7,
+          9
+        ],
+        "score": 6,
+        "capped": false,
+        "outcome": "hit",
+        "match": false
+      }
+    }
+  ],
+  "playerLine": "I slip the manifest out of the clerk's drawer.",
+  "narration": "The drawer slides without a whisper and the manifest is in your coat before the clerk turns. On your way out the bell above the door gives one bright note, and he looks up, and looks at you a moment too long.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}
