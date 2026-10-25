@@ -2782,6 +2782,7 @@ async function generateStoryTurnOnce(
         // Local conversation history (will be copied to outer scope at end)
         let conversationHistory: ChatMessage[] = [];
         let isComplete = false;
+        let rollGatePromptedRound = -1; // the round after which the M2 prompt was sent
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
         // Phase 2 campaign-plan gate (mirror of the M2 roll gate below): its
@@ -3741,6 +3742,26 @@ async function generateStoryTurnOnce(
             // Check for repetition (AI stuck in a loop)
             const isRepetitive = detectRepetition(content);
 
+            // The M2 gate asked on `auto` and this round, the one right after
+            // the prompt, called no tool at all: the GM declined. That ends
+            // the gate for the turn, and the round's words (a second telling
+            // of the moment) are taken back out so the story is the gated
+            // round's prose once. A prompted round that called other tools
+            // is not a decline, so the second prompt stays available to it.
+            const rollGateDeclined = rollGatePromptedRound === gmRound - 1;
+            if (rollGateDeclined) {
+              rollGatePromptedRound = -1;
+              noToolCallPrompts = MAX_NO_TOOL_PROMPTS;
+              gmThinking.length = roundMarks.thinking;
+              gmAccumulatedStory.length = roundMarks.accumulated;
+              allGMContextParts.length = roundMarks.context;
+              conversationHistory.length = roundMarks.history;
+              logger.action(
+                "M2 gate: the GM declined the roll - ending the gate for this turn",
+                { round: gmRound },
+              );
+            }
+
             if (isRepetitive) {
               logger.action(
                 "GM stage detected repetitive content - forcing end",
@@ -3748,7 +3769,7 @@ async function generateStoryTurnOnce(
               allGMContextParts.push(
                 `[GAME MASTER: AI got stuck in repetition loop.]`,
               );
-            } else if (content.trim()) {
+            } else if (content.trim() && !rollGateDeclined) {
               // Add raw content to context parts (with thinking) for backward compat
               // (Prose extraction already happened earlier - don't duplicate)
               allGMContextParts.push(content);
@@ -3828,6 +3849,7 @@ async function generateStoryTurnOnce(
                         cause: classifySetupRejection({
                           visibleText: roundVisibleText,
                           toolNames: [],
+                          next: setupNow.next,
                         }),
                         rejected: roundVisibleText,
                         multiPlayer:
@@ -3900,6 +3922,7 @@ async function generateStoryTurnOnce(
               // "auto", not "required": the message lets the GM decline when
               // nothing in the declared action is uncertain.
               forceToolChoiceNextRound = "auto";
+              rollGatePromptedRound = gmRound;
               continue gmRoundLoop;
             }
 

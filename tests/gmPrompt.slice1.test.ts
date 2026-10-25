@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import { buildGMStagePrompt, PINNED_NOTE_TYPES, PINNED_TYPES_LINE } from "@/app/misc/ai_staged";
 import { rollGateMessage } from "@/app/misc/gateMessages";
 import { ROLL_OR_ORACLE_TOOL_NAMES } from "@/app/misc/reasoningTiers";
+import { GOOGLE_ESSENTIAL_TOOLS } from "@/app/misc/providerCall";
 import {
   classifySetupRejection,
   quoteWholeSentences,
@@ -158,6 +159,24 @@ describe("rollGateMessage", () => {
     expect(msg).not.toContain("\n");
   });
 
+  it("the decline arm ends the turn and does not ask for the scene again", () => {
+    const msg = rollGateMessage(["formula_roll"]);
+    expect(msg).toContain("reply with nothing more, and do not repeat what you wrote");
+  });
+
+  it("names manage_track's progress_roll action when manage_track is offered", () => {
+    expect(rollGateMessage(["formula_roll", "manage_track"])).toContain(
+      "`manage_track` (action `progress_roll`)",
+    );
+    expect(rollGateMessage(["formula_roll"])).not.toContain("manage_track");
+  });
+
+  it("every roll tool the message can name reaches Gemini", () => {
+    for (const n of ["formula_roll", "gm_roll", "opposed_formula", "fate_question", "action_roll", "manage_track"]) {
+      expect(GOOGLE_ESSENTIAL_TOOLS.has(n), n).toBe(true);
+    }
+  });
+
   it("falls back to a generic phrase when no roll tool is offered", () => {
     expect(rollGateMessage([])).toContain("a roll or oracle tool");
   });
@@ -203,7 +222,65 @@ describe("setupGateMessage causes", () => {
   it("a note that did call create_note is not a prose note", () => {
     expect(
       classifySetupRejection({ visibleText: "## Character Sheet\nMara", toolNames: ["create_note"] }),
-    ).toBe("nothing");
+    ).toBeUndefined();
+  });
+
+  it("narration prose before setup is done is not called 'no words'", () => {
+    const rejected = "The rain comes down on the harbour. A lantern swings.";
+    const cause = classifySetupRejection({ visibleText: rejected, toolNames: [], next: "character" });
+    expect(cause).toBeUndefined();
+    expect(setupGateMessage("character", undefined, { cause, rejected })).not.toContain("no words");
+  });
+
+  it("approved but not started: 'Ready to begin?' gets the start_game message alone", () => {
+    const cause = classifySetupRejection({
+      visibleText: "Everything looks set. Ready to begin?",
+      toolNames: [],
+      next: "start_game",
+    });
+    expect(cause).toBeUndefined();
+    const msg = setupGateMessage("start_game", undefined, { cause, rejected: "Ready to begin?" });
+    expect(msg).toContain("Call start_game now");
+    expect(msg).not.toContain("ask_question");
+    expect(msg).not.toContain("You wrote");
+  });
+
+  it("next === character with 'does that look right?' gets the sheet message alone", () => {
+    const cause = classifySetupRejection({
+      visibleText: "Here is the idea. Does that look right?",
+      toolNames: [],
+      next: "character",
+    });
+    expect(cause).toBeUndefined();
+    const msg = setupGateMessage("character", undefined, { cause });
+    expect(msg).toContain("write the character sheet with create_note");
+    expect(msg).not.toContain("ask_question");
+  });
+
+  it("a bold question line is not a sheet heading", () => {
+    expect(
+      classifySetupRejection({
+        visibleText: "**What is your character's spine?**\nPick one.",
+        toolNames: [],
+        next: "interview",
+      }),
+    ).toBe("prose_question");
+    expect(
+      classifySetupRejection({
+        visibleText: "**What is your character's spine?**",
+        toolNames: [],
+        next: "character",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("a question is a prose question only while a setup question is next", () => {
+    for (const next of ["interview", "concept"] as const) {
+      expect(classifySetupRejection({ visibleText: "Who are you?", toolNames: [], next })).toBe("prose_question");
+    }
+    for (const next of ["campaign", "confirm", "start_game"] as const) {
+      expect(classifySetupRejection({ visibleText: "Who are you?", toolNames: [], next })).toBeUndefined();
+    }
   });
 
   it("an empty round says there was nothing", () => {

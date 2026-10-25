@@ -10,6 +10,7 @@
   CountdownTimer,
   SceneChallenge,
   PendingDirectorMove,
+  StoryThread,
 } from "@/app/misc/structs";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
@@ -628,10 +629,11 @@ export const PINNED_TYPES_LINE = `Only ${PINNED_NOTE_TYPES.map((t) => `\`${t}\``
 
 // Shared pinned-note-type check, parameterized so the GM-Stage/other-stage
 // difference is explicit instead of two copy-pasted closures silently
-// drifting apart. `includeMechanics` differs on purpose: the GM Stage needs
-// the full mechanics rules pinned every round to run dice checks correctly;
-// other stages (Choices, legacy Tools) only propose/parse actions and treat
-// mechanics as a lazy-loaded folder note (fetched via read_notes) instead.
+// drifting apart. `includeMechanics` only decides whether a mechanics note is
+// left out of the categorised folder lists: the GM Stage lists mechanics notes
+// by title in their own "rules" list (to open with read_notes), so it skips
+// them there; no stage carries a mechanics note in full (only
+// PINNED_NOTE_TYPES are).
 function isPinnedNoteType(
   type: string | undefined,
   includeMechanics: boolean,
@@ -646,7 +648,7 @@ function isPinnedNoteType(
 // Note: Stats, resources, abilities, and rpgSystem are DEPRECATED.
 // All mechanics are now defined in "mechanics" type lore entries and handled by GM stage formula_roll.
 // AGENTIC NOTE SYSTEM:
-// - Pinned types (dm_instructions, character_sheet, mechanics): Always loaded in full
+// - Pinned types (dm_instructions, character_sheet, gm_plan): Always loaded in full
 // - Folder types (lore, secret): Show titles only, use read_notes tool
 // - story_instructions: NOT included here (only used by Story Stage)
 export function buildInfoMessage(
@@ -656,7 +658,7 @@ export function buildInfoMessage(
   // ============================================
   // AGENTIC NOTE SYSTEM - Folder-based approach
   // ============================================
-  // GM Stage pinned types: dm_instructions, character_sheet, mechanics
+  // GM Stage pinned types: dm_instructions, character_sheet, gm_plan
   // Folder types: lore, secret (show titles only, use read_notes tool)
 
   // Helper to check if a note type is "pinned" (always loaded in full).
@@ -1535,6 +1537,63 @@ export function buildSessionZeroBlock(story: StoryData): string {
   return out;
 }
 
+/** One thread's description is cut past this many characters. */
+export const THREAD_DESCRIPTION_CAP_CHARS = 600;
+/** The threads section as a whole is held to about this many tokens. */
+export const THREADS_SECTION_CAP_TOKENS = 2000;
+
+/**
+ * A thread description cut at a sentence boundary within the cap. The thread
+ * keeps its whole text; there is no tool that reads it back, so the marker
+ * only says the text was cut for length.
+ */
+function capThreadDescription(description: string): string {
+  const text = description ?? "";
+  if (text.length <= THREAD_DESCRIPTION_CAP_CHARS) return text;
+  const head = text.slice(0, THREAD_DESCRIPTION_CAP_CHARS);
+  const sentenceEnd = Math.max(
+    ...[". ", "! ", "? ", ".\n", "!\n", "?\n"].map((s) => head.lastIndexOf(s)),
+  );
+  const cutAt =
+    sentenceEnd > 0 ? sentenceEnd + 1 : Math.max(head.lastIndexOf(" "), 1);
+  return `${head.slice(0, cutAt).trimEnd()} … (cut for length)`;
+}
+
+/**
+ * The live block's active-threads section: every description whole up to the
+ * cap, main threads first, and the section held to
+ * THREADS_SECTION_CAP_TOKENS. Threads that do not fit are counted, not shown.
+ */
+export function renderThreadsSection(
+  threads: readonly StoryThread[],
+): string {
+  if (threads.length === 0) return "";
+  const rank = { main: 0, side: 1, background: 2 } as const;
+  const ordered = [...threads].sort(
+    (a, b) => rank[a.priority || "side"] - rank[b.priority || "side"],
+  );
+  const heading = "## 🧵 Active Story Threads";
+  const lines: string[] = [];
+  let used = estimateTokens(heading);
+  let left = 0;
+  for (const t of ordered) {
+    const line = `- [${t.priority || "side"}] ${t.title}: ${capThreadDescription(t.description)}`;
+    const cost = estimateTokens(line);
+    if (left === 0 && used + cost <= THREADS_SECTION_CAP_TOKENS) {
+      lines.push(line);
+      used += cost;
+    } else {
+      left++;
+    }
+  }
+  if (left > 0) {
+    lines.push(
+      `- … ${left} more active thread${left === 1 ? "" : "s"} not shown here (lowest priority first cut).`,
+    );
+  }
+  return `${heading}\n${lines.join("\n")}`;
+}
+
 export function buildLiveBlock(input: LiveBlockInput): string {
   let out = `${STATE_RULE}\n📋 LIVE GAME STATE (this turn)\n${STATE_RULE}\n`;
   if (input.loreSection) out += "\n" + input.loreSection + "\n";
@@ -1710,8 +1769,9 @@ export function buildGMStagePrompt({
   // AGENTIC NOTE SYSTEM for GM Stage
   // ============================================
   // Helper to check if a note type is "pinned" (always loaded in full).
-  // mechanics IS pinned here (unlike buildInfoMessage's version above) - the
-  // GM Stage needs the full rules text every round to run dice checks.
+  // The flag only keeps mechanics notes out of the categorised lists below:
+  // they are listed by title as "rules" (renderNoteTitleList), not carried in
+  // full. Only PINNED_NOTE_TYPES go in full.
   const isPinnedType = (type?: string): boolean => isPinnedNoteType(type, true);
 
   // Helper to check if a note type is "secret" (hidden from player)
@@ -2062,14 +2122,7 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
   const gmActiveThreads = (storyData.threads || []).filter(
     (t) => t.status === "active",
   );
-  const gmThreadsSection = gmActiveThreads.length
-    ? `## 🧵 Active Story Threads\n${gmActiveThreads
-        .map(
-          (t) =>
-            `- [${t.priority || "side"}] ${t.title}: ${t.description}`,
-        )
-        .join("\n")}`
-    : "";
+  const gmThreadsSection = renderThreadsSection(gmActiveThreads);
 
   // Oracle/chaos state (Mythic chaos factor): drives fate_question odds and
   // signals how unpredictable the world should feel right now. The GM rolls

@@ -16,9 +16,12 @@ import { ROLL_OR_ORACLE_TOOL_NAMES } from "./reasoningTiers";
 export function rollGateMessage(offeredTools: readonly string[]): string {
   const offered = new Set(offeredTools);
   const names = [...ROLL_OR_ORACLE_TOOL_NAMES].filter((n) => offered.has(n));
-  const list =
-    names.length > 0
-      ? names.map((n) => `\`${n}\``).join(", ")
-      : "a roll or oracle tool";
-  return `This scene is contested: combat or a challenge is active, or high or deadly stakes were declared earlier in it, and no roll or oracle call has been made this turn. If the action the player declared this turn has an uncertain outcome, resolve it now with ${list}, then continue. If nothing in that action is uncertain, say what happens and continue without a roll.`;
+  const named = names.map((n) => `\`${n}\``);
+  // manage_track rolls only through its progress_roll action, so it is not a
+  // roll tool by name; say the action.
+  if (offered.has("manage_track")) {
+    named.push("`manage_track` (action `progress_roll`)");
+  }
+  const list = named.length > 0 ? named.join(", ") : "a roll or oracle tool";
+  return `This scene is contested: combat or a challenge is active, or high or deadly stakes were declared earlier in it, and no roll or oracle call has been made this turn. If the action the player declared this turn has an uncertain outcome, resolve it now with ${list}, then continue. If nothing in that action is uncertain, the turn is done: reply with nothing more, and do not repeat what you wrote.`;
 }

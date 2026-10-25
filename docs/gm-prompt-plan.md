@@ -223,3 +223,29 @@ revised section, with the "beyond noise" rule there.
   (`generation.setupGate`, `setupDetail`, `m2RollGate`, `claudeCli`) were
   updated to the new anchors ("This scene is contested", "Next step:"), and the
   M2 tests now expect `toolChoice` `auto` (and an unforced CLI schema).
+
+### 2026-10-25 - engine-review fixes to slice 1
+
+- **A decline ends the M2 gate.** A prompted round (`rollGatePromptedRound`)
+  that ends with no tool call is a decline: `noToolCallPrompts` is set to the
+  cap, and the round's text is taken back out of the thinking, accumulated,
+  context and history stores (as the setup gate does), so the gated round's
+  prose is the turn's text once. A prompted round that called other tools is not
+  a decline and still gets the second prompt. The decline arm now reads "the
+  turn is done: reply with nothing more, and do not repeat what you wrote".
+  The tests that expected three rounds (`m2RollGate`, `setupGate`) now expect
+  two.
+- **Setup causes fit the next step.** `classifySetupRejection` takes `next`,
+  returns `"nothing"` only for empty text and `undefined` otherwise (the default
+  head). `prose_question` only for `interview`/`concept`, `prose_note` only for
+  `character`/`campaign`; a heading line with a "?" is never a sheet heading.
+  `next` is optional in the function (absent means no restriction); the gate
+  always passes it.
+- **Threads are capped.** `renderThreadsSection`: 600 characters per
+  description, cut at a sentence end with "… (cut for length)" (no tool reads a
+  thread back, so no pointer to one); the section is held to 2,000 tokens, main
+  first, with an overflow line counting the threads left out.
+- **`gm_roll`** added to `GOOGLE_ESSENTIAL_TOOLS`; `rollGateMessage` names
+  `manage_track` (action `progress_roll`) when it is offered (this replaces the
+  earlier note that `progress_roll` never appears).
+- The `isPinnedNoteType` comments no longer say mechanics is pinned.

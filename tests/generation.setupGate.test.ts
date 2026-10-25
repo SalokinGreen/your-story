@@ -605,7 +605,9 @@ describe("outside session zero the gates are unchanged", () => {
     await generateStoryTurn(story, "attack", baseOptions, {});
 
     const calls = gmStageCalls();
-    expect(calls).toHaveLength(3);
+    // Round 2 is the prompted round; with no tool call it is a decline, so
+    // the gate does not ask a second time.
+    expect(calls).toHaveLength(2);
     expect(hasUser(calls[1], M2_TEXT)).toBe(true);
     expect(hasUser(calls[1], GATE_TEXT)).toBe(false);
   });

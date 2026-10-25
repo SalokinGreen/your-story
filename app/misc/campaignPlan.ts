@@ -465,28 +465,43 @@ export interface SetupGateOptions {
 
 // A heading (markdown or bold) shaped like a character sheet or a plan.
 const SETUP_NOTE_HEADING =
-  /^\s*(?:#{1,6}\s+|\*\*)[^\n]*\b(?:character sheet|campaign plan|spine|fronts?|current beat|opening image)\b/im;
+  /^\s*(?:#{1,6}\s+|\*\*)[^\n?]*\b(?:character sheet|campaign plan|spine|fronts?|current beat|opening image)\b[^\n?]*$/im;
 
 /**
- * Names the cause of a rejected setup round from what it said and which tools
- * it called. A sheet- or plan-shaped heading with no create_note is a note
- * written as prose (checked first, since a plan can hold a question mark); a
- * question mark with no ask_question is a question asked as prose; anything
- * else is "nothing".
+ * Names the cause of a rejected setup round from what it said, which tools
+ * it called and the step that is next. A sheet- or plan-shaped heading with no
+ * create_note is a note written as prose (checked first, since a plan can hold
+ * a question mark), but only when the next step is the sheet or the plan; a
+ * question mark with no ask_question is a question asked as prose, but only
+ * when the next step is a setup question. "nothing" is for a round with no
+ * words at all. Anything else has no cause, so the default head is used and
+ * the next step's own message does the asking (a "Ready to begin?" when the
+ * card is the next step is not a lost question).
  */
 export function classifySetupRejection(round: {
   visibleText: string;
   toolNames?: string[];
-}): SetupGateCause {
+  next?: SetupStep | null;
+}): SetupGateCause | undefined {
   const tools = round.toolNames ?? [];
   const text = round.visibleText ?? "";
-  if (SETUP_NOTE_HEADING.test(text) && !tools.includes("create_note")) {
+  if (!text.trim()) return "nothing";
+  const next = round.next;
+  if (
+    SETUP_NOTE_HEADING.test(text) &&
+    !tools.includes("create_note") &&
+    (next === undefined || next === "character" || next === "campaign")
+  ) {
     return "prose_note";
   }
-  if (text.includes("?") && !tools.includes("ask_question")) {
+  if (
+    text.includes("?") &&
+    !tools.includes("ask_question") &&
+    (next === undefined || next === "interview" || next === "concept")
+  ) {
     return "prose_question";
   }
-  return "nothing";
+  return undefined;
 }
 
 /**
