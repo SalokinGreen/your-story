@@ -186,3 +186,22 @@ describe("FR — Bestiary", () => {
     }
   });
 });
+
+describe("review fixes", () => {
+  const byId = (id: string) => rules.find((n) => n.id === `builtin:fantastic-realms:${id}`)!;
+
+  it("tells the GM to leave target out when a hit cannot hurt the foe", () => {
+    expect(BESTIARY_NOTE.content).toContain("leave target out of that feat_roll");
+    expect(CORE_NOTE.content).toContain("leave target out");
+  });
+
+  it("hedges what the realms add later", () => {
+    expect(MAGIC_NOTE.content).toContain("added with the realms in a later release");
+    expect(CALLINGS_NOTE.content).toContain("with the realms in a later release");
+  });
+
+  it("states the journey length and names the hero for a hearth use", () => {
+    expect(byId("travel").content).toContain("rounds = the days, 2 to 5");
+    expect(byId("downtime").content).toContain("manage_feats use with hero");
+  });
+});

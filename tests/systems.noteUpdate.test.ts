@@ -10,13 +10,14 @@ import { BLOOD_AND_BONE } from "@/app/misc/systems/blood-and-bone";
 import { BUILTIN_NOTE_HISTORY } from "@/app/misc/systems/builtinNoteHistory";
 import {
   addMissingBuiltinNotes,
+  BLOOD_AND_BONE_CORE_ID,
   hashNoteContent,
   updateBuiltinNotes,
 } from "@/app/misc/systems/builtinNotes";
 import { FANTASTIC_REALMS } from "@/app/misc/systems/fantastic-realms";
 import { CORE_NOTE } from "@/app/misc/systems/fantastic-realms/core";
 import { CREATION_NOTE } from "@/app/misc/systems/fantastic-realms/creation";
-import { PRE_E2_CORE, PRE_E2_CREATION } from "./helpers/frPreE2Notes";
+import { FIRST_RELEASE_CORE, PRE_E2_CORE, PRE_E2_CREATION } from "./helpers/frPreE2Notes";
 import { mockStory } from "./helpers/systemsHarness";
 
 
@@ -57,15 +58,18 @@ describe("BUILTIN_NOTE_HISTORY", () => {
   });
 
   it("records the older core and creation note beside the current one", () => {
-    expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id]).toHaveLength(2);
+    expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id]).toHaveLength(3);
     expect(BUILTIN_NOTE_HISTORY[CREATION_NOTE.id]).toHaveLength(2);
     expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id][0]).not.toBe(hashNoteContent(CORE_NOTE.content));
   });
 
-  it("records only the current hash for every Blood & Bone note", () => {
-    for (const n of BLOOD_AND_BONE.packs.flatMap((p) => p.notes)) {
-      expect(BUILTIN_NOTE_HISTORY[n.id], n.id).toHaveLength(1);
-    }
+  it("records the first-release core, the pre-E2 core and the current core in order", () => {
+    expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id]).toEqual([
+      hashNoteContent(FIRST_RELEASE_CORE.content),
+      hashNoteContent(PRE_E2_CORE.content),
+      hashNoteContent(CORE_NOTE.content),
+    ]);
+    expect(hashNoteContent(FIRST_RELEASE_CORE.content)).toBe("85639573ad5c6de4-7118");
   });
 });
 
@@ -94,7 +98,7 @@ describe("updateBuiltinNotes", () => {
   });
 
   it("keeps the previous releases hashes in the history", () => {
-    expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id][0]).toBe(hashNoteContent(PRE_E2_CORE.content));
+    expect(BUILTIN_NOTE_HISTORY[CORE_NOTE.id][1]).toBe(hashNoteContent(PRE_E2_CORE.content));
     expect(BUILTIN_NOTE_HISTORY[CREATION_NOTE.id][0]).toBe(hashNoteContent(PRE_E2_CREATION.content));
   });
 
@@ -129,18 +133,49 @@ describe("updateBuiltinNotes", () => {
     expect(updateBuiltinNotes(story).updated).toEqual([]);
   });
 
-  it("leaves a Blood & Bone story byte for byte as it was", () => {
+  it("leaves a current Blood & Bone story byte for byte as it was", () => {
     const notes = BLOOD_AND_BONE.packs.flatMap((p) => p.notes);
-    const story = mockStory({
-      lore: [
-        ...notes.map((n) => lore(n, n.content)),
-        // an edited one and an older-release one: both kept, neither reported.
-        lore(notes[1], "an edit"),
-      ],
-    });
+    const story = mockStory({ lore: notes.map((n) => lore(n, n.content)) });
     const before = JSON.stringify(story);
     expect(updateBuiltinNotes(story)).toEqual({ updated: [], keptEdited: [] });
     expect(JSON.stringify(story)).toBe(before);
+  });
+
+  it("keeps an edited Blood & Bone note that has older shipped versions", () => {
+    const notes = BLOOD_AND_BONE.packs.flatMap((p) => p.notes);
+    const multi = notes.find((n) => BUILTIN_NOTE_HISTORY[n.id].length > 1)!;
+    const story = mockStory({ lore: [lore(multi, "my own rules")] });
+    story.lore!.push(lore(notes.find((n) => n.id === BLOOD_AND_BONE_CORE_ID)!, "core stand-in"));
+    const res = updateBuiltinNotes(story);
+    expect(res.updated).toEqual([]);
+    expect(res.keptEdited).toContain(multi.title);
+    expect(story.lore![0].content).toBe("my own rules");
+  });
+
+  it("updates a Blood & Bone note whose text is an older shipped version", () => {
+    const notes = BLOOD_AND_BONE.packs.flatMap((p) => p.notes);
+    const multi = notes.find((n) => BUILTIN_NOTE_HISTORY[n.id].length > 1)!;
+    const story = mockStory({ lore: notes.map((n) => lore(n, n.content)) });
+    const history = {
+      ...BUILTIN_NOTE_HISTORY,
+      [multi.id]: [hashNoteContent("an older " + multi.title), hashNoteContent(multi.content)],
+    };
+    story.lore = story.lore!.map((l) =>
+      l.libraryNoteId === multi.id ? { ...l, content: "an older " + multi.title } : l,
+    );
+    const res = updateBuiltinNotes(story, BUILTIN_SYSTEMS, history);
+    expect(res.updated).toEqual([multi.title]);
+    expect(story.lore!.find((l) => l.libraryNoteId === multi.id)!.content).toBe(multi.content);
+  });
+
+  it("updates a story started on the first-release core", () => {
+    const story = frStory(FIRST_RELEASE_CORE.content);
+    const res = updateBuiltinNotes(story);
+    expect(res.updated).toEqual(["FR — Core rules"]);
+    expect(res.keptEdited).toEqual([]);
+    expect(story.lore!.find((l) => l.libraryNoteId === CORE_NOTE.id)!.content).toBe(
+      CORE_NOTE.content,
+    );
   });
 
   it("adds the new rules notes to an older Fantastic Realms story after the update", () => {

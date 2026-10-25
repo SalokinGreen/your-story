@@ -20,7 +20,7 @@ Supplies is the party's meter (0 to 6). On the first journey, manage_meter creat
 - At 0 the party is **Hungry**: give *Hungry* once to each hero (manage_feats add_condition). Only a meal clears it (manage_feats clear_condition after the meal); a rest alone does not.
 
 ## A journey is a challenge
-Run it with start_challenge, mode "tally", rounds = the days (up to 5). A longer trip is several legs of up to five rounds each; each leg is its own challenge.
+Run it with start_challenge, mode "tally", rounds = the days, 2 to 5 (a one-day trip is a single feat_roll, not a challenge). A longer trip is several legs of up to five rounds each; each leg is its own challenge.
 - **Each round is one day.** One feat_roll for its hardest part (the weather, the road, getting lost) against the route's DC: 2 on a good road, 3 in rough country, 4 in wild land, 5 on a feared route.
 - Record it with record_challenge_result: miss, weak_hit, hit or strong_hit. A hit counts +1, a strong hit +1, a weak hit 0, a miss -1.
 - **A miss** costs a Supply, a condition (*Exhausted*, *Lost*, *Frozen*) or an encounter from the realm's road table. **A weak hit** costs the same, in a smaller way. **A strong hit** finds something: a camp, a shortcut, a friendly face, a find.
@@ -28,7 +28,7 @@ Run it with start_challenge, mode "tally", rounds = the days (up to 5). A longer
 - Let any hero lead a day. Another helps (FR — Group play), and a hero with a fitting feat (*Knows Every Road*) is the natural pick.
 
 ## The road
-Each realm has an On the road table (FR — On the road is the shared one): roll it with formula_roll on a miss, or when a journey needs a moment. An encounter is a scene, not a roll for its own sake: a stranger, a toll, a storm, a sign.
+The shared table is FR — On the road (each realm will add its own, later): roll it with formula_roll on a miss, or when a journey needs a moment. An encounter is a scene, not a roll for its own sake: a stranger, a toll, a storm, a sign.
 
 ## The Thin Mile
 Where one realm gives way to the next, the road thins: a mile of mist, a ford, a gate, a stretch of burnt ground. The Thin Mile is a scene, not a roll. Say what changes when the party crosses it: the rest rule, the realm's magic and its miscasts, the local callings. The heroes keep all they carry. A condition from one realm may mean something else in the next: *Hollow-Eyed* is a sorrow in Gloamreach and a fashion in Aurelane. Call take_rest with the realm the party is resting in.`,

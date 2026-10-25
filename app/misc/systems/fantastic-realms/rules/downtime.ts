@@ -29,7 +29,7 @@ Downtime is what the heroes do between adventures, in a stretch longer than a re
 ## The hearth
 An optional home base the party shares: a farmhouse, a tower, a ship. Keep a note for the place and its people (create_note, type lore); the improvements live in the engine.
 - Up to five improvements: *Library*, *Stables*, *Shrine*, *Workshop*, *Watchtower*, *Cellar*, *Garden*, *Forge*. Each is a **party feat**: manage_feats add_party_feat (remove_party_feat to lose one). No hero is needed.
-- Any hero may name a party feat in a roll it fits (the Workshop for a repair, the Library for a rumour). **At the hearth it is free. Away from it, it works once per adventure:** manage_feats use with the improvement as feat, per adventure.
+- Any hero may name a party feat in a roll it fits (the Workshop for a repair, the Library for a rumour). **At the hearth it is free. Away from it, it works once per adventure:** manage_feats use with hero (who names it), the improvement as feat, per adventure.
 - Townsfolk at the hearth are NPCs with a want. Give them one.
 - A hearth is a place to be defended. A raid on it is an adventure of its own.
 

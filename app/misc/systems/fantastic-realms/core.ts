@@ -56,7 +56,7 @@ Each hero has meters: Hearts (3 to start), Level and XP.
 
 ## 6. Fights
 - Initiative, once, when the fight starts: initiative_roll with each hero and their edge_feats. A hero's number is 1d6 plus 1 per edge feat (a Swift item counts). A foe's number is its DC plus 1 per edge word (Fast, Ambusher), with no roll. Highest goes first; ties go to the heroes.
-- A hero's turn: they say what they do and feat_roll against the foe's DC, with the foe's name as target. A foe loses hearts by the result: weak hit 1 (and the hero pays a cost), hit 1, strong hit 2, plus 1 per magnitude, plus 1 for a Keen item on a strong hit. The result states the damage. Record it on the foe's Hearts meter (manage_meter: create it with the foe's hearts when the fight starts, then adjust by the loss).
+- A hero's turn: they say what they do and feat_roll against the foe's DC, with the foe's name as target. A foe loses hearts by the result: weak hit 1 (and the hero pays a cost), hit 1, strong hit 2, plus 1 per magnitude, plus 1 for a Keen item on a strong hit. The result states the damage. If a hit cannot hurt the foe (a strange word's key is missing), leave target out. Record it on the foe's Hearts meter (manage_meter: create it with the foe's hearts when the fight starts, then adjust by the loss).
 - A foe's turn: foes never roll. Narrate its threat aimed at one or more heroes. Each targeted hero who has not yet acted rolls to answer it: feat_roll against the foe's DC. A miss takes the harm (section 4). A weak hit takes it partly or pays another cost. A hit or better avoids it. A strong hit can turn it back on the foe.
 - At 0 hearts a foe is beaten, or flees or yields. A legend changes by phase (FR — Bestiary).
 

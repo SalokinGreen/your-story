@@ -221,7 +221,7 @@ export interface BuiltinNoteUpdate {
  * shipped version is the player's own edit (or an older release than the
  * history records) and is kept; it is reported in `keptEdited` only when the
  * history knows of a newer version that was therefore not applied. A note with
- * a single recorded version (Blood & Bone's, today) never changes. In place,
+ * a single recorded version never changes. In place,
  * like addMissingBuiltinNotes; it persists with the story's next save. Does
  * nothing to a story that is not kept up to date.
  */
