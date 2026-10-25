@@ -1429,7 +1429,7 @@ precondition holds (`selectJudges`: length past the ceiling, agency with a
 player line, outcome with a typed ruling, world consistency when the prose names
 a person or place of the record, secret leak with an unrevealed secret, lines
 and veils with a line or veil, the oracle judge when no oracle ran, the tier
-judge below the top tier) goes into **one** `callSideModel` call
+judge below the top tier) goes into **one** `callSideModel` call per pass (the rewriting judges before release, the rest in the background wave, one more per pause)
 (`judges/combined.ts`, prompts in `judges/prompts.ts`) on the side-agent model
 at its explicit effort. The prompt is written to the prompt rules (decision
 238): each judge a numbered decision chain with a minimal pair (`RUBRICS`; the
@@ -1442,7 +1442,7 @@ verdict only when its severity is in the set, its quote is really in the
 narration (the player's line for the tier judge) and every fact id exists;
 anything else, a missing key and malformed JSON included, is "unknown": no flag,
 a Debug Logs line. Facts are never truncated: past about 3,000 tokens the call
-splits into two by judge group (`planCalls`). A Stop passes through; a failed
+splits into two by judge group (`planCalls`). A judge's free-text `fix` goes to the corrective prompt and the Debug Logs only: every flag `detail` the player can see is a fixed sentence per judge. A Stop passes through; a failed
 call is unknown. The scene-increment question is a free phrase check
 (`sceneIncrementFlag`), not a judge. The per-judge calls survive as
 `runObserverSplit`, reachable only from the eval runner (J4), never Settings.

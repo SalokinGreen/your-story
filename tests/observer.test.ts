@@ -2419,10 +2419,10 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
   });
 
   it("counts the calls the enabled judges can add, for the cost line", () => {
-    // Defaults: every judge on and the prose judges rewrite.
+    // Defaults: the agency judge rewrites (a pass before release) and the oracle and tier judges run in the background wave.
     expect(countJudgeCalls(cloneDefaultObserverSettings())).toEqual({
-      always: 1,
-      sometimes: 1,
+      always: 2,
+      sometimes: 0,
       rewrites: true,
     });
     // The flag-only table: the outcome judge only, and only on a turn with a ruling.
@@ -2432,8 +2432,8 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
       rewrites: false,
     });
     expect(countJudgeCalls(LEGACY_OBSERVER_SETTINGS)).toEqual({
-      always: 1,
-      sometimes: 1,
+      always: 2,
+      sometimes: 0,
       rewrites: true,
     });
   });

@@ -255,9 +255,9 @@ describe("parsing the keyed reply (design 11.5)", () => {
   });
 
   it("matches a quote through curly quotes, case and ellipses", () => {
-    expect(quoteAppearsIn("“she says”", 'The old woman: "She says" nothing more')).toBe(true);
+    expect(quoteAppearsIn("“she says nothing more”", 'The old woman: "She says nothing more" and left')).toBe(true);
     expect(quoteAppearsIn("She says ... the lamp", ctx.narration)).toBe(true);
-    expect(quoteAppearsIn("the lamp ... She says", ctx.narration)).toBe(true); // fragments, not order
+    expect(quoteAppearsIn("the lamp ... She says", ctx.narration)).toBe(false); // fragments in the text's order
     expect(quoteAppearsIn("", ctx.narration)).toBe(false);
   });
 });
@@ -451,7 +451,9 @@ describe("runObserver on the combined call", () => {
       ["player_agency", "major"],
       ["missing_oracle_or_table", "minor"],
     ]);
-    expect(flags[0].detail).toBe("Cut the promise.");
+    // A judge's free text never reaches the player: the detail is a fixed sentence.
+    expect(flags[0].detail).not.toContain("Cut the promise");
+    expect(flags[0].correctivePrompt).toContain("Cut the promise.");
   });
 
   it("never quotes a secret in a flag the player can see", async () => {

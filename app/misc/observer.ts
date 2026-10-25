@@ -1026,6 +1026,7 @@ export interface RewriteNarrationParams {
  */
 const ALSO_FIX_CLAUSES: Partial<Record<ObserverFlagType, string>> = {
   player_agency: `if the narration gives the player character new meaningful dialogue, makes a significant choice for them or decides what they feel, cut that back and leave that choice to the player; narrating them carrying out what they declared, in second person, stays`,
+  response_length: `if the narration runs longer than the moment needs, cut scenery, repeated beats and anything the player did not ask for; keep every event and every result`,
   outcome_narration_mismatch: `if the narration contradicts what a roll or check mechanically resolved to this turn, correct the narration to match the result - the result is ground truth and never changes to suit the prose`,
 };
 
@@ -2111,7 +2112,7 @@ export interface ObserverParams {
  * judges, the background wave the rest, so each judge runs once per turn.
  *
  * The per-judge calls this replaced are runObserverSplit below, kept for the
- * eval runner's comparison (scripts/eval-judges.mjs --mode split) and never
+ * eval runner's comparison (slice J4 will add scripts/eval-judges.mjs; it does not exist yet) and never
  * reachable from Settings.
  */
 export async function runObserver(params: ObserverParams): Promise<ObserverFlag[]> {
@@ -2414,36 +2415,49 @@ export function replaceVisibleProse(
 
 /**
  * How many AI calls the enabled judges can add to a turn, from the settings
- * alone. The judges share one call (judges/combined.ts), so the count is the
- * passes, not the judges: `always` is one call on essentially every turn when a
- * judge that runs on every turn is on (player agency, the tier judge, the oracle
- * judge); `sometimes` is one more, only when the turn gives a conditional judge
- * something to judge (the length judge past its ceiling, the outcome judge on
- * an engine ruling, the judges of the record: a secret, a line, a named person)
- * and the rewriting judges' pass is separate from the background wave. The
- * scene-increment check is free. A rewrite is extra and only when a judge is
- * set to rewrite.
+ * alone. The judges share one call per pass (judges/combined.ts), so this
+ * counts passes, not judges. There are two passes: the rewriting judges' pass
+ * before the turn is released, and the background wave for the rest. `always`
+ * counts a pass that runs on essentially every turn (the agency judge when it
+ * rewrites; the oracle, tier or a non-rewriting agency judge in the wave);
+ * `sometimes` counts a pass that runs only when the turn gives its judges
+ * something to judge (a long turn, an engine ruling, a secret, a line, a named
+ * person). A turn that pauses on the player adds one more pass per pause, and a
+ * rewrite is extra, only when a judge is set to rewrite. The scene-increment
+ * check is free.
  */
 export function countJudgeCalls(settings: ObserverSettings): {
   always: number;
   sometimes: number;
   rewrites: boolean;
 } {
-  const on = (type: ObserverFlagType) => settingsFor(settings, type).enabled;
-  const always =
-    on("player_agency") ||
-    on("tier_escalation_missed") ||
-    on("missing_oracle_or_table")
-      ? 1
-      : 0;
-  const sometimes =
-    on("response_length") ||
-    on("outcome_narration_mismatch") ||
-    on("world_consistency") ||
-    on("secret_leak") ||
-    on("lines_and_veils")
-      ? 1
-      : 0;
+  const s = (type: ObserverFlagType) => settingsFor(settings, type);
+  const on = (type: ObserverFlagType) => s(type).enabled;
+  const rewriting = (type: ObserverFlagType) => s(type).enabled && s(type).triggersReset;
+
+  const blockingAlways = rewriting("player_agency");
+  const blockingSometimes =
+    !blockingAlways &&
+    (["response_length", "outcome_narration_mismatch", "tier_escalation_missed"] as const).some(
+      rewriting,
+    );
+  const backgroundAlways =
+    (on("player_agency") && !rewriting("player_agency")) ||
+    on("missing_oracle_or_table") ||
+    (on("tier_escalation_missed") && !rewriting("tier_escalation_missed"));
+  const backgroundSometimes =
+    !backgroundAlways &&
+    (
+      [
+        "response_length",
+        "outcome_narration_mismatch",
+        "world_consistency",
+        "secret_leak",
+        "lines_and_veils",
+      ] as const
+    ).some((type) => on(type) && !rewriting(type));
+  const always = (blockingAlways ? 1 : 0) + (backgroundAlways ? 1 : 0);
+  const sometimes = (blockingSometimes ? 1 : 0) + (backgroundSometimes ? 1 : 0);
   const rewrites = (
     ["response_length", "player_agency", "outcome_narration_mismatch"] as const
   ).some((type) => {

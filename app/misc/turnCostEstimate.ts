@@ -57,7 +57,7 @@ import {
 } from "@/app/misc/layerSettings";
 import type { ProviderKeys } from "@/app/misc/sideModelCall";
 import { hasKeyForModel } from "@/app/misc/ai_prices";
-import { ObserverSettings, settingsFor } from "@/app/misc/observer";
+import { ObserverSettings, countJudgeCalls, settingsFor } from "@/app/misc/observer";
 import { ObserverFlagType } from "@/app/misc/structs";
 import { computeGMStageBudget } from "@/app/misc/ai_staged";
 import {
@@ -88,8 +88,8 @@ const GM_TOOL_ROUND_OUTPUT_TOKENS = 250;
 const CHOICES_INPUT_TOKENS = 5000;
 const CHOICES_OUTPUT_TOKENS = 350;
 /** Observer judges see the narration plus a compact context block. */
-const OBSERVER_INPUT_TOKENS = 2200;
-const OBSERVER_OUTPUT_TOKENS = 120;
+const OBSERVER_INPUT_TOKENS = 2600;
+const OBSERVER_OUTPUT_TOKENS = 450;
 /** The rewrite re-sends the turn's whole conversation and rewrites the prose. */
 const OBSERVER_REWRITE_INPUT_FILL = 0.8;
 const MEMORY_KEEPER_INPUT_TOKENS = 1400;
@@ -459,30 +459,16 @@ export function estimateTurnCost(
   });
 
   // --- Observer judges -------------------------------------------------
-  // The judges share one call per pass (judges/combined.ts), so the cost is
-  // the passes, not the checks: one call on a turn when a judge that runs on
-  // every turn is on (agency, the oracle judge, the tier judge), and a
-  // fraction when only judges that need something to judge are (a long turn,
-  // an engine ruling, a secret or line in the record). The scene-increment
-  // check is a free phrase check and costs nothing.
+  // The judges share one call per pass (judges/combined.ts), so the cost is the
+  // passes, not the checks: the rewriting judges' pass before release and the
+  // background wave (countJudgeCalls). A turn that pauses on the player adds a
+  // pass per pause, which the high estimate allows for once. The
+  // scene-increment check is a free phrase check.
   const enabledChecks = (
     Object.keys(observerSettings) as ObserverFlagType[]
   ).filter((type) => settingsFor(observerSettings, type).enabled);
-  const everyTurnJudge = enabledChecks.some(
-    (type) =>
-      type === "player_agency" ||
-      type === "missing_oracle_or_table" ||
-      type === "tier_escalation_missed",
-  );
-  const conditionalJudge = enabledChecks.some(
-    (type) =>
-      type === "response_length" ||
-      type === "outcome_narration_mismatch" ||
-      type === "world_consistency" ||
-      type === "secret_leak" ||
-      type === "lines_and_veils",
-  );
-  const observerCalls = everyTurnJudge ? 1 : conditionalJudge ? 0.4 : 0;
+  const passes = countJudgeCalls(observerSettings);
+  const observerCalls = passes.always + 0.4 * passes.sometimes;
 
   if (observerCalls > 0) {
     plans.push({
@@ -493,9 +479,9 @@ export function estimateTurnCost(
       inputPerCall: OBSERVER_INPUT_TOKENS,
       outputPerCall: OBSERVER_OUTPUT_TOKENS,
       expectedCalls: calibratedCalls(calibration, "observer", observerCalls),
-      lowCalls: everyTurnJudge ? 1 : 0,
-      highCalls: everyTurnJudge && conditionalJudge ? 2 : 1,
-      note: "The enabled checks share one call (two when some rewrite and some only flag). Turn off checks you don't need in Settings > Architecture.",
+      lowCalls: passes.always,
+      highCalls: passes.always + passes.sometimes + 1,
+      note: "The enabled checks share one call per pass: one before the turn is released for the checks that rewrite, one in the background for the rest, and one more each time the turn pauses on you. Turn off checks you don't need in Settings > Architecture.",
     });
 
     plans.push({

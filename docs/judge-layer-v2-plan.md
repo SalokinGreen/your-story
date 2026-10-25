@@ -465,3 +465,30 @@ shared `AGENCY_CHAIN`, the prompt builders), `app/misc/judges/combined.ts`
   coverage through `runObserverSplit`.
 - **GM request digests** (`tests/campaign.oldSaves.test.ts`) did not change: no
   GM prompt, tool list or block moved.
+
+### 2026-10-25 — engine review of J2 (seven findings, all fixed)
+
+1. **A secret revealed this turn is no leak.** `collectTurnFacts` skips a secret
+   that is revealed in the story after the turn as well as before it.
+2. **A judge's `fix` never reaches the player.** Every flag `detail` is a fixed
+   sentence per judge (length keeps its word counts); the `fix` goes to the
+   `correctivePrompt` and the Debug Logs. A rewrite is therefore told the rule
+   that was broken ("took a decision away from the player…"), not the judge's
+   wording, until J3 hands it the facts. Tested with a canary in a secret, an
+   NPC status, a gm_roll line and a line, across all eight judges.
+3. **Quotes.** `quoteAppearsIn` strips surrounding quote marks and stray
+   punctuation, `*` and `_`, folds hyphens and dashes, requires the fragments in
+   the text's order, and refuses a quote under three words and twelve characters.
+4. **Reply cap.** `judgeMaxTokens` = 260 per judge + 240 + one third of the
+   narration's characters, at most 8,000, so span lists fit on a long turn.
+5. **Cost.** `countJudgeCalls` counts passes: a default turn is `always: 2`
+   (the agency pass before release, the oracle/tier pass in the background),
+   `sometimes: 0`; `turnCostEstimate` uses it (expected `always + 0.4 *
+   sometimes`, low `always`, high `always + sometimes + 1` for a pause), with
+   `OBSERVER_OUTPUT_TOKENS` 450 and input 2,600. CLAUDE.md says "one call per pass".
+6. **One rewrite fixes the other majors.** `alsoFixTypes` hands the other
+   rewritable majors to `rewriteFlaggedNarration` as `alsoFixIfPresent` (end of
+   turn and at a pause); `ALSO_FIX_CLAUSES` gained a `response_length` clause.
+   `runObserverSplit`'s comment now says the eval runner is slice J4 and not yet
+   written.
+7. **`generate_name`** counts as randomness in `executedRandomness`.

@@ -99,7 +99,9 @@ export function collectTurnFacts(
     }
   }
   for (const secret of recordBefore?.secrets ?? []) {
+    // Revealed before the turn, or by it (reveal_secret): telling it is no leak.
     if (secret.revealed) continue;
+    if (recordAfter?.secrets?.some((s) => s.id === secret.id && s.revealed)) continue;
     add(
       "record",
       secret.id,

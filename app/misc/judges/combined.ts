@@ -248,20 +248,46 @@ function normalizeQuote(text: string): string {
   return text
     .replace(/[‘’‛]/g, "'")
     .replace(/[“”]/g, '"')
+    .replace(/[‐-―−]/g, "-") // hyphens, en and em dashes fold to one
+    .replace(/[*_]/g, "") // markdown emphasis the narration may carry and the quote drop
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 }
 
-/** Whether a quote is really in the text. A quote may skip words with an ellipsis. */
+/** A fragment without the quote marks and stray punctuation a judge wraps around it. */
+function trimFragment(fragment: string): string {
+  return fragment.replace(/^[\s"'`.,;:!?-]+|[\s"'`.,;:!?-]+$/g, "");
+}
+
+/** The shortest quote that counts as evidence: a "the" is in every narration. */
+const MIN_QUOTE_WORDS = 3;
+const MIN_QUOTE_CHARS = 12;
+
+/**
+ * Whether a quote is really in the text. A quote may skip words with an
+ * ellipsis, but its fragments must come in the text's order. Surrounding quote
+ * marks, emphasis marks and dash style do not matter; a quote shorter than
+ * three words and twelve characters is no evidence.
+ */
 export function quoteAppearsIn(quote: string, text: string): boolean {
   const haystack = normalizeQuote(text);
   const fragments = quote
     .split(/…|\.{3}/)
-    .map(normalizeQuote)
+    .map((f) => trimFragment(normalizeQuote(f)))
     .filter(Boolean);
   if (fragments.length === 0) return false;
-  return fragments.every((fragment) => haystack.includes(fragment));
+  const whole = fragments.join(" ");
+  if (whole.split(" ").length < MIN_QUOTE_WORDS && whole.length < MIN_QUOTE_CHARS) {
+    return false;
+  }
+  let from = 0;
+  for (const fragment of fragments) {
+    const at = haystack.indexOf(fragment, from);
+    if (at < 0) return false;
+    from = at + fragment.length;
+  }
+  return true;
 }
 
 export interface VerdictProblem {
@@ -387,6 +413,14 @@ function tierInput(tierUsed: number): TierInput {
   };
 }
 
+/**
+ * The reply cap: a fixed share per judge, plus room for the span lists and
+ * quotes, which can add up to about the narration's own length on a long turn.
+ */
+export function judgeMaxTokens(judgeCount: number, narration: string): number {
+  return Math.min(8000, 260 * judgeCount + 240 + Math.ceil(narration.length / 3));
+}
+
 async function callJudges(
   turn: JudgeTurn,
   judges: JudgeId[],
@@ -445,7 +479,7 @@ async function callJudges(
         { role: "user", content: user },
       ],
       keys: apiOptions,
-      maxTokens: Math.min(3200, 260 * judges.length + 240),
+      maxTokens: judgeMaxTokens(judges.length, turn.narration),
       temperature: 0,
       reasoningEffort: apiOptions.reasoningEffort,
       abortSignal: apiOptions.abortSignal,
@@ -520,7 +554,8 @@ function flagFor(judge: JudgeId, v: JudgeVerdict, ctx: FlagContext): ObserverFla
       return {
         ...base,
         severity,
-        detail: v.fix ? `${base.detail} ${v.fix}` : base.detail,
+        // The word counts only: a judge's free text never reaches the player.
+        detail: base.detail,
       };
     }
     case "agency": {
@@ -528,7 +563,8 @@ function flagFor(judge: JudgeId, v: JudgeVerdict, ctx: FlagContext): ObserverFla
       return {
         type: "player_agency",
         severity,
-        detail: reason,
+        detail:
+          "The narration may have taken a decision away from the player: new dialogue, a significant choice, a decided feeling, or an action past the one they declared.",
         correctivePrompt: `Your previous attempt at this turn was reset because it broke the PLAYER AGENCY rule: it took a decision away from the player. ${reason} Rewrite this turn: narrate the character carrying out what the player declared (second person is fine) and the world's answer, but give them no new meaningful dialogue, no significant choice and no decided feeling the player didn't give.`,
       };
     }
@@ -542,7 +578,7 @@ function flagFor(judge: JudgeId, v: JudgeVerdict, ctx: FlagContext): ObserverFla
       return {
         type: "outcome_narration_mismatch",
         severity,
-        detail: reason,
+        detail: `The narration may not match the mechanical result of this turn's checks (${label}).`,
         correctivePrompt: `Your previous attempt at this turn was reset because the narration didn't match the mechanical result of this turn's checks (${label}): ${reason} Rewrite the narration so it agrees with what the rolls actually determined - the roll results are ground truth and narration cannot override them.`,
       };
     }
@@ -551,7 +587,7 @@ function flagFor(judge: JudgeId, v: JudgeVerdict, ctx: FlagContext): ObserverFla
       return {
         type: "world_consistency",
         severity,
-        detail: reason,
+        detail: "The narration may contradict a fact the story holds.",
         correctivePrompt: `The narration contradicted a fact the story holds: ${reason} Keep to the facts of the world.`,
       };
     }
@@ -581,7 +617,8 @@ function flagFor(judge: JudgeId, v: JudgeVerdict, ctx: FlagContext): ObserverFla
         type: "missing_oracle_or_table",
         severity:
           settings.sensitivity >= TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD ? "major" : "minor",
-        detail: reason,
+        detail:
+          "This turn may have invented an uncertain outcome instead of consulting the oracle or a table.",
         correctivePrompt: `Consider using fate_question (for uncertain yes/no world questions) or roll_table (for random flavor) instead of deciding an outcome narratively: ${reason}`,
       };
     }
@@ -591,7 +628,8 @@ function flagFor(judge: JudgeId, v: JudgeVerdict, ctx: FlagContext): ObserverFla
       return {
         type: "tier_escalation_missed",
         severity,
-        detail: reason,
+        detail:
+          "This turn's complexity may have called for more careful adjudication than its tier provides.",
         correctivePrompt: `Your previous attempt at this turn was reset because it needed more careful adjudication than it got: ${reason} This retry is running at a higher reasoning tier - take the extra room to think the stakes and consequences through before resolving the action.`,
       };
     }

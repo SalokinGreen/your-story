@@ -296,7 +296,7 @@ describe("the length rewrite - generateStoryTurn integration", () => {
       LONG_NARRATION,
       async (call) => {
         if (isRewrite(call)) {
-          return call.body.messages.some((m) => m.content?.includes("Spoke for the player"))
+          return call.body.messages.some((m) => m.content?.includes("taken a decision away"))
             ? "You hesitate at the lock."
             : REWRITTEN;
         }
@@ -319,6 +319,13 @@ describe("the length rewrite - generateStoryTurn integration", () => {
     );
 
     expect(observerCalls.filter(isRewrite)).toHaveLength(1);
+    // The one rewrite also carries the other major's fix, so it cuts the length too.
+    const prompt = observerCalls
+      .filter(isRewrite)[0]
+      .body.messages.map((m) => m.content)
+      .join("\n");
+    expect(prompt).toContain("runs longer than the moment needs");
+    expect(prompt).not.toContain("makes a significant choice for them"); // the chosen flag is not its own clause
     expect(result.content).toBe("You hesitate at the lock.");
     expect(result.scenePart.correctedObserverFlags?.[0]?.type).toBe("player_agency");
   });

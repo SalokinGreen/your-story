@@ -262,11 +262,27 @@ export function mergeRefusedDiceCalls(
   return { ...execution, results };
 }
 
+/** The other rewritable majors of a turn, to be fixed in the same rewrite as `chosen`. */
+export function alsoFixTypes(
+  flags: readonly ObserverFlag[],
+  chosen: ObserverFlag,
+): ObserverFlagType[] {
+  return flags
+    .filter(
+      (f) =>
+        f !== chosen &&
+        f.type !== chosen.type &&
+        f.severity === "major" &&
+        REWRITABLE_FLAG_TYPES.has(f.type),
+    )
+    .map((f) => f.type);
+}
+
 /**
  * True when a turn's tools already drew randomness: a die, an oracle or table,
- * a track's progress roll. A full-turn retry would draw it again, so it is
- * refused (the re-ask's list, minus the deterministic `calculate` and the
- * pausing tools). A refused or errored call drew nothing.
+ * a name draw, a track's progress roll. A full-turn retry would draw it again,
+ * so it is refused (the re-ask's list, minus the deterministic `calculate` and
+ * the pausing tools). A refused or errored call drew nothing.
  */
 export function executedRandomness(
   results: readonly GMToolResult[] | undefined,
@@ -283,7 +299,11 @@ export function executedRandomness(
     ) {
       return false;
     }
-    if (DICE_TOOLS.includes(r.toolName) || REASK_EXTRA_ROLL_TOOLS.includes(r.toolName)) {
+    if (
+      DICE_TOOLS.includes(r.toolName) ||
+      REASK_EXTRA_ROLL_TOOLS.includes(r.toolName) ||
+      r.toolName === "generate_name"
+    ) {
       return true;
     }
     return (
@@ -1410,6 +1430,7 @@ export async function generateStoryTurn(
               storyData,
             ),
             flag: pauseMajor,
+            alsoFixIfPresent: alsoFixTypes(pauseFlags, pauseMajor),
             replyLength: options.replyLength,
             storytellerMode: options.storytellerMode,
             characterContext: pauseCharacterContext,
@@ -1805,6 +1826,10 @@ export async function generateStoryTurn(
               // style notes, the recent prose. Not the GM's reasoning or notes.
               narrationContext: result.narrationContext,
               narrationThoughts: result.narrationOwnThoughts,
+              // The turn gets one rewrite, so the other rewritable majors ride
+              // along as conditional "fix this too" clauses (priority decides
+              // which is the flag; the rest are fixed in the same pass).
+              alsoFixIfPresent: alsoFixTypes(flags, majorFlag),
               // The Observer's pin if the player set one, else the narration
               // voice (decision 52) - not sideCallApiOptions, or the rewrite
               // would silently skip that pin.
