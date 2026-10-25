@@ -325,11 +325,15 @@ export function TurnWorkLine({
   blocks,
   reasoningTier,
   streaming = false,
+  phaseLabel,
   trailing,
 }: {
   blocks: TimelineBlock[];
   reasoningTier?: ReasoningTierDisplay;
   streaming?: boolean;
+  // Where a held turn is (decision 221), in words; stands in for "Thinking…"
+  // when nothing is streaming a thought.
+  phaseLabel?: string;
   // The "Turn actions" button, which sits at the end of the line - or alone
   // when the turn did no work worth a line.
   trailing?: React.ReactNode;
@@ -341,7 +345,9 @@ export function TurnWorkLine({
     reasoningTier && slotForTier(reasoningTier.tier) === "advanced"
       ? reasoningTier
       : undefined;
-  const live = streaming ? (summary.live ?? "Thinking…") : undefined;
+  const live = streaming
+    ? (summary.live ?? phaseLabel ?? "Thinking…")
+    : undefined;
   if (summary.isEmpty && !live && !advancedTier) {
     // No work line to sit at the end of: a lone "…" above the prose reads as
     // a glitch, and touch players open the row by tapping the turn anyway.
@@ -407,8 +413,19 @@ export function TurnWorkLine({
   );
 }
 
+/** Where a turn held for the judges is (generation.ts onTurnPhase). */
+export type TurnPhase = "writing" | "checking" | "revising";
+
+export const TURN_PHASE_LABELS: Record<TurnPhase, string> = {
+  writing: "Writing…",
+  checking: "Checking the turn…",
+  revising: "Revising…",
+};
+
 export interface GMTurnProps {
   content: string;
+  /** The live work line's label while a held turn is checked or revised. */
+  phaseLabel?: string;
   /** True only on the latest exchange: the prose fades in. */
   animate?: boolean;
   isStreaming?: boolean;
@@ -473,6 +490,7 @@ export function isTurnTap(
 // prose with no card, avatar or name.
 export function GMTurn({
   content,
+  phaseLabel,
   animate = false,
   isStreaming = false,
   showHiddenMessages = false,
@@ -555,6 +573,7 @@ export function GMTurn({
           blocks={timeline}
           reasoningTier={reasoningTier}
           streaming={isStreaming}
+          phaseLabel={phaseLabel}
           trailing={
             onToggleActions ? (
               <TurnActionsToggle

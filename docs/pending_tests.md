@@ -30,6 +30,51 @@ key):
   errors (then the story did not resolve to the system: check
   `systemState.systemId` in the Story Editor).
 
+## 2026-10-25 — Judges on, turns held (decisions 220–221, 237, 240)
+
+Built and unit-tested (the held turn's callbacks, the phases, the rewrite
+released once, the Stop); not played on the APK or against a real model:
+
+- **A turn appears only after it is checked.** On the Android app, play a
+  turn with the default Observer settings. Expected: the work line reads
+  "Writing…" (or "Thinking…" while a thought streams), then "Checking the
+  turn…", and the turn's text appears all at once; nothing streams in word by
+  word and read-aloud starts only when it appears. Failure looks like: prose
+  streaming in before "Checking the turn…", or text that changes after it was
+  shown.
+- **A long turn comes back shortened.** Set Response Length to short and play
+  until a turn runs well over the ceiling. Expected: "Revising…" shows, the
+  shortened text appears, the turn's actions offer "Undo revision", and Undo
+  puts the long first draft back. Failure looks like: the long text shown
+  first, or no Undo revision.
+- **Flag-only judges still stream.** In Settings, set every judge to Flag.
+  Expected: the next turn streams live as before, with no "Checking the turn…".
+- **The agency judge rewrites (decision 237).** Play a turn where your line
+  is short ("I nod.") against a GM that tends to speak for you. Expected: every
+  turn with a line shows "Checking the turn…" for about a second; a turn that
+  decides what your character says or feels is revised before you see it, with
+  "Undo revision". Failure looks like: such a turn appearing at once with only
+  a flag toast.
+- **A pause shows the scene first (decision 240).** Play until the GM writes a
+  few paragraphs and then asks a question, a roll or the dice tray. Expected:
+  the paragraphs are on screen, checked, before the question appears; the text
+  after your answer appears together once checked. Failure looks like: the
+  question over an empty turn, or the first paragraphs changing after you
+  answered. Also try it as an online guest: the host's question should not show
+  the previous turn's text as "being written".
+- **A pause rewrite with Claude (decision 240, engine-review fixes).** With a
+  Claude model as the GM at a thinking effort, play until the GM asks a
+  question after a stretch of prose that a judge rewrites (agency is the easy
+  one). Answer. Expected: the turn continues with no 400 from OpenRouter about
+  thinking blocks, the second round's request (Debug Logs) shows the rewritten
+  prose beside the tool call, and the next turn's GM does not repeat the first
+  draft's habit. Failure looks like: a 400 naming `thinking` or `signature`
+  after the answer.
+- **A failed suggestions call keeps the turn.** With Suggested Choices on, turn
+  the network off just as the turn's text is about to appear (or use a model
+  that rejects the choices call). Expected: the narration still appears, with
+  no suggestions and a Debug Logs line "Choices generation failed".
+
 ## 2026-10-25 — Starters welcome you in (decisions 197–200)
 
 Seen in the browser preview (the welcome first, the opening not shown); not

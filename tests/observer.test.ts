@@ -29,6 +29,9 @@ import {
   rewriteFlaggedNarration,
   settingsFor,
   plausibleResetFlagTypes,
+  splitObserverSettings,
+  restrictObserverSettings,
+  replaceVisibleProse,
   DEFAULT_OBSERVER_SETTINGS,
   FLAG_ONLY_FLAG_TYPES,
   canObserverTriggerReset,
@@ -43,7 +46,10 @@ import {
   OutcomeTier,
   OutcomeVerdict,
 } from "../app/misc/observer";
-import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import {
+  LEGACY_OBSERVER_SETTINGS,
+  FLAG_ONLY_OBSERVER_SETTINGS,
+} from "./helpers/observerSettings";
 import type {
   ObserverFlag,
   GMConversationMessage,
@@ -2311,35 +2317,39 @@ describe("reconcileGmThinkingAfterRewrite", () => {
 });
 
 describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
-  it("is flag only by default: nothing rewrites or rerolls on its own (decision 187)", () => {
-    // No check is allowed to correct a turn.
+  it("has every judge on; the three prose judges rewrite, the rest flag (decision 220)", () => {
     for (const type of Object.keys(DEFAULT_OBSERVER_SETTINGS) as Array<
       keyof typeof DEFAULT_OBSERVER_SETTINGS
     >) {
-      expect(DEFAULT_OBSERVER_SETTINGS[type].triggersReset).toBe(false);
+      expect(DEFAULT_OBSERVER_SETTINGS[type].enabled).toBe(true);
     }
-    // Only the outcome judge is on, at sensitivity 2.
-    expect(DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch).toEqual({
+    expect(DEFAULT_OBSERVER_SETTINGS.response_length).toEqual({
       enabled: true,
-      triggersReset: false,
-      sensitivity: 2,
+      triggersReset: true,
+      sensitivity: 5,
     });
     expect(DEFAULT_OBSERVER_SETTINGS.player_agency).toEqual({
-      enabled: false,
-      triggersReset: false,
+      enabled: true,
+      triggersReset: true,
       sensitivity: 3,
     });
+    expect(DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch).toEqual({
+      enabled: true,
+      triggersReset: true,
+      sensitivity: 2,
+    });
     for (const type of [
-      "response_length",
       "missing_oracle_or_table",
       "missing_scene_increment",
       "tier_escalation_missed",
     ] as const) {
-      expect(DEFAULT_OBSERVER_SETTINGS[type].enabled).toBe(false);
+      expect(DEFAULT_OBSERVER_SETTINGS[type].triggersReset).toBe(false);
       expect(DEFAULT_OBSERVER_SETTINGS[type].sensitivity).toBe(5);
     }
-    // ...so by default no turn ever waits on a judge that could change it.
-    expect(canObserverTriggerReset(undefined)).toBe(false);
+    // ...so a turn can wait on a judge that may rewrite it.
+    expect(canObserverTriggerReset(undefined)).toBe(true);
+    // The decision 187 table is still reachable, and cannot rewrite.
+    expect(canObserverTriggerReset(FLAG_ONLY_OBSERVER_SETTINGS)).toBe(false);
   });
 
   it("is frozen, and settingsFor hands out copies so no caller can change it", () => {
@@ -2347,15 +2357,15 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
     expect(Object.isFrozen(DEFAULT_OBSERVER_SETTINGS.player_agency)).toBe(true);
 
     const copy = settingsFor(undefined, "player_agency");
-    copy.enabled = true;
+    copy.enabled = false;
     copy.sensitivity = 9;
-    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.enabled).toBe(false);
+    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.enabled).toBe(true);
     expect(DEFAULT_OBSERVER_SETTINGS.player_agency.sensitivity).toBe(3);
-    expect(settingsFor(undefined, "player_agency").enabled).toBe(false);
+    expect(settingsFor(undefined, "player_agency").enabled).toBe(true);
 
     const fresh = cloneDefaultObserverSettings();
-    fresh.response_length.enabled = true;
-    expect(DEFAULT_OBSERVER_SETTINGS.response_length.enabled).toBe(false);
+    fresh.response_length.enabled = false;
+    expect(DEFAULT_OBSERVER_SETTINGS.response_length.enabled).toBe(true);
   });
 
   it("falls back to defaults when no settings object is provided", () => {
@@ -2366,19 +2376,19 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
 
   it("merges a partial override with that type's defaults", () => {
     const merged = settingsFor(
-      { player_agency: { enabled: true } } as any,
+      { player_agency: { enabled: false } } as any,
       "player_agency",
     );
-    expect(merged.enabled).toBe(true);
+    expect(merged.enabled).toBe(false);
     // Fields the override didn't specify still fall back to the default.
-    expect(merged.triggersReset).toBe(false);
+    expect(merged.triggersReset).toBe(true);
     expect(merged.sensitivity).toBe(3);
   });
 
   it("does not let an override for one type leak into another", () => {
-    const settings = { response_length: { enabled: true } } as any;
-    expect(settingsFor(settings, "response_length").enabled).toBe(true);
-    expect(settingsFor(settings, "player_agency").enabled).toBe(false);
+    const settings = { response_length: { enabled: false } } as any;
+    expect(settingsFor(settings, "response_length").enabled).toBe(false);
+    expect(settingsFor(settings, "player_agency").enabled).toBe(true);
     expect(settingsFor(settings, "outcome_narration_mismatch").enabled).toBe(true);
   });
 
@@ -2386,6 +2396,9 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
     const stored = {
       missing_oracle_or_table: { enabled: true, triggersReset: true, sensitivity: 9 },
       missing_scene_increment: { enabled: true, triggersReset: true, sensitivity: 9 },
+      response_length: { enabled: false },
+      player_agency: { enabled: false },
+      outcome_narration_mismatch: { enabled: false },
     } as any;
     for (const type of ["missing_oracle_or_table", "missing_scene_increment"] as const) {
       expect(FLAG_ONLY_FLAG_TYPES.has(type)).toBe(true);
@@ -2404,13 +2417,18 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
   });
 
   it("counts the calls the enabled judges can add, for the cost line", () => {
-    // Defaults: the outcome judge only, and only on a turn with a ruling.
+    // Defaults: every judge on and the prose judges rewrite.
     expect(countJudgeCalls(cloneDefaultObserverSettings())).toEqual({
+      always: 3,
+      sometimes: 2,
+      rewrites: true,
+    });
+    // The flag-only table: the outcome judge only, and only on a turn with a ruling.
+    expect(countJudgeCalls(FLAG_ONLY_OBSERVER_SETTINGS)).toEqual({
       always: 0,
       sometimes: 1,
       rewrites: false,
     });
-    // Every judge on: the oracle and scene judges share one call.
     expect(countJudgeCalls(LEGACY_OBSERVER_SETTINGS)).toEqual({
       always: 3,
       sometimes: 2,
@@ -2419,7 +2437,7 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
   });
 });
 
-describe("runObserver with the default settings", () => {
+describe("runObserver with the flag-only settings (decision 187's table)", () => {
   const originalFetch = global.fetch;
 
   afterEach(() => {
@@ -2432,6 +2450,7 @@ describe("runObserver with the default settings", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const flags = await runObserver({
+      settings: FLAG_ONLY_OBSERVER_SETTINGS,
       narration: Array(400).fill("word").join(" "),
       playerChoice: "I draw my sword",
       replyLength: "medium",
@@ -2454,6 +2473,7 @@ describe("runObserver with the default settings", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const flags = await runObserver({
+      settings: FLAG_ONLY_OBSERVER_SETTINGS,
       narration: "You clear the gap cleanly.",
       playerChoice: "I jump",
       rollResults: [verdict("action_roll", "miss", "MISS")],
@@ -2463,10 +2483,12 @@ describe("runObserver with the default settings", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(flags.map((f) => f.type)).toEqual(["outcome_narration_mismatch"]);
-    // Flag only: never reset-eligible under the defaults.
+    // Flag only: never reset-eligible under this table.
     expect(
       flags.some(
-        (f) => f.severity === "major" && settingsFor(undefined, f.type).triggersReset,
+        (f) =>
+          f.severity === "major" &&
+          settingsFor(FLAG_ONLY_OBSERVER_SETTINGS, f.type).triggersReset,
       ),
     ).toBe(false);
   });
@@ -2474,6 +2496,7 @@ describe("runObserver with the default settings", () => {
   it("is not plausible-to-reset on any turn, so the player never waits on a judge", () => {
     expect(
       plausibleResetFlagTypes({
+        settings: FLAG_ONLY_OBSERVER_SETTINGS,
         narration: Array(400).fill("word").join(" "),
         rollResults: [verdict("action_roll", "miss", "MISS")],
         tierUsed: 0,
@@ -2932,5 +2955,160 @@ describe("rewriteFlaggedNarration", () => {
     });
 
     expect(rewritten).toBeNull();
+  });
+});
+
+describe("agency is plausible with a player line (decision 237)", () => {
+  const rewriting = cloneDefaultObserverSettings();
+
+  it("lists player_agency when the turn has a non-empty player line", () => {
+    expect(
+      plausibleResetFlagTypes({
+        narration: "The lock clicks open.",
+        playerChoice: "I pick the lock",
+        settings: rewriting,
+      }),
+    ).toContain("player_agency");
+  });
+
+  it("does not list it for an empty line, or when agency is off or only flags", () => {
+    const base = { narration: "The lock clicks open.", playerChoice: "I pick the lock" };
+    expect(
+      plausibleResetFlagTypes({ ...base, playerChoice: "  ", settings: rewriting }),
+    ).not.toContain("player_agency");
+    expect(
+      plausibleResetFlagTypes({
+        ...base,
+        settings: { ...rewriting, player_agency: { enabled: false, triggersReset: false, sensitivity: 3 } },
+      }),
+    ).not.toContain("player_agency");
+    expect(
+      plausibleResetFlagTypes({
+        ...base,
+        settings: { ...rewriting, player_agency: { enabled: true, triggersReset: false, sensitivity: 3 } },
+      }),
+    ).not.toContain("player_agency");
+  });
+});
+
+describe("splitObserverSettings: each judge runs once", () => {
+  it("gives the blocking pass the rewriting judges and the background the rest", () => {
+    const { blocking, background } = splitObserverSettings(cloneDefaultObserverSettings(), true);
+    for (const type of ["response_length", "player_agency", "outcome_narration_mismatch"] as const) {
+      expect(blocking[type].enabled).toBe(true);
+      expect(background[type].enabled).toBe(false);
+    }
+    for (const type of ["missing_oracle_or_table", "missing_scene_increment", "tier_escalation_missed"] as const) {
+      expect(blocking[type].enabled).toBe(false);
+      expect(background[type].enabled).toBe(true);
+    }
+  });
+
+  it("keeps the whole config in the background when no blocking pass runs", () => {
+    const { background } = splitObserverSettings(cloneDefaultObserverSettings(), false);
+    expect(background.player_agency.enabled).toBe(true);
+    expect(background.response_length.enabled).toBe(true);
+  });
+});
+
+describe("prose released at a pause (decision 240): rewrite prompt and history", () => {
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  const flag: ObserverFlag = {
+    type: "player_agency",
+    severity: "major",
+    detail: "The GM spoke for the player.",
+    correctivePrompt: "Do not speak for the player.",
+  };
+
+  async function promptOf(extra: {
+    alreadyRead?: string;
+    endsAtPause?: boolean;
+  }): Promise<string> {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "A cleaner continuation." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await rewriteFlaggedNarration({
+      narration: "A first draft of the continuation.",
+      playerChoice: "I wait",
+      flag,
+      alreadyRead: extra.alreadyRead,
+      endsAtPause: extra.endsAtPause,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    return body.messages.map((m: { content: string }) => m.content).join("\n");
+  }
+
+  it("tells a tail rewrite the read prefix is final and asks for a segment, not a turn", async () => {
+    const prompt = await promptOf({ alreadyRead: "You reach the door." });
+    expect(prompt).toContain("already read");
+    expect(prompt).toContain("You reach the door.");
+    expect(prompt).toContain("Rewrite only the continuation");
+    expect(prompt).toContain("only part of the turn");
+  });
+
+  it("tells a pause rewrite a question or roll follows and to stay the same length", async () => {
+    const prompt = await promptOf({ endsAtPause: true });
+    expect(prompt).toContain("pauses on the player");
+    expect(prompt).toContain("about as long as the text you were given");
+  });
+
+  it("leaves a whole-turn rewrite prompt without either", async () => {
+    const prompt = await promptOf({});
+    expect(prompt).not.toContain("already read");
+    expect(prompt).not.toContain("only part of the turn");
+  });
+
+  it("splitObserverSettings with blockingTypes leaves the other rewriting judges in the background", () => {
+    const settings = {
+      ...cloneDefaultObserverSettings(),
+      tier_escalation_missed: { enabled: true, triggersReset: true, sensitivity: 5 },
+    };
+    const prose = new Set<keyof ObserverSettings>([
+      "response_length",
+      "player_agency",
+      "outcome_narration_mismatch",
+    ]);
+    const { blocking, background } = splitObserverSettings(settings, true, prose);
+    expect(blocking.tier_escalation_missed.enabled).toBe(false);
+    expect(background.tier_escalation_missed.enabled).toBe(true);
+    expect(blocking.player_agency.enabled).toBe(true);
+    expect(background.player_agency.enabled).toBe(false);
+  });
+
+  it("restrictObserverSettings keeps only the chosen judges, as configured", () => {
+    const only = restrictObserverSettings(
+      cloneDefaultObserverSettings(),
+      (t) => t === "response_length",
+    );
+    expect(only.response_length.enabled).toBe(true);
+    expect(only.player_agency.enabled).toBe(false);
+    expect(only.tier_escalation_missed.enabled).toBe(false);
+  });
+
+  it("replaceVisibleProse swaps the first prose-bearing round and keeps every round's thinking", () => {
+    const out = replaceVisibleProse(
+      ["", "<thinking>plan A</thinking>\n\nDraft one.", "<thinking>plan B</thinking>\n\nDraft two."],
+      "Fixed text.",
+      flag,
+    );
+    expect(out[0]).toBe("");
+    expect(out[1]).toContain("plan A");
+    expect(out[1]).toContain("OBSERVER CORRECTION");
+    expect(extractVisibleText(out[1])).toBe("Fixed text.");
+    expect(out[2]).toContain("plan B");
+    expect(extractVisibleText(out[2])).toBe("");
+  });
+
+  it("replaceVisibleProse hands back the same array when no round had prose", () => {
+    const raws = ["", "<thinking>only thoughts</thinking>"];
+    expect(replaceVisibleProse(raws, "Fixed.", flag)).toBe(raws);
   });
 });

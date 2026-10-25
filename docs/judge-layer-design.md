@@ -1,5 +1,28 @@
 # The judge layer: flag only, and the bugs under it
 
+> **Update 2026-10-25 (decisions 220–221).** The flag-only defaults of §2 were
+> revised: every judge is on, the three prose judges rewrite, settings version
+> 3. A rewrite never replaces text the player has seen: while a judge may
+> rewrite, the turn is **held** (`holdLiveText`, `heldTurnOutput.ts`) and
+> released once after the judging, with the phases "Writing…", "Checking the
+> turn…" and "Revising…" on the work line. The background wave no longer
+> rewrites, so §3.1's rewrite patch (`applyBackgroundRewrite`) is gone; flags,
+> memory, director and progress deltas still land by id.
+>
+> **Follow-up fixes (decisions 237 and 240, same day).** The blocking pass runs
+> only the judges that are enabled and rewriting; the background wave runs the
+> rest once (`splitObserverSettings`). The agency gap is closed (237, "Check
+> before release"): `player_agency` is plausible on every turn with a player
+> line while enabled and rewriting, so it can rewrite, for about one cheap call
+> and a second of wait per turn. At a pause on the player (a question, a roll,
+> the dice tray, the setup card) the prose so far is checked, rewritten if a
+> major flag lands, and shown before the pause appears (240, "Release up to the
+> pause"); it cannot be rewritten afterwards, and the text after the pause is
+> held and checked as usual (a tier retry is refused once text is on screen).
+> A failed choices call no longer discards a finished narration, an empty held
+> turn appends nothing, and guests are no longer sent the previous turn's text
+> as "being written" during the hold (`liveRelayText.ts`).
+
 Status: **approved (decision 189) and built on 2026-10-24; see "Decisions made
 during implementation" at the bottom.** Decisions 187–188. Source: Codex's review of the judge layer
 (`docs/research/codex-judge-layer-review-2026-10-24.md`), after the author's
@@ -277,3 +300,74 @@ forced a different shape from the design, or the design left a call open:
 Tests for the page-level wiring (1, 7, 8) are source checks: the page cannot be
 mounted in Vitest. A browser check of a Save-as jump during a background wave
 is owed.
+
+## Decisions made during implementation (2026-10-25, held-turn fixes)
+
+- **Pause release mirrors the unheld flow.** The prose released at a pause goes
+  out through `onGMContent` and `onLiveNarrationUpdate` (what a round's prose
+  uses without the hold), not through `onStoryContent`: the page has no part for
+  the turn until the story callbacks, exactly as before 221. The finished turn's
+  text then begins with the released prose (it is kept as the first entry of the
+  GM's accumulation, and both paths share `polishGMProse`), and
+  `held.release(text, pause.text)` adds only the tail to the live timeline.
+- **A pause rewrite is applied to the GM's own history (fix 2, below).** The
+  rewrite there still runs without the turn's conversation
+  (`conversationMessages`), on the standalone rewrite prompt, because the
+  conversation does not exist yet mid-turn.
+- **The reset budget is shared.** A pause rewrite spends the turn's one
+  `MAX_OBSERVER_RESETS`, so the end-of-turn pass will not rewrite again.
+- **No heavier-tier retry once anything is on screen.** A
+  `tier_escalation_missed` reset after a pause release keeps the turn with its
+  flag.
+- **If the finished text does not begin with the released prose** (a story
+  stage that rewrote it), the end-of-turn pass judges nothing more and logs it.
+
+## Decisions made during implementation (2026-10-25, engine review of the held-turn fixes)
+
+An engine review of b6bc8d8d found seven problems; all are fixed.
+
+1. **Released prose is assembled verbatim, never polished twice.** With a
+   pause release, `storyContent` is the released entry plus `polishGMProse` of
+   the rounds after it only (`pauseReleasedText`, `postPauseRawParts`). The
+   de-AI-ify swap is random, so a second pass over the whole text could differ
+   from what the player read: the `startsWith` check failed, the tail went
+   unjudged, the prefix showed twice and "Undo revision" could not find its
+   text. `finish` in the pause hook trims, so `pause.text` is literally the
+   prefix.
+2. **A pause rewrite edits the GM's own history.** `releaseBeforePause`
+   replaces the visible prose of the assistant rounds since the last release
+   (`replaceVisibleProse`, observer.ts): each keeps its `<thinking>`, tool
+   calls and `reasoning_details`; the first round that had prose gets the
+   rewrite plus the correction marker (inside `<thinking>`); the others lose
+   their visible prose. Later rounds of the turn, the saved `gmConversation`,
+   `gmThinking` and Reword all agree with the screen, and `correctedObserverFlags`
+   is truthful. **Signed reasoning:** `providerCall.ts` sends `reasoning_details`
+   as its own message field and only for the current turn; Claude's signature
+   covers the thinking block, not the text content beside it, so editing
+   `content` is accepted and the details are not touched. This was read from the
+   code (lines 943-953 of `providerCall.ts`) and the Anthropic rule, not
+   exercised against a real Claude call (see `pending_tests.md`). If no round
+   had prose to replace (`PauseHistoryEdit.fixed` false), the correction is
+   recorded as an advisory `observerFlags` entry instead of a "your history is
+   already fixed" note. "Undo revision" puts the first draft's rounds back by
+   assistant ordinal (the stored conversation drops the engine's user nudges).
+3. **The tail rewrite is told the prefix is final.** Both the end-of-turn and
+   the speculative rewrite pass `alreadyRead`; the prompt shows the read text,
+   says to rewrite only the continuation, and asks for a segment's length, not
+   a turn's. The pause rewrite passes `endsAtPause`: keep the lead-in to the
+   question or roll, and stay about the same length.
+4. **The length judge reads a whole paused turn.** When a pause released text
+   and a blocking pass ran, a flag-only length check runs in the background on
+   the whole `result.content` (each part alone may be under the ceiling).
+5. **A pause runs the prose judges only** (`splitObserverSettings(..., true,
+   REWRITABLE_FLAG_TYPES)`); a stored config with the tier judge set to reset
+   no longer runs it at every pause. When only the pause ran, the tier judge
+   stays in the background wave.
+6. **Raw pre-pause text is kept.** `pauseRawPrefix` feeds `rawStoryContent`,
+   `scenePart.raw` and `narrationThoughts`, while the polished released text is
+   what is shown and saved as content.
+7. **A stretch released unjudged** (nothing plausible at its pause) is read in
+   the background wave by the other rewriting judges, flag-only
+   (`pause.unjudged`), when a blocking pass ran. The length judge is excluded
+   there because the whole-turn check covers it. Each judge still runs once per
+   text it judges.

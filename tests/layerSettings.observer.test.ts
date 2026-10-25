@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe("getObserverSettings", () => {
-  it("returns the flag-only defaults when nothing is stored", () => {
+  it("returns the defaults when nothing is stored", () => {
     stubStorage();
     expect(getObserverSettings()).toEqual(DEFAULT_OBSERVER_SETTINGS);
   });
@@ -51,18 +51,19 @@ describe("getObserverSettings", () => {
   it("returns a fresh copy every call, so an edit cannot change the defaults (finding 9)", () => {
     stubStorage();
     const first = getObserverSettings();
-    first.player_agency.enabled = true;
-    first.player_agency.triggersReset = true;
-    expect(getObserverSettings().player_agency.enabled).toBe(false);
-    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.enabled).toBe(false);
+    first.player_agency.enabled = false;
+    first.player_agency.triggersReset = false;
+    expect(getObserverSettings().player_agency.enabled).toBe(true);
+    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.enabled).toBe(true);
+    expect(DEFAULT_OBSERVER_SETTINGS.player_agency.triggersReset).toBe(true);
   });
 
   it("an edit then a Reset leaves the pristine defaults, not the edited ones", () => {
     stubStorage();
-    setObserverCheckSetting("response_length", { enabled: true, triggersReset: true });
-    expect(getObserverSettings().response_length.triggersReset).toBe(true);
+    setObserverCheckSetting("response_length", { enabled: false, triggersReset: false });
+    expect(getObserverSettings().response_length.enabled).toBe(false);
     // The exported defaults were assigned into by the old code.
-    expect(DEFAULT_OBSERVER_SETTINGS.response_length.enabled).toBe(false);
+    expect(DEFAULT_OBSERVER_SETTINGS.response_length.enabled).toBe(true);
 
     resetObserverSettings();
     expect(getObserverSettings()).toEqual(DEFAULT_OBSERVER_SETTINGS);
@@ -93,7 +94,7 @@ describe("the one-time settings reset (decision 187)", () => {
     setObserverCheckSetting("player_agency", { enabled: true, sensitivity: 7 });
 
     const after = getObserverSettings();
-    expect(after.player_agency).toEqual({ enabled: true, triggersReset: false, sensitivity: 7 });
+    expect(after.player_agency).toEqual({ enabled: true, triggersReset: true, sensitivity: 7 });
     // ...and the next read does not reset it again.
     expect(getObserverSettings().player_agency.sensitivity).toBe(7);
   });
@@ -121,7 +122,7 @@ describe("the one-time settings reset (decision 187)", () => {
     });
     expect(getObserverSettings().player_agency).toEqual({
       enabled: true,
-      triggersReset: false,
+      triggersReset: true,
       sensitivity: 3,
     });
   });

@@ -7,12 +7,13 @@
  * warning. This module is the judge counterpart - it reviews a completed GM
  * turn for violations of rules the GM was already given.
  *
- * BY DEFAULT IT ONLY FLAGS (decision 187, docs/judge-layer-design.md). Nothing
- * here rewrites or rerolls a turn on its own: only the outcome-mismatch judge
- * is on, and its finding is a flag in the turn's details. A player can switch
- * each judge on in Settings, and the three that judge the prose
- * (REWRITABLE_FLAG_TYPES) can be allowed to rewrite it automatically - which
- * changes text the player may already have read. When that is on, a "major"
+ * EVERY JUDGE IS ON BY DEFAULT (decision 220, revising 187's flag-only
+ * defaults; docs/judge-layer-design.md). The three that judge the prose
+ * (REWRITABLE_FLAG_TYPES) rewrite a flagged turn automatically, the other three
+ * flag. A rewrite never replaces text the player has seen: generateStoryTurn
+ * holds the turn's output until the judging is done (decision 221,
+ * heldTurnOutput.ts), and the background wave only flags. Nothing rerolls a
+ * turn on its own. A "major"
  * flag can make generateStoryTurn (generation.ts) call rewriteFlaggedNarration
  * below: the GM is shown the exact narration it wrote and the specific reason
  * it was flagged, and rewrites just the prose - dice rolls/tool calls/state
@@ -30,10 +31,9 @@
  *   deterministic signals - the word count, which tier the turn used and
  *   whether the engine ruled on a check. A turn where none of them could
  *   produce a reset-eligible flag hands control straight back to the player
- *   and gets judged in generateStoryTurn's background wave instead. With the
- *   default settings no turn is ever plausible, so no turn ever waits. See
- *   that function's comment for why player_agency is deliberately not on the
- *   list.
+ *   and gets judged in generateStoryTurn's background wave instead, which
+ *   only flags. See that function's comment for why player_agency is
+ *   deliberately not on the list (so it is never rewritten).
  * - Suspension (observerSuspensionReason): session zero - a brand-new story
  *   up to and including the turn that calls start_game - is never judged.
  *   Setup turns legitimately run long and legitimately propose character
@@ -154,29 +154,32 @@ export interface ObserverCheckSettings {
 export type ObserverSettings = Record<ObserverFlagType, ObserverCheckSettings>;
 
 /**
- * The stored-settings version the current defaults belong to (decision 187).
- * Before it, every judge was on and three could rewrite or reroll a turn by
- * default; a config saved then would keep that behaviour for good, because a
- * stored config overrides the defaults. layerSettings.ts replaces a stored
- * config that lacks this version, once, and keeps the player's choices after.
+ * The stored-settings version the current defaults belong to. A stored config
+ * overrides the defaults, so a change of defaults would never reach a player
+ * who had saved one. layerSettings.ts replaces a stored config that lacks this
+ * version, once, and keeps the player's choices after. Version 2 was the
+ * flag-only defaults (decision 187); version 3 turns every judge back on
+ * (decision 220).
  */
-export const OBSERVER_SETTINGS_VERSION = 2;
+export const OBSERVER_SETTINGS_VERSION = 3;
 
 function frozenCheckSettings(
   enabled: boolean,
   sensitivity: number,
+  rewrite = false,
 ): Readonly<ObserverCheckSettings> {
-  return Object.freeze({ enabled, triggersReset: false, sensitivity });
+  return Object.freeze({ enabled, triggersReset: rewrite, sensitivity });
 }
 
 /**
- * Decision 187: flag only, no rewrites. Nothing rewrites or rerolls a turn on
- * its own by default; only the outcome-mismatch judge stays on, as a flag in
- * the turn's details (its input is typed verdicts now, see
- * extractOutcomeVerdicts). The other five judges are off, and Settings can turn
- * each back on. With every `triggersReset` false, canObserverTriggerReset is
- * false: no blocking judge, no reset, no background rewrite and no speculative
- * shortening.
+ * Decision 220 (revising 187's "flag only"): every judge is on. The three
+ * prose judges (REWRITABLE_FLAG_TYPES) rewrite a flagged turn automatically,
+ * the "Rewrite automatically" choice Settings offers, through the checked
+ * rewrite path decisions 187-189 built: a rewrite is validated before it
+ * replaces anything, a failed one keeps the turn with its flag, nothing is
+ * rerolled, and the turn carries "Undo revision". The other three only flag:
+ * the two tool-usage gaps are flag-only by type, and tier_escalation_missed's
+ * heavier-tier retry stays off. Settings can turn each one off or down.
  *
  * Frozen, and every reader gets a copy (settingsFor, layerSettings.ts): the
  * first edit in Settings used to assign into this very object, so the
@@ -185,12 +188,12 @@ function frozenCheckSettings(
  */
 export const DEFAULT_OBSERVER_SETTINGS: Readonly<ObserverSettings> =
   Object.freeze({
-    response_length: frozenCheckSettings(false, 5),
-    player_agency: frozenCheckSettings(false, 3),
-    outcome_narration_mismatch: frozenCheckSettings(true, 2),
-    missing_oracle_or_table: frozenCheckSettings(false, 5),
-    missing_scene_increment: frozenCheckSettings(false, 5),
-    tier_escalation_missed: frozenCheckSettings(false, 5),
+    response_length: frozenCheckSettings(true, 5, true),
+    player_agency: frozenCheckSettings(true, 3, true),
+    outcome_narration_mismatch: frozenCheckSettings(true, 2, true),
+    missing_oracle_or_table: frozenCheckSettings(true, 5),
+    missing_scene_increment: frozenCheckSettings(true, 5),
+    tier_escalation_missed: frozenCheckSettings(true, 5),
   });
 
 /**
@@ -312,18 +315,16 @@ export function canObserverTriggerReset(
  * happen HERE" - so generateStoryTurn can hand control straight back to the
  * player and run the observer in the background whenever the answer is no.
  *
- * player_agency is deliberately absent. It is the one reset-eligible check
- * with no free pre-signal at all: telling "the GM decided what the player
- * character does" apart from "the GM narrated an NPC" needs the judge, and
- * any regex standing in for it would be wrong in both directions. Listing it
- * here would mean "always plausible", which is exactly the always-block
- * behavior this function exists to end - so agency violations are caught by
- * the background pass instead, which can still rewrite, just after the player
- * already has control.
+ * player_agency has no free pre-signal: telling "the GM decided what the
+ * player character does" apart from "the GM narrated an NPC" needs the judge.
+ * Decision 237 ("Check before release"): with the text held until it is
+ * checked, the agency judge could otherwise only rewrite when another judge
+ * made the turn blocking, so it counts as plausible on every turn with a
+ * non-empty player line while it is enabled and rewriting. The cost is about
+ * one cheap call and a second of wait per turn.
  *
  * Erring toward NOT listing a type is safe: a missed one still gets judged in
- * the background wave and can still be rewritten there. The only thing lost
- * is the guarantee that the player never reads the flagged draft.
+ * the background wave, as a flag. What is lost is the automatic rewrite.
  */
 export function plausibleResetFlagTypes(params: {
   narration: string;
@@ -341,6 +342,8 @@ export function plausibleResetFlagTypes(params: {
    * below for why it gates that check specifically.
    */
   highStakes?: boolean;
+  /** The player's line this turn; player_agency is plausible when it is non-empty (decision 237). */
+  playerChoice?: string;
   settings?: ObserverSettings;
 }): ObserverFlagType[] {
   const { narration, rollResults = [], tierUsed } = params;
@@ -373,6 +376,10 @@ export function plausibleResetFlagTypes(params: {
     rollResults.some((r) => OUTCOME_CHECK_TOOL_NAMES.has(r.toolName))
   ) {
     types.push("outcome_narration_mismatch");
+  }
+
+  if (canReset("player_agency") && (params.playerChoice ?? "").trim()) {
+    types.push("player_agency");
   }
 
   // The two tool-usage gaps (missing_oracle_or_table, missing_scene_increment)
@@ -410,6 +417,53 @@ export function plausibleResetFlagTypes(params: {
   }
 
   return types;
+}
+
+/**
+ * Splits a config between the pass the player waits on and the background
+ * wave, so each enabled judge runs once per turn. `blocking` keeps only the
+ * judges that are enabled AND allowed to rewrite; `background` is everything
+ * else. When no blocking pass runs, the background keeps the whole config (it
+ * flags only, whatever a judge's reset setting).
+ */
+export function splitObserverSettings(
+  settings: ObserverSettings | undefined,
+  blockingRuns: boolean,
+  /** When given, only these types count as blocking (a pause runs the prose judges alone). */
+  blockingTypes?: ReadonlySet<ObserverFlagType>,
+): { blocking: ObserverSettings; background: ObserverSettings } {
+  const blocking = {} as ObserverSettings;
+  const background = {} as ObserverSettings;
+  for (const type of Object.keys(
+    DEFAULT_OBSERVER_SETTINGS,
+  ) as ObserverFlagType[]) {
+    const s = settingsFor(settings, type);
+    const rewriting =
+      s.enabled && s.triggersReset && (!blockingTypes || blockingTypes.has(type));
+    blocking[type] = rewriting ? s : { ...s, enabled: false };
+    background[type] =
+      blockingRuns && rewriting ? { ...s, enabled: false } : s;
+  }
+  return { blocking, background };
+}
+
+/**
+ * A copy of a config with only the judges `keep` accepts left on, each as the
+ * player set it. Used for the flag-only passes over text a blocking pass did not
+ * read (a paused turn's whole length, a stretch released unjudged).
+ */
+export function restrictObserverSettings(
+  settings: ObserverSettings | undefined,
+  keep: (type: ObserverFlagType) => boolean,
+): ObserverSettings {
+  const out = {} as ObserverSettings;
+  for (const type of Object.keys(
+    DEFAULT_OBSERVER_SETTINGS,
+  ) as ObserverFlagType[]) {
+    const s = settingsFor(settings, type);
+    out[type] = keep(type) ? s : { ...s, enabled: false };
+  }
+  return out;
 }
 
 function clampSensitivity(sensitivity: number): number {
@@ -871,6 +925,14 @@ export interface RewriteNarrationParams {
   alsoFixIfPresent?: ObserverFlagType[];
   /** Swap the AI vocabulary tics in the result, like the story stage does (default on). */
   deAiifyWords?: boolean;
+  /**
+   * Prose the player has already read (released at a pause, decision 240). It is
+   * final: `narration` is only the continuation after it, and the rewrite is
+   * told so and asked for a continuation-sized answer, not a whole turn.
+   */
+  alreadyRead?: string;
+  /** `narration` ends where the turn pauses on the player (a question, a roll, a dice tray). */
+  endsAtPause?: boolean;
   apiOptions: ObserverApiOptions;
 }
 
@@ -934,6 +996,17 @@ export async function rewriteFlaggedNarration(
   const storytellerMode = params.storytellerMode || "narrator";
   const { paragraphs } = getLengthGuidance(replyLength);
   const band = PACING_BANDS[replyLength] ?? PACING_BANDS.medium;
+  const alreadyRead = params.alreadyRead?.trim() ?? "";
+  // A stretch of a turn is not a turn: never ask it for a whole turn's length.
+  const lengthLine =
+    alreadyRead || params.endsAtPause
+      ? `This is only part of the turn, so do not write a whole turn's length: stay about as long as the text you were given${
+          flag.type === "response_length" ? ", or shorter, as the flag asks" : ""
+        }.`
+      : paragraphs;
+  const pauseLine = params.endsAtPause
+    ? `\n- This text ends where the turn pauses on the player: a question, a roll or a dice throw follows it. Keep the lead-in to that, so the question or roll still makes sense after it.`
+    : "";
 
   const voiceGuidance =
     storytellerMode === "dm"
@@ -965,10 +1038,20 @@ export async function rewriteFlaggedNarration(
 - Same moment, same scene, same events, same outcome. Do NOT advance the story, start a new scene, skip time, or introduce people, places, or events that weren't already in it.
 - Any dice rolls, checks, and state changes this turn already resolved are ground truth - the rewrite must stay consistent with them. They are NOT re-rolled.
 - Keep everything that was already correct (the tone, the details, the beat it lands on). Fix only what was flagged.${alsoFixBlock}
-- ${paragraphs} ${voiceGuidance}
+- ${lengthLine} ${voiceGuidance}${pauseLine}
 - Output ONLY the corrected narration prose - no meta-commentary, no explanation of what you changed, no notes to yourself, no tool calls.`;
 
-  const flaggedBlock = `Your previous narration for this turn was flagged by an automated reviewer.
+  const readBlock = alreadyRead
+    ? `The player has already read this opening of the turn, and it stays exactly as it is:
+"""
+${alreadyRead}
+"""
+Rewrite only the continuation that follows it. Do not repeat, change or summarise what the player has read.
+
+`
+    : "";
+
+  const flaggedBlock = `${readBlock}Your previous narration for this turn was flagged by an automated reviewer.
 
 What you wrote (FLAGGED - do not repeat it as-is):
 """
@@ -2163,6 +2246,33 @@ export function reconcileGmThinkingAfterRewrite(
   const inner = [lastReasoning, marker].filter(Boolean).join("\n\n");
   stripped[lastIdx] = `<thinking>\n${inner}\n</thinking>\n\n${rewritten}`;
   return stripped;
+}
+
+/**
+ * A prose rewrite made at a pause (decision 240), applied to the raw text of
+ * the GM rounds it covers: each keeps its <thinking> reasoning, and the first
+ * one that carried visible prose gets the rewrite (and the correction marker,
+ * inside <thinking>); the others lose their visible prose. Rounds with no
+ * visible prose pass through. Returns the same array when none had any, so the
+ * caller can tell nothing was fixed.
+ */
+export function replaceVisibleProse(
+  raws: string[],
+  rewritten: string,
+  flag: ObserverFlag,
+): string[] {
+  const firstWithProse = raws.findIndex((r) => extractVisibleText(r || "") !== "");
+  if (firstWithProse < 0) return raws;
+  const marker = observerRewriteMarker(flag);
+  return raws.map((raw, i) => {
+    if (i < firstWithProse || extractVisibleText(raw || "") === "") return raw;
+    const reasoning = extractGmReasoning(raw);
+    if (i !== firstWithProse) {
+      return reasoning ? `<thinking>\n${reasoning}\n</thinking>` : "";
+    }
+    const inner = [reasoning, marker].filter(Boolean).join("\n\n");
+    return `<thinking>\n${inner}\n</thinking>\n\n${rewritten.trim()}`;
+  });
 }
 
 // ============================================================

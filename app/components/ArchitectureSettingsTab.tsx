@@ -90,7 +90,7 @@ const LAYERS: LayerInfo[] = [
     title: "Adjudication",
     badge: "Layer 5",
     summary:
-      "The Observer reviews each completed turn against rules the GM was already given. By default it only flags: it never rewrites a turn you may already have read, and it never re-rolls one. Only the roll-outcome check is on; each of the others can be switched on, and the three that judge the prose can be allowed to rewrite it. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
+      "The Observer reviews each completed turn against rules the GM was already given. Every check is on by default: the three that judge the prose rewrite a flagged turn before you see it (the agency check runs on every turn that has your line, so it can), and the other three only flag, after the turn appears. When the GM stops to ask you something, the text written so far is checked and shown first. It never re-rolls a turn. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
     files: "app/misc/observer.ts, app/misc/consistencyCheck.ts",
     aiDriven: true,
   },
@@ -543,9 +543,12 @@ export default function ArchitectureSettingsTab() {
           <p className="text-xs text-ys-muted">
             Each check is Off, or Flag (a note in the turn&rsquo;s details and a
             heads-up to the GM next turn; the text you read never changes). The
-            three that judge the prose can also Rewrite automatically, which
-            changes text you may already have read; you can undo a revision on
-            its turn. Nothing here ever re-rolls a turn.
+            three that judge the prose can also Rewrite automatically; you can
+            undo a revision on its turn. Nothing here ever re-rolls a turn.
+          </p>
+          <p className="text-xs text-ys-muted">
+            While a judge can rewrite, a turn&rsquo;s text appears only after it
+            has been checked.
           </p>
           <p className="text-xs text-ys-muted">
             Cost now:{" "}
@@ -584,7 +587,7 @@ export default function ArchitectureSettingsTab() {
                               aria-pressed={active}
                               title={
                                 mode === "rewrite"
-                                  ? "Rewrite automatically: changes text you may already have read"
+                                  ? "Rewrite automatically: a turn appears only after it has been checked"
                                   : undefined
                               }
                               onClick={() =>

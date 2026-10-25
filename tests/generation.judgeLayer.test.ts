@@ -18,7 +18,10 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch, sseStreamResponse } from "./helpers/mockGMFetch";
-import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import {
+  LEGACY_OBSERVER_SETTINGS,
+  FLAG_ONLY_OBSERVER_SETTINGS,
+} from "./helpers/observerSettings";
 import type { ObserverSettings } from "@/app/misc/observer";
 import type { ObserverFlag, StoryData } from "@/app/misc/structs";
 import type { ResolvedTier } from "@/app/misc/reasoningTiers";
@@ -125,10 +128,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("the defaults are flag only (decision 187)", () => {
+describe("the flag-only table (decision 187, a choice since decision 220)", () => {
   it("makes no judge call and no rewrite for a long, plain turn", async () => {
     const { calls } = installFetch([{ content: LONG }], () => ALL_CLEAR);
-    const result = await generateStoryTurn(story(), "I pick the lock", baseOptions, {});
+    const result = await generateStoryTurn(
+      story(),
+      "I pick the lock",
+      { ...baseOptions, observerSettings: FLAG_ONLY_OBSERVER_SETTINGS },
+      {},
+    );
     await settle();
 
     expect(result.content).toBe(LONG);
@@ -288,29 +296,18 @@ describe("a rewrite respects Suggested Choices (finding 7)", () => {
     expect(calls.filter(isChoices)).toHaveLength(2);
   });
 
-  it("returns a background rewrite's choices as data, never through the UI callbacks", async () => {
-    // player_agency is judged in the background; a major finding rewrites.
-    const agency = JSON.stringify({ violation: true, severity: "major", reason: "Spoke for the player." });
-    const { calls } = installFetch([{ content: SHORT }], (call) => {
-      if (isRewrite(call)) return REWRITTEN;
-      if (first(call).includes("took a decision away from the player")) return agency;
-      return ALL_CLEAR;
-    });
+  it("shows only the re-derived choices, never the first draft's (decision 221)", async () => {
+    const { calls } = installFetch([{ content: LONG }], respond);
     const uiChoices: number[] = [];
-    const patches: Array<{ narration: string; choices?: unknown[] }> = [];
-    await generateStoryTurn(story(), "I pick the lock", rewriting(false), {
-      // The turn's own (original) choices fire this once; a background
-      // re-derivation must not fire it again.
+    const result = await generateStoryTurn(story(), "I pick the lock", rewriting(false), {
       onChoicesComplete: (choices) => uiChoices.push(choices.length),
-      onBackgroundObserverRewrite: (patch) => patches.push(patch),
     });
     await settle();
 
+    expect(result.content).toBe(REWRITTEN);
+    // Generated twice (the draft's, then the rewrite's); the UI is told once.
     expect(calls.filter(isChoices)).toHaveLength(2);
-    expect(uiChoices).toHaveLength(1);
-    expect(patches).toHaveLength(1);
-    expect(patches[0].narration).toBe(REWRITTEN);
-    expect(patches[0].choices).toHaveLength(3);
+    expect(uiChoices).toEqual([3]);
   });
 });
 

@@ -45,11 +45,12 @@ export function effectiveLoadingStage(
 
 /**
  * Whether the narration waits for the outer onComplete before read-aloud may
- * start. When a judge may rewrite the text (a player turned automatic
- * rewriting on), the prose is not final until the judge has decided, and
- * speaking text that is about to change under the voice is worse than the
- * short wait. With the defaults (flag only) nothing can change the text, so
- * read-aloud starts as soon as the prose is complete.
+ * start. When a judge may rewrite the text (the default since decision 220),
+ * the turn's text is held back from every live callback until the judging is
+ * done (decision 221, generation.ts), so the narration callbacks and the outer
+ * onComplete fire together, right after the release, and read-aloud waits for
+ * the outer one. When every judge can only flag, nothing can change the text:
+ * it streams live and read-aloud starts as soon as the prose is complete.
  */
 export function shouldHoldNarrationForJudge(
   settings: ObserverSettings | undefined,

@@ -7,6 +7,7 @@
  * fetch it was not given - so a story-continuation call, which has no `tools`
  * array, fails these tests loudly.
  */
+import { FLAG_ONLY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import type { GenerationCallbacks } from "@/app/misc/generation";
@@ -567,7 +568,14 @@ describe("outside session zero the gates are unchanged", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     const { cb, rec } = recordingCallbacks();
 
-    const result = await generateStoryTurn(story, "I look around", baseOptions, cb);
+    // Flag-only judges: no judge may rewrite, so the prose streams live
+    // (under the defaults it is held for the judges, decision 221).
+    const result = await generateStoryTurn(
+      story,
+      "I look around",
+      { ...baseOptions, observerSettings: FLAG_ONLY_OBSERVER_SETTINGS },
+      cb,
+    );
 
     const calls = gmStageCalls();
     expect(calls).toHaveLength(1);

@@ -352,7 +352,7 @@ export function getObserverSettings(): ObserverSettings {
     const stored = JSON.parse(raw) as StoredObserverSettings;
     if (stored.observerSettingsVersion !== OBSERVER_SETTINGS_VERSION) {
       logger.action(
-        "Observer settings reset to the flag-only defaults (one time, settings version 2)",
+        `Observer settings reset to the current defaults (one time, settings version ${OBSERVER_SETTINGS_VERSION})`,
         { hadVersion: stored.observerSettingsVersion ?? null },
       );
       localStorage.setItem(
