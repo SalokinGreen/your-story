@@ -25,6 +25,7 @@ import {
   type ScriptedGMRound,
 } from "./helpers/mockGMFetch";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import { expectAlternatingRoles } from "./helpers/roles";
 import type { StoryData } from "@/app/misc/structs";
 
 const CANARY_REASONING = "CANARY_REASONING_the_baron_poisoned_the_well";
@@ -195,7 +196,7 @@ describe("publicSummary", () => {
     expect(dice).not.toContain(CANARY_CAMPAIGN);
     // A tool outside the allowlist that ticked a clock: the visible line alone.
     const other = publicSummary({
-      toolName: "increment_scene",
+      toolName: "create_note",
       success: true,
       contextForStory: "scene advanced",
       clockReports: reports,
@@ -265,13 +266,14 @@ describe("buildNarrationContext", () => {
     expect(a[0]).toEqual(b[0]);
     expect(a[1]).toEqual(b[1]);
     expect(a[1].cacheBreakpoint).toBe("prefix");
-    expect(a[2]).not.toEqual(b[2]);
+    expect(a[2]).toEqual(b[2]);
+    expect(a[3]).not.toEqual(b[3]);
   });
 
   it("works for a story with no campaign record and no style notes", () => {
     const plain = story({ campaign: undefined, lore: [] } as Partial<StoryData>);
     const messages = buildNarrationContext(turn, plain);
-    expect(messages).toHaveLength(3);
+    expect(messages).toHaveLength(4);
     expect(messages[1].content).toContain("Rainfall");
     expect(messages[1].content).not.toContain("Tone");
   });
@@ -336,7 +338,7 @@ describe("the character sheet and roster", () => {
     const b = buildNarrationContext({ playerLine: "b", results: [] }, story());
     expect(a[1].content).toContain("Nimble 3");
     expect(a[1].content).toBe(b[1].content);
-    expect(a[2].content).toContain("Marta the ferrywoman");
+    expect(a[3].content).toContain("Marta the ferrywoman");
   });
 
   it("includes every enabled sheet, and never gm_plan, dm_instructions or NPC notes", () => {
@@ -414,8 +416,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function runTurn(narration: string, lengthJudgeJustified: boolean) {
-  const gm = createMockGMFetch(rounds);
+async function runTurn(narration: string, lengthJudgeJustified: boolean, gmRounds: ScriptedGMRound[] = rounds) {
+  const gm = createMockGMFetch(gmRounds);
   const narrationCalls: Req[] = [];
   const rewriteCalls: Req[] = [];
   const allCalls: Req[] = [];
@@ -506,5 +508,139 @@ describe("the narration request of a real turn", () => {
     const rewrite = rewriteCalls[0].body.messages;
     expect(rewrite.slice(0, 3)).toEqual(narration.slice(0, 3));
     expect(rewrite[rewrite.length - 1].content).toContain("flagged by an automated reviewer");
+  });
+});
+
+describe("roles alternate in every request built from the context", () => {
+  it("the narration request ends on one user message holding the live block and the instruction", async () => {
+    const { narrationCalls } = await runTurn("The lock clicks open.", true);
+    const messages = narrationCalls[0].body.messages;
+    expectAlternatingRoles(messages);
+    const last = messages[messages.length - 1].content;
+    expect(last).toContain("# This turn");
+    expect(last).toContain("Now write the story");
+    // The stable block keeps its cache mark.
+    expect((messages[1] as { cacheBreakpoint?: string }).cacheBreakpoint).toBe("prefix");
+  });
+
+  it("the rewrite of separately written prose alternates", async () => {
+    const { rewriteCalls } = await runTurn(LONG_NARRATION, false);
+    expect(rewriteCalls).toHaveLength(1);
+    expectAlternatingRoles(rewriteCalls[0].body.messages);
+  });
+
+  it("the rewrite of the GM's inline prose alternates (the flagged block joins the live message)", async () => {
+    const { rewriteCalls, narrationCalls } = await runTurn(LONG_NARRATION, false, [
+      { content: LONG_NARRATION },
+    ]);
+    expect(narrationCalls).toHaveLength(0);
+    expect(rewriteCalls).toHaveLength(1);
+    const messages = rewriteCalls[0].body.messages;
+    expectAlternatingRoles(messages);
+    expect(messages[messages.length - 1].content).toContain("# This turn");
+    expect(messages[messages.length - 1].content).toContain("flagged by an automated reviewer");
+  });
+});
+
+describe("engine-decided content reaches the narrator", () => {
+  const wire = (r: Record<string, unknown>) =>
+    buildNarrationContext({ playerLine: "ok", results: [r as never] }, story())
+      .map((m) => m.content)
+      .join("\n");
+
+  it("start_game's campaign intro and authored opening", () => {
+    const text = wire({
+      toolName: "start_game",
+      success: true,
+      contextForStory:
+        "[Session zero complete. Now write the campaign intro. The adventure's author wrote the opening scene: AUTHORED_OPENING_CAFE]",
+    });
+    expect(text).toContain("AUTHORED_OPENING_CAFE");
+  });
+
+  it("confirm_setup only when approved and started", () => {
+    const base = { toolName: "confirm_setup", success: true, contextForStory: "SETUP_CARD_TEXT" };
+    expect(
+      wire({ ...base, result: { type: "confirm_setup", outcome: "approved", started: true } }),
+    ).toContain("SETUP_CARD_TEXT");
+    expect(
+      wire({ ...base, result: { type: "confirm_setup", outcome: "approved", started: false } }),
+    ).not.toContain("SETUP_CARD_TEXT");
+    expect(
+      wire({ ...base, result: { type: "confirm_setup", outcome: "changes" } }),
+    ).not.toContain("SETUP_CARD_TEXT");
+  });
+
+  it.each(["acknowledge_director_move", "resolve_random_event", "increment_scene"])(
+    "%s",
+    (toolName) => {
+      expect(wire({ toolName, success: true, contextForStory: "ENGINE_SAID_THIS" })).toContain(
+        "ENGINE_SAID_THIS",
+      );
+    },
+  );
+});
+
+describe("publicSummary scrubs the GM's own words and tool instructions", () => {
+  it("drops [Reason] and [Context] lines, keeps outcomes, stakes and planned consequences", () => {
+    const out = publicSummary({
+      toolName: "fate_question",
+      success: true,
+      contextForStory:
+        "[Fate: Yes, and...]\n[Context: GM_ARG_TEXT is the baron guilty]\n[Reason: GM_REASON]\n[Stakes: high]\n[If you fail: the guard shouts]",
+    })!;
+    expect(out).toContain("Yes, and");
+    expect(out).toContain("[Stakes: high]");
+    expect(out).toContain("the guard shouts");
+    expect(out).not.toContain("GM_ARG_TEXT");
+    expect(out).not.toContain("GM_REASON");
+  });
+
+  it("drops a cancelled challenge's and an NPC roll's reason, and the compare-with-calculate line", () => {
+    expect(
+      publicSummary({
+        toolName: "cancel_challenge",
+        success: true,
+        contextForStory: '[Challenge Cancelled: "Chase" - SECRET_WHY]',
+      }),
+    ).toBe('[Challenge Cancelled: "Chase"]');
+    const npc = publicSummary({
+      toolName: "npc_roll",
+      success: true,
+      contextForStory:
+        '[NPC Roll: Guard rolled 1d20+2 = 14 - SECRET_REASON]\n[No hit/miss verdict was computed. Compare it with `calculate` (e.g. "14 >= 15") before narrating the outcome.]',
+    });
+    expect(npc).toBe("[NPC Roll: Guard rolled 1d20+2 = 14]");
+    const roll = publicSummary({
+      toolName: "formula_roll",
+      success: true,
+      contextForStory:
+        "[Roll: 1d20 = 7]\n[No verdict was computed. Compare against the target with `calculate` before narrating an outcome.]",
+    });
+    expect(roll).toBe("[Roll: 1d20 = 7]");
+  });
+
+  it("drops the call-resolve_random_event instruction but keeps the event", () => {
+    const out = publicSummary({
+      toolName: "increment_scene",
+      success: true,
+      contextForStory:
+        '[⚡ RANDOM EVENT TRIGGERED: [Ally] "Betray the court" — condition: a rumour - incorporate this into the narrative, then call resolve_random_event(id: "e1"). It will keep reappearing every turn until resolved.]',
+    })!;
+    expect(out).toContain("Betray the court");
+    expect(out).not.toContain("resolve_random_event");
+  });
+
+  it("treats a [Combat Error: …] as an error, but keeps a failed check", () => {
+    expect(
+      publicSummary({
+        toolName: "add_combatant",
+        success: false,
+        contextForStory: "[Combat Error: No active combat - cannot add combatant]",
+      }),
+    ).toBeNull();
+    expect(
+      publicSummary({ toolName: "action_roll", success: false, contextForStory: "[Action roll: miss]" }),
+    ).toBe("[Action roll: miss]");
   });
 });

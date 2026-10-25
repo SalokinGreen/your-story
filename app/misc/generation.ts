@@ -127,7 +127,7 @@ import { snapshotJudgeView } from "@/app/misc/judges/facts";
 import { buildReask, pacingNoteFor, runRung1 } from "@/app/misc/judges/rung1";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
-import { buildNarrationContext } from "@/app/misc/campaign/narrationContext";
+import { appendToLastUser, buildNarrationContext } from "@/app/misc/campaign/narrationContext";
 import {
   executeGMTools,
   GMToolResult,
@@ -4577,13 +4577,12 @@ async function generateStoryTurnOnce(
       );
 
       // Build messages: the narration context + the story prompt
-      const storyMessages: ChatMessage[] = [
-        ...narrationContext,
-        {
-          role: "user" as const,
-          content: storyContinuationPrompt,
-        },
-      ];
+      // (the instruction joins the live block's message: two user messages in
+      // a row are rejected by strict-alternation models)
+      const storyMessages: ChatMessage[] = appendToLastUser(
+        narrationContext,
+        storyContinuationPrompt,
+      );
 
       // Narration always runs on the (user-configurable) narration model,
       // regardless of which tier adjudication used - this is what keeps
@@ -4837,8 +4836,7 @@ async function generateStoryTurnOnce(
       // gmConversationForStorage, which is replayed on retries.
       if (storyContent.trim()) {
         narrationContext = [
-          ...narrationContext,
-          { role: "user", content: storyContinuationPrompt },
+          ...storyMessages,
           {
             role: "assistant",
             content: storyContent,

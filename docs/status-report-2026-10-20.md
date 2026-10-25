@@ -682,7 +682,9 @@ Found 2026-10-22; verified in the code.
 > round is the prose (the common path) the GM wrote it with the secrets in
 > view, and only the secret-leak judge (judge layer v2) checks that.
 > `search_notes` still returns hidden notes to the GM by default, which is the
-> GM's to see.
+> GM's to see. **The choices stage is also not covered:** it still replays
+> `part.raw` (the GM's raw content, `<thinking>` included) to the choices model,
+> so choices still see raw GM content.
 
 ### 6.17 `calculate` strips letters and commas: `min(12,10)` evaluates as 1210
 

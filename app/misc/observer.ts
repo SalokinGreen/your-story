@@ -112,6 +112,7 @@ import { logger } from "./logger";
 import { SideCallCostContext } from "./turnCost";
 import { callSideModel, ProviderKeys } from "./sideModelCall";
 import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
+import { appendToLastUser } from "./campaign/narrationContext";
 
 // ============================================================
 // PER-FLAG-TYPE CONFIGURATION
@@ -1075,7 +1076,7 @@ ${rewriteRules}`;
   // sheet, and this turn's own tool results in front of it.
   const conversation = params.narrationContext || [];
   const messages: ChatMessage[] = conversation.length
-    ? [...conversation, { role: "user" as const, content: flaggedBlock }]
+    ? appendToLastUser(conversation, flaggedBlock)
     : (() => {
         // Fallback for callers with no conversation: the old standalone
         // prompt, which has to restate everything it can from the flag alone.

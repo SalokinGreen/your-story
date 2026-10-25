@@ -25,9 +25,10 @@
  * summariser reads tool results, so it can carry any of those). A new field
  * joins this context by being added here on purpose.
  *
- * It returns the messages up to, not including, the final instruction: the
- * story stage appends the continuation prompt and a rewrite appends its
- * flagged-prose block, so both start from byte-identical context.
+ * It returns the messages up to, not including, the final instruction, which
+ * the story stage (the continuation prompt) and a rewrite (its flagged-prose
+ * block) add INTO the last user message, so both start from byte-identical
+ * context and roles alternate.
  */
 
 import type { ChatMessage } from "../chatMessage";
@@ -247,8 +248,11 @@ function liveBlock(turn: NarrationTurn, story: StoryData): string {
  * The message list for the narration call and for rewrites: a fixed system
  * message; a stable user message (marked as the cache prefix, so it is the
  * start of the Claude CLI's system file and is byte-identical from turn to
- * turn while the premise, tone and style notes are unchanged); and a live user
- * message with everything that changes each turn.
+ * turn while the premise, tone, sheets and style notes are unchanged); a short
+ * assistant acknowledgement, as the GM prompt has, so roles alternate for the
+ * models that reject two user messages in a row; and a live user message with
+ * everything that changes each turn. It ends on that user message: the caller
+ * adds its instruction INTO it (appendToLastUser), never as a second one.
  */
 export function buildNarrationContext(
   turn: NarrationTurn,
@@ -257,6 +261,29 @@ export function buildNarrationContext(
   return [
     { role: "system", content: NARRATOR_SYSTEM_PROMPT },
     { role: "user", content: stableBlock(story), cacheBreakpoint: "prefix" },
+    { role: "assistant", content: NARRATOR_ACK },
     { role: "user", content: liveBlock(turn, story), cacheBreakpoint: "turn" },
   ];
+}
+
+/** The assistant's short acknowledgement after the stable block. */
+export const NARRATOR_ACK = "Understood. I have the story so far. What happens this turn?";
+
+/**
+ * `text` appended to the last message when it is a user message (so two user
+ * messages never sit side by side), else added as a new user message. Returns
+ * a copy; the stored context is shared.
+ */
+export function appendToLastUser(
+  messages: readonly ChatMessage[],
+  text: string,
+): ChatMessage[] {
+  const last = messages[messages.length - 1];
+  if (last && last.role === "user") {
+    return [
+      ...messages.slice(0, -1),
+      { ...last, content: `${last.content}\n\n${text}` },
+    ];
+  }
+  return [...messages, { role: "user", content: text }];
 }

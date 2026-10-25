@@ -94,7 +94,7 @@ export function redactForPlayer(text: string, toolName?: string): string {
 // The narration call and every rewrite are given an allowlisted context
 // (campaign/narrationContext.ts, campaign design 14.1). A tool result gets in
 // only through publicSummary: the one-line, player-safe account of what the
-// tool did. It is an ALLOWLIST by tool name: a tool not listed here (a note
+// tool did, minus the GM's own argument text. It is an ALLOWLIST by tool name: a tool not listed here (a note
 // read, a memory search, the game-state dump, the campaign record, a hidden
 // roll, an edit of a note, a timer) contributes nothing, because its result
 // can hold the GM's secrets and the narrator has no use for it.
@@ -138,7 +138,37 @@ const NARRATOR_VISIBLE_TOOLS = new Set([
   // the player's own answers
   "ask_question",
   "ask_for_roll",
+  // engine-decided content the narrator has to play
+  "start_game", // the campaign intro brief and the authored opening (decision 197)
+  "acknowledge_director_move",
+  "resolve_random_event",
+  "increment_scene",
 ]);
+
+/** The result type confirm_setup returns; only an approval that started the game counts. */
+function confirmSetupStartedGame(result: PublicSummarySource): boolean {
+  const r = result.result as { outcome?: unknown; started?: unknown } | undefined;
+  return r?.outcome === "approved" && r?.started === true;
+}
+
+/**
+ * Takes the GM's own argument text and its tool instructions out of a result
+ * line, keeping what the engine decided: the reason/context a call carried
+ * (the GM's words, not an outcome), a cancelled challenge's or NPC roll's
+ * reason, and the "compare it with calculate" / "then call resolve_random_event"
+ * tails. Planned consequences, stakes and the outcomes stay.
+ */
+function scrubGMText(text: string): string {
+  return text
+    .replace(/\n?\[(?:Reason|Context): [^\n]*\]/g, "")
+    .replace(/(\[Challenge Cancelled: "[^"\n]*") - [^\n]*\]/g, "$1]")
+    .replace(/(\[NPC Roll: [^\n]*?= -?\d+(?:\.\d+)?) - [^\n]*\]/g, "$1]")
+    .replace(/\n?\[No [^\n]*`calculate`[^\n]*\]/g, "")
+    .replace(
+      /(?: - )?[Ii]ncorporate this into (?:the )?(?:next )?narrat(?:ive|ion),? then call resolve_random_event\([^)]*\)\.?(?: It will keep reappearing every turn until resolved\.)?/g,
+      "",
+    );
+}
 
 /** The longest public summary of one tool result, in characters. */
 const PUBLIC_SUMMARY_MAX_CHARS = 1200;
@@ -177,7 +207,11 @@ function timerFiring(result: PublicSummarySource): { name: string } | null {
  * line is already part of `contextForStory`, a hidden one's lives only in
  * `gmOnlyContext`, which this never reads. A result for a tool outside the
  * allowlist yields only the visible clock lines it caused, if any. Errors
- * yield null (their text echoes the GM's arguments). Anything between
+ * ("[ERROR…]", "[X Error: …]") yield null; a failed check (success false) is
+ * NOT an error and is kept. The GM's own words (a call's reason or context, a
+ * cancelled challenge's reason) and its tool instructions ("compare with
+ * calculate", "then call resolve_random_event") are scrubbed, so what is left
+ * is the engine's result and the consequences the GM planned. Anything between
  * [[HIDDEN_LORE]] markers is replaced the way the player's own view replaces
  * it (redactForPlayer).
  */
@@ -192,7 +226,16 @@ export function publicSummary(
     .filter((r) => r.visible)
     .map((r) => r.line);
   const text = result.contextForStory ?? "";
-  if (/^\s*\[ERROR/.test(text) || /\*\*ERROR\*\*/.test(text)) return null;
+  // [ERROR…], **ERROR** and the executors' own "[Combat Error: …]" /
+  // "[Timer Error: …]" forms. Not success === false: a graded miss is a
+  // valid outcome the narration (and the outcome rewrite) must hear.
+  if (
+    /^\s*\[ERROR/.test(text) ||
+    /\*\*ERROR\*\*/.test(text) ||
+    /^\s*\[[^\]]*\bError\b/.test(text)
+  ) {
+    return null;
+  }
   // A timer or clock that fires lands in the story, so the narrator hears it,
   // but only when the player can see that timer: a hidden one stays the GM's.
   const firing = result.success === false ? null : timerFiring(result);
@@ -204,14 +247,18 @@ export function publicSummary(
         : t;
     }
   }
-  if (!NARRATOR_VISIBLE_TOOLS.has(result.toolName)) {
+  const allowed =
+    result.toolName === "confirm_setup"
+      ? confirmSetupStartedGame(result)
+      : NARRATOR_VISIBLE_TOOLS.has(result.toolName);
+  if (!allowed) {
     return visibleClockLines.length > 0 ? visibleClockLines.join("\n") : null;
   }
   // The debug tail an error carries ("[Debug: params=...]") is the GM's
   // arguments; no allowed tool's success text has one, but cut it regardless.
-  const cleaned = redactForPlayer(text, result.toolName)
-    .replace(/\n?\[Debug:[\s\S]*$/, "")
-    .trim();
+  const cleaned = scrubGMText(
+    redactForPlayer(text, result.toolName).replace(/\n?\[Debug:[\s\S]*$/, ""),
+  ).trim();
   if (!cleaned) return visibleClockLines.length > 0 ? visibleClockLines.join("\n") : null;
   return cleaned.length > PUBLIC_SUMMARY_MAX_CHARS
     ? `${cleaned.slice(0, PUBLIC_SUMMARY_MAX_CHARS)}…`
