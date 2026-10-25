@@ -5,8 +5,9 @@
  * runs a built-in system gains the system's rules notes and its cross-setting
  * notes it does not hold yet.
  *
- * - A note the story holds is never touched, edited or not (matched by
- *   `libraryNoteId`).
+ * - A note the story holds is never touched by the adder, edited or not
+ *   (matched by `libraryNoteId`). `updateBuiltinNotes` is the one thing that
+ *   rewrites a held note: see its comment.
  * - A note the player deleted stays deleted: `systemState.builtinNotesOffered`
  *   records every built-in id the story has been given, and only ids outside
  *   it are added.
@@ -22,7 +23,9 @@
  * - City notes are not pushed (scope is a place name); they stay in the
  *   library to import.
  */
+import { hashNotes } from "../campaignPlan";
 import type { StoryData, StoryLore } from "../structs";
+import { BUILTIN_NOTE_HISTORY } from "./builtinNoteHistory";
 import { BUILTIN_SYSTEMS } from "./index";
 import { recordSystemId, resolveSystem } from "./resolve";
 import {
@@ -195,4 +198,57 @@ export function seedBuiltinNotesOffered(
     ...story.systemState,
     builtinNotesOffered: [...offered],
   };
+}
+
+/** The hash a shipped note's content is recorded under (BUILTIN_NOTE_HISTORY). */
+export function hashNoteContent(content: string): string {
+  return hashNotes([{ title: "", content }]);
+}
+
+export interface BuiltinNoteUpdate {
+  /** Titles of held notes replaced with the current shipped text. */
+  updated: string[];
+  /** Titles of held notes the player edited: kept, with a log line from the caller. */
+  keptEdited: string[];
+}
+
+/**
+ * Brings the built-in notes a story already holds up to the text the app now
+ * ships (Fantastic Realms expansion E2). A held note whose content hashes to
+ * an EARLIER shipped version in BUILTIN_NOTE_HISTORY was never edited by the
+ * player, so it is replaced with the current one; this includes the pinned
+ * core, the one case a pinned note is touched. A note whose content matches no
+ * shipped version is the player's own edit (or an older release than the
+ * history records) and is kept; it is reported in `keptEdited` only when the
+ * history knows of a newer version that was therefore not applied. A note with
+ * a single recorded version (Blood & Bone's, today) never changes. In place,
+ * like addMissingBuiltinNotes; it persists with the story's next save. Does
+ * nothing to a story that is not kept up to date.
+ */
+export function updateBuiltinNotes(
+  story: StoryData,
+  systems: BuiltinSystem[] = BUILTIN_SYSTEMS,
+  history: Readonly<Record<string, readonly string[]>> = BUILTIN_NOTE_HISTORY,
+): BuiltinNoteUpdate {
+  const out: BuiltinNoteUpdate = { updated: [], keptEdited: [] };
+  if (!keepsBuiltinNotes(story, systems)) return out;
+  const { system } = resolveSystem(story, systems);
+  if (!system) return out;
+  const shipped = new Map<string, BuiltinNote>();
+  for (const pack of system.packs) for (const n of pack.notes) shipped.set(n.id, n);
+  story.lore = (story.lore ?? []).map((l) => {
+    const note = l.libraryNoteId ? shipped.get(l.libraryNoteId) : undefined;
+    const versions = note ? history[note.id] : undefined;
+    if (!note || !versions || versions.length === 0) return l;
+    const current = hashNoteContent(note.content);
+    const held = hashNoteContent(l.content ?? "");
+    if (held === current) return l;
+    if (versions.includes(held)) {
+      out.updated.push(l.title);
+      return { ...l, content: note.content };
+    }
+    if (versions.length > 1) out.keptEdited.push(l.title);
+    return l;
+  });
+  return out;
 }

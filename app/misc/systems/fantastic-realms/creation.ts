@@ -28,7 +28,7 @@ Read this in session zero. A hero is quick to make: a concept, four feats and a 
 ## The steps
 Step by step setup asks each player these, then the shared steps. Quick setup asks only for the world and the tone, and fills the rest from a short chat.
 1. **Concept.** One line: who they are and what they do.
-2. **Feats.** The four feats, with suggestions drawn from the concept and the realm.
+2. **Feats.** The four feats, with suggestions drawn from the concept and the realm. Offer a calling (FR — Callings) as an option, never a requirement: a calling's kit is its signature feat plus three from its five suggestions, and a freeform hero picks one personal move of the same size instead (a once-per-rest flourish). Magic is a "spell" feat and a good item an "item" feat (FR — Magic, FR — Gear).
 3. **Realm tie.** Why the hero is in the starting realm: an errand, a debt, a flight, a promise, a curiosity. It should point at the first scene.
 4. **Name and look.** A name, and two things people notice.
 5. **History.** Where they come from, in three short questions: who raised them, what did they leave behind, what are they proud of.
