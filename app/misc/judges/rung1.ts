@@ -155,7 +155,7 @@ function lineHits(turn: Rung1Turn, facts: Fact[]): Rung1Hit[] {
   return hits;
 }
 
-function secretHits(turn: Rung1Turn, facts: Fact[]): Rung1Hit[] {
+export function secretHits(turn: Rung1Turn, facts: Fact[]): Rung1Hit[] {
   if (!turn.prose.trim()) return [];
   const afterById = new Map((turn.storyAfter.campaign?.secrets ?? []).map((s) => [s.id, s] as const));
   const hits: Rung1Hit[] = [];

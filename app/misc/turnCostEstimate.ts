@@ -459,16 +459,30 @@ export function estimateTurnCost(
   });
 
   // --- Observer judges -------------------------------------------------
-  // One call per enabled check. checkResponseLength only spends a call when
-  // the turn actually ran long, so it's counted at less than one.
+  // The judges share one call per pass (judges/combined.ts), so the cost is
+  // the passes, not the checks: one call on a turn when a judge that runs on
+  // every turn is on (agency, the oracle judge, the tier judge), and a
+  // fraction when only judges that need something to judge are (a long turn,
+  // an engine ruling, a secret or line in the record). The scene-increment
+  // check is a free phrase check and costs nothing.
   const enabledChecks = (
     Object.keys(observerSettings) as ObserverFlagType[]
   ).filter((type) => settingsFor(observerSettings, type).enabled);
-  const alwaysOnChecks = enabledChecks.filter(
-    (type) => type !== "response_length",
-  ).length;
-  const lengthCheckCalls = enabledChecks.includes("response_length") ? 0.3 : 0;
-  const observerCalls = alwaysOnChecks + lengthCheckCalls;
+  const everyTurnJudge = enabledChecks.some(
+    (type) =>
+      type === "player_agency" ||
+      type === "missing_oracle_or_table" ||
+      type === "tier_escalation_missed",
+  );
+  const conditionalJudge = enabledChecks.some(
+    (type) =>
+      type === "response_length" ||
+      type === "outcome_narration_mismatch" ||
+      type === "world_consistency" ||
+      type === "secret_leak" ||
+      type === "lines_and_veils",
+  );
+  const observerCalls = everyTurnJudge ? 1 : conditionalJudge ? 0.4 : 0;
 
   if (observerCalls > 0) {
     plans.push({
@@ -479,9 +493,9 @@ export function estimateTurnCost(
       inputPerCall: OBSERVER_INPUT_TOKENS,
       outputPerCall: OBSERVER_OUTPUT_TOKENS,
       expectedCalls: calibratedCalls(calibration, "observer", observerCalls),
-      lowCalls: alwaysOnChecks,
-      highCalls: enabledChecks.length,
-      note: "One call per enabled check, every turn. Turn off checks you don't need in Settings > Architecture.",
+      lowCalls: everyTurnJudge ? 1 : 0,
+      highCalls: everyTurnJudge && conditionalJudge ? 2 : 1,
+      note: "The enabled checks share one call (two when some rewrite and some only flag). Turn off checks you don't need in Settings > Architecture.",
     });
 
     plans.push({

@@ -7,7 +7,7 @@ import type { StoryData } from "../structs";
 
 /** What a turn's checks read of a story: a StoryData satisfies it, a snapshot is cheaper. */
 export type JudgeStoryView = Pick<StoryData, "npcs" | "meters" | "campaign"> &
-  Partial<Pick<StoryData, "multiplayer" | "systemState">>;
+  Partial<Pick<StoryData, "multiplayer" | "systemState" | "lore">>;
 
 /** The slice of a GMToolResult the checks read. */
 export interface JudgeToolResult {
@@ -20,6 +20,20 @@ export interface JudgeToolResult {
 
 export type FactSourceKind = "tool" | "record" | "sheet" | "npc";
 
+/**
+ * What a fact is about, so each judge is handed only the kinds it reads
+ * (`selectFactsFor`, plan "Revised after Codex's review", finding 20).
+ */
+export type FactTopic =
+  | "result"
+  | "clock"
+  | "line"
+  | "veil"
+  | "secret"
+  | "person"
+  | "location"
+  | "sheet";
+
 /** A fact with provenance (design 11.3). Ids are `f1..fn` per turn. */
 export interface Fact {
   id: string;
@@ -27,6 +41,33 @@ export interface Fact {
   /** Whether it held before the turn or after it. */
   when: "before" | "after";
   text: string;
+  topic?: FactTopic;
+  /** Names the narration can use for what the fact is about (a person, a place). */
+  names?: string[];
+}
+
+/** The eight rung-3 judges that share one call (design section 3). */
+export type JudgeId =
+  | "length"
+  | "agency"
+  | "outcome"
+  | "world_consistency"
+  | "secret_leak"
+  | "lines_veils"
+  | "oracle_gap"
+  | "tier_gap";
+
+export type JudgeSeverity = "none" | "minor" | "major" | "unknown";
+
+/** One judge's answer (plan, finding 13). `unknown` means: no flag, a Debug Logs line. */
+export interface JudgeVerdict {
+  severity: JudgeSeverity;
+  /** A quote from the narration (the player's line, for the tier judge). */
+  evidence: string;
+  /** Ids of facts the verdict rests on; every one must exist in the turn's facts. */
+  factIds: string[];
+  /** One sentence: what to change. */
+  fix: string;
 }
 
 export type Rung1Check =

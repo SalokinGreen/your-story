@@ -77,7 +77,6 @@ import {
   buildObserverWarningNote,
   buildObserverCorrectionNote,
   rewriteFlaggedNarration,
-  prospectiveLengthFlag,
   reconcileGmConversationAfterRewrite,
   reconcileGmThinkingAfterRewrite,
   settingsFor,
@@ -123,8 +122,10 @@ import {
 import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
 import { resolveSystem } from "@/app/misc/systems/resolve";
 import { pendingCheck, splitPlayerLines } from "@/app/misc/turnEndChecks";
-import { snapshotJudgeView } from "@/app/misc/judges/facts";
-import { buildReask, pacingNoteFor, runRung1 } from "@/app/misc/judges/rung1";
+import { collectTurnFacts, snapshotJudgeView } from "@/app/misc/judges/facts";
+import { buildReask, pacingNoteFor, runRung1, secretHits } from "@/app/misc/judges/rung1";
+import { pickMajorFlag } from "@/app/misc/judges/combined";
+import type { Fact } from "@/app/misc/judges/types";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
 import { appendToLastUser, buildNarrationContext } from "@/app/misc/campaign/narrationContext";
@@ -259,6 +260,37 @@ export function mergeRefusedDiceCalls(
     return refused;
   });
   return { ...execution, results };
+}
+
+/**
+ * True when a turn's tools already drew randomness: a die, an oracle or table,
+ * a track's progress roll. A full-turn retry would draw it again, so it is
+ * refused (the re-ask's list, minus the deterministic `calculate` and the
+ * pausing tools). A refused or errored call drew nothing.
+ */
+export function executedRandomness(
+  results: readonly GMToolResult[] | undefined,
+): boolean {
+  return (results ?? []).some((r) => {
+    if (isReaskRefused(r) || r.contextForStory?.trimStart().startsWith("[ERROR")) {
+      return false;
+    }
+    if (
+      r.toolName === "calculate" ||
+      r.toolName === "record_challenge_result" ||
+      r.toolName === "ask_question" ||
+      r.toolName === "confirm_setup"
+    ) {
+      return false;
+    }
+    if (DICE_TOOLS.includes(r.toolName) || REASK_EXTRA_ROLL_TOOLS.includes(r.toolName)) {
+      return true;
+    }
+    return (
+      r.toolName === "manage_track" &&
+      (r.result as { action?: unknown } | undefined)?.action === "progress_roll"
+    );
+  });
 }
 
 /** True when the story's campaign record holds a line with a keyword to watch for. */
@@ -1087,6 +1119,30 @@ export async function generateStoryTurn(
     );
   }
 
+  // Rung 0 for the judges (judges/facts.ts): the facts the combined judge call
+  // compares the prose against, and what the key-phrase check found in it. Taken
+  // from the story as the turn found it (the snapshot) and as it stands now.
+  const judgeInputsFor = (
+    results: readonly GMToolResult[] | undefined,
+    prose: string,
+  ): { facts: Fact[]; phraseHits: string[] } => {
+    try {
+      const before = preTurnSnapshot ?? storyData;
+      const facts = collectTurnFacts(before, storyData, results ?? []);
+      const phraseHits = secretHits(
+        { storyBefore: before, storyAfter: storyData, results: [], prose },
+        facts,
+      ).map((h) => h.evidence);
+      return { facts, phraseHits };
+    } catch (factsError) {
+      logger.action("Judge facts could not be collected - judging without them", {
+        error:
+          factsError instanceof Error ? factsError.message : String(factsError),
+      });
+      return { facts: [], phraseHits: [] };
+    }
+  };
+
   // Carry forward any flags that survived the PRIOR turn (minor flags never
   // trigger a reset, and a major flag can still survive if the reset budget
   // ran out) - otherwise a flagged mistake reaches the player via the
@@ -1291,6 +1347,7 @@ export async function generateStoryTurn(
       pause.ranJudges = true;
       const pauseCharacterContext = buildObserverCharacterContext(storyData);
       let pauseFlags: ObserverFlag[] = [];
+      const pauseJudgeInputs = judgeInputsFor(ctx.gmResults, ctx.prose);
       try {
         pauseFlags = await runObserver({
           narration: ctx.prose,
@@ -1300,6 +1357,8 @@ export async function generateStoryTurn(
           rollResults: pauseVerdicts,
           gmStoryContext: ctx.gmStoryContext,
           characterContext: pauseCharacterContext,
+          facts: pauseJudgeInputs.facts,
+          phraseHits: pauseJudgeInputs.phraseHits,
           // The prose judges alone: a stored config that lets the tier judge
           // reset must not run it at every pause and again at the end.
           settings: splitObserverSettings(
@@ -1327,11 +1386,10 @@ export async function generateStoryTurn(
           })),
         });
       }
-      const pauseMajor = pauseFlags.find(
-        (f) =>
-          f.severity === "major" &&
-          REWRITABLE_FLAG_TYPES.has(f.type) &&
-          settingsFor(observerSettings, f.type).triggersReset,
+      // The highest-priority major flag wins (judges/combined.ts FLAG_PRIORITY),
+      // not whichever judge happened to be listed first.
+      const pauseMajor = pickMajorFlag(pauseFlags, observerSettings, (type) =>
+        REWRITABLE_FLAG_TYPES.has(type),
       );
       let released = ctx.prose;
       let rewrittenBy: ObserverFlag | undefined;
@@ -1634,117 +1692,6 @@ export async function generateStoryTurn(
       );
     }
 
-    // ---- SPECULATIVE SHORTENED REWRITE -------------------------------
-    // The response_length check has a free, deterministic trip (the word
-    // counter) followed by an LLM judge that decides whether the overage was
-    // earned. The flag's text depends only on the counter, never on the
-    // judge - so the moment the counter trips we already know exactly what a
-    // length rewrite would be asked to do, and the only open question is
-    // whether it'll be wanted at all.
-    //
-    // Waiting for that answer used to cost the player two full round trips
-    // back to back: the judge, then the rewrite. Instead, start the shortened
-    // version NOW, concurrently with the observer, and let the verdict decide
-    // what to do with it - keep it if the judge confirms the turn was too
-    // long, throw it away (and abort the call) if the judge justifies the
-    // overage or some other flag wins instead. The rewrite's latency hides
-    // behind the judge's, and the turn's behavior is unchanged either way:
-    // nothing is swapped in that the observer didn't ask for.
-    //
-    // Gated on a rewrite actually being reachable - the check being enabled
-    // AND allowed to rewrite (decision 187: off by default, so by default this
-    // never fires and no discarded rewrite is ever billed), and the reset
-    // budget not already spent - so a speculation is never fired for a
-    // correction that could not happen.
-    const lengthCheckSettings = settingsFor(observerSettings, "response_length");
-    const speculativeFlag =
-      resetPossible &&
-      resetAttempts < MAX_OBSERVER_RESETS &&
-      lengthCheckSettings.enabled &&
-      lengthCheckSettings.triggersReset
-        ? prospectiveLengthFlag(
-            judgedText,
-            options.replyLength,
-            lengthCheckSettings,
-          )
-        : null;
-
-    let speculativeRewrite: {
-      promise: Promise<string | null>;
-      abort: () => void;
-    } | null = null;
-
-    if (speculativeFlag) {
-      logger.action(
-        "Turn is over the reply-length ceiling - starting a shortened rewrite speculatively",
-        { detail: speculativeFlag.detail },
-      );
-
-      // Its own controller so an unwanted speculation can be cancelled
-      // without touching the turn, chained to the turn's signal so a real
-      // abort (player cancelled) still tears it down.
-      const speculationAbort = new AbortController();
-      const forwardAbort = () => speculationAbort.abort();
-      if (options.abortSignal?.aborted) {
-        speculationAbort.abort();
-      } else {
-        options.abortSignal?.addEventListener("abort", forwardAbort, {
-          once: true,
-        });
-      }
-
-      const promise = rewriteFlaggedNarration({
-        narration: judgedText,
-        playerChoice: playerLine,
-        flag: speculativeFlag,
-        replyLength: options.replyLength,
-        storytellerMode: options.storytellerMode,
-        characterContext: observerCharacterContext,
-        narrationContext: result.narrationContext,
-        // The narrator's own reasoning (never the GM's), so the shortening
-        // pass cuts the scenery and keeps the plant.
-        narrationThoughts: result.narrationOwnThoughts,
-        // The other reviewers are still deciding while this runs, and the turn
-        // only ever gets one rewrite - so their complaints ride along as
-        // conditional instructions ("fix this too, if it's also true here").
-        // Whichever of them are actually reset-eligible right now: a check
-        // that's off, or that can't reset, has no business steering a rewrite.
-        // Their verdicts still stand on their own afterwards - a flag they DO
-        // raise is still attached to the turn, since nothing here re-judges
-        // the corrected text and a preventive clause is not proof of a fix.
-        alsoFixIfPresent: (
-          ["player_agency", "outcome_narration_mismatch"] as const
-        ).filter((type) => {
-          const s = settingsFor(observerSettings, type);
-          return s.enabled && s.triggersReset;
-        }),
-        deAiifyWords: options.deAiifyWords,
-        alreadyRead: pause.text || undefined,
-        apiOptions: { ...observerRewriteApiOptions, abortSignal: speculationAbort.signal },
-      })
-        // Attached immediately, before anything awaits this: a speculation
-        // that fails (or is aborted as unwanted) must never surface as an
-        // unhandled rejection, and a failure here is just "no speculation" -
-        // the normal rewrite path takes over.
-        .catch((speculationError) => {
-          logger.action("Speculative shortened rewrite failed", {
-            error:
-              speculationError instanceof Error
-                ? speculationError.message
-                : String(speculationError),
-          });
-          return null;
-        })
-        .finally(() => {
-          options.abortSignal?.removeEventListener("abort", forwardAbort);
-        });
-
-      speculativeRewrite = {
-        promise,
-        abort: () => speculationAbort.abort(),
-      };
-    }
-
     // Each enabled judge runs once per turn: the rewriting ones before release
     // (here, or at a pause), the others in the background wave below.
     // A pause ran only the prose judges, so when the end-of-turn pass does not
@@ -1755,11 +1702,15 @@ export async function generateStoryTurn(
       resetPossible ? undefined : REWRITABLE_FLAG_TYPES,
     );
     const blockingPassRan = resetPossible || pause.ranJudges;
+    // The facts and the key-phrase hits every judge pass of this turn shares.
+    const judgeInputs = judgeInputsFor(result.gmResults, judgedText);
     let flags: ObserverFlag[] = [];
     if (resetPossible) {
       if (held) callbacks.onTurnPhase?.("checking");
       try {
         flags = await runObserver({
+          facts: judgeInputs.facts,
+          phraseHits: judgeInputs.phraseHits,
           narration: judgedText,
           playerChoice: playerLine,
           replyLength: options.replyLength,
@@ -1781,7 +1732,6 @@ export async function generateStoryTurn(
       } catch (observerError) {
         // A Stop is not an infra failure (finding 8): never commit past it.
         if (isAbortError(observerError) || options.abortSignal?.aborted) {
-          speculativeRewrite?.abort();
           throw new Error("Generation cancelled by user");
         }
         // Fail open - an observer infra failure should never block the turn.
@@ -1809,38 +1759,12 @@ export async function generateStoryTurn(
       }
 
       // A flag only resets when it's both "major" severity (decided per-
-      // instance by the check itself) AND that flag type's triggersReset is
-      // on (decided by config - defaults to true for the three checks that
-      // can naturally be major, false for the two tool-usage-gap checks,
-      // reproducing exactly what shipped before this setting existed).
-      const majorFlag = flags.find(
-        (f) =>
-          f.severity === "major" &&
-          settingsFor(observerSettings, f.type).triggersReset,
-      );
-
-      // The verdict on the speculation fired above. It's only usable when the
-      // flag that actually won is the length flag it was written against - a
-      // justified overage (no flag), or a different major flag whose
-      // corrective prompt says something else entirely, both mean the
-      // shortened version gets thrown away and the original narration stands.
-      const useSpeculativeRewrite = Boolean(
-        speculativeRewrite &&
-          majorFlag?.type === "response_length" &&
-          resetAttempts < MAX_OBSERVER_RESETS,
-      );
-      if (speculativeRewrite && !useSpeculativeRewrite) {
-        logger.action(
-          "Discarding speculative shortened rewrite - the observer didn't ask for one",
-          {
-            reason: majorFlag
-              ? `a ${majorFlag.type} flag won instead`
-              : "the overage was justified",
-          },
-        );
-        speculativeRewrite.abort();
-        speculativeRewrite = null;
-      }
+      // instance by the judge) AND that flag type's triggersReset is on
+      // (decided by config). Several majors are acted on in the design's
+      // priority order (judges/combined.ts FLAG_PRIORITY), not the order the
+      // judges were listed. There is no speculative rewrite: the length judge
+      // is part of the combined call, so every correction goes through here.
+      const majorFlag = pickMajorFlag(flags, observerSettings);
 
       if (majorFlag && resetAttempts < MAX_OBSERVER_RESETS) {
         resetAttempts++;
@@ -1867,17 +1791,7 @@ export async function generateStoryTurn(
         // re-run the tools (allowMechanicalRetry), takes the full-turn reset
         // below, which also forces the retry onto a higher tier.
         let rewrittenNarration: string | null = null;
-        if (useSpeculativeRewrite && speculativeRewrite) {
-          // Already in flight since before the observer ran - the judge just
-          // confirmed the turn really was too long, so this is the rewrite
-          // that would have been started here anyway, minus the wait.
-          rewrittenNarration = await speculativeRewrite.promise;
-          logger.action(
-            rewrittenNarration
-              ? "Speculative shortened rewrite confirmed by the observer"
-              : "Speculative shortened rewrite was rejected or came back empty, keeping the turn with the flag",
-          );
-        } else if (REWRITABLE_FLAG_TYPES.has(majorFlag.type)) {
+        if (REWRITABLE_FLAG_TYPES.has(majorFlag.type)) {
           try {
             rewrittenNarration = await rewriteFlaggedNarration({
               narration: judgedText,
@@ -1914,8 +1828,7 @@ export async function generateStoryTurn(
           }
         }
 
-        // A Stop during the rewrite (the speculative one swallows its own
-        // AbortError) must not commit a rewrite or start a retry (finding 8).
+        // A Stop during the rewrite must not commit a rewrite or start a retry (finding 8).
         if (options.abortSignal?.aborted) {
           throw new Error("Generation cancelled by user");
         }
@@ -2050,6 +1963,13 @@ export async function generateStoryTurn(
               detail: majorFlag.detail,
             },
           );
+        } else if (executedRandomness(result.gmResults)) {
+          // The full-turn retry rolls the tools again; the dice a turn threw
+          // are never thrown twice (judge layer v2, plan finding 12).
+          logger.action(
+            "Observer asked for a heavier tier, but this turn's dice are already thrown - keeping the turn",
+            { detail: majorFlag.detail },
+          );
         } else if (options.allowMechanicalRetry === false) {
           // The reword path: its mechanics are already applied and the
           // snapshot below would be post-mechanics (see allowMechanicalRetry).
@@ -2177,7 +2097,10 @@ export async function generateStoryTurn(
     const runBackgroundLayers = async () => {
       if (!suspensionReason) {
         try {
+          const backgroundInputs = judgeInputsFor(result.gmResults, result.content);
           const backgroundFlags = await runObserver({
+            facts: backgroundInputs.facts,
+            phraseHits: backgroundInputs.phraseHits,
             narration: result.content,
             playerChoice: playerLine,
             replyLength: options.replyLength,
@@ -2253,7 +2176,10 @@ export async function generateStoryTurn(
         }
         for (const run of extraRuns) {
           try {
+            const extraInputs = judgeInputsFor(result.gmResults, run.narration);
             const extraFlags = await runObserver({
+              facts: extraInputs.facts,
+              phraseHits: extraInputs.phraseHits,
               narration: run.narration,
               playerChoice: playerLine,
               replyLength: options.replyLength,

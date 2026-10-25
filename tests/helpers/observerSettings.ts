@@ -28,4 +28,8 @@ export const FLAG_ONLY_OBSERVER_SETTINGS: ObserverSettings = {
   missing_oracle_or_table: { enabled: false, triggersReset: false, sensitivity: 5 },
   missing_scene_increment: { enabled: false, triggersReset: false, sensitivity: 5 },
   tier_escalation_missed: { enabled: false, triggersReset: false, sensitivity: 5 },
+  // The judges of the record (judge layer v2) came after the table: it never had them.
+  world_consistency: { enabled: false, triggersReset: false, sensitivity: 5 },
+  secret_leak: { enabled: false, triggersReset: false, sensitivity: 5 },
+  lines_and_veils: { enabled: false, triggersReset: false, sensitivity: 5 },
 };

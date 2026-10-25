@@ -10,7 +10,7 @@
  * world-consistency judge, which is its first reader.
  */
 import type { ClockReport } from "../campaign/clocks";
-import type { Fact, JudgeStoryView, JudgeToolResult } from "./types";
+import type { Fact, FactTopic, JudgeId, JudgeStoryView, JudgeToolResult } from "./types";
 
 /** Tool results that carry a ruling or a state change worth handing a judge. */
 const FACT_TOOLS: ReadonlySet<string> = new Set([
@@ -61,18 +61,27 @@ export function collectTurnFacts(
     ref: string,
     when: Fact["when"],
     text: string,
+    topic?: FactTopic,
+    names?: string[],
   ) => {
-    facts.push({ id: `f${facts.length + 1}`, source: { kind, ref }, when, text });
+    facts.push({
+      id: `f${facts.length + 1}`,
+      source: { kind, ref },
+      when,
+      text,
+      ...(topic && { topic }),
+      ...(names && names.length > 0 && { names }),
+    });
   };
 
   // The turn's tool results, in the order they ran.
   for (const r of results) {
     if (isErrorText(r) || !FACT_TOOLS.has(r.toolName)) continue;
     const line = resultLine(r);
-    if (line) add("tool", r.toolCallId, "after", line);
+    if (line) add("tool", r.toolCallId, "after", line, "result");
     // A clock tick is its own fact; the line is the GM's, hidden ones included.
     const reports = (r as { clockReports?: ClockReport[] }).clockReports ?? [];
-    for (const c of reports) add("tool", r.toolCallId, "after", c.line);
+    for (const c of reports) add("tool", r.toolCallId, "after", c.line, "clock");
   }
 
   // The record, as the turn found it (safety and secrets) and left it (clocks).
@@ -80,12 +89,24 @@ export function collectTurnFacts(
   const recordAfter = storyAfter.campaign;
   for (const kind of ["lines", "veils"] as const) {
     for (const item of recordBefore?.safety?.[kind] ?? []) {
-      add("record", item.id, "before", `${kind === "lines" ? "Line" : "Veil"}: ${item.text}`);
+      add(
+        "record",
+        item.id,
+        "before",
+        `${kind === "lines" ? "Line" : "Veil"}: ${item.text}`,
+        kind === "lines" ? "line" : "veil",
+      );
     }
   }
   for (const secret of recordBefore?.secrets ?? []) {
     if (secret.revealed) continue;
-    add("record", secret.id, "before", `Unrevealed secret "${secret.title}": ${secret.truth}`);
+    add(
+      "record",
+      secret.id,
+      "before",
+      `Unrevealed secret "${secret.title}": ${secret.truth}`,
+      "secret",
+    );
   }
   for (const clock of recordAfter?.clocks ?? []) {
     if (clock.cancelled) continue;
@@ -94,6 +115,7 @@ export function collectTurnFacts(
       clock.id,
       "after",
       `Clock "${clock.name}" ${clock.filled}/${clock.segments}${clock.paused ? " (paused)" : ""}`,
+      "clock",
     );
   }
 
@@ -109,10 +131,67 @@ export function collectTurnFacts(
       npc.id,
       was === npc.status ? "before" : "after",
       `${npc.name} is ${npc.status}`,
+      "person",
+      [npc.name],
+    );
+  }
+
+  // Where the record puts people (the only location link there is, design 11.3).
+  const namesById = new Map(
+    (storyAfter.npcs ?? []).map((n) => [n.id, n.name] as const),
+  );
+  for (const loc of recordAfter?.locations ?? []) {
+    const here = (loc.npcIds ?? [])
+      .map((id) => namesById.get(id))
+      .filter((n): n is string => Boolean(n));
+    if (here.length === 0) continue;
+    const features = loc.features?.length ? ` (${loc.features.join("; ")})` : "";
+    add(
+      "record",
+      loc.id,
+      "after",
+      `Location "${loc.name}"${features}: the record places ${here.join(", ")} here`,
+      "location",
+      [loc.name, ...here],
+    );
+  }
+
+  // The character sheet(s), whole: the gear and conditions the narration must keep.
+  for (const note of storyAfter.lore ?? []) {
+    if (note.type !== "character_sheet" || note.enabled === false) continue;
+    const body = (note.content ?? "").trim();
+    if (!body) continue;
+    add(
+      "sheet",
+      note.title || "Character sheet",
+      "after",
+      `Character sheet "${note.title}": ${body}`,
+      "sheet",
     );
   }
 
   return facts;
+}
+
+/**
+ * The fact topics each judge reads. A judge is handed only these, so a split
+ * call carries less, not the same facts twice (plan, finding 20).
+ */
+export const JUDGE_FACT_TOPICS: Readonly<Record<JudgeId, readonly FactTopic[]>> = {
+  length: ["result"],
+  agency: [],
+  outcome: ["result"],
+  world_consistency: ["person", "location", "sheet", "result"],
+  secret_leak: ["secret"],
+  lines_veils: ["line", "veil"],
+  oracle_gap: ["result"],
+  tier_gap: [],
+};
+
+/** The facts one judge reads, in the turn's order. */
+export function selectFactsFor(judgeId: JudgeId, facts: readonly Fact[]): Fact[] {
+  const topics = JUDGE_FACT_TOPICS[judgeId];
+  return facts.filter((f) => f.topic !== undefined && topics.includes(f.topic));
 }
 
 /**

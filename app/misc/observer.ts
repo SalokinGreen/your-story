@@ -25,6 +25,21 @@
  * heavier tier, reachable only by a config that sets its triggersReset
  * directly; Settings does not offer it.)
  *
+ * JUDGE LAYER V2, SLICE 2 (docs/judge-layer-v2-plan.md): the judges below no
+ * longer run one call each. runObserver sends every judge whose precondition
+ * holds as ONE call (judges/combined.ts; the prompts are judges/prompts.ts), with
+ * the turn's facts (judges/facts.ts) first and the narration last, and reads a
+ * keyed JSON verdict per judge. A verdict whose quote is not in the narration, or
+ * whose fact ids do not exist, is "unknown": no flag. The functions below
+ * (checkResponseLength, checkPlayerAgencyViolation, checkOutcomeMismatch,
+ * checkToolUsageGaps, checkTierEscalation) and runObserverSplit are the
+ * version-1 per-judge form, kept for the eval runner's comparison and never
+ * reached from Settings. Three judges joined (world_consistency, secret_leak,
+ * lines_and_veils); they flag only until the confirming judge lands. The
+ * scene-increment question is a free phrase check now, not a judge. When several
+ * flags are major generateStoryTurn acts on the highest-priority one
+ * (judges/combined.ts pickMajorFlag), and there is no speculative rewrite.
+ *
  * Three things scope every check below:
  * - Deferral (plausibleResetFlagTypes): whether the player WAITS on any of
  *   this is decided per-turn, before a single call is made, from free
@@ -113,6 +128,12 @@ import { SideCallCostContext } from "./turnCost";
 import { callSideModel, ProviderKeys } from "./sideModelCall";
 import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
 import { appendToLastUser } from "./campaign/narrationContext";
+import {
+  runCombinedJudges,
+  combinedResultToFlags,
+  sceneIncrementFlag,
+} from "./judges/combined";
+import type { Fact } from "./judges/types";
 
 // ============================================================
 // PER-FLAG-TYPE CONFIGURATION
@@ -152,7 +173,28 @@ export interface ObserverCheckSettings {
   sensitivity: number;
 }
 
-export type ObserverSettings = Record<ObserverFlagType, ObserverCheckSettings>;
+/** The six flag types every stored config and test fixture names. */
+export type LegacyObserverFlagType =
+  | "player_agency"
+  | "response_length"
+  | "missing_oracle_or_table"
+  | "missing_scene_increment"
+  | "outcome_narration_mismatch"
+  | "tier_escalation_missed";
+
+/** The judges the combined call added (judge layer v2, slice 2). */
+export type NewJudgeFlagType = Exclude<ObserverFlagType, LegacyObserverFlagType>;
+
+/**
+ * A config may omit the newer judges: an older stored config or a fixture that
+ * names the six legacy types reads the rest from the defaults (settingsFor), so
+ * adding a judge never needs a settings-version migration.
+ */
+export type ObserverSettings = Record<LegacyObserverFlagType, ObserverCheckSettings> &
+  Partial<Record<NewJudgeFlagType, ObserverCheckSettings>>;
+
+/** Every flag type present: the shape of the defaults and of a settings read. */
+export type CompleteObserverSettings = Record<ObserverFlagType, ObserverCheckSettings>;
 
 /**
  * The stored-settings version the current defaults belong to. A stored config
@@ -187,7 +229,7 @@ function frozenCheckSettings(
  * "defaults" changed for the rest of the session and Reset handed the changed
  * ones back (Codex review finding 9).
  */
-export const DEFAULT_OBSERVER_SETTINGS: Readonly<ObserverSettings> =
+export const DEFAULT_OBSERVER_SETTINGS: Readonly<CompleteObserverSettings> =
   Object.freeze({
     response_length: frozenCheckSettings(true, 5, true),
     player_agency: frozenCheckSettings(true, 3, true),
@@ -195,6 +237,12 @@ export const DEFAULT_OBSERVER_SETTINGS: Readonly<ObserverSettings> =
     missing_oracle_or_table: frozenCheckSettings(true, 5),
     missing_scene_increment: frozenCheckSettings(true, 5),
     tier_escalation_missed: frozenCheckSettings(true, 5),
+    // The combined call's newer judges. They flag only until the confirming
+    // judge and the rewrite with facts land (plan slice 3), and each runs only
+    // when its precondition holds (a secret, a line, a named person).
+    world_consistency: frozenCheckSettings(true, 5),
+    secret_leak: frozenCheckSettings(true, 5),
+    lines_and_veils: frozenCheckSettings(true, 5),
   });
 
 /**
@@ -212,8 +260,8 @@ const CHECK_RUNS_BALANCED: Readonly<ObserverCheckSettings> = Object.freeze({
 });
 
 /** A fresh, mutable copy of the defaults - what every reader of them gets. */
-export function cloneDefaultObserverSettings(): ObserverSettings {
-  const copy = {} as ObserverSettings;
+export function cloneDefaultObserverSettings(): CompleteObserverSettings {
+  const copy = {} as CompleteObserverSettings;
   for (const type of Object.keys(
     DEFAULT_OBSERVER_SETTINGS,
   ) as ObserverFlagType[]) {
@@ -242,6 +290,11 @@ export const OBSERVER_UNREGISTERED_TOOLS: ReadonlySet<string> = new Set(["campai
 export const FLAG_ONLY_FLAG_TYPES: ReadonlySet<ObserverFlagType> = new Set([
   "missing_oracle_or_table",
   "missing_scene_increment",
+  // Flag-only in this slice: a rewrite for these needs a confirming judge from
+  // another model family and the facts handed to the rewriter (slice 3).
+  "world_consistency",
+  "secret_leak",
+  "lines_and_veils",
 ]);
 
 /**
@@ -511,7 +564,7 @@ function sensitivityInstruction(sensitivity: number): string {
 // always-major nature) - past this sensitivity, a hit is reported as
 // "major" instead of "minor", making it eligible to reset if the type's
 // triggersReset is also on.
-const TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD = 8;
+export const TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD = 8;
 
 // ============================================================
 // WHO IS WHO (character context for the judges)
@@ -747,7 +800,7 @@ export function formatMechanicsBlock(
  * A GM that talks itself into an outcome the comparisons don't support is
  * still a mismatch, and the prompt says so.
  */
-function formatJudgeReasoningBlock(thoughts?: string): string {
+export function formatJudgeReasoningBlock(thoughts?: string): string {
   const trimmed = thoughts?.trim();
   if (!trimmed) return "";
 
@@ -819,11 +872,11 @@ export function observerSuspensionReason(params: {
  * in under the ceiling - i.e. exactly when checkResponseLength returns null
  * without spending a call.
  */
-export function prospectiveLengthFlag(
+export function lengthOverage(
   narration: string,
   replyLength: ReplyLength = "medium",
   settings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
-): ObserverFlag | null {
+): { words: number; ceiling: number; band: number } | null {
   if (!settings.enabled) return null;
 
   const words = countNarrationWords(narration);
@@ -832,6 +885,18 @@ export function prospectiveLengthFlag(
   const band = PACING_BANDS[replyLength] ?? PACING_BANDS.medium;
   const ceiling = band.high * overageMultiplierForSensitivity(settings.sensitivity);
   if (words <= ceiling) return null;
+  return { words, ceiling: Math.round(ceiling), band: band.high };
+}
+
+export function prospectiveLengthFlag(
+  narration: string,
+  replyLength: ReplyLength = "medium",
+  settings: ObserverCheckSettings = CHECK_RUNS_BALANCED,
+): ObserverFlag | null {
+  const over = lengthOverage(narration, replyLength, settings);
+  if (!over) return null;
+  const { words } = over;
+  const band = PACING_BANDS[replyLength] ?? PACING_BANDS.medium;
 
   return {
     type: "response_length",
@@ -1287,7 +1352,7 @@ export function isAbortError(error: unknown): boolean {
 }
 
 /** Strips a ```json ... ``` fence if present and parses the first {...} block. */
-function extractJsonObject(content: string): Record<string, unknown> | null {
+export function extractJsonObject(content: string): Record<string, unknown> | null {
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced ? fenced[1] : content;
   const braceMatch = candidate.match(/\{[\s\S]*\}/);
@@ -1490,7 +1555,7 @@ const OUTCOME_TIERS: ReadonlySet<string> = new Set([
 ]);
 
 /** The tool names that can produce a verdict (after progress_roll is told apart). */
-const OUTCOME_CHECK_TOOL_NAMES = new Set([
+export const OUTCOME_CHECK_TOOL_NAMES = new Set([
   "calculate",
   "record_challenge_result",
   "action_roll",
@@ -1710,7 +1775,7 @@ export async function checkOutcomeMismatch(
 // The two tool names that count as "consulted the oracle/a table" - either
 // one is enough, they serve the same purpose (letting randomness rather
 // than narrative convenience decide an uncertain outcome).
-const ORACLE_OR_TABLE_TOOL_NAMES = new Set([
+export const ORACLE_OR_TABLE_TOOL_NAMES = new Set([
   "fate_question",
   "roll_table",
   "roll_portent",
@@ -2019,26 +2084,85 @@ export interface ObserverParams {
   apiOptions: ObserverApiOptions;
   /** Per-flag-type enable/reset/sensitivity config - defaults to DEFAULT_OBSERVER_SETTINGS (today's shipped behavior) for any type a partial/future config omits. */
   settings?: ObserverSettings;
+  /**
+   * The turn's facts with provenance (judges/facts.ts collectTurnFacts). The
+   * judges that compare the narration to the record (world consistency, secret
+   * leak, lines and veils) run only when a fact of their kind exists, so a call
+   * without facts judges the original four (length, agency, outcome, tier) and
+   * the tool gaps.
+   */
+  facts?: Fact[];
+  /** What the engine's key-phrase check found in the narration (rung 1), for the secret-leak judge. */
+  phraseHits?: string[];
 }
 
 /**
- * Runs all checks for a completed turn. Safe to call every turn - the
- * length check is free, and every LLM-backed check fails open (returns no
- * flag) on any API error rather than blocking the turn on observer infra
- * issues. Returns no flags at all for a suspended turn (session zero - see
- * observerSuspensionReason), without spending a single API call on it.
+ * Runs the turn's judges (rung 3 of the judge ladder, docs/judge-layer-v2-design.md):
+ * every judge whose precondition holds goes into ONE side-model call
+ * (judges/combined.ts), which answers a keyed JSON verdict per judge. A judge
+ * that did not answer, or whose quote is not in the narration, is "unknown":
+ * logged, no flag. The scene-increment question is a free heuristic here.
  *
- * The checks run CONCURRENTLY. They're fully independent - each reads only
- * the finished turn and its own settings, none of them mutates anything, and
- * every one already fails open on its own - so running them one after another
- * only ever bought latency: up to five sequential API round trips stacked
- * between the end of narration and the choices the player is waiting on.
- * Flags are collected in the same fixed order as before (length, agency,
- * outcome, tool-usage, tier) regardless of which call finishes first, because
- * generateStoryTurn picks the FIRST major flag to correct and that choice has
- * to stay deterministic rather than becoming a race between judges.
+ * Safe to call every turn: it makes no call when no judge has anything to judge,
+ * fails open on any API error, and returns no flags at all for a suspended turn
+ * (session zero - see observerSuspensionReason). A Stop (AbortError) passes
+ * through. The caller decides which judges run by handing in the settings it
+ * wants run now (splitObserverSettings): the blocking pass is the rewriting
+ * judges, the background wave the rest, so each judge runs once per turn.
+ *
+ * The per-judge calls this replaced are runObserverSplit below, kept for the
+ * eval runner's comparison (scripts/eval-judges.mjs --mode split) and never
+ * reachable from Settings.
  */
 export async function runObserver(params: ObserverParams): Promise<ObserverFlag[]> {
+  if (
+    observerSuspensionReason({
+      sessionZeroActive: params.sessionZeroActive,
+      toolNames: params.toolNames,
+      hasCharacterSheet: params.hasCharacterSheet,
+    })
+  ) {
+    return [];
+  }
+
+  const result = await runCombinedJudges(
+    {
+      narration: params.narration,
+      playerChoice: params.playerChoice,
+      replyLength: params.replyLength,
+      toolNames: params.toolNames ?? [],
+      rollResults: params.rollResults ?? [],
+      tierUsed: params.tierUsed,
+      characterContext: params.characterContext,
+      narrationThoughts: params.narrationThoughts,
+      facts: params.facts ?? [],
+      phraseHits: params.phraseHits,
+      settings: params.settings,
+    },
+    params.apiOptions,
+  );
+  const flags = combinedResultToFlags(result, {
+    narration: params.narration,
+    replyLength: params.replyLength,
+    rollResults: params.rollResults ?? [],
+    settings: params.settings,
+  });
+  const scene = sceneIncrementFlag(
+    params.narration,
+    params.toolNames ?? [],
+    settingsFor(params.settings, "missing_scene_increment"),
+  );
+  if (scene) flags.push(scene);
+  return flags;
+}
+
+/**
+ * The version-1 judge runner: one call per judge, concurrently. Kept only for
+ * the eval runner's split-versus-combined comparison (plan slice 4); nothing
+ * in the app calls it. Flags are collected in the fixed order length, agency,
+ * outcome, tool-usage, tier regardless of which call finishes first.
+ */
+export async function runObserverSplit(params: ObserverParams): Promise<ObserverFlag[]> {
   if (
     observerSuspensionReason({
       sessionZeroActive: params.sessionZeroActive,
@@ -2290,12 +2414,15 @@ export function replaceVisibleProse(
 
 /**
  * How many AI calls the enabled judges can add to a turn, from the settings
- * alone. `always` is calls made on essentially every turn (player agency, the
- * tier judge, the shared tool-usage call); `sometimes` is calls made only when
- * the turn gives them something to judge (the length judge past its ceiling,
- * the outcome judge on a turn with an engine ruling). The oracle and
- * scene-increment judges share one call, so they count once. A rewrite is
- * extra and only when a judge is set to rewrite.
+ * alone. The judges share one call (judges/combined.ts), so the count is the
+ * passes, not the judges: `always` is one call on essentially every turn when a
+ * judge that runs on every turn is on (player agency, the tier judge, the oracle
+ * judge); `sometimes` is one more, only when the turn gives a conditional judge
+ * something to judge (the length judge past its ceiling, the outcome judge on
+ * an engine ruling, the judges of the record: a secret, a line, a named person)
+ * and the rewriting judges' pass is separate from the background wave. The
+ * scene-increment check is free. A rewrite is extra and only when a judge is
+ * set to rewrite.
  */
 export function countJudgeCalls(settings: ObserverSettings): {
   always: number;
@@ -2304,12 +2431,19 @@ export function countJudgeCalls(settings: ObserverSettings): {
 } {
   const on = (type: ObserverFlagType) => settingsFor(settings, type).enabled;
   const always =
-    (on("player_agency") ? 1 : 0) +
-    (on("tier_escalation_missed") ? 1 : 0) +
-    (on("missing_oracle_or_table") || on("missing_scene_increment") ? 1 : 0);
+    on("player_agency") ||
+    on("tier_escalation_missed") ||
+    on("missing_oracle_or_table")
+      ? 1
+      : 0;
   const sometimes =
-    (on("response_length") ? 1 : 0) +
-    (on("outcome_narration_mismatch") ? 1 : 0);
+    on("response_length") ||
+    on("outcome_narration_mismatch") ||
+    on("world_consistency") ||
+    on("secret_leak") ||
+    on("lines_and_veils")
+      ? 1
+      : 0;
   const rewrites = (
     ["response_length", "player_agency", "outcome_narration_mismatch"] as const
   ).some((type) => {
