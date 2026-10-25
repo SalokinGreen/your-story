@@ -481,14 +481,24 @@ supported. A request built outside `providerCall` (the OCR importer's
 often each piece changes** (decision 91, `buildGMStagePrompt`): the system
 prompt with nothing per-turn in it; one user message, the stable block
 (`buildStableBlock`: the player, the archetype, the DM instructions, the
-"story so far" summary), and a short assistant acknowledgement; history (every
+"story so far" summary), and the assistant acknowledgement "Ready."; history (every
 part after `summarizedThroughIndex`), its last message marked
 `cacheBreakpoint: "prefix"`; then ONE user message, the live block and the
 player's action (`buildLiveBlock`: the character sheet, the campaign plan,
-the note-title lists (`renderNoteTitleList`: a built-in pack's notes on one line per category with the shared prefix said once, its creation prompts under their own heading, the story's own notes one line each), memory, NPCs, goals, threads, the oracle line, combat,
+the system's roll tool (`buildRollToolSection`: `feat_roll`, `action_roll`, `ask_for_roll` or `formula_roll`, from the resolved system), the note-title lists (`renderNoteTitleList`: a built-in pack's notes on one line per category with the shared prefix said once, its creation prompts under their own heading, the story's own notes one line each), memory, NPCs, goals, threads, the oracle line, combat,
 timers, pending events and moves, then the setup blocks, the Observer,
 progress, repetition and knowledge notes, the pacing note and the GM tip),
-marked `"turn"`. `generation.ts` marks the last message of each later round's
+marked `"turn"`. **The system prompt's rules are two chains** (GM prompt slice 2,
+`gmPromptChains.ts`, `docs/gm-prompt-design.md` 2.1 and 2.3): `rollDecisionChain()`
+(read, roll if a failure changes the fiction, ask the oracle if the notes do not
+establish a fact, narrate) and `agencyRule()`, which carries the judge's
+`AGENCY_CHAIN` verbatim; the system prompt names no system's roll tool (it says
+"your roll tool, named under YOUR ROLL TOOL"), so it is identical for every story.
+The `<thinking>` instruction rides in the player-turn message and only for a model
+that does not reason natively (`usesNativeReasoning`). The behavioural cases for
+these live in `evals/generation/`, run by `scripts/eval-generation.mjs`
+(`judges/generationEval.ts`; plan only without `--go`, which spends the author's
+keys). `generation.ts` marks the last message of each later round's
 request copy `"round"` (`cacheMarks.ts`). A Claude request with tools gets
 `cache_control` on the system message and the last message of each mark kind,
 four at most; the system message and the "prefix" mark live an hour (`ttl: "1h"`,

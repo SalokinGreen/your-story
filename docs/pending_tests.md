@@ -10,6 +10,28 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — GM prompts slice 2: the roll chain and the agency chain
+
+The prompt, the live block's roll tool, the stakes text and the generation-case
+runner are covered by `tests/gmPrompt.chains.test.ts` (the runner against a mocked
+provider). No model was called, so the plan's baseline-then-compare is owed before
+this merges. Every run costs the author's money and waits for their go.
+
+- **Baseline, then after.** Put a key in `.env.eval` (`OPENROUTER_API_KEY=...`).
+  `node scripts/eval-generation.mjs` first: it prints "8 generation cases, 20 runs
+  each" and a call range (320 to 1280) and makes no call. On the commit before the
+  prompt change (`origin/master`, with `scripts/eval-generation.mjs`,
+  `evals/generation/`, `app/misc/judges/generationEval.ts` and the `evalFormat.ts`
+  change copied across): `node scripts/eval-generation.mjs --go --out evals/generation-baseline.json`.
+  On this branch: `node scripts/eval-generation.mjs --go --baseline evals/generation-baseline.json --out evals/generation-after.json`.
+  Expected: per case and slot (Default GLM 5.3, Advanced Claude Sonnet 5.5) a
+  failing count out of 20. The target cases (the roll-vs-narrate and oracle pairs,
+  the two agency cases) must fall; none may rise by more than 2 of 20 on two
+  separate runs (repeat the second command to confirm a "worse"). Failure looks
+  like: "No provider key"; `errors` above 0 (a provider rejected the request; the
+  message is in the report); a case failing 20 of 20 on both prompts (the case is
+  mis-specified: read its top failure).
+
 ## 2026-10-25 — Judge layer J4: the labelled set and its runner
 
 The format, the scoring, the runner (against a mocked provider), the exporter and

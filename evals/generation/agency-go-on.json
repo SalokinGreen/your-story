@@ -1,0 +1,44 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "agency-go-on",
+  "published": true,
+  "note": "Agency chain, step 1: \"Go on.\" is the declared action, so the GM narrates the crossing and the arrival, and stops at the door. Writing the character speaking, deciding or knocking is a failure.",
+  "storySnapshot": {
+    "story_name": "The Tallow Gate",
+    "premise": "A mountain toll-town in winter. Ilse Varrow, a courier, carries a sealed tin to the toll-house at the far end of the Pim causeway.",
+    "player_name": "Ilse Varrow",
+    "difficulty": "medium",
+    "scene": {
+      "parts": [
+        {
+          "content": "The lamp in the toll-house window burns at the far end of the Pim causeway, two hundred paces of wet planks away. Do you cross?",
+          "imageUrl": "",
+          "user": false,
+          "role": "assistant"
+        }
+      ]
+    },
+    "lore": [
+      {
+        "title": "Character: Ilse Varrow",
+        "type": "character_sheet",
+        "content": "Ilse Varrow, courier. Quick, stubborn, owes the Hobnail Guild a debt. Carries a sealed tin she has not opened.",
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": [],
+        "enabled": true
+      }
+    ],
+    "npcs": []
+  },
+  "playerLine": "Go on.",
+  "expect": {
+    "noCalls": ["formula_roll", "opposed_formula", "gm_roll", "ask_for_roll"],
+    "proseMatching": ["toll-house|causeway"],
+    "proseNotMatching": [
+      "\\byou (say|ask|tell|whisper|call out|shout|mutter|reply|answer|decide|choose|knock|reach for|push open|draw your)\\b"
+    ]
+  }
+}

@@ -249,3 +249,54 @@ revised section, with the "beyond noise" rule there.
   `manage_track` (action `progress_roll`) when it is offered (this replaces the
   earlier note that `progress_roll` never appears).
 - The `isPinnedNoteType` comments no longer say mechanics is pinned.
+
+### 2026-10-25, slice 2 (G2)
+
+Built on `claude/gm-prompts-g2`. Files: `app/misc/gmPromptChains.ts` (new),
+`ai_staged.ts`, `gmTools.ts`, `judges/generationEval.ts` (new), `judges/evalFormat.ts`,
+`scripts/eval-generation.mjs`, `evals/generation/` (eight cases), `evals/README.md`,
+`tests/gmPrompt.chains.test.ts`.
+
+- **The roll chain and the cache rule.** `rollDecisionChain()` takes no tool name;
+  it says "your roll tool (named under YOUR ROLL TOOL in the live state)". The live
+  block gains `## 🎲 YOUR ROLL TOOL` from `buildRollToolSection(story)`
+  (`feat_roll`, `action_roll`, `ask_for_roll` in Manual Dice Mode, else
+  `formula_roll`), a story-level choice. The system prompt is byte-identical for
+  Blood & Bone, Fantastic Realms and no system (tested). The section precedes the
+  combat state in the live block, so every story's live block changed.
+- **The agency chain is the judge's `AGENCY_CHAIN` verbatim**, framed as "run this
+  check on your draft". Its steps 1 and 4 still carry judge wording ("severity is
+  none", "violation"); I kept one text rather than fork it, as the plan asks. If
+  the cases show the GM misreading it, a GM-framed copy is the fix.
+- **The thinking rule is in the player-turn message, not the system prompt.** The
+  system prompt must not vary by model, and `usesNativeReasoning` varies by tier,
+  so the system prompt says only that a `<thinking>` block, when the turn message
+  asks for one, is the exception to "everything is shown". The turn message asks
+  for one only when `usesNativeReasoning` is false (the flag that already gates the
+  prefill).
+- **The acknowledgement is "Ready."** `GM_STAGE_AFFIRMATION` (the prefill) is
+  unchanged.
+- **Cut:** CORE STANCE (its agency, dice, oracle and "keep it short" items), the old
+  PLAYER AGENCY bullets, the "Routine actions" bullet, the closing restatement, the
+  "ALWAYS start with <thinking>" lines. The Combat & Mechanics how-to lines stay,
+  with `formula_roll` replaced by "your roll tool" where they meant the player's
+  roll. The campaign plan's "manufactured certainty" reference now points at step 3.
+- **The `stakes` description** is "Consequence on failure. high or deadly lasts the
+  scene and raises the model tier." A longer version put the default tool list over
+  10,000 tokens; this one holds `tests/toolBudget.test.ts`.
+- **System prompt size** (default story, `estimateTokens`): 6,713 tokens before,
+  6,508 after.
+- **Digests retaken** in `tests/campaign.oldSaves.test.ts`: the system prompt, the
+  acknowledgement and the last user message; the other twelve are unchanged.
+  `tests/oracleRecency.test.ts`'s CORE STANCE test now checks the chain.
+- **The generation runner.** `generationEval.ts` builds the GM's real request with
+  `buildGMStagePrompt`, calls `callSideModel`, answers tool calls from
+  `scriptedToolResponses` (`{ tool, result }`, never executed) and runs at most four
+  rounds. It scores `expect` (`calls`, `callsAny`, `noCalls`, `proseMatching`,
+  `proseNotMatching`, `narrationExcludes`) and `expectArguments` (G3's session-zero
+  case). It reads `evals/generation/` only. Gates, tiers and the Observer are not
+  run, so a case measures the GM's own rounds; it samples at the GM's base
+  temperature (0.4 plus the chaos delta). The agency cases are checked by patterns,
+  not by the agency judge.
+- **Owed before merge: the baseline-then-compare measurement.** No model was
+  called. Commands are in `docs/pending_tests.md`.

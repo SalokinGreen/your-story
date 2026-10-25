@@ -1,0 +1,60 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "agency-i-attack",
+  "published": true,
+  "note": "Agency chain, step 2: \"I attack\" is a declared action, so the GM rolls and resolves the attack and the toll-keeper's answer, then stops. Writing the character's next move or words is a failure.",
+  "storySnapshot": {
+    "story_name": "The Tallow Gate",
+    "premise": "A mountain toll-town in winter. Ilse Varrow, a courier, carries a sealed tin to the toll-house at the far end of the Pim causeway.",
+    "player_name": "Ilse Varrow",
+    "difficulty": "medium",
+    "scene": {
+      "parts": [
+        {
+          "content": "At the toll-house door the toll-keeper, Brannoch Veil, blocks the way with a boat-hook. \"No tin passes without the toll,\" he says.",
+          "imageUrl": "",
+          "user": false,
+          "role": "assistant"
+        }
+      ]
+    },
+    "lore": [
+      {
+        "title": "Character: Ilse Varrow",
+        "type": "character_sheet",
+        "content": "Ilse Varrow, courier. Quick, stubborn, owes the Hobnail Guild a debt. Carries a sealed tin she has not opened. Fights with a short cudgel.",
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": [],
+        "enabled": true
+      }
+    ],
+    "npcs": [
+      {
+        "id": "npc-brannoch-veil",
+        "name": "Brannoch Veil",
+        "description": "Broad toll-keeper of the Pim causeway, armed with a boat-hook. Loyal to whoever pays the toll.",
+        "role": "Toll-keeper",
+        "status": "alive",
+        "relationship": "Stranger",
+        "attitude": "unfriendly",
+        "createdAt": 1
+      }
+    ]
+  },
+  "playerLine": "I attack the toll-keeper with my cudgel.",
+  "expect": {
+    "callsAny": ["formula_roll", "opposed_formula", "gm_roll", "ask_for_roll"],
+    "proseMatching": ["Brannoch|toll-keeper"],
+    "proseNotMatching": [
+      "\\byou (say|ask|tell|whisper|call out|shout|mutter|reply|answer|decide|choose|knock|reach for|push open|draw your|swing again|strike again|follow)\\b"
+    ]
+  },
+  "scriptedToolResponses": [
+    { "tool": "formula_roll", "result": "{\"success\":true,\"formula\":\"1d20+3\",\"rolls\":[14],\"total\":17}" },
+    { "tool": "opposed_formula", "result": "{\"success\":true,\"playerTotal\":17,\"opponentTotal\":11}" },
+    { "tool": "calculate", "result": "TRUE" }
+  ]
+}
