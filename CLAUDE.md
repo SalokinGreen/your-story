@@ -1300,7 +1300,7 @@ checkboxes and a Done button in `AskQuestionModal.tsx`. The answer item carries
 `selectedLabels`. The executor (`gmExecutor.ts`) and the party host
 (`partyHost.ts`) keep only offered labels, once each, in option order, and the
 GM's line reads `→ "A", "C"`. Any custom text the player typed is kept
-alongside the picks (the modal offers the box only when `allow_custom` is set). `selectedLabels` is honoured only on a multi-select
+alongside the picks (the box shows unless the question sets `allow_custom: false`; in session zero a creative step's items are always given it, `prepareSetupQuestions`). `selectedLabels` is honoured only on a multi-select
 question. The phone protocol caps picks at 4 (`PARTY_MAX_PICKS`). Couch
 `target_player_name` routing is unchanged.
 

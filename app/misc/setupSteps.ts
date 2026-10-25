@@ -74,7 +74,8 @@ const WORLD_STEPS: CreationStep[] = [
     label: "Style",
     group: "world",
     scope: "table",
-    kind: "creative",
+    // A choice: the record takes one of seven fixed styles.
+    kind: "choice",
     hint: 'The shape of the campaign, which decides what you build: sandbox, adventure path, mystery, horror, episodic, slice of life or solo/oracle. Offer the ones that fit the setting with a line each on how they play, then record the pick with the campaign tool (part "style").',
   },
   {
