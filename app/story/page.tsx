@@ -4781,6 +4781,8 @@ function StoryPageContent() {
       // just ruled the draft fine, so the note has to go with it - otherwise
       // the GM gets told off for prose that's back in the story.
       correctedObserverFlags: undefined,
+      // The turn is no longer revised: the notice goes with the revision.
+      publicNotice: undefined,
     };
 
     const restoredPart = storyData.scene.parts[lastIdx];

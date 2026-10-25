@@ -210,7 +210,7 @@ describe("a rewrite waits for a judge of another family", () => {
     expect(result.scenePart.observerFlags?.map((f) => f.type)).toContain("player_agency");
   });
 
-  it("makes no confirmation call when the player's pick has no key", async () => {
+  it("falls back to another family when the player's pick has no key", async () => {
     const entries = { rewriteConfirmModelOverride: JSON.stringify({ modelKey: "Mistral Medium 3.5", reasoningEffort: "none" }) };
     const map = new Map(Object.entries(entries));
     const storage = {
@@ -228,14 +228,15 @@ describe("a rewrite waits for a judge of another family", () => {
       dispatchEvent: vi.fn(),
     });
     const { result, calls } = await runTurn({ first: LEAK });
-    expect(calls.filter(isConfirmation)).toHaveLength(0);
+    // Mistral has no key, so another family the player has a key for stands in.
     expect(calls.filter((c) => c.body.model === "Mistral Medium 3.5")).toHaveLength(0);
-    expect(calls.filter((c) => isRewriteCall(c.body))).toHaveLength(0);
-    expect(result.content).toBe(NARRATION);
-    expect(result.scenePart.observerFlags?.map((f) => f.type)).toContain("secret_leak");
+    const standIn = calls.filter((c) => isJudgeCall(c.body) && c.body.model !== "Claude Haiku 5.5");
+    expect(standIn).toHaveLength(1);
+    expect(calls.filter((c) => isRewriteCall(c.body))).toHaveLength(1);
+    expect(result.content).toBe(FIXED);
   });
 
-  it("refuses a confirming model of the first judge's own family", async () => {
+  it("never confirms with the first judge's own family: another stands in", async () => {
     const storage = {
       getItem: (k: string) =>
         k === "rewriteConfirmModelOverride"
@@ -254,10 +255,96 @@ describe("a rewrite waits for a judge of another family", () => {
       dispatchEvent: vi.fn(),
     });
     const { result, calls } = await runTurn({ first: LEAK });
-    // The first judge is Claude Haiku 5.5; Sonnet is the same family.
+    // The first judge is Claude Haiku 5.5; Sonnet is the same family, so another stands in.
     expect(calls.filter((c) => c.body.model === "Claude Sonnet 5.5")).toHaveLength(0);
-    expect(calls.filter((c) => isRewriteCall(c.body))).toHaveLength(0);
+    const judgeModels = calls.filter((c) => isJudgeCall(c.body)).map((c) => c.body.model);
+    expect(judgeModels.some((m) => m !== "Claude Haiku 5.5")).toBe(true);
+    expect(calls.filter((c) => isRewriteCall(c.body))).toHaveLength(1);
+    expect(result.content).toBe(FIXED);
+  });
+
+  it("holds nothing and runs no blocking judge when no other family can confirm", async () => {
+    // Only a Z.ai key, and the Observer on GLM 5.3 (Z.ai): every other family is out of reach.
+    const store: Record<string, string> = {
+      observerModelOverride: JSON.stringify({ modelKey: "GLM 5.3 (Z.ai)", reasoningEffort: "none" }),
+    };
+    const storage = {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+    };
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("sessionStorage", storage);
+    vi.stubGlobal("window", {
+      localStorage: storage,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    });
+    const gm = createMockGMFetch([{ content: NARRATION }]);
+    const events: string[] = [];
+    global.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+      if (String(url) === "/api/generate") {
+        const body = JSON.parse(init!.body as string);
+        if (isJudgeCall(body)) events.push("judge");
+        if (isRewriteCall(body)) events.push("rewrite");
+        return {
+          ok: true,
+          json: async () => ({ content: isJudgeCall(body) ? judgeReply(body, LEAK) : "{}" }),
+        } as unknown as Response;
+      }
+      return (gm.fetchMock as unknown as typeof fetch)(url as RequestInfo, init);
+    }) as unknown as typeof fetch;
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await generateStoryTurn(
+      story(),
+      "I follow her",
+      { ...baseOptions, openRouterKey: undefined, zaiKey: "zai-test-key" },
+      {
+        onGMContent: () => events.push("shown:gm"),
+        onLiveNarrationUpdate: () => events.push("shown:gm"),
+        onStoryContent: () => events.push("shown:gm"),
+        onComplete: () => events.push("complete"),
+      },
+    );
+    for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
+    // The prose streamed live, before any judge call, and nothing was rewritten.
+    expect(events.indexOf("shown:gm")).toBeGreaterThan(-1);
+    expect(events.indexOf("shown:gm")).toBeLessThan(events.indexOf("judge"));
+    expect(events).not.toContain("rewrite");
     expect(result.content).toBe(NARRATION);
+  });
+
+  it("never puts a hidden roll's reason or text into the rewrite request", async () => {
+    const gm = createMockGMFetch([
+      {
+        toolCalls: [
+          { name: "gm_roll", arguments: { formulas: ["1d20"], reason: "CANARY_HIDDEN_ROLL_REASON" } },
+        ],
+      },
+      { content: NARRATION },
+    ]);
+    const rewrites: string[] = [];
+    global.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+      if (String(url) === "/api/generate") {
+        const body = JSON.parse(init!.body as string);
+        let content = "{}";
+        if (isRewriteCall(body)) {
+          rewrites.push(JSON.stringify(body));
+          content = rewriteReply(body, FIXED);
+        } else if (isJudgeCall(body)) {
+          content = judgeReply(body, LEAK);
+        }
+        return { ok: true, json: async () => ({ content }) } as unknown as Response;
+      }
+      return (gm.fetchMock as unknown as typeof fetch)(url as RequestInfo, init);
+    }) as unknown as typeof fetch;
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await generateStoryTurn(story(), "I follow her", baseOptions, {});
+    for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(rewrites).toHaveLength(1);
+    expect(rewrites[0]).not.toContain("CANARY_HIDDEN_ROLL_REASON");
   });
 
   it("passes a Stop during the confirmation through and shows nothing", async () => {

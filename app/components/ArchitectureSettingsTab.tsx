@@ -446,7 +446,7 @@ export function SideAgentPickers({
       <StageOverrideCard
         icon="ShieldCheck"
         title="Rewrite confirmation"
-        description="Before the Observer rewrites a turn, a second judge from another model family has to agree the problem is real. Pick it here. A model of the same family as the Observer's is refused, and with no key for it the turn is flagged instead of rewritten."
+        description="Before the Observer rewrites a turn, a second judge from another model family has to agree the problem is real. Pick it here. If your pick cannot run (no key, the same family as the Observer, a subscription model off the desktop), another family you have a key for stands in; with none, the turn is flagged instead of rewritten."
         override={rewriteConfirmOverride}
         onChange={handleRewriteConfirmChange}
         customModels={customModels}

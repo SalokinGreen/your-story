@@ -48,9 +48,8 @@ export interface CorrectionArgs {
   /** The first judge's call options; the confirming call carries its keys and cost turn. */
   judgeApi: ObserverApiOptions;
   rewriteApi: ObserverApiOptions;
-  hiddenRefs: ReadonlySet<string>;
   rewrite: CorrectionRewriteParams;
-  recheck: (rewritten: string) => string | null;
+  recheck: (rewritten: string, confirmed: ConfirmedFinding[]) => string | null;
 }
 
 export interface CorrectionResult {
@@ -72,7 +71,6 @@ export async function confirmAndRewrite(args: CorrectionArgs): Promise<Correctio
     base: args.judgeApi,
     pick,
     fallbackModel: REWRITE_CONFIRM_DEFAULT_MODEL_KEY,
-    hiddenRefs: args.hiddenRefs,
   });
   if (run.confirmed.length === 0) {
     return { rewritten: null, confirmed: [], skipped: run.skipped };
@@ -82,7 +80,7 @@ export async function confirmAndRewrite(args: CorrectionArgs): Promise<Correctio
     narration: args.judged.narration,
     flag: run.confirmed[0].flag,
     findings: run.confirmed,
-    recheck: args.recheck,
+    recheck: (text) => args.recheck(text, run.confirmed),
     apiOptions: args.rewriteApi,
   });
   return { rewritten, confirmed: run.confirmed };

@@ -9,7 +9,6 @@ import {
   confirmFinding,
   confirmMajorFlags,
   evidenceOverlaps,
-  hiddenToolRefs,
   resolveConfirmModel,
   rewriterFactsFor,
 } from "@/app/misc/judges/confirm";
@@ -64,9 +63,30 @@ describe("model families", () => {
     expect(confirmModelFamily("GLM 5.3")).not.toBe(confirmModelFamily("Claude Haiku 5.5"));
     expect(confirmModelFamily("Mistral Medium 3.5")).toBe("mistral");
   });
-  it("gives a custom model its own family", () => {
+  it("gives a custom model the family of its OpenRouter id's vendor, else its own", () => {
     const uuid = "123e4567-e89b-12d3-a456-426614174000";
     expect(confirmModelFamily(uuid)).toBe(`custom:${uuid}`);
+    const store = new Map<string, string>([
+      [
+        "customModels",
+        JSON.stringify([
+          { id: uuid, modelId: "anthropic/claude-sonnet-4", name: "x", contextSize: 1, maxOutputTokens: 1 },
+        ]),
+      ],
+    ]);
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+    };
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("window", { localStorage: storage, addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() });
+    try {
+      expect(confirmModelFamily(uuid)).toBe("anthropic");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -81,23 +101,50 @@ describe("the confirming model", () => {
     });
     expect(r).toMatchObject({ ok: true, model: "GLM 5.3", family: "zai" });
   });
-  it("is refused without a key for its provider", () => {
+  it("falls back to another family the player has a key for when the pick has no key", () => {
     const r = resolveConfirmModel({
       judgeModel: "Claude Haiku 5.5",
       keys: { mistralKey: "k" },
       pick,
       fallbackModel: "GLM 5.3",
     });
-    expect(r).toMatchObject({ ok: false, reason: "no_key" });
+    expect(r).toMatchObject({ ok: true, family: "mistral", fellBackFrom: { model: "GLM 5.3", reason: "no_key" } });
   });
-  it("is refused when it is the first judge's own family, naming the family", () => {
+  it("falls back when the pick is the first judge's own family, never to that family", () => {
     const r = resolveConfirmModel({
       judgeModel: "GLM 5.3 (Z.ai)",
       keys: { openRouterKey: "k", zaiKey: "k" },
       pick,
       fallbackModel: "GLM 5.3",
     });
-    expect(r).toMatchObject({ ok: false, reason: "same_family", family: "zai" });
+    expect(r).toMatchObject({ ok: true, fellBackFrom: { reason: "same_family" } });
+    expect(r.ok && r.family).not.toBe("zai");
+  });
+  it("falls back from a subscription pick that cannot run here, and never picks a subscription model", () => {
+    const r = resolveConfirmModel({
+      judgeModel: "GLM 5.3",
+      keys: { openRouterKey: "k" },
+      pick: { model: "Claude Haiku (subscription)", reasoningEffort: "none" },
+      fallbackModel: "GLM 5.3",
+    });
+    expect(r).toMatchObject({ ok: true, fellBackFrom: { reason: "cannot_run" } });
+    expect(r.ok && r.model).not.toMatch(/subscription/);
+  });
+  it("has no confirmer when no other family has a key, and names why the pick failed", () => {
+    const r = resolveConfirmModel({
+      judgeModel: "GLM 5.3 (Z.ai)",
+      keys: { zaiKey: "k" },
+      pick,
+      fallbackModel: "GLM 5.3",
+    });
+    expect(r).toMatchObject({ ok: false, reason: "no_key", model: "GLM 5.3" });
+    const same = resolveConfirmModel({
+      judgeModel: "GLM 5.3 (Z.ai)",
+      keys: { zaiKey: "k" },
+      pick: { model: "GLM 5.3 (Z.ai)", reasoningEffort: "none" },
+      fallbackModel: "GLM 5.3",
+    });
+    expect(same).toMatchObject({ ok: false, reason: "same_family", family: "zai" });
   });
   it("reads a pick the catalog dropped as the default", () => {
     const r = resolveConfirmModel({
@@ -275,43 +322,55 @@ describe("the facts a rewrite is handed", () => {
     fact("f2", "clock", `Clock "The Vigil closes in" 3/6`),
     fact("f3", "person", "Marta is dead", { source: { kind: "npc", ref: "n1" }, names: ["Marta"] }),
     fact("f4", "person", "Hollis is dead", { source: { kind: "npc", ref: "n2" }, names: ["Hollis"] }),
-    fact("f5", "result", "gm_roll: 4 vs the guard's alertness", { source: { kind: "tool", ref: "c-hidden" } }),
     fact("f6", "result", "action_roll: weak hit", { source: { kind: "tool", ref: "c-public" } }),
     fact("f7", "line", "Line: no harm to children"),
     fact("f8", "sheet", 'Character sheet "Sheet": private notes'),
   ];
   const all = facts.map((f) => f.id);
-  const hidden = new Set(["c-hidden"]);
 
   it("never includes a secret or a clock, whatever the finding cites", () => {
     for (const judge of ["secret_leak", "world_consistency", "outcome", "lines_veils", "length", "agency"] as const) {
-      const text = JSON.stringify(rewriterFactsFor(judge, all, facts, NARRATION, hidden));
+      const text = JSON.stringify(rewriterFactsFor(judge, all, facts, NARRATION));
       expect(text).not.toContain(SECRET);
       expect(text).not.toContain("Vigil");
     }
-    expect(rewriterFactsFor("secret_leak", all, facts, NARRATION, hidden)).toEqual([]);
+    expect(rewriterFactsFor("secret_leak", all, facts, NARRATION)).toEqual([]);
   });
-  it("leaves out a hidden roll, the sheet, and a person the narration does not name", () => {
-    const world = rewriterFactsFor("world_consistency", all, facts, NARRATION, hidden);
+  it("leaves out the sheet and a person the narration does not name", () => {
+    const world = rewriterFactsFor("world_consistency", all, facts, NARRATION);
     expect(world.map((f) => f.id)).toEqual(["f3", "f6"]);
-    expect(JSON.stringify(world)).not.toContain("alertness");
     expect(JSON.stringify(world)).not.toContain("private notes");
     expect(JSON.stringify(world)).not.toContain("Hollis");
   });
   it("hands over only the facts the finding cites", () => {
-    expect(rewriterFactsFor("world_consistency", ["f3"], facts, NARRATION, hidden).map((f) => f.id)).toEqual(["f3"]);
-    expect(rewriterFactsFor("lines_veils", ["f7"], facts, NARRATION, hidden).map((f) => f.id)).toEqual(["f7"]);
-    expect(rewriterFactsFor("outcome", ["f6"], facts, NARRATION, hidden).map((f) => f.id)).toEqual(["f6"]);
+    expect(rewriterFactsFor("world_consistency", ["f3"], facts, NARRATION).map((f) => f.id)).toEqual(["f3"]);
+    expect(rewriterFactsFor("lines_veils", ["f7"], facts, NARRATION).map((f) => f.id)).toEqual(["f7"]);
+    expect(rewriterFactsFor("outcome", ["f6"], facts, NARRATION).map((f) => f.id)).toEqual(["f6"]);
   });
-  it("marks the tools whose results the player never sees as hidden", () => {
-    const refs = hiddenToolRefs([
-      { toolName: "gm_roll", toolCallId: "c1", success: true, contextForStory: "gm_roll: 4" },
-      { toolName: "campaign", toolCallId: "c2", success: true, contextForStory: "clock moved" },
-      { toolName: "action_roll", toolCallId: "c3", success: true, contextForStory: "action_roll: weak hit" },
+  it("builds tool facts from the player-facing summary: no hidden roll, no GM reason", () => {
+    const view = { npcs: [], meters: [], campaign: undefined };
+    const REASON = "she is lying to hide that she poisoned the abbot";
+    const built = collectTurnFacts(view, view, [
+      {
+        toolName: "npc_roll",
+        toolCallId: "c1",
+        success: true,
+        contextForStory: `[NPC Roll: Sister Ana rolled 1d20 = 14 - ${REASON}]\n[No hit/miss verdict was computed. Compare it with \`calculate\`.]`,
+      },
+      { toolName: "gm_roll", toolCallId: "c2", success: true, contextForStory: "gm_roll: 4 vs the abbot's guilt" },
+      { toolName: "campaign", toolCallId: "c3", success: true, contextForStory: "clock moved: the Vigil" },
+      { toolName: "action_roll", toolCallId: "c4", success: true, contextForStory: "action_roll: weak hit" },
     ]);
-    expect(refs.has("c1")).toBe(true);
-    expect(refs.has("c2")).toBe(true);
-    expect(refs.has("c3")).toBe(false);
+    const text = JSON.stringify(built);
+    expect(text).toContain("Sister Ana rolled 1d20 = 14");
+    expect(text).toContain("weak hit");
+    expect(text).not.toContain("poisoned");
+    expect(text).not.toContain("guilt");
+    expect(text).not.toContain("Vigil");
+    // So whatever a judge cites, the rewrite is handed none of it.
+    const ids = built.map((f) => f.id);
+    const handed = rewriterFactsFor("world_consistency", ids, built, "Sister Ana rolled");
+    expect(JSON.stringify(handed)).not.toContain("poisoned");
   });
 });
 

@@ -80,6 +80,7 @@ import {
   reconcileGmThinkingAfterRewrite,
   settingsFor,
   canObserverTriggerReset,
+  flagOnlyRewritables,
   plausibleResetFlagTypes,
   splitObserverSettings,
   restrictObserverSettings,
@@ -101,6 +102,8 @@ import { runDirectorAssistant } from "@/app/misc/directorAssistant";
 import { runStoryProgressObserver } from "@/app/misc/storyProgressObserver";
 import {
   getObserverSettings,
+  getRewriteConfirmModel,
+  REWRITE_CONFIRM_DEFAULT_MODEL_KEY,
   getObserverModelOverride,
   getMemoryKeeperModelOverride,
   getReflectionModelOverride,
@@ -126,7 +129,7 @@ import { collectTurnFacts, snapshotJudgeView } from "@/app/misc/judges/facts";
 import { buildReask, pacingNoteFor, runRung1, secretHits } from "@/app/misc/judges/rung1";
 import { pickMajorFlag } from "@/app/misc/judges/combined";
 import { confirmAndRewrite } from "@/app/misc/judges/correction";
-import { hiddenToolRefs } from "@/app/misc/judges/confirm";
+import { resolveConfirmModel } from "@/app/misc/judges/confirm";
 import { recheckRewrite } from "@/app/misc/judges/rewritePlan";
 import { kindOnlyFlag } from "@/app/misc/judges/publicView";
 import type { ConfirmedFinding, Fact } from "@/app/misc/judges/types";
@@ -1156,11 +1159,15 @@ export async function generateStoryTurn(
   // departed person the first draft did not have acting fails it (rewritePlan.ts).
   const recheckFor =
     (original: string) =>
-    (rewritten: string): string | null => {
+    (rewritten: string, confirmed: ConfirmedFinding[] = []): string | null => {
       try {
         const checked = recheckRewrite({
           rewritten,
           original,
+          fixing: {
+            line: confirmed.some((c) => c.judge === "lines_veils"),
+            secret: confirmed.some((c) => c.judge === "secret_leak"),
+          },
           storyBefore: preTurnSnapshot ?? storyData,
           storyAfter: storyData,
         });
@@ -1210,7 +1217,28 @@ export async function generateStoryTurn(
   // Explicit caller-supplied settings win; otherwise fall back to the user's
   // stored Architecture-tab config (DEFAULT_OBSERVER_SETTINGS, decision 220).
   // Read once per turn, before the loop, because the hold below depends on it.
-  const observerSettings = options.observerSettings ?? getObserverSettings();
+  const requestedObserverSettings = options.observerSettings ?? getObserverSettings();
+  // A rewrite needs a second judge of another family (judges/confirm.ts). When
+  // none can run this turn, the rewriting judges are flag-only for it: nothing is
+  // held for a rewrite that cannot happen, and they are judged in the
+  // background wave. Resolved once, before the hold decision below.
+  const confirmerKeys = pickProviderKeys(options);
+  const confirmer = resolveConfirmModel({
+    judgeModel: resolveSideCallModel(getObserverModelOverride(), confirmerKeys).model,
+    keys: confirmerKeys,
+    pick: getRewriteConfirmModel(),
+    fallbackModel: REWRITE_CONFIRM_DEFAULT_MODEL_KEY,
+  });
+  const observerSettings = confirmer.ok
+    ? requestedObserverSettings
+    : flagOnlyRewritables(requestedObserverSettings);
+  if (!confirmer.ok && canObserverTriggerReset(requestedObserverSettings)) {
+    logger.action("No second judge can confirm a rewrite this turn - the judges only flag", {
+      reason: confirmer.reason,
+      pick: confirmer.model,
+      family: confirmer.family,
+    });
+  }
   // Decision 221: when a judge may rewrite this turn, the player never sees,
   // hears or is sent text a rewrite could replace. The live callbacks stay
   // silent (holdLiveText) and the narration callbacks queue in `held` until the
@@ -1443,7 +1471,6 @@ export async function generateStoryTurn(
             judged: pauseObserverParams,
             judgeApi: observerApiOptions,
             rewriteApi: observerRewriteApiOptions,
-            hiddenRefs: hiddenToolRefs(ctx.gmResults),
             rewrite: {
               playerChoice: playerLine,
               narrationContext: buildNarrationContext(
@@ -1862,7 +1889,6 @@ export async function generateStoryTurn(
               // voice (decision 52) - not sideCallApiOptions, or the rewrite
               // would silently skip that pin.
               rewriteApi: observerRewriteApiOptions,
-              hiddenRefs: hiddenToolRefs(result.gmResults ?? []),
               rewrite: {
                 playerChoice: playerLine,
                 replyLength: options.replyLength,

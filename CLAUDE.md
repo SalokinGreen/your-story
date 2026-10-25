@@ -1530,10 +1530,16 @@ verdict whose quote overlaps the first judge's (`evidenceOverlaps`: a shared
 run of three words). The model is the player's pick
 (`getRewriteConfirmModel`, `rewriteConfirmModelOverride`, a synced key, picker
 "Rewrite confirmation" under Settings → AI → Advanced), **GLM 5.3** by default.
-No key for it, or a model of the first judge's family
-(`confirmModelFamily`, read from the catalog), or a subscription model that
-cannot run here: no confirmation call and no rewrite, the finding stays a flag,
-and the Debug Logs say why. A confirmation that fails or cannot be read is
+A pick that cannot run (no key, a model of the first judge's family
+(`confirmModelFamily`, read from the catalog; a custom model's family is its
+OpenRouter id's vendor), or a subscription model off the desktop or in an online
+session) **falls back**: the first catalog model the player has a key for, of
+another family and not a subscription model (`resolveConfirmModel`; logged, and
+Settings' subscription notice lists the card). Only when none exists is there no
+confirmer, and then `generateStoryTurn` resolves that once per turn, before the
+hold decision, and runs the rewriting judges as flag-only for the turn
+(`flagOnlyRewritables`): nothing is held, they are judged in the background
+wave. A confirmation that fails or cannot be read is
 "unknown", never a rewrite; a Stop passes through. `judges/correction.ts`
 (`confirmAndRewrite`) is the one path for the end-of-turn pass and the pass
 before a pause: confirm, then **one** rewrite (`rewriteFlaggedNarration` with
@@ -1542,9 +1548,11 @@ confirmed finding. `alsoFixIfPresent` and the speculative "fix this too"
 clauses are gone. **The rewrite is handed facts, never secrets**
 (`rewriterFactsFor`): only the facts the finding cites, of kinds the judge's
 rewrite may use (outcome: results; world: people, places, results; lines and
-veils: the line and veil text), never a secret's truth, a clock, the sheet, a
-hidden roll (`hiddenToolRefs`, the tools `publicSummary` hides) or a person the
-prose does not name. A secret-leak rewrite is told only the quoted statement to
+veils: the line and veil text), never a secret's truth, a clock, the sheet or a
+person the prose does not name. A tool result is a fact only as its
+`publicSummary` (`collectTurnFacts`), so a hidden roll is no fact at all and an
+NPC roll's reason is stripped, for the judges (whose `fix` reaches the rewrite)
+as well as the rewrite. A secret-leak rewrite is told only the quoted statement to
 take out. It replies with a **fix plan** (a JSON array of
 `{span, problem, replacement}`), the line `===PROSE===`, then the prose
 (`judges/rewritePlan.ts`): `parseFixPlan` rejects a span that is not in the

@@ -25,16 +25,16 @@
 import type { ObserverFlag, ObserverFlagType } from "../structs";
 import { logger } from "../logger";
 import {
+  AI_MODELS,
   confirmModelFamily,
   hasKeyForModel,
   isKnownModelKey,
   resolveModelKeyAlias,
 } from "../ai_prices";
 import { canRunClaudeCliModel, isClaudeCliModel } from "../claudeCliModels";
-import { publicSummary } from "../turnTimeline";
 import type { ObserverApiOptions, ObserverSettings } from "../observer";
 import type { ProviderKeys } from "../sideModelCall";
-import type { ReasoningEffort } from "../reasoningTiers";
+import { DEFAULT_REASONING_EFFORT, type ReasoningEffort } from "../reasoningTiers";
 import {
   JUDGE_FLAG_TYPE,
   callJudges,
@@ -46,7 +46,6 @@ import type {
   Fact,
   FactTopic,
   JudgeId,
-  JudgeToolResult,
 } from "./types";
 
 /** Per turn, at most this many findings are confirmed (design 11.5). */
@@ -57,7 +56,14 @@ export const MAX_CONFIRMATIONS = 2;
 // ---------------------------------------------------------------------------
 
 export type ConfirmModelResolution =
-  | { ok: true; model: string; reasoningEffort: ReasoningEffort; family: string }
+  | {
+      ok: true;
+      model: string;
+      reasoningEffort: ReasoningEffort;
+      family: string;
+      /** Set when the pick could not run and another family's model stands in. */
+      fellBackFrom?: { model: string; reason: "no_key" | "cannot_run" | "same_family" };
+    }
   | {
       ok: false;
       reason: "no_key" | "cannot_run" | "same_family";
@@ -69,6 +75,15 @@ export type ConfirmModelResolution =
  * The confirming model for this turn. `pick` is the player's choice (or the
  * default, `getRewriteConfirmModel`), `judgeModel` the model the first judge
  * ran on, `keys` the provider keys the call would carry.
+ *
+ * The pick is used when it can run here and is another family than the first
+ * judge's. Otherwise (design section 3: "or whichever other family the player
+ * has a key for") the first catalog model the player has a key for, of another
+ * family, stands in, so a pick that cannot run (no key, a subscription model
+ * off the desktop or in an online session, the judge's own family) never stops
+ * rewrites silently. A subscription model is never chosen as the stand-in:
+ * side agents reach the subscription only when the player points them there.
+ * Only when no such model exists is there no confirmer, and the flag stays.
  */
 export function resolveConfirmModel(args: {
   judgeModel: string;
@@ -80,16 +95,34 @@ export function resolveConfirmModel(args: {
   const model = isKnownModelKey(args.pick.model)
     ? resolveModelKeyAlias(args.pick.model)
     : args.fallbackModel;
-  if (isClaudeCliModel(model)) {
-    if (!canRunClaudeCliModel()) return { ok: false, reason: "cannot_run", model };
-  } else if (!hasKeyForModel(model, args.keys)) {
-    return { ok: false, reason: "no_key", model };
+  const judgeFamily = confirmModelFamily(args.judgeModel);
+  let failure: Extract<ConfirmModelResolution, { ok: false }>;
+  if (isClaudeCliModel(model) && !canRunClaudeCliModel()) {
+    failure = { ok: false, reason: "cannot_run", model };
+  } else if (!isClaudeCliModel(model) && !hasKeyForModel(model, args.keys)) {
+    failure = { ok: false, reason: "no_key", model };
+  } else {
+    const family = confirmModelFamily(model);
+    if (family !== judgeFamily) {
+      return { ok: true, model, reasoningEffort: args.pick.reasoningEffort, family };
+    }
+    failure = { ok: false, reason: "same_family", model, family };
   }
-  const family = confirmModelFamily(model);
-  if (family === confirmModelFamily(args.judgeModel)) {
-    return { ok: false, reason: "same_family", model, family };
+
+  for (const [key, config] of Object.entries(AI_MODELS)) {
+    if ((config as { provider: string }).provider === "claude-cli") continue;
+    if (!hasKeyForModel(key, args.keys)) continue;
+    const family = confirmModelFamily(key);
+    if (family === judgeFamily) continue;
+    return {
+      ok: true,
+      model: key,
+      reasoningEffort: DEFAULT_REASONING_EFFORT,
+      family,
+      fellBackFrom: { model: failure.model, reason: failure.reason },
+    };
   }
-  return { ok: true, model, reasoningEffort: args.pick.reasoningEffort, family };
+  return failure;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,35 +216,22 @@ function wholeWordIn(text: string, name: string): boolean {
 }
 
 /**
- * The tool calls whose results the player is never shown (a hidden roll, the
- * campaign tool, a hidden clock's tick): their facts never reach a rewrite.
+ * The facts one confirmed finding hands the rewrite, in the turn's order. A
+ * tool result's fact is already its player-facing summary and a hidden result
+ * is no fact at all (facts.ts `resultLine`), so a judge's `fix` can never echo
+ * what the GM kept behind the screen either.
  */
-export function hiddenToolRefs(results: readonly JudgeToolResult[]): Set<string> {
-  const hidden = new Set<string>();
-  for (const r of results) {
-    const summary = publicSummary(
-      r as Parameters<typeof publicSummary>[0],
-      {},
-    );
-    if (summary === null) hidden.add(r.toolCallId);
-  }
-  return hidden;
-}
-
-/** The facts one confirmed finding hands the rewrite, in the turn's order. */
 export function rewriterFactsFor(
   judge: JudgeId,
   factIds: readonly string[],
   facts: readonly Fact[],
   narration: string,
-  hiddenRefs: ReadonlySet<string> = new Set(),
 ): Fact[] {
   const topics = REWRITER_TOPICS[judge];
   if (!topics) return [];
   const cited = new Set(factIds);
   return facts.filter((f) => {
     if (!cited.has(f.id) || !f.topic || !topics.includes(f.topic)) return false;
-    if (f.source.kind === "tool" && hiddenRefs.has(f.source.ref)) return false;
     // A person or place the narration does not name is not the rewrite's to introduce.
     if (f.topic === "person" || f.topic === "location") {
       return (f.names ?? []).some((n) => wholeWordIn(narration, n));
@@ -256,7 +276,6 @@ export async function confirmMajorFlags(args: {
   base: ObserverApiOptions;
   pick: { model: string; reasoningEffort: ReasoningEffort };
   fallbackModel: string;
-  hiddenRefs?: ReadonlySet<string>;
 }): Promise<ConfirmRun> {
   const candidates = majorFlagsInOrder(args.flags, args.settings, (t) =>
     args.rewritable.has(t),
@@ -289,6 +308,14 @@ export async function confirmMajorFlags(args: {
     return { confirmed: [], skipped, attempted: 0 };
   }
 
+  if (resolved.fellBackFrom) {
+    logger.action("Confirming judge: the pick cannot run here, another family stands in", {
+      pick: resolved.fellBackFrom.model,
+      why: resolved.fellBackFrom.reason,
+      using: resolved.model,
+      family: resolved.family,
+    });
+  }
   const confirmApi: ObserverApiOptions = {
     ...args.base,
     model: resolved.model,
@@ -332,7 +359,6 @@ export async function confirmMajorFlags(args: {
         finding.factIds,
         args.turn.facts,
         args.turn.narration,
-        args.hiddenRefs,
       ),
     });
   }

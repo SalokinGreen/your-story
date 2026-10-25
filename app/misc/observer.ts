@@ -367,6 +367,22 @@ export function settingsFor(
 }
 
 /**
+ * A copy of a config with every judge that rewrites turned down to Flag (still
+ * on, no longer allowed to correct the turn), and the rest as the player set
+ * them. A turn with no second judge to confirm a rewrite runs on this.
+ */
+export function flagOnlyRewritables(
+  settings: ObserverSettings | undefined,
+): ObserverSettings {
+  const out = {} as ObserverSettings;
+  for (const type of Object.keys(DEFAULT_OBSERVER_SETTINGS) as ObserverFlagType[]) {
+    const s = settingsFor(settings, type);
+    out[type] = REWRITABLE_FLAG_TYPES.has(type) ? { ...s, triggersReset: false } : s;
+  }
+  return out;
+}
+
+/**
  * True if the current config makes an automatic reset-and-retry (see
  * runObserver/generateStoryTurn) possible at all - i.e. at least one flag
  * type is both enabled and allowed to trigger a reset. Mirrors the gate

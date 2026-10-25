@@ -17,6 +17,7 @@
 import type { ObserverFlagType } from "../structs";
 import { extractVisibleText } from "../turnTimeline";
 import { runRung1 } from "./rung1";
+import { normalizeQuote, trimFragment } from "./combined";
 import type {
   ConfirmedFinding,
   JudgeStoryView,
@@ -36,7 +37,8 @@ export type FixPlanResult =
   | { ok: true; plan: FixPlanEntry[]; prose: string }
   | { ok: false; reason: string };
 
-const SEPARATOR_LINE = /^[ \t]*={3,}[ \t]*PROSE[ \t]*={3,}[ \t]*$/im;
+// A separator may carry markdown (a bold or heading mark) around it.
+const SEPARATOR_LINE = /^[ 	]*[*_`#>]*[ 	]*={3,}[ 	]*PROSE[ 	]*={3,}[ 	]*[*_`]*[ 	]*$/gim;
 const MAX_PLAN_ENTRIES = 12;
 /** A span shorter than this many words is too small to say whether it "survived". */
 const SURVIVAL_CHECK_MIN_WORDS = 4;
@@ -53,19 +55,46 @@ function normalize(text: string): string {
 }
 
 /**
+ * Whether a quoted span is in the text, read the way the judges' quotes are
+ * (combined.ts `normalizeQuote`: quote style, dashes, emphasis marks and case do
+ * not matter): an ellipsis skips words, and the pieces come in the text's order.
+ */
+function spanIn(span: string, text: string): boolean {
+  const haystack = normalizeQuote(text);
+  const fragments = span
+    .split(/…|\.{3}/)
+    .map((f) => trimFragment(normalizeQuote(f)))
+    .filter(Boolean);
+  if (fragments.length === 0) return false;
+  let from = 0;
+  for (const fragment of fragments) {
+    const at = haystack.indexOf(fragment, from);
+    if (at < 0) return false;
+    from = at + fragment.length;
+  }
+  return true;
+}
+
+/**
  * Splits a rewrite reply into its fix plan and its prose, and checks that every
  * quoted span is really in the original. A reply with no separator, no plan, a
  * plan that is not a list of entries, or a span that is not in the original is
  * rejected: the original text is then released with its flags.
  */
 export function parseFixPlan(content: string, original: string): FixPlanResult {
-  const match = SEPARATOR_LINE.exec(content);
-  if (!match) return { ok: false, reason: "the reply has no prose separator" };
+  const separators = [...content.matchAll(SEPARATOR_LINE)];
+  if (separators.length === 0) return { ok: false, reason: "the reply has no prose separator" };
+  // A second separator would put a line of the plan's format into the story.
+  if (separators.length > 1) {
+    return { ok: false, reason: "the reply has more than one prose separator" };
+  }
+  const match = separators[0];
   const planText = content.slice(0, match.index);
-  const prose = content.slice(match.index + match[0].length).trim();
+  const prose = content.slice((match.index ?? 0) + match[0].length).trim();
   if (!prose) return { ok: false, reason: "the reply has no prose after the separator" };
 
-  const open = planText.indexOf("[");
+  // Words before the plan are ignored: it starts at the first "[" that opens a list.
+  const open = planText.search(/\[\s*[{\]]/);
   const close = planText.lastIndexOf("]");
   if (open < 0 || close < open) return { ok: false, reason: "the reply has no fix plan" };
   let raw: unknown;
@@ -81,7 +110,6 @@ export function parseFixPlan(content: string, original: string): FixPlanResult {
     return { ok: false, reason: "the fix plan has too many entries" };
   }
 
-  const haystack = normalize(original);
   const plan: FixPlanEntry[] = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
@@ -90,7 +118,7 @@ export function parseFixPlan(content: string, original: string): FixPlanResult {
     const e = entry as Record<string, unknown>;
     const span = typeof e.span === "string" ? e.span.trim() : "";
     if (!span) return { ok: false, reason: "a fix plan entry has no span" };
-    if (!haystack.includes(normalize(span))) {
+    if (!spanIn(span, original)) {
       return { ok: false, reason: "a fix plan span is not in the original text" };
     }
     plan.push({
@@ -112,9 +140,12 @@ export function planFollowed(
 ): { ok: true } | { ok: false; reason: string } {
   const text = normalize(extractVisibleText(prose) || prose);
   for (const entry of plan) {
+    // A span with an ellipsis is a pattern, not words to look for.
+    if (/…|\.{3}/.test(entry.span)) continue;
     const span = normalize(entry.span);
     if (span.split(" ").length < SURVIVAL_CHECK_MIN_WORDS) continue;
-    if (normalize(entry.replacement) === span) continue;
+    // A replacement that keeps the span (it adds around it) is no failure.
+    if (normalize(entry.replacement).includes(span)) continue;
     if (text.includes(span)) {
       return { ok: false, reason: "a span the fix plan replaces is still in the prose" };
     }
@@ -174,19 +205,26 @@ export function recheckRewrite(args: {
   original: string;
   storyBefore: JudgeStoryView;
   storyAfter: JudgeStoryView;
+  /**
+   * What the confirmed findings are about. A line's keyword or a secret's key
+   * phrase the draft already had is excused (the finding is about something
+   * else), unless the finding being fixed is that line or that secret.
+   */
+  fixing?: { line?: boolean; secret?: boolean };
 }): { ok: true } | { ok: false; reason: string; hits: Rung1Hit[] } {
   const base = { storyBefore: args.storyBefore, storyAfter: args.storyAfter, results: [] };
-  const hits = runRung1({ ...base, prose: args.rewritten }).filter(
-    (h) => h.check === "line" || h.check === "secret_phrase" || h.check === "departed_person",
-  );
-  const hadBefore = new Set(
-    runRung1({ ...base, prose: args.original })
-      .filter((h) => h.check === "departed_person")
-      .map((h) => h.evidence),
-  );
-  const failed = hits.filter(
-    (h) => h.check !== "departed_person" || !hadBefore.has(h.evidence),
-  );
+  const kinds = (h: Rung1Hit) =>
+    h.check === "line" || h.check === "secret_phrase" || h.check === "departed_person";
+  const hits = runRung1({ ...base, prose: args.rewritten }).filter(kinds);
+  const keyOf = (h: Rung1Hit) =>
+    h.check === "departed_person" ? `d:${h.evidence}` : `${h.check}:${h.factIds.join(",")}`;
+  const hadBefore = new Set(runRung1({ ...base, prose: args.original }).filter(kinds).map(keyOf));
+  const failed = hits.filter((h) => {
+    if (!hadBefore.has(keyOf(h))) return true;
+    if (h.check === "line") return Boolean(args.fixing?.line);
+    if (h.check === "secret_phrase") return Boolean(args.fixing?.secret);
+    return false;
+  });
   return failed.length === 0
     ? { ok: true }
     : { ok: false, reason: `the rewrite fails a rung 1 check (${failed.map((h) => h.check).join(", ")})`, hits: failed };

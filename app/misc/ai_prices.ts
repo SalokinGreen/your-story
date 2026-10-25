@@ -3,6 +3,7 @@ import {
   isClaudeCliAvailablePlatform,
   isClaudeCliUsable,
 } from "@/app/misc/claudeCliModels";
+import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 
 export const AI_MODELS = {
   "Grok 4.5": {
@@ -1508,7 +1509,9 @@ const FAMILY_BY_VENDOR: Readonly<Record<string, string>> = {
 export function confirmModelFamily(modelKey: string): string {
   const key = resolveModelKeyAlias(modelKey);
   if (!Object.prototype.hasOwnProperty.call(AI_MODELS, key)) {
-    return `custom:${key}`;
+    // A custom model names its OpenRouter id ("vendor/model"): the vendor is the family.
+    const vendor = getCustomModelIfUUID(key)?.modelId?.split("/")[0]?.toLowerCase();
+    return vendor ? (FAMILY_BY_VENDOR[vendor] ?? vendor) : `custom:${key}`;
   }
   const config = AI_MODELS[key as AIModelKey] as unknown as AIModelConfig;
   switch (config.provider) {

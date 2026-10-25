@@ -253,7 +253,7 @@ export function planCalls(judges: readonly JudgeId[], facts: readonly Fact[]): J
 // Parsing and validating the verdicts
 // ---------------------------------------------------------------------------
 
-function normalizeQuote(text: string): string {
+export function normalizeQuote(text: string): string {
   return text
     .replace(/[‘’‛]/g, "'")
     .replace(/[“”]/g, '"')
@@ -265,7 +265,7 @@ function normalizeQuote(text: string): string {
 }
 
 /** A fragment without the quote marks and stray punctuation a judge wraps around it. */
-function trimFragment(fragment: string): string {
+export function trimFragment(fragment: string): string {
   return fragment.replace(/^[\s"'`.,;:!?-]+|[\s"'`.,;:!?-]+$/g, "");
 }
 

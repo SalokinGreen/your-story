@@ -206,6 +206,8 @@ export function getLayerSubscriptionFallbacks(): {
     ["Reflection", getReflectionModelOverride()],
     ["Director Assistant", getDirectorAssistantModelOverride()],
     ["Story Progress Observer", getStoryProgressObserverModelOverride()],
+    // Another family's model stands in (judges/confirm.ts resolveConfirmModel).
+    ["Rewrite confirmation", getRewriteConfirmModelOverride()],
   ];
   return layers
     .filter(([, o]) => o && isClaudeCliModel(o.modelKey))
