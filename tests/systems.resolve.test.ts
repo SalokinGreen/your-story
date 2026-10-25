@@ -64,7 +64,7 @@ describe("resolveSystem", () => {
 
   it("handles missing lore", () => {
     expect(resolveSystem({ lore: undefined as never, systemState: undefined }).usesSystemTools).toBe(false);
-    expect(BUILTIN_SYSTEMS.map((s) => s.id)).toEqual(["blood-and-bone"]);
+    expect(BUILTIN_SYSTEMS.map((s) => s.id)).toEqual(["blood-and-bone", "fantastic-realms"]);
   });
 
   it("names the four tools", () => {

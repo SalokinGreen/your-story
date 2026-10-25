@@ -381,6 +381,32 @@ The author: "I'm also not a fan of the default adventures. They just throw you i
 | 199 | "What should Grave Watcher's first day look like?" | **"Town, then the tower (Recommended)."** Founders' Day morning in Hollins Ferry: the diner, the crew, the paperwork, the keys to Tower Nine; the climb at dusk for the first watch. The green light in the Old Lot ends the first night instead of opening it. Rejected: straight to the tower. |
 | 200 | "How should I go about it?" | **"Build it now (Recommended)."** The answers are the plan; the new prose is read in the PR. |
 
+### Interview — Fantastic Realms, the second default system (2026-10-25)
+
+Design: [`fantastic-realms-design.md`](fantastic-realms-design.md).
+
+| # | question | decision |
+|---|---|---|
+| 201 | The author: "next I want us to work on the second default system: Fantastic Realms. A fantasy ttrpg inspired by EZD6, stone stop, tiny rpg, mythic bastion land, and legends of the mist." | **The author's rules, as given.** Words are power: a hero's feats (words or phrases) each add a d6 when they apply, on top of a base d6. The GM sets a DC from 1 (easy, no roll) to 6 (almost impossible); each die is compared to it; 1 hit is a weak hit, 2 a hit, 3+ a strong hit, each hit beyond 3 one magnitude stronger. Burning a feat is a grand display that can't be used again until a rest. There is one kind of rest, whose condition the world sets. Initiative is 1d6 + 1 per feat that helps get the edge. |
+| 202 | "When does a die count as a hit: when it equals or beats the DC, or only when it beats it?" | **"Equal or beat (Recommended)."** |
+| 203 | "How do characters get hurt, and what does a miss (0 hits) cost?" | **"Hearts."** A small count lost on misses and weak hits; at 0 the hero is down. Rejected: statuses as words; both. |
+| 204 | "How does burning a feat work?" | **"Auto-hit, die still rolls (Recommended)."** |
+| 205 | "Do enemies and other characters roll?" | **"Only players roll (Recommended)."** A foe is a DC and words; it hurts the hero through misses and weak hits. |
+| 206 | "How many hearts does a starting hero have, and what happens at 0?" | **"3, then 'down' (Recommended)."** At 0 the hero is out of the scene and the GM picks a cost; death only when the tone and stated stakes say so. A rest heals all hearts. |
+| 207 | "What does a starting hero have?" | **"4 feats (Recommended)."** A one-line concept and four feats. |
+| 208 | "How do heroes grow?" → "XP level multiplied by 1000"; asked to confirm the curve and the source | **XP, per level:** going from level N to N+1 costs (N+1) × 1,000 XP and the counter resets ("Yes, per level"). **"Treasures and enemies have xp they give for gathering or defeating. Quests too."** |
+| 209 | "What does a new level give?" | **"A new feat (Recommended)."** |
+| 210 | "What should the first release hold?" | **"Rules + a world + 1 starter (Recommended)."** |
+| 211 | "What should the first world be like?" | **"Many realms, many rests (Recommended)."** A crossroads of realms with different rest rules: a bright heroic realm, a folk frontier, a grim realm. |
+| 212 | The design's open points, as questions. "How does a foe's initiative work, since foes don't roll?" | **"DC + edge words (Recommended)."** |
+| 213 | "Is this XP scale right? Foes give DC × 50 (mook), × 200 (champion), × 1,000 (legend); treasure about its worth in gold; a finished quest 500–2,000." | **"Yes (Recommended)."** |
+| 214 | "Do levels ever raise a hero's maximum hearts?" | **"Every 3rd level."** Levels 3, 6, 9… also give +1 maximum heart. Rejected: never; a feat that is a heart. |
+| 215 | "Should the system's description name its inspirations?" | **"Yes, 'inspired by' (Recommended)."** |
+| 216 | After Codex's review of the design ([`research/codex-fantastic-realms-review-2026-10-25.md`](research/codex-fantastic-realms-review-2026-10-25.md)): "How much damage does each result do to a foe, and what does a hero lose on a miss or weak hit?" | **"1 / 1 / 2 / +1 (Recommended)."** To a foe: weak hit 1 (plus a cost to the hero), hit 1, strong 2, +1 per magnitude. To the hero: a miss costs 1 heart (2 against a harm word); a weak hit costs 1 only when the GM picks harm as its cost. |
+| 217 | "When a foe acts first in initiative, what happens, given that foes never roll?" | **"Threat, then you answer (Recommended)."** The foe makes its move and the heroes it targets roll to answer it against its DC. Rejected: a free hit. |
+| 218 | "When the party earns XP (a foe, a treasure, a quest), who gets it?" | **"Everyone, in full (Recommended)."** Rejected: split evenly; to who earned it. |
+| 219 | The design revised after Codex's review (`docs/fantastic-realms-design.md`) | **"Build it."** The design is approved; the implementation plan is [`fantastic-realms-plan.md`](fantastic-realms-plan.md). |
+
 ### The judges, back on (2026-10-25)
 
 The author: "Okay why did we turn the judges off? They were very useful for not much cost." Decision 187 had made the layer flag-only and switched five of the six judges off, after Codex found rewrites replacing read text, races and double mechanics; those bugs were fixed by the judge-layer build (decisions 188–189). Decisions 201–219 are the Fantastic Realms interview, on its own branch.

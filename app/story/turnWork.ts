@@ -103,6 +103,8 @@ function fateHeadline(text: string): string | null {
 
 const ROLL_TOOLS = new Set([
   "action_roll",
+  "feat_roll",
+  "initiative_roll",
   "formula_roll",
   "opposed_formula",
   "npc_roll",

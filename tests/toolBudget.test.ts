@@ -7,6 +7,8 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { buildGMStagePrompt, estimateTokens } from "@/app/misc/ai_staged";
 import type { StoryData } from "@/app/misc/structs";
+import { BUILTIN_SYSTEMS } from "@/app/misc/systems";
+import type { BuiltinSystem } from "@/app/misc/systems/types";
 import { DESIGN_FIXTURE, buildFixtureStory, warmTokenizer } from "./helpers/turnHarness";
 
 vi.setConfig({ testTimeout: 120_000 }); // the fixture story is slow to build
@@ -17,6 +19,18 @@ const MANUAL_DICE_EXTRA = 400; // ask_for_roll
 // offered only to stories that use a system (decision 79). Their own bound, so
 // the default list's budget is not loosened for them.
 const SYSTEM_TOOLS_EXTRA = 1_500; // measured 1,204 on 2026-10-22
+
+// Fantastic Realms is registered in slice 6; until then a stand-in with its
+// tool list measures what its stories will be offered.
+const FR_STAND_IN: BuiltinSystem = {
+  id: "fantastic-realms",
+  title: "Fantastic Realms (test stand-in)",
+  description: "",
+  packs: [],
+  starters: [],
+  meterSets: [],
+  tools: ["manage_meter", "manage_feats", "feat_roll", "initiative_roll", "award_xp", "take_rest"],
+};
 
 beforeAll(async () => {
   await warmTokenizer();
@@ -70,6 +84,28 @@ describe("the GM's tool list", () => {
     expect(extra).toBeLessThan(SYSTEM_TOOLS_EXTRA);
     // a system story's whole list still fits the default budget plus its own bound
     expect(estimateTokens(JSON.stringify(sys))).toBeLessThan(DEFAULT_LIST_BUDGET + SYSTEM_TOOLS_EXTRA);
+  });
+
+  it("a Fantastic Realms story's list stays inside the default budget plus the system bound", () => {
+    BUILTIN_SYSTEMS.push(FR_STAND_IN);
+    try {
+      const base = toolsFor(emptyStory());
+      const fr = toolsFor(
+        emptyStory({
+          systemState: { systemId: "fantastic-realms", sessionCount: 0, dedupKeys: [] },
+        } as Partial<StoryData>),
+      );
+      const names = fr.map((t) => t.function.name);
+      for (const n of FR_STAND_IN.tools ?? []) expect(names, n).toContain(n);
+      expect(names).not.toContain("action_roll");
+      const total = estimateTokens(JSON.stringify(fr));
+      const extra = total - estimateTokens(JSON.stringify(base));
+      console.log(`Fantastic Realms tools: +${extra} tokens, list ${total}`);
+      expect(extra).toBeLessThan(SYSTEM_TOOLS_EXTRA);
+      expect(total).toBeLessThan(DEFAULT_LIST_BUDGET + SYSTEM_TOOLS_EXTRA);
+    } finally {
+      BUILTIN_SYSTEMS.splice(BUILTIN_SYSTEMS.indexOf(FR_STAND_IN), 1);
+    }
   });
 
   it("is byte-identical across turns of the same story", () => {

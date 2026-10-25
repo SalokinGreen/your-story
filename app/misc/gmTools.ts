@@ -604,6 +604,40 @@ export interface ActionRollParams {
   reason: string;
 }
 
+// Fantastic Realms tools (systems/fantastic-realms; offered only to its stories)
+export interface ManageFeatsParams {
+  hero: string;
+  action: "add" | "rename" | "remove";
+  feat: string;
+  new_wording?: string;
+}
+
+export interface FeatRollParams {
+  hero: string;
+  feats: string[]; // feats that apply; the pool is 1 + feats.length d6
+  dc: number; // 2-6
+  burn?: string; // one of `feats`: one sure success, spent until a rest
+  reason: string;
+  dice?: number[]; // manual dice mode: one face per die, 1 + feats.length
+}
+
+export interface InitiativeRollParams {
+  heroes: { hero: string; edge_feats?: string[] }[];
+  /** Manual dice mode only: the d6 each hero reported, in the order of `heroes`. */
+  dice?: number[];
+}
+
+export interface AwardXpParams {
+  amount: number;
+  source: string;
+  heroes?: string[];
+}
+
+export interface TakeRestParams {
+  heroes?: string[];
+  realm?: string;
+}
+
 // ============================================
 // NPC MANAGEMENT INTERFACES
 // ============================================
@@ -684,6 +718,11 @@ export type GMToolParams =
   | { name: "manage_track"; params: ManageTrackParams }
   | { name: "end_session"; params: EndSessionParams }
   | { name: "action_roll"; params: ActionRollParams }
+  | { name: "manage_feats"; params: ManageFeatsParams }
+  | { name: "feat_roll"; params: FeatRollParams }
+  | { name: "initiative_roll"; params: InitiativeRollParams }
+  | { name: "award_xp"; params: AwardXpParams }
+  | { name: "take_rest"; params: TakeRestParams }
   // Combat tools
   | { name: "start_combat"; params: StartCombatParams }
   | { name: "add_combatant"; params: AddCombatantUnifiedParams }
@@ -1947,6 +1986,106 @@ const actionRollTool: ToolSchema = {
   },
 };
 
+const manageFeatsTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "manage_feats",
+    description: `Add, rename or remove a hero's feat. A rename keeps the feat's burn.`,
+    parameters: {
+      type: "object",
+      properties: {
+        hero: { type: "string" },
+        action: { type: "string", enum: ["add", "rename", "remove"] },
+        feat: { type: "string", description: "The feat's wording (add) or current wording" },
+        new_wording: { type: "string", description: "rename: the new wording" },
+      },
+      required: ["hero", "action", "feat"],
+    },
+  },
+};
+
+const featRollTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "feat_roll",
+    description: `Roll 1 + one d6 per feat against a DC. Each die at or above the DC is a success: 0 miss, 1 weak hit, 2 hit, 3 strong hit, +1 magnitude per extra. A burned feat is one sure success and stays spent until a rest.`,
+    parameters: {
+      type: "object",
+      properties: {
+        hero: { type: "string" },
+        feats: { type: "array", items: { type: "string" }, description: "The hero's unburned feats that apply, once each" },
+        dc: { type: "number", description: "2-6" },
+        burn: { type: "string", description: "One of feats, to burn it" },
+        reason: { type: "string" },
+        dice: { type: "array", items: { type: "number" }, description: "Manual dice: the faces reported, 1 + feats" },
+      },
+      required: ["hero", "feats", "dc", "reason"],
+    },
+  },
+};
+
+const initiativeRollTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "initiative_roll",
+    description: `Roll each hero's initiative: 1d6 + 1 per edge feat. Foes' numbers are their DC + edge words, no roll.`,
+    parameters: {
+      type: "object",
+      properties: {
+        heroes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              hero: { type: "string" },
+              edge_feats: { type: "array", items: { type: "string" } },
+            },
+            required: ["hero"],
+          },
+        },
+        dice: {
+          type: "array",
+          items: { type: "integer" },
+          description: "Manual dice mode only: each hero's reported d6, in order.",
+        },
+      },
+      required: ["heroes"],
+    },
+  },
+};
+
+const awardXpTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "award_xp",
+    description: `Give XP in full to each hero listed (default all). Names its source; a hero's repeated source is refused. Reports levels and hearts gained.`,
+    parameters: {
+      type: "object",
+      properties: {
+        amount: { type: "number" },
+        source: { type: "string", description: "The foe, treasure or quest" },
+        heroes: { type: "array", items: { type: "string" } },
+      },
+      required: ["amount", "source"],
+    },
+  },
+};
+
+const takeRestTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "take_rest",
+    description: `Heal all hearts and un-burn every feat for the heroes listed (default all). Returns the realm's rest condition.`,
+    parameters: {
+      type: "object",
+      properties: {
+        heroes: { type: "array", items: { type: "string" } },
+        realm: { type: "string", description: "Records the realm the story is in" },
+      },
+    },
+  },
+};
+
 // ============================================
 // NPC MANAGEMENT TOOL SCHEMAS
 // ============================================
@@ -2158,6 +2297,12 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   manageTrackTool,
   endSessionTool,
   actionRollTool,
+  // Fantastic Realms tools: offered only to its stories
+  manageFeatsTool,
+  featRollTool,
+  initiativeRollTool,
+  awardXpTool,
+  takeRestTool,
   // Combat tools
   startCombatTool,
   addCombatantTool,

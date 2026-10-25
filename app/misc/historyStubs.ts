@@ -53,6 +53,8 @@ const KEEP_WHOLE_TOOLS = new Set([
   "ask_question",
   // Rolls with a verdict the GM must still see in later turns (decision 90).
   "action_roll",
+  "feat_roll",
+  "initiative_roll",
   "manage_track",
 ]);
 

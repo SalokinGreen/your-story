@@ -59,6 +59,11 @@ export const TOOL_LABELS: Record<string, string> = {
   manage_track: "Updating a track",
   end_session: "Ending the night",
   action_roll: "Rolling the action",
+  manage_feats: "Updating feats",
+  feat_roll: "Rolling the feats",
+  initiative_roll: "Rolling initiative",
+  award_xp: "Awarding experience",
+  take_rest: "Resting",
 
   // Goals / threads
   create_goal: "Creating goal",

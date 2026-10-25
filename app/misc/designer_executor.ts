@@ -64,7 +64,7 @@ export interface AdventureDraft {
   characterSheetTemplate?: CharacterSheetTemplate;
   // The hand switch for the meter, track, session and action-roll tools
   // (decision 79). Unset means "derive it from the notes imported".
-  systemState?: Pick<SystemState, "usesSystemTools" | "setting">;
+  systemState?: Pick<SystemState, "usesSystemTools" | "setting" | "systemId">;
   // Carried through untouched, never edited by a Designer tool: a built-in
   // starter opened in the Designer ("Open a copy") has meters and tracks
   // (the world's Heat, the cohort's objectives) that a draft otherwise has
@@ -568,16 +568,21 @@ export function executeDesignerTools(
  * `undefined` is Automatic. Only `usesSystemTools` changes; the setting a
  * built-in starter carries (E5, "grave-watch") is kept, or a copy opened in
  * the Designer would lose it and its stories would read as Europe by Night.
+ * The recorded system (`systemId`) is kept the same way, so a copy that also
+ * imports another system's notes still runs the system it was made for.
  */
 export function withSystemToolsSwitch(
   current: AdventureDraft["systemState"],
   usesSystemTools: boolean | undefined,
 ): AdventureDraft["systemState"] {
-  const setting = current?.setting;
+  const kept = {
+    ...(current?.setting !== undefined ? { setting: current.setting } : {}),
+    ...(current?.systemId !== undefined ? { systemId: current.systemId } : {}),
+  };
   if (usesSystemTools === undefined) {
-    return setting !== undefined ? { setting } : undefined;
+    return Object.keys(kept).length > 0 ? kept : undefined;
   }
-  return { usesSystemTools, ...(setting !== undefined ? { setting } : {}) };
+  return { usesSystemTools, ...kept };
 }
 
 export function draftToAdventure(draft: AdventureDraft): Partial<Adventure> {
@@ -599,12 +604,16 @@ export function draftToAdventure(draft: AdventureDraft): Partial<Adventure> {
       ? { progressTracks: draft.progressTracks }
       : {}),
     ...(draft.systemState?.usesSystemTools !== undefined ||
-    draft.systemState?.setting !== undefined
+    draft.systemState?.setting !== undefined ||
+    draft.systemState?.systemId !== undefined
       ? {
           systemState: {
             usesSystemTools: draft.systemState.usesSystemTools,
             ...(draft.systemState.setting !== undefined
               ? { setting: draft.systemState.setting }
+              : {}),
+            ...(draft.systemState.systemId !== undefined
+              ? { systemId: draft.systemState.systemId }
               : {}),
             sessionCount: 0,
             dedupKeys: [],
@@ -664,12 +673,16 @@ export function adventureToDraft(adventure: Partial<Adventure>): AdventureDraft 
       ? { progressTracks: story.progressTracks }
       : {}),
     ...(story.systemState?.usesSystemTools !== undefined ||
-    story.systemState?.setting !== undefined
+    story.systemState?.setting !== undefined ||
+    story.systemState?.systemId !== undefined
       ? {
           systemState: {
             usesSystemTools: story.systemState.usesSystemTools,
             ...(story.systemState.setting !== undefined
               ? { setting: story.systemState.setting }
+              : {}),
+            ...(story.systemState.systemId !== undefined
+              ? { systemId: story.systemState.systemId }
               : {}),
           },
         }

@@ -10,6 +10,26 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Fantastic Realms (decisions 201–219)
+
+Seen in the browser preview: the Library lists the system, its two packs and
+*Wolfwillow Crossing*; a started story opens on the welcome; the Meters panel
+shows a hero's Hearts, Level, XP and feat chips with a burned feat struck
+through (state written by hand). Never played against a model (the author's
+key):
+
+- **Play Wolfwillow Crossing to the first fight.** Pick a preset, Quick setup,
+  approve the card. Expected: during setup the GM calls `manage_meter
+  create_set "Fantastic Realms hero"` and `manage_feats add` four times for the
+  hero (Debug Logs), the Notes page then shows the hero's meters and feats, the
+  opening is the Lantern Eve arrival, and a roll is a `feat_roll` naming feats
+  and a DC (never `formula_roll` or `action_roll`). Burn a feat: the chip
+  strikes through and a later `feat_roll` naming it is refused. Beat a foe:
+  `award_xp` credits every hero, and the same source a second time is refused.
+  Failure looks like: the GM rolling with `formula_roll`, or "Unknown tool"
+  errors (then the story did not resolve to the system: check
+  `systemState.systemId` in the Story Editor).
+
 ## 2026-10-25 — Judges on, turns held (decisions 220–221, 237, 240)
 
 Built and unit-tested (the held turn's callbacks, the phases, the rewrite
