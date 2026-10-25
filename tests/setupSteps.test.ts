@@ -227,13 +227,13 @@ describe("the gate's words name the next step and player", () => {
     const s = story({ mode: "full", covered: { table: ["setting", "tone", "campaign"], players: { solo: ["kind", "archetype", "stats", "vow"] } } }, [bbLore()]);
     const p = getSetupProgress(s);
     expect(setupEngineLine(p.next, p.creation)).toBe(
-      "(Let's finish setting up first: next is Connections (Nik).)",
+      "Next up: Connections (Nik). Anything you want to tell me first? Or just say go on.",
     );
   });
 
-  it("the old steps' words are unchanged", () => {
+  it("the line for a step without a creation step hands the floor back", () => {
     expect(setupEngineLine("concept")).toBe(
-      "(Let's finish setting up first: next is a few questions about the game.)",
+      "Next up: a few questions about the game. Anything you want to tell me first? Or just say go on.",
     );
     expect(setupGateMessage("character")).toContain("character_sheet");
   });
@@ -272,5 +272,17 @@ describe("pre-made characters", () => {
     expect(creationTotal(couch)).toBe(16); // 1 cohort + 3 world + 12 x Bo
     expect(getCreationProgress(couch).missing.every((m) => m.playerId !== "a")).toBe(true);
     expect(creationTotal(story({ mode: "quick", premadeFor: ["solo"] }))).toBe(2);
+  });
+});
+
+describe("setupEngineLine hands the floor back (decision 195)", () => {
+  it("asks before the sheet and the plan, and offers go on", () => {
+    expect(setupEngineLine("character")).toBe(
+      "Next up: your character sheet. Anything you want me to know before I write it? Or just say go on.",
+    );
+    expect(setupEngineLine("campaign")).toContain("Or just say go on.");
+    expect(setupEngineLine("start_game")).toBe(
+      "Everything's set. Say go on and we'll start.",
+    );
   });
 });

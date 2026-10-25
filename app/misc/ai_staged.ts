@@ -175,14 +175,37 @@ export const GM_STAGE_MIN_BUDGET = 4000;
 /**
  * The max_tokens a GM stage round actually requests: the user's Response
  * Length (customMaxOutput), capped by the model's own output limit.
+ * `multiplier` raises it for the rest of a turn after a round was cut off
+ * with nothing usable (roundCutOffEmpty, decision 196); the model's limit
+ * still caps it.
  */
 export function getGMStageOutputTokens(
   customMaxOutput: number | undefined,
   modelName: string,
+  multiplier = 1,
 ): number {
   return Math.min(
-    customMaxOutput || GM_STAGE_DEFAULT_OUTPUT,
+    (customMaxOutput || GM_STAGE_DEFAULT_OUTPUT) * multiplier,
     getModelConfig(modelName).maxOutputTokens || 4000,
+  );
+}
+
+/**
+ * True when the provider cut a GM round off at max_tokens before it gave the
+ * turn anything to use: no visible words, and no tool call whose arguments
+ * finished (a cut-off one carries `argsTruncated`, providerCall.ts). A model
+ * that thinks at a heavy effort can spend the whole Response Length thinking,
+ * since thinking counts against max_tokens (decision 196).
+ */
+export function roundCutOffEmpty(
+  finishReason: string | undefined,
+  visibleText: string,
+  toolCalls: readonly { argsTruncated?: boolean }[],
+): boolean {
+  return (
+    finishReason === "length" &&
+    !visibleText.trim() &&
+    toolCalls.every((tc) => tc.argsTruncated === true)
   );
 }
 
