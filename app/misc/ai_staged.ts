@@ -1364,7 +1364,7 @@ function creationRules(
   );
   if (mode === "full") {
     lines.push(
-      "- Table and world steps (setting, tone, style, tone_safety, campaign, cohort) may be batched in one `ask_question`, each under its own tag. A character step (name and look, history, drives, abilities) is asked one at a time: never two different character tags in one call, and never mixed with another. Several questions under the same tag are fine (all must be answered).",
+      "- Table and world steps (setting, tone, style, tone_safety, campaign or campaign_review, cohort) may be batched in one `ask_question`, each under its own tag. A character step (name and look, history, drives, abilities) is asked one at a time: never two different character tags in one call, and never mixed with another. Several questions under the same tag are fine (all must be answered).",
       "- Always give `intro`: one or two sentences on what is being chosen and why it matters. Give 2-4 options whose descriptions say what each does in play, mechanics and flavour.",
       "- Creative steps (the table, world, name and look, history, drives): offer 2-4 suggestions and set allow_custom true. Tone is a multi_select.",
       "- With several players, a player step carries target_player_name (the player it is for) on every item; table steps are untargeted. Table steps first, then each player in turn.",
@@ -1511,6 +1511,11 @@ function campaignSetupGuide(story: StoryData): string {
       ? story.campaign
       : undefined;
   const lines: string[] = ["## CAMPAIGN (build it with the `campaign` tool)"];
+  if (record?.origin === "starter") {
+    lines.push(
+      "This adventure shipped with its campaign already built. Do not rebuild it: read it (`campaign` read), review its public parts with the player (the `campaign_review` step), and change only what they ask for. Its secrets, dooms and what people hide are yours; keep them off the card and out of the table talk.",
+    );
+  }
   if (!record?.style) {
     lines.push(
       `Pick the style first (offer the ones that fit; the player may name another): ${CAMPAIGN_STYLES.map((s) => `${s} (${STYLE_SPECS[s].blurb})`).join("; ")}. Record it: \`campaign\` add, part "style", data {"style": "<one of those>"}.`,

@@ -296,7 +296,7 @@ function executeWrite(story: StoryData, p: CampaignParams, toolCallId: string): 
   switch (part) {
     case "style": {
       rec.style = (value as { style: CampaignStyle }).style;
-      delete rec.origin;
+      if (rec.origin === "migrated") delete rec.origin;
       return result(toolCallId, p, true, `style set to ${rec.style}`, { part });
     }
     case "pitch": {

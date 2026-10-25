@@ -771,6 +771,18 @@ report's §11.3. The ones that shape play:
   Night) comes from the starter's template and is kept by the Designer's
   draft; only a Europe by Night story is given the cross-Europe notes on
   load. `tests/systems.starters.test.ts` holds both starters.
+  **Every starter ships a built campaign record** (slice 5 of the campaign
+  format, decision 224; `tests/campaign.starters.test.ts`): *The Hollow Hour*
+  is a `mystery` (`hollowHourCampaign.ts`: a hunter front and a "Margot loses
+  patience" front, two secrets with three clues each, Runa, Callum and Margot
+  as people, four endings), *Grave Watcher* a `slice_of_life`
+  (`grave-watcher/campaign.ts`: a season clock on `session`, the Tally and
+  Tower Six as slow manual fronts, Ashcombe Holdings with a faction clock,
+  twelve regulars with wants, three secrets with four clues, six locations,
+  the three Ferry Day endings) and *The Last Resort* a `sandbox`
+  (`last-resort/campaign.ts`: four factions, the Boarder and the bank as
+  fronts, four secrets, six locations, the four endings). Blood & Bone has no
+  `take_rest`, so none of its clocks use `rest`.
   **The core's "Reading abilities" line** (decisions 174–177, after Codex
   reviewed the whole book on 2026-10-24) is how every ability is read:
   non-players never roll (an ability that makes one Face Danger stops a
@@ -822,7 +834,19 @@ report's §11.3. The ones that shape play:
   Crossroads (Aurelane, Larkenfell, Gloamreach, each with its own rest); the
   starter is *Wolfwillow Crossing*, an arrival in a Larkenfell village on
   Lantern Eve, which copies every realm (a starter's story is seeded as already
-  offered every note, so the loader would never add one).
+  offered every note, so the loader would never add one). Its campaign is an
+  `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
+  Week, the barrow king's front (a hidden clock on `rest`) and the goblins'
+  flight (a visible clock on `miss`), two secrets with three clues each, and
+  the seven village people as the starter's NPCs (`people.ts`).
+  **A shipped record is `origin: "starter"`** (`starterKit.ts` builds them,
+  with fixed ids): session zero then replaces the `campaign` step with
+  `campaign_review` (`setupSteps.ts`; the GM summarises the public parts and
+  applies the player's changes, never rebuilding), words the `style` and
+  `tone_safety` hints as confirmations, and `campaignSetupGuide` says the
+  campaign shipped built. A style edit keeps the mark (only `"migrated"` is
+  dropped by one). The starters' "Running it" notes no longer tell the GM to
+  write a plan.
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9
   chaos factor) and the 45 **built-in** Mythic element tables. The
   adventure's own tables are `StoryLore` notes with `type: "table"` that name
@@ -897,7 +921,8 @@ report's §11.3. The ones that shape play:
   block. A story with no record is byte-identical to before
   (`tests/campaign.oldSaves.test.ts`). The Designer writes the record too
   (slice 4, below), and the GM builds it in session zero (slice 3, "Session
-  zero" below). The starters and the player view are later slices.
+  zero" below). The starters ship records (slice 5, above); the player view is
+  a later slice.
 - `manage_timer` — countdown timers. **On a story with no campaign record,
   `auto_advance` timers never tick (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
   behind `end_gm_thinking`) and was deleted on 2026-10-23 (decision 128).

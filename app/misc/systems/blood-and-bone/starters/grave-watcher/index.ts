@@ -11,6 +11,7 @@ import { createMeter, createTrack } from "../../../../metersAndTracks";
 import type { BuiltinAdventure, BuiltinNote } from "../../../types";
 import { BLOOD_AND_BONE_SHEET_TEMPLATE } from "../../sheet";
 import { builtinToLore, ownWorldRulesNotes } from "../shared";
+import { graveWatcherCampaign } from "./campaign";
 import { GW_REGULARS_NOTE, GW_REGULARS_NPCS, GW_VISITORS_NOTES } from "./people";
 import { GW_PRESETS, GW_ROSTER_NOTE } from "./roster";
 import { GW_TOWN_TABLES } from "./townTables";
@@ -81,6 +82,7 @@ export function buildGraveWatcher(packNotes: BuiltinNote[]): BuiltinAdventure {
       goals: [],
       presets: GW_PRESETS,
       sessionZeroActive: true,
+      campaign: graveWatcherCampaign(),
       systemState: { sessionCount: 0, dedupKeys: [], setting: "grave-watch" },
       meters: [unrest()],
       progressTracks: [

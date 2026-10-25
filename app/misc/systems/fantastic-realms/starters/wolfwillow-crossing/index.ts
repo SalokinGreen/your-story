@@ -12,6 +12,8 @@ import { builtinToLore } from "../../../blood-and-bone/starters/shared";
 import { FANTASTIC_REALMS_SHEET_TEMPLATE } from "../../sheet";
 import { WOLFWILLOW_NOTES } from "./notes";
 import { WOLFWILLOW_PRESETS } from "./heroes";
+import { wolfwillowCampaign } from "./campaign";
+import { WOLFWILLOW_NPCS } from "./people";
 
 export const WOLFWILLOW_CROSSING_ID = "builtin:fantastic-realms:wolfwillow-crossing";
 
@@ -66,10 +68,11 @@ export function buildWolfwillowCrossing(packNotes: BuiltinNote[]): BuiltinAdvent
       chapters: [],
       scene: { parts: [] },
       lore,
-      npcs: [],
+      npcs: WOLFWILLOW_NPCS,
       goals: [],
       presets: WOLFWILLOW_PRESETS,
       sessionZeroActive: true,
+      campaign: wolfwillowCampaign(),
       systemState,
     },
     characterSheetTemplate: createCharacterSheetTemplate(FANTASTIC_REALMS_SHEET_TEMPLATE),

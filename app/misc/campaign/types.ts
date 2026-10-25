@@ -144,8 +144,8 @@ export interface EndState {
 
 export interface CampaignRecord {
   version: 1;
-  /** "migrated" on a record the timer migration made and nothing else has. */
-  origin?: "migrated";
+  /** "migrated" on a record the timer migration made and nothing else has; "starter" on one a built-in starter shipped (session zero reviews it). */
+  origin?: "migrated" | "starter";
   style?: CampaignStyle;
   pitch?: { premise: string; tone: string[] };
   safety?: { lines: SafetyItem[]; veils: SafetyItem[] };
