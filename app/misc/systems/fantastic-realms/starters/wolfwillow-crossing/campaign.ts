@@ -152,7 +152,7 @@ export function wolfwillowCampaign(): CampaignRecord {
         id: "sec_ww_king",
         title: "The king under Greyhill",
         truth:
-          "Hollin Greycrown, a king buried alive by his own people, lies in the barrow on Greyhill and is waking. The new dam at Oakhallow Mill has changed the water, and the river no longer fills the barrow's moat. The Redthistle goblins have always known he was there, and are fleeing south from his stirring. He can be fought, laid to rest by giving him back his name and a funeral, or bargained with.",
+          "Hollin Greycrown, a king buried alive by his own people, lies in the barrow on Greyhill and is waking. The new dam at Oakhallow Mill has changed the water, and the river no longer fills the barrow's moat. The Redthistle goblins have always known he was there, and are fleeing south from his stirring. He is the season's legend (FR — Legends calls him the Barrow King and leaves his name lost; here it is Hollin Greycrown). He can be fought, laid to rest by giving him back his name, his oath and a funeral, or bargained with; the oath spoken aloud lowers his DC by 1 for a scene.",
         keyPhrases: ["Hollin", "Greycrown", "king"],
         clues: [
           [
@@ -263,7 +263,7 @@ export function wolfwillowCampaign(): CampaignRecord {
       [
         "bt_ww_3",
         "Stolen Things",
-        "Sheep missing, a cart gone, a farmer's boy lost for a night. Tracks lead into the Hushwood, and the hedge-folk send a polite message.",
+        "Sheep missing, a cart gone, a farmer's boy lost for a night. Tracks lead into the Hushwood, and the hedge-folk send a polite message. The trail is a journey: a three-day tally challenge, route DC 3, with Supplies from the \"Fantastic Realms party\" set (FR — Travel).",
       ],
       [
         "bt_ww_4",
@@ -278,7 +278,7 @@ export function wolfwillowCampaign(): CampaignRecord {
       [
         "bt_ww_6",
         "Greyhill",
-        "The barrow opens on the night of the last lantern. Wights, then Hollin Greycrown himself, who can be fought, laid to rest by name, or bargained with.",
+        "The barrow opens on the night of the last lantern. Wights, then Hollin Greycrown himself, the season's legend (FR — Legends, The Barrow King: DC 6 and 6 hearts, DC 5 at 4 hearts, DC 4 at 2). He can be fought, laid to rest by name, oath and funeral, or bargained with.",
       ],
       [
         "bt_ww_7",
