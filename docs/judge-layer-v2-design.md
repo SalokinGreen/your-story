@@ -1,6 +1,8 @@
 # The judge layer, version 2 — design
 
-**Status:** design, for the author's review. Not approved for building.
+**Status:** design, revised after Codex's review
+([`research/codex-campaign-judges-review-2026-10-25.md`](research/codex-campaign-judges-review-2026-10-25.md);
+its findings are answered in §11), for the author's go. Not approved for building.
 Decisions 220–221 (the judges on, output held; on branch `claude/judges-on`)
 and 226–229 (`docs/decisions.md`). Research:
 [`research/ai-supervision-2026-10-25.md`](research/ai-supervision-2026-10-25.md)
@@ -39,12 +41,12 @@ calls against rung 0, every turn, at no cost:
 
 | Check | What it catches |
 |---|---|
-| **Rules adherence** (per system, declared like turn-end checks, decision 183) | Fantastic Realms: a foe's hearts changed by a different amount than the result's damage table says; a burned feat narrated as used. Blood & Bone: Exposure or Heat moved without the move that moves it. General: a meter written outside its range (already refused). |
+| **Rules adherence** (per system, as declared **event contracts**, §11.2) | Only what a tool result can prove. Fantastic Realms: a `feat_roll` naming a foe target whose hearts were then changed by a different amount than its result's damage. Everything without a causal link (Blood & Bone's Exposure, which fiction may move) is advisory, a flag, never a re-ask. |
 | **Dead or departed people** | The existing consistency check, extended to campaign people. |
 | **Lines** | A line's keywords in the narration. Lines are written with keywords at session zero; the GM is asked for them. |
 | **Secret phrases** | Any unrevealed secret's key phrases (3–6 words, from the record) in the narration before it is revealed. |
 | **Pacing counters** | Turns since a clock last moved; turns since each player was addressed (couch and party); repeated phrases across recent turns (the existing `findRepeatedPhrases`). |
-| **Tool-usage gaps** (deterministic first) | A scene change in the prose with no `increment_scene`; an uncertain outcome with no roll, detected by the existing roll gate. |
+| **Tool-usage gaps** | A scene change and an "uncertain outcome" both need interpretation, so they are **heuristics**, not verified violations (§11.3). They flag, and only re-ask where the existing gates already do (combat, challenges, high stakes). |
 
 **Rung 2: re-ask the GM.** A process fix, inside the turn, before the text
 is final:
@@ -130,8 +132,12 @@ Settings → AI → Judges lists every judge with Off / Flag / Rewrite (where
 allowed) and sensitivity, and its measured accuracy once the labelled set has
 run (§7).
 
-The turn's details show each flag with its evidence quote. "Undo revision"
-stays.
+Findings are split in two (§11.4):
+- **Private findings** (evidence quotes, secret leaks, pacing) go to the Debug
+  Logs and the GM's next live block, never to the player.
+- **Public notices** go to the turn's details and say only that the turn was
+  checked or revised, with "Undo revision". A removed secret leak is never
+  quoted to anyone but the logs.
 
 ## 7. Measuring: the labelled turn set (decision 229)
 
@@ -173,7 +179,10 @@ The rest of version 1 is kept:
 - "Undo revision";
 - the hold (decision 221).
 
-The background wave already only flags (221).
+**Decision 221 is a prerequisite, not a current fact.** Its build, on
+`claude/judges-on`, must land first. It holds the text, has the background
+wave only flag, and covers inline narration, the continuation, read-aloud and
+party delivery. A test asserts that no background path rewrites.
 
 ## 9. Slices (for the implementation plan)
 
@@ -197,6 +206,100 @@ The background wave already only flags (221).
 Slices 1–2 depend on the campaign record (lines, veils, secrets and people)
 for their facts. They can start with today's NPCs, sheet and notes, and
 widen when the record lands.
+
+## 11. Revised after Codex's review
+
+Codex's findings 4, 6, 7, 10 and 11, and the judge half of 12, are answered
+here.
+
+### 11.1 The turn, in order
+
+```
+GM rounds --> tools execute (clocks tick, facts recorded)
+   |
+   +- rung 1 checks (code, on the GM's final round)
+   |     +- a verified, tool-fixable violation? --> one re-ask round (rung 2)
+   |                                               (shares the gates' round budget;
+   |                                                never re-runs executed dice)
+   v
+narration (allowlisted context, campaign design 14.1) -- text held (221)
+   |
+   +- combined judge call (rung 3), only judges whose preconditions hold
+   |     +- a major, rewritable finding with facts --> confirming judge
+   |           +- agrees --> rewrite with the facts --> re-validated by rung 1
+   v
+release once --> the background wave: flags only
+```
+
+### 11.2 Event contracts (finding 4)
+
+A system declares checkable contracts on `BuiltinSystem`, as it declares
+turn-end checks:
+`{ id, when: { tool, resultType }, requires: { tool, match }, message }`.
+
+**The Fantastic Realms example.**
+- **When:** a `feat_roll` with a `target` (a new optional field naming the
+  foe) and a hit tier.
+- **Requires:** a meter change on that target, in this turn, equal to the
+  damage.
+
+**What does not trip it:**
+- A burn on the current roll is legitimate.
+- A clamped meter write is not a violation.
+
+**When it trips** (a verified violation): one re-ask.
+**What has no contract:** the semantic judges look at it as advisory.
+
+### 11.3 Facts with provenance (finding 10)
+
+Every fact handed to a judge or a rewriter carries an id, its source (a tool
+result id, a record part id, the sheet, an NPC id) and when it held (before
+the turn or after it).
+
+**Verified violations** are rung-1 hits backed by a tool result. Only these
+re-ask. **Heuristics** (a scene change, an item from a free-form sheet, an
+uncertain outcome) only flag or feed a judge.
+
+NPCs have no canonical location or ownership today. World consistency uses
+only status and the record's location links until they do.
+
+### 11.4 Public and private (finding 6)
+
+The split is in §6. The party phones and online guests get only public
+notices. `buildPlayerView` never receives findings.
+
+### 11.5 The combined call, the confirmation and the rewrite (finding 11)
+
+**The combined call's reply** is keyed JSON:
+`{ "<judgeId>": { severity, evidence, factIds, fix } }`. A missing key or
+malformed JSON counts as "unknown" for that judge (no flag), and is logged.
+
+**Agreement.** The confirming judge is asked the same rubric for that one
+finding. It agrees when it also says major and quotes overlapping evidence.
+
+**Priority.** When several majors land, the order is:
+1. safety (lines and veils);
+2. secret leak;
+3. outcome;
+4. world consistency;
+5. agency;
+6. length.
+
+One rewrite addresses them all, handed every confirmed finding's facts.
+
+**The budget.** Per turn:
+- at most one re-ask round;
+- one combined judge call;
+- one confirmation per rewritable finding, at most two;
+- one rewrite.
+
+**The rewrite** is re-checked by rung 1 and `validateRewriteResponse`. If it
+fails either, the original is released with its flags. Executed dice and
+state are never re-run.
+
+**The cost.** The expected cost is about one Haiku call per turn, at roughly
+2–4k input tokens with the facts. A rewrite turn adds a confirmation and a
+rewrite on the narration model. The plan measures it with the cost ledger.
 
 ## 10. Settled
 
