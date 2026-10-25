@@ -12,6 +12,11 @@ on:
 
 env:
   NODE_VERSION: "22"
+  # The sync Worker's address, baked into every native build (it also takes
+  # feedback). A public repository variable (Settings > Variables), not a
+  # secret: it ends up in the shipped app either way. Unset, the build has no
+  # feedback and no sync. The app version comes from package.json.
+  NEXT_PUBLIC_SYNC_API_URL: ${{ vars.NEXT_PUBLIC_SYNC_API_URL }}
 
 permissions:
   contents: write

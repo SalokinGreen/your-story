@@ -45,6 +45,8 @@ import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/sessio
 import type { MPBackend } from "../misc/multiplayer/types";
 import { useBackHandler } from "@/app/misc/useBackHandler";
 import { saveFile } from "@/app/misc/saveFile";
+import { feedbackAvailable } from "@/app/misc/feedbackClient";
+import { openFeedback } from "@/app/misc/feedbackLauncher";
 
 interface MenuProps extends StoryData {
   storyDbId: string | null;
@@ -733,6 +735,24 @@ export default function MenuPage({
           <DynamicIcon name="Settings" className="w-4 h-4 shrink-0 text-ys-muted" />
           <span className="flex-1 min-w-0 truncate">Settings</span>
         </button>
+        {feedbackAvailable() && netSession?.role !== "guest" && (
+          <button
+            type="button"
+            onClick={() => {
+              // Close the sheet first, or it would stay over the form.
+              onClose();
+              openFeedback({ kind: "app", target: "app" });
+            }}
+            className={ROW}
+            title="Tell the developer what works and what does not"
+          >
+            <DynamicIcon
+              name="MessageSquare"
+              className="w-4 h-4 shrink-0 text-ys-muted"
+            />
+            <span className="flex-1 min-w-0 truncate">Send feedback</span>
+          </button>
+        )}
       </section>
 
       <APIKeysModal

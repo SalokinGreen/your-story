@@ -1271,8 +1271,24 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 
 ## BYOK, no accounts, local storage, native shells
 
-- **There is no auth, no account and no database.** `app/layout.tsx` wraps
-  only `NotificationProvider` and `APIKeysProvider`.
+- **There is no auth, no account and no database of the player's data.**
+  `app/layout.tsx` wraps only `NotificationProvider` and `APIKeysProvider`
+  (plus `FeedbackHost`, the one feedback form). The one thing the developer
+  stores is **feedback a player chooses to send** (decisions 190–194,
+  `docs/feedback-design.md`): `POST /feedback` on the sync Worker, into
+  Cloudflare D1 (`sync-worker/src/feedback.ts`, the migration in
+  `sync-worker/migrations/`), kept 180 days, read on the Worker's private
+  `/feedback/admin` page behind `FEEDBACK_ADMIN_TOKEN`. A submission is an
+  allowlist (`app/misc/feedback.ts`: rating, text, kind, system/starter,
+  version, platform, and an optional turn the player previews: their line,
+  the visible prose, one-line roll summaries, the model), never reasoning,
+  tool results, notes, memory, the sheet or keys. The app's
+  `validateSubmission` and the Worker's `parseSubmission` are two copies of
+  one schema, held together by `tests/feedback.schemaAgreement.test.ts`;
+  change both. The entries (a turn's actions, the Library's built-in rows,
+  the story menu, Settings → Game, the after-a-night card) show only when
+  `NEXT_PUBLIC_SYNC_API_URL` is set, never for an online guest or on a party
+  phone; the card also never in couch, party or online play.
 - **AI is BYOK, always.** Keys live in the player's storage, read through
   `useAPIKeys()` (`APIKeysContext.tsx`): six LLM keys (OpenRouter, DeepSeek,
   Google, Mistral, DeepInfra, Z.ai) plus Cartesia, ElevenLabs
@@ -1301,7 +1317,8 @@ work in any of these layers — it tracks what was tried and reverted, and why.
 - **Storage is on the device.** The `local*Manager.ts` files keep stories,
   adventures and the libraries in IndexedDB (folders in localStorage), and
   keys and settings live in localStorage. Optional cross-device sync stores
-  encrypted blobs in Cloudflare KV through a Worker (`sync-worker/`,
+  encrypted blobs in Cloudflare KV through a Worker (`sync-worker/`, which
+  also takes feedback, above,
   `syncManager.ts`, `NEXT_PUBLIC_SYNC_API_URL`); the server never sees the
   plaintext.
 - **The native shells.** `NEXT_PUBLIC_STANDALONE=true` builds the static
@@ -1459,8 +1476,10 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 203 files and 3,228 tests (2026-10-24, after the judge
-  layer; the counts were run). Earlier: 195 files and 3,032 tests (after Blood &
+- `tests/` — Vitest, 211 files and 3,418 tests (2026-10-25, after feedback
+  and the session-zero hand-back; earlier 210 files and 3,410 after feedback;
+  the counts were run). Earlier: 203 files and 3,228 tests (after the judge
+  layer), 195 files and 3,032 tests (after Blood &
   Bone E1), 193 files and 3,000 tests (2026-10-24, after session
   zero detail; the test count is from the implementation log in
   `docs/session-zero-detail-design.md`, not a run), 189 files and 2,933 tests (2026-10-23, after session

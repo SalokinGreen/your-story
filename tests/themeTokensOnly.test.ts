@@ -120,6 +120,11 @@ const TOKENISED_TSX: string[] = [
   "app/misc/APIKeysContext.tsx",
   "app/misc/NotificationContext.tsx",
   "app/party/page.tsx",
+  // feedback in the app (docs/feedback-design.md)
+  "app/components/FeedbackModal.tsx",
+  "app/components/FeedbackHost.tsx",
+  "app/components/FeedbackSettingsSection.tsx",
+  "app/story/SessionFeedbackCard.tsx",
 ];
 
 /** Stylesheets: no hex colour outside the `:root` token block. */
