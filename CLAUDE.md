@@ -875,8 +875,9 @@ report's §11.3. The ones that shape play:
   `manage_timer` is translated onto clocks once a record exists. The GM sees
   `formatCampaignBrief` (about 800 tokens, in priority order) in the live
   block. A story with no record is byte-identical to before
-  (`tests/campaign.oldSaves.test.ts`). The narration context, session zero, the
-  Designer, the starters and the player view are later slices.
+  (`tests/campaign.oldSaves.test.ts`). The Designer writes the record too
+  (slice 4, below). The narration context, session zero, the starters and the
+  player view are later slices.
 - `manage_timer` — countdown timers. **On a story with no campaign record,
   `auto_advance` timers never tick (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
   behind `end_gm_thinking`) and was deleted on 2026-10-23 (decision 128).
@@ -1168,11 +1169,24 @@ for a player and never breaks fiction; the Designer talks to the *author*
 about the adventure as a designed object and writes the material the GM later
 improvises from. The prompt is `app/misc/designer_ai.ts`.
 
-- `designer_tools.ts` — 12 tools, all targeting things the GM actually reads:
+- `designer_tools.ts` — 13 tools, all targeting things the GM actually reads:
   `set_adventure_info`, `set_premise`, `write_note` / `delete_note` (one tool
   for every `LoreType`, including the mechanics note, the character sheet and
   random tables), `write_npcs`, `write_goals`, `set_starting_choices`,
-  `write_presets`, `set_character_sheet_template`, plus deletes.
+  `write_presets`, `set_character_sheet_template`, plus deletes, and
+  `write_campaign` (slice 4 of `docs/campaign-format-plan.md`): `add`, `edit`
+  or `remove` one part of the campaign record, run through the GM tool's own
+  executor and `validatePart` against a stand-in story built from the draft
+  (`app/misc/campaign/designer.ts`, `applyDesignerCampaignWrite`), on a deep
+  clone, so a refusal leaves the draft byte-identical. `AdventureDraft.campaign`
+  is carried by `draftToAdventure` / `adventureToDraft` into
+  `storyTemplate.campaign`, `startAdventureLocally` hands each story its own
+  copy, Restart restores it (`resetCampaignPlayState`), `summarizeDraft` lists
+  every part with its id plus `campaignWarnings` (no style; a mystery secret
+  under three clues; a front with no clock), and the Adventure Inspector has a
+  Campaign section (read-only, a remove button per part). The prompt now says
+  what session zero does, what the campaign record and its styles are, that
+  notes are read by title (not keyword), and names the starters as the examples.
 - `designer_executor.ts` — the deterministic half. Owns `AdventureDraft`,
   applies tool calls to a *copy* so a malformed call can't corrupt the draft,
   and converts with `draftToAdventure` / `adventureToDraft`. It forces

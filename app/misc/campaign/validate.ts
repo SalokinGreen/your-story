@@ -191,6 +191,35 @@ function safetyItems(
 }
 
 /**
+ * Authoring warnings for the Game Designer (plan slice 4). They never block:
+ * the GM can build what is missing in session zero. A mystery secret wants
+ * three clues (the rule in `PART_SHAPES`), a front wants a clock that moves
+ * it, and a record wants a style, since the style decides which parts the GM
+ * expects.
+ */
+export function campaignWarnings(record: CampaignRecord): string[] {
+  const out: string[] = [];
+  if (!record.style) {
+    out.push('No style set: the style decides which parts the GM expects (set it with part "style").');
+  }
+  if (record.style === "mystery") {
+    for (const s of record.secrets) {
+      if (s.clues.length < 3) {
+        out.push(
+          `Secret "${s.title}" has ${s.clues.length} clue${s.clues.length === 1 ? "" : "s"}; a mystery wants at least three, found in different places.`,
+        );
+      }
+    }
+  }
+  for (const f of record.fronts) {
+    if (!f.clockId || !record.clocks.some((c) => c.id === f.clockId)) {
+      out.push(`Front "${f.name}" has no clock: add one (a clock part linked to the front) so it advances on its own.`);
+    }
+  }
+  return out;
+}
+
+/**
  * Validates `data` for one part and returns it normalised. `data` is the whole
  * part for a new one; for an edit the executor merges the changes over the
  * existing part first, so the same rules judge both.
