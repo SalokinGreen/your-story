@@ -417,3 +417,18 @@ The author: "Okay why did we turn the judges off? They were very useful for not 
 | 221 | The author, unprompted: "Also rewrites happen only when judging gets apperent enough. So when rewrite is possible, it should hold the output back until the judging is done and rewrite if necessary." | **A turn's text is held while a rewrite is possible.** When a rewriting judge is on, nothing streams, is read aloud or reaches guests until the judges that could rewrite this turn have run; the final text is released once, with "Writing…", "Checking the turn…" and "Revising…" shown meanwhile. The background judges only flag: no rewrite ever replaces text the player has seen. |
 | 237 | An engine review found that, with the text held, the agency judge could only rewrite when another judge made the turn blocking. "With the text now held until it's checked, the agency judge … can only rewrite if it runs before release on every turn with a player line. … What should it do?" | **"Check before release (Recommended)."** Every turn with a player line runs the agency judge before the text appears, so it can rewrite: about one cheap call and a second of wait per turn. |
 | 240 | "With the text held, when the GM writes a bit of scene and then pauses to ask you something (a question, a roll, the dice tray), the question now pops up with none of that scene on screen. … What should happen?" | **"Release up to the pause (Recommended)."** At a pause the text written so far is checked and shown before the question appears; it can no longer be rewritten afterwards; the text after the pause is held and checked as usual. |
+
+### Interview — Fantastic Realms, grown (2026-10-25)
+
+The author: "We need to grow the Endless Realms rules a lot more." (Fantastic Realms.) Design: [`fr-expansion-design.md`](fr-expansion-design.md). Decisions 222–236, 238–239 and 241–242 are on the redesign branches.
+
+| # | question | decision |
+|---|---|---|
+| 243 | "Which areas should Fantastic Realms grow?" (two questions, several allowed) | **All eight:** magic; gear and treasure; conditions and harm; callings and paths; travel and the realms; a bestiary; downtime and the hearth; group play. |
+| 244 | "How big a step should this be?" | **"A full rules book (Recommended)."** A pinned core under ~3,000 tokens plus many on-demand notes; several PRs, one area each. |
+| 245 | "Who writes the new rules text?" | **"I draft, you approve (Recommended)."** |
+| 246 | "How should magic cost something?" | **"Feats + miscasts (Recommended)."** A spell is a feat; a magic miss is a miscast from the realm's table; no new meter. Rejected: costing hearts; a focus meter. |
+| 247 | "Conditions: hearts were chosen over statuses (decision 203). How should conditions sit beside hearts?" | **"Words that cost a die (Recommended)."** A condition takes one die from a roll it gets in the way of (never below 1); the GM may give one instead of a heart; most clear at a rest; hearts stay the main harm. Rejected: story only; replacing hearts. |
+| 248 | "How should gear work?" | **"Gear as feats (Recommended)."** A good item is a feat that can be lost, broken or stolen, with a quality word; plain gear is fiction. Rejected: a separate inventory. |
+| 249 | "How should callings (Knight, Witch, Rogue…) work?" | **"Optional paths (Recommended)."** A starting kit, a signature feat and level-up path feats; a hero may stay freeform; each realm adds local callings. Rejected: required classes. |
+
