@@ -14,6 +14,7 @@ import {
   type PartyRequestView,
   type PlayerView,
 } from "../misc/party/protocol";
+import CampaignBody, { campaignViewHasContent } from "../story/CampaignBody";
 import { DEFAULT_JOIN_COLOR } from "../misc/multiplayer/palette";
 import {
   DEFAULT_THEME_ID,
@@ -463,6 +464,17 @@ function Seated({ socket, view }: { socket: PartySocket; view: PlayerView }) {
           <p className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap text-[15px] leading-relaxed text-ys-text">
             {view.narration}
           </p>
+        </details>
+      )}
+
+      {campaignViewHasContent(view.campaign) && view.campaign && (
+        <details className={card}>
+          <summary className="cursor-pointer text-base font-semibold">
+            Campaign{view.campaign.styleLabel ? ` · ${view.campaign.styleLabel}` : ""}
+          </summary>
+          <div className="mt-3">
+            <CampaignBody view={view.campaign} />
+          </div>
         </details>
       )}
 

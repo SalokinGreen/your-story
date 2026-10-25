@@ -49,6 +49,8 @@ const TOKENISED_TSX: string[] = [
   "app/story/menu/StoryMetaEditor.tsx",
   "app/story/menu/ChatDisplaySettings.tsx",
   "app/story/MetersPanel.tsx",
+  "app/story/CampaignPanel.tsx",
+  "app/story/CampaignBody.tsx",
   "app/story/ContextViewer.tsx",
   "app/story/LogViewer.tsx",
   "app/story/page.tsx",

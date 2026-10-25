@@ -530,6 +530,13 @@ generate the icons (`generate-icons.sh` exists at the repo root).
   `to_be_revealed` lore and `gm_plan` notes**. Guests' UIs may not show them, but
   anyone with devtools can read the GM's plan. A spoiler/cheating issue rather
   than a security one (games are among friends), but worth a redaction pass.
+- *Update 2026-10-25 (campaign slice 6):* the campaign record is no longer in
+  that leak. The host's snapshot sends guests `guestCampaignRecord()`, a record
+  rebuilt from `publicCampaignView`, so the `campaign` field a guest holds has no
+  secret, doom, portent, hidden clock, beat or end state. That is the record
+  field only: each scene part's `gmConversation` (the GM's `campaign` calls and
+  reads), the GM's reasoning and `scene.summary` still go to guests whole and can
+  carry the same secrets, as do notes and the rest of `StoryData`.
 - No wire message relays **`ask_question`** or **`ask_for_roll`** (no
   `ask_question` reference anywhere in `app/misc/multiplayer/`), so these modals
   only appear on the host — **online guests can't answer GM questions** or

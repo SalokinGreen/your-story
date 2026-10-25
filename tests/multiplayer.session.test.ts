@@ -326,6 +326,32 @@ describe("NetSession", () => {
     expect(JSON.stringify(storyData)).toContain("LEAK_DRAFT");
   });
 
+  it("sends a guest the campaign's player view and no secret, doom, hidden clock or beat (slice 6)", async () => {
+    const { canaryCampaign, HIDDEN, PUBLIC } = await import("./helpers/campaignCanaries");
+    const { publicCampaignView } = await import("../app/misc/campaign/publicView");
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const snapshot = vi.fn();
+    guest.onSnapshot(snapshot);
+
+    const campaign = canaryCampaign();
+    const storyData = fakeStoryData({ campaign } as never);
+    host.broadcastSnapshot(storyData);
+
+    const received = snapshot.mock.calls[0][0] as StoryData;
+    const sent = JSON.stringify(received);
+    for (const [what, canary] of Object.entries(HIDDEN)) {
+      expect(sent, `${what} reached the guest`).not.toContain(canary);
+    }
+    for (const [what, marker] of Object.entries(PUBLIC)) {
+      expect(sent, `${what} did not reach the guest`).toContain(marker);
+    }
+    // The guest's panel shows exactly what the host's would.
+    expect(publicCampaignView(received.campaign!)).toEqual(publicCampaignView(campaign));
+    // The host's own record is untouched.
+    expect(JSON.stringify(storyData)).toContain(HIDDEN.truth);
+    expect(storyData.campaign).toBe(campaign);
+  });
+
   it("does not let a guest broadcast a snapshot or a host send a player action", async () => {
     const { host, guest } = await createHostAndGuest("host-1", "guest-1");
     const hostAction = vi.fn();

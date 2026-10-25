@@ -6,6 +6,8 @@ import remarkGfm from "remark-gfm";
 import { useState, useMemo } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
 import MetersPanel from "./MetersPanel";
+import CampaignPanel from "./CampaignPanel";
+import { publicCampaignView } from "../misc/campaign/publicView";
 import { isBuiltinId } from "../misc/systems";
 import FullScreenView from "../components/FullScreenView";
 import { StoredPortrait } from "../components/StoryImage";
@@ -168,6 +170,11 @@ const AUTO_PINNED_TYPES: LoreType[] = ["character_sheet", "gm_plan"];
 export default function LorePage(props: LorePageProps) {
   const { onUpdateLore, initialSelectedTitle, onMakePlayerPortrait, ...storyData } = props;
   const { addNotification } = useNotification();
+  // The player's view of the campaign: only the projection reaches the panel.
+  const campaignView = useMemo(
+    () => (storyData.campaign ? publicCampaignView(storyData.campaign) : null),
+    [storyData.campaign],
+  );
   const [selectedLore, setSelectedLore] = useState<StoryLore | null>(() =>
     initialSelectedTitle
       ? storyData.lore.find((l) => l.title === initialSelectedTitle) || null
@@ -471,6 +478,11 @@ export default function LorePage(props: LorePageProps) {
           progressTracks={storyData.progressTracks}
           activeChallenge={storyData.activeChallenge}
         />
+      </div>
+      {/* The campaign as the player may know it (renders nothing without a
+          record or without anything public in it). */}
+      <div className={selectedLore ? "hidden lg:block empty:hidden" : "empty:hidden"}>
+        <CampaignPanel view={campaignView} />
       </div>
       {/* Header Section - collapsed away on mobile while reading a note so the
           note starts at the top of the screen */}

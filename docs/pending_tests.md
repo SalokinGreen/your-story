@@ -44,6 +44,26 @@ author's money and waits for their go.
   Vite's SSR loader; it was run here on Windows with Node 24 and Vite 8. If it
   fails with a module error on your machine, say which module.
 
+## 2026-10-25 — Campaign slice 6: the player's view
+
+A worker without a display built this; the panel is covered by render tests
+(`tests/campaign.playerView.test.tsx`) but has never been seen on screen.
+
+- **The Lore page's Campaign panel, at phone width.** Start a copy of *The
+  Hollow Hour* (or any starter), open the ☰ menu, then Lore. At the top of the
+  page, under the Meters panel, a "Campaign" card with a "Mystery" chip shows
+  the pitch and tone chips. It collapses and expands with the header, does not
+  overflow at 360 px wide, and is hidden on a phone while a note is open. With
+  a visible clock, a segment bar shows the fill; with a found clue it lists
+  "What we know". Nothing from the secrets, fronts' doom or hidden clocks
+  appears. A story with no campaign record shows no card.
+- **A party phone.** In party mode with a started story that has a record, a
+  seated phone shows a collapsed "Campaign · Mystery" section above the
+  character sheet; opened, it shows the same content in the phone's colours.
+- **An online guest.** Host a story with a record, join as a guest: the Lore
+  page shows the same panel, and the guest's devtools (the received snapshot's
+  `campaign`) show empty secrets, no `doom`, no beats and no hidden clocks.
+
 ## 2026-10-25 — Judge layer J3: confirmation and the rewrite with facts
 
 Everything below needs a live model and the author's go, plus an OpenRouter key
