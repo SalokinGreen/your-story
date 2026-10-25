@@ -47,6 +47,7 @@ import { useBackHandler } from "@/app/misc/useBackHandler";
 import { saveFile } from "@/app/misc/saveFile";
 import { feedbackAvailable } from "@/app/misc/feedbackClient";
 import { openFeedback } from "@/app/misc/feedbackLauncher";
+import { resetCampaignPlayState } from "@/app/misc/campaign/designer";
 
 interface MenuProps extends StoryData {
   storyDbId: string | null;
@@ -818,6 +819,18 @@ export default function MenuPage({
                       freshTemplate?.agmtState || storyData.agmtState,
                     customTables:
                       freshTemplate?.customTables || storyData.customTables,
+                    // The campaign record starts over: the adventure's own copy
+                    // when there is one, else this story's with its play state
+                    // (clocks, found clues, beats) put back.
+                    ...(freshTemplate?.campaign
+                      ? { campaign: structuredClone(freshTemplate.campaign) }
+                      : storyData.campaign
+                        ? {
+                            campaign: resetCampaignPlayState(
+                              storyData.campaign,
+                            ),
+                          }
+                        : {}),
                     // Always reset these
                     scene: { parts: [] },
                     memory: [],

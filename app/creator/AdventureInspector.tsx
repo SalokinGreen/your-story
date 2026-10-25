@@ -18,6 +18,9 @@ import {
 import { pinnedNoteWarning } from "@/app/misc/contextLimits";
 import { LoreType, NPC, StoryLore } from "@/app/misc/structs";
 import { resolveSystem } from "@/app/misc/systems/resolve";
+import { removeCampaignPart } from "@/app/misc/campaign/designer";
+import { campaignWarnings } from "@/app/misc/campaign/validate";
+import type { CampaignPart } from "@/app/misc/campaign/validate";
 
 interface AdventureInspectorProps {
   draft: AdventureDraft;
@@ -31,6 +34,7 @@ type SectionId =
   | "notes"
   | "cast"
   | "goals"
+  | "campaign"
   | "tables";
 
 const NOTE_TYPE_LABELS: Partial<Record<LoreType, string>> = {
@@ -89,6 +93,171 @@ function EmptyHint({ children }: { children: React.ReactNode }) {
   );
 }
 
+function campaignItemCount(c: AdventureDraft["campaign"]): number {
+  if (!c) return 0;
+  return (
+    c.factions.length +
+    c.fronts.length +
+    c.clocks.length +
+    c.people.length +
+    c.secrets.length +
+    c.locations.length +
+    (c.beats?.list.length ?? 0) +
+    c.endStates.length
+  );
+}
+
+/**
+ * The campaign record, read from the draft with a remove button per part.
+ * Writing parts is the Designer's `write_campaign`; the AI and the author see
+ * the same record. Removal goes through `removeCampaignPart`, which also
+ * clears the links that pointed at the part.
+ */
+function CampaignSection({
+  draft,
+  onChange,
+}: {
+  draft: AdventureDraft;
+  onChange: (campaign: AdventureDraft["campaign"]) => void;
+}) {
+  const record = draft.campaign;
+  if (!record) {
+    return (
+      <EmptyHint>
+        No campaign record yet. Ask the Designer for one: a style, a pitch and
+        tone, then the factions, fronts, clocks, secrets and places the GM runs
+        the story on. Anything left out is built with the player in session
+        zero.
+      </EmptyHint>
+    );
+  }
+  const remove = (part: CampaignPart, ref?: string) => {
+    const copy = structuredClone(record);
+    const out = removeCampaignPart(copy, part, ref, draft.npcs);
+    if (out.ok) onChange(copy);
+  };
+  const warnings = campaignWarnings(record);
+  const npcName = (id: string) =>
+    draft.npcs.find((n) => n.id === id)?.name ?? "(missing)";
+
+  const row = (
+    key: string,
+    title: string,
+    detail: string | undefined,
+    onRemove: () => void,
+  ) => (
+    <div
+      key={key}
+      className="bg-ys-surface-2 border border-ys-border rounded-xl p-3 flex items-start justify-between gap-2"
+    >
+      <div className="min-w-0 flex-1">
+        <span className="font-medium text-ys-text text-sm">{title}</span>
+        {detail && <p className="text-xs text-ys-muted mt-1">{detail}</p>}
+      </div>
+      <button
+        onClick={onRemove}
+        aria-label={`Remove ${title}`}
+        className="p-1.5 rounded-md hover:bg-ys-danger/25 text-ys-muted hover:text-ys-danger transition-colors shrink-0"
+      >
+        <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+  const group = (label: string, rows: React.ReactNode[]) =>
+    rows.length > 0 && (
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-ys-muted">
+          {label}
+        </h4>
+        {rows}
+      </div>
+    );
+
+  return (
+    <div className="space-y-4">
+      {warnings.length > 0 && (
+        <div className="bg-ys-warning/15 text-ys-warning rounded-xl p-3 text-xs space-y-1">
+          {warnings.map((w) => (
+            <p key={w}>{w}</p>
+          ))}
+        </div>
+      )}
+      <div className="bg-ys-surface-2 border border-ys-border rounded-xl p-3 text-xs space-y-1">
+        <p className="text-ys-text">
+          <span className="text-ys-muted">Style: </span>
+          {record.style ?? "not set"}
+        </p>
+        {record.pitch && (
+          <p className="text-ys-text">
+            {record.pitch.premise}{" "}
+            <span className="text-ys-muted">[{record.pitch.tone.join(", ")}]</span>
+          </p>
+        )}
+        {record.safety && (
+          <p className="text-ys-muted">
+            Lines: {record.safety.lines.map((l) => l.text).join("; ") || "none"}
+            {" · "}
+            Veils: {record.safety.veils.map((l) => l.text).join("; ") || "none"}
+          </p>
+        )}
+      </div>
+      {group(
+        "Factions",
+        record.factions.map((f) =>
+          row(f.id, f.name, f.goal, () => remove("faction", f.id)),
+        ),
+      )}
+      {group(
+        "Fronts",
+        record.fronts.map((f) =>
+          row(f.id, f.name, f.doom, () => remove("front", f.id)),
+        ),
+      )}
+      {group(
+        "Clocks",
+        record.clocks.map((c) =>
+          row(
+            c.id,
+            c.name,
+            `${c.segments} segments · ${c.triggers.join(", ")}${c.visible ? "" : " · hidden"}`,
+            () => remove("clock", c.id),
+          ),
+        ),
+      )}
+      {group(
+        "People",
+        record.people.map((p) =>
+          row(p.npcId, npcName(p.npcId), p.want, () => remove("person", p.npcId)),
+        ),
+      )}
+      {group(
+        "Secrets",
+        record.secrets.map((s) =>
+          row(s.id, s.title, `${s.clues.length} clues`, () => remove("secret", s.id)),
+        ),
+      )}
+      {group(
+        "Locations",
+        record.locations.map((l) =>
+          row(l.id, l.name, l.features.join("; "), () => remove("location", l.id)),
+        ),
+      )}
+      {group(
+        "Beats",
+        (record.beats?.list ?? []).map((b) =>
+          row(b.id, b.title, b.summary, () => remove("beat", b.id)),
+        ),
+      )}
+      {group(
+        "End states",
+        record.endStates.map((e) =>
+          row(e.id, e.text, undefined, () => remove("end_state", e.id)),
+        ),
+      )}
+    </div>
+  );
+}
+
 export default function AdventureInspector({
   draft,
   onChange,
@@ -139,6 +308,12 @@ export default function AdventureInspector({
       { id: "notes", label: "World notes", icon: "ScrollText", count: otherNotes.length },
       { id: "cast", label: "Cast", icon: "Users", count: draft.npcs.length },
       { id: "goals", label: "Goals", icon: "Target", count: draft.goals.length },
+      {
+        id: "campaign",
+        label: "Campaign",
+        icon: "Compass",
+        count: campaignItemCount(draft.campaign),
+      },
       {
         id: "tables",
         label: "Tables",
@@ -634,6 +809,13 @@ export default function AdventureInspector({
               ))}
             </div>
           ))}
+
+        {openSection === "campaign" && (
+          <CampaignSection
+            draft={draft}
+            onChange={(campaign) => onChange({ campaign })}
+          />
+        )}
 
         {openSection === "tables" &&
           (tableNotes.length === 0 ? (

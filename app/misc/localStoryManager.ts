@@ -201,6 +201,12 @@ export async function startAdventureLocally(
     story_name: `${adventure.title || "Adventure"} - ${new Date().toLocaleDateString()}`,
     player_name: playerName,
     starting_choices: adventure.startingChoices,
+    // The campaign record the Designer (or a starter) shipped. A copy, so the
+    // story's clocks and clues never write back into the adventure. An old
+    // adventure without one adds no key at all.
+    ...(adventure.storyTemplate?.campaign
+      ? { campaign: structuredClone(adventure.storyTemplate.campaign) }
+      : {}),
     player_notes:
       defaultUserNotes || adventure.storyTemplate?.player_notes || "",
     characterSheetTemplate: adventure.characterSheetTemplate,
