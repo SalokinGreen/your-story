@@ -317,6 +317,19 @@ export function TurnActions({
   );
 }
 
+export type PublicNotice = "checked" | "revised";
+
+// What the turn's details say about the judges. Generic on purpose: a kind, a
+// quote or a fix stays in the Debug Logs (judge layer v2, design 11.4).
+export const PUBLIC_NOTICE_LABELS: Record<PublicNotice, string> = {
+  checked: "Checked",
+  revised: "Revised after a check",
+};
+export const PUBLIC_NOTICE_TITLES: Record<PublicNotice, string> = {
+  checked: "This turn was checked and something was flagged. Nothing in the text changed.",
+  revised: "This turn was revised after a check. Undo revision puts the original back.",
+};
+
 // The GM's working, folded into one quiet line: dice spelled out, everything
 // else counted, the "Advanced" tag at its end (a Default turn shows nothing). Tapping it opens the pills in
 // their original order. While the turn streams it shows what the GM is doing
@@ -326,6 +339,7 @@ export function TurnWorkLine({
   reasoningTier,
   streaming = false,
   phaseLabel,
+  notice,
   trailing,
 }: {
   blocks: TimelineBlock[];
@@ -334,6 +348,9 @@ export function TurnWorkLine({
   // Where a held turn is (decision 221), in words; stands in for "Thinking…"
   // when nothing is streaming a thought.
   phaseLabel?: string;
+  // The public half of the judges' findings (ScenePart.publicNotice): that the
+  // turn was checked, or revised after a check. Never a kind, quote or fix.
+  notice?: PublicNotice;
   // The "Turn actions" button, which sits at the end of the line - or alone
   // when the turn did no work worth a line.
   trailing?: React.ReactNode;
@@ -348,7 +365,8 @@ export function TurnWorkLine({
   const live = streaming
     ? (summary.live ?? phaseLabel ?? "Thinking…")
     : undefined;
-  if (summary.isEmpty && !live && !advancedTier) {
+  const noticeText = !streaming && notice ? PUBLIC_NOTICE_LABELS[notice] : undefined;
+  if (summary.isEmpty && !live && !advancedTier && !noticeText) {
     // No work line to sit at the end of: a lone "…" above the prose reads as
     // a glitch, and touch players open the row by tapping the turn anyway.
     // The toggle stays for keyboard users, shown once it has focus.
@@ -395,6 +413,14 @@ export function TurnWorkLine({
             title={`${getTierModelDisplayName(advancedTier.modelKey)} · ${advancedTier.effort} effort`}
           >
             Advanced
+          </span>
+        )}
+        {noticeText && (
+          <span
+            className="text-[10px] text-ys-muted border border-ys-border rounded px-1 leading-tight cursor-default shrink-0"
+            title={PUBLIC_NOTICE_TITLES[notice!]}
+          >
+            {noticeText}
           </span>
         )}
         {trailing}
@@ -455,6 +481,8 @@ export interface GMTurnProps {
   // The story stage's own native reasoning (ScenePart.reasoning).
   storyReasoning?: string;
   reasoningTier?: ReasoningTierDisplay;
+  // ScenePart.publicNotice: shown on the work line.
+  notice?: PublicNotice;
   // Live timeline for the turn currently generating - undefined for
   // historical turns, which rebuild theirs from gmConversation.
   liveTimeline?: TimelineBlock[];
@@ -499,6 +527,7 @@ export function GMTurn({
   toolResults,
   storyReasoning,
   reasoningTier,
+  notice,
   liveTimeline,
   mentionMatcher,
   onMentionClick,
@@ -574,6 +603,7 @@ export function GMTurn({
           reasoningTier={reasoningTier}
           streaming={isStreaming}
           phaseLabel={phaseLabel}
+          notice={notice}
           trailing={
             onToggleActions ? (
               <TurnActionsToggle

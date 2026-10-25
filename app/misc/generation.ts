@@ -1447,6 +1447,8 @@ export async function generateStoryTurn(
             type: f.type,
             severity: f.severity,
             detail: f.detail,
+            // Private: the Debug Logs only (never the turn's details).
+            finding: f.finding,
           })),
         });
       }
@@ -1838,6 +1840,8 @@ export async function generateStoryTurn(
             type: f.type,
             severity: f.severity,
             detail: f.detail,
+            // Private: the Debug Logs only (never the turn's details).
+            finding: f.finding,
           })),
         });
       }

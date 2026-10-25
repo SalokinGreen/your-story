@@ -1542,6 +1542,15 @@ run once more for the Debug Logs; the pacing hits make a GM-only
 `ScenePart.pacingNote`, carried into the next live block under the story-progress
 check-in (decision 235).
 
+**Judge layer v2, slice J5: Settings and the turn details** (plan slice 5).
+`judges/measured.ts` bundles `evals/results.json` (a committed stub until the
+author's first `eval-judges.mjs --go`) and gives Settings each judge's measured
+precision at the rewriting severity (`MEASURED_JUDGES`; nothing shown when absent);
+`JUDGE_DEFAULT_OVERRIDES` (`observer.ts`, empty) holds the judges that ship as Flag
+below 0.7, updated by hand from the report. The turn's work line shows
+`publicNotice` as "Checked" or "Revised after a check" (`TurnWorkLine`); the private
+`finding` is in the Debug Logs and the Context Viewer only.
+
 **Judge layer v2, slice J2: the combined judge call** (`docs/judge-layer-v2-plan.md`
 slice 2; confirmation and the rewrite with facts are J3, below).
 `runObserver` no longer makes one call per judge: every judge whose
