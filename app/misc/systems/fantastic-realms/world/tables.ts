@@ -138,7 +138,7 @@ Roll for what the heroes meet (or pick). The realm note holds its stat line and 
 9. A Hedge-Folk Tithe-Taker with a polite ledger.
 10. A Scarecrow of the Last Furrow, one field closer each night.
 11. A Mire Troll under the bridge, hungry for a toll.
-12. Hollin Greycrown, the Barrow King, awake and wanting his oath kept.
+12. The Barrow King, awake and wanting his oath kept.
 
 ## Gloamreach foes (1d12)
 

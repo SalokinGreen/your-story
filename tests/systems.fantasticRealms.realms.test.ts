@@ -129,9 +129,11 @@ describe("the realms, grown", () => {
       expect(list.length, id).toBe(3);
     }
     // The original three realm notes did not change in E4.
-    for (const r of ["aurelane", "larkenfell", "gloamreach"]) {
+    for (const r of ["aurelane", "gloamreach"]) {
       expect(BUILTIN_NOTE_HISTORY[`builtin:fantastic-realms:realm-${r}`], r).toHaveLength(2);
     }
+    // Larkenfell's roster line lost the barrow king's name (a starter secret).
+    expect(BUILTIN_NOTE_HISTORY["builtin:fantastic-realms:realm-larkenfell"]).toHaveLength(3);
     // The new realms start a history of one.
     for (const r of ["thornmere", "emberhold", "hollow-sky"]) {
       expect(BUILTIN_NOTE_HISTORY[`builtin:fantastic-realms:realm-${r}`], r).toHaveLength(1);

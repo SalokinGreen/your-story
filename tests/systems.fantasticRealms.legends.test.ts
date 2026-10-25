@@ -7,6 +7,7 @@ import { getEncoding } from "js-tiktoken";
 import { FANTASTIC_REALMS } from "@/app/misc/systems/fantastic-realms";
 import { BUILTIN_NOTE_HISTORY } from "@/app/misc/systems/builtinNoteHistory";
 import { REALM_NOTES } from "@/app/misc/systems/fantastic-realms/world/realms";
+import { wolfwillowCampaign } from "@/app/misc/systems/fantastic-realms/starters/wolfwillow-crossing/campaign";
 
 const enc = getEncoding("cl100k_base");
 const tokens = (s: string) => enc.encode(s).length;
@@ -70,6 +71,37 @@ describe("the new realms (E4)", () => {
     }
     expect(BUILTIN_NOTE_HISTORY["builtin:fantastic-realms:legends"].length).toBeGreaterThanOrEqual(2);
     expect(BUILTIN_NOTE_HISTORY["builtin:fantastic-realms:crossroads"].length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("built-in Fantastic Realms notes keep the starter's secrets", () => {
+  // Rules and realm notes are player-visible (Lore page, party phones), so
+  // they must not carry what a starter's campaign hides: Wolfwillow Crossing's
+  // secrets name the barrow king, and finding his name is the best ending.
+  // Common words that must stay in the shared notes (the Barrow King is a
+  // legend's title) are allowed explicitly.
+  const ALLOWED = new Set(["king"]);
+  const phrases = (wolfwillowCampaign().secrets ?? [])
+    .flatMap((s) => s.keyPhrases ?? [])
+    .map((p) => p.toLowerCase())
+    .filter((p) => !ALLOWED.has(p));
+
+  it("finds the secrets' key phrases to check", () => {
+    expect(phrases).toEqual(expect.arrayContaining(["hollin", "greycrown", "lantern promise", "grandfather"]));
+  });
+
+  it("puts no starter secret key phrase in any rules, realm, legend or table note", () => {
+    for (const pack of FANTASTIC_REALMS.packs) {
+      for (const note of pack.notes) {
+        const text = note.content.toLowerCase();
+        for (const p of phrases) expect(text, `${note.title} contains "${p}"`).not.toContain(p);
+      }
+    }
+  });
+
+  it("titles the Larkenfell legend without a name and says the name is lost", () => {
+    expect(legends.content).toContain("## The Barrow King (Larkenfell)");
+    expect(legends.content).toContain("His name is lost");
   });
 });
 

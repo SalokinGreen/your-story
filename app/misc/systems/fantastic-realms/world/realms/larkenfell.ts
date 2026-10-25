@@ -77,7 +77,7 @@ Two more than the twelve in FR — Callings, in the same shape: the signature pl
 *Tactics:* stands in the corn, closer each time you look; a miss costs 2 and is *Afraid*.
 **Mire Troll** — DC 5 · Crushing, Regenerating, Hungry · Hearts 5 · XP 5000
 *Tactics:* grabs and drags toward the water; fire or salt stops its mending.
-**Hollin Greycrown, the Barrow King** — DC 6 · Armored, Cursed Touch, Frightening, Tireless · Hearts 6 · XP 6000
+**The Barrow King** — DC 6 · Armored, Cursed Touch, Frightening, Tireless · Hearts 6 · XP 6000
 *Tactics:* walks straight at the one who woke him and talks of oaths; a miss costs 2, and he stops for the lantern's song.`,
 };
 

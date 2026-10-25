@@ -536,3 +536,22 @@ Judgment calls the plan left to the builder. None changes the plan's scope.
   descending marks); the E3 realm test's regexes now accept a multi-word realm
   name (`[\w ]+`), the local-callings list has six entries, and table notes are
   ten.
+
+### 2026-10-25 — E4 fix: no starter secret in the shared notes
+
+The Wolfwillow Crossing campaign hides the barrow king's name (secret
+`sec_ww_king`, key phrases "Hollin", "Greycrown", "king"), and built-in rules
+and realm notes are player-visible, so FR — Legends, the Larkenfell roster line
+and the Larkenfell foes table (E3 had already shipped the name in the last two)
+now call him **The Barrow King**. The legend says his name is lost and finding
+it is a story in itself. The other five legends and every E4 note were checked
+against both Wolfwillow secrets' key phrases ("lantern promise", "grandfather"
+included): clean.
+
+- **Test:** `tests/systems.fantasticRealms.legends.test.ts` fails when any note
+  in either Fantastic Realms pack contains a Wolfwillow secret key phrase,
+  except an explicit allow-list of one word, "king" (the legend's title).
+- **History:** the legends and foes-table hashes of E4 were never shipped on
+  master, so I **replaced** E4's own entry in each (legends `5b0ea4cf…`, foes
+  table `32e8f6b0…`); Larkenfell's realm note shipped in E3, so I **appended**
+  (`db5c3f19…`, three entries).

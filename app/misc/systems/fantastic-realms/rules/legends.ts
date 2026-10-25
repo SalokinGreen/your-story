@@ -30,12 +30,12 @@ Threat: insults the heroes, then sweeps flame across the whole party.
 **Emberwing, Phase 2** — DC 5 · Fire-Breath, Proud, Furious · Hearts mark (4) · Threat: grounded by a torn wing, she lashes tail and breath and the ledge cracks under the heroes' feet.
 **Emberwing, Phase 3** — DC 6 · Flying, Fire-Breath, Reckless · Hearts mark (2) · Threat: she takes to the sky over the city and burns a tower; the heroes must save people and strike at once.
 
-## Hollin Greycrown, the Barrow King (Larkenfell)
-**Lair:** the barrow under Greyhill: a long hall of oath-stones, a throne of roots, a lantern in the wall. **Weakness:** the oath he was killed to keep, spoken aloud, or the lantern's song.
-**Hollin Greycrown, the Barrow King** — DC 6 · Armored, Cursed Touch, Frightening, Tireless · Hearts 6 · XP 6000
+## The Barrow King (Larkenfell)
+**Lair:** the barrow under Greyhill: a long hall of oath-stones, a throne of roots, a lantern in the wall. His name is lost; finding it is a story in itself. **Weakness:** the oath he was killed to keep, spoken aloud, or the lantern's song.
+**The Barrow King** — DC 6 · Armored, Cursed Touch, Frightening, Tireless · Hearts 6 · XP 6000
 Threat: walks straight at whoever woke him and speaks of oaths; his touch marks.
-**Hollin, Phase 2** — DC 5 · Cursed Touch, Frightening, Pack · Hearts mark (4) · Threat: the barrow-guard rise at his call; two heroes must fend off the guards while he presses a third.
-**Hollin, Phase 3** — DC 4 · Cursed Touch, Grieving · Hearts mark (2) · Threat: he stops and asks for his oath; a wrong answer is a curse on every hero in the hall.
+**The Barrow King, Phase 2** — DC 5 · Cursed Touch, Frightening, Pack · Hearts mark (4) · Threat: the barrow-guard rise at his call; two heroes must fend off the guards while he presses a third.
+**The Barrow King, Phase 3** — DC 4 · Cursed Touch, Grieving · Hearts mark (2) · Threat: he stops and asks for his oath; a wrong answer is a curse on every hero in the hall.
 
 ## The Weeping Colossus (Gloamreach)
 **Lair:** a bell-less cathedral buried to its windows in ash, with a face in the nave. **Weakness:** a lit lamp held to its weeping face, or the name of the one it mourns.
