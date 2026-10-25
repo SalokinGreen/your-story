@@ -13,8 +13,9 @@
 // Reads: a missed dawn is a dawn case where the answer is not yes; a false dawn is a
 // non-dawn case where it is yes. An "unknown" falls back to the phrase table in the
 // game, so it is scored as the phrase table's answer for that case. The judge ships
-// when its missed + false dawns are no more than the phrase table's (and no case
-// is worse by more than 1 run in 10).
+// only if missed dawns do not rise at all (any case, any run) and its weighted
+// total (a missed dawn counts 3, a false one 1) is no worse than the table's;
+// a case with more than 1 extra false dawn also fails it.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { REPO_ROOT, parseArgs, parseEnvFile, providerKeysFrom } from "./eval-lib.mjs";
@@ -64,8 +65,13 @@ try {
     console.error("No provider key in .env.eval or the environment. Nothing was run.");
     process.exit(1);
   }
-  let judgeWrong = 0;
-  let worse = 0;
+  // Missed dawns (a dawn case not read as yes) cost more than false ones: a
+  // missed dawn means end_session never runs. An unknown is the table's answer.
+  const MISSED_WEIGHT = 3;
+  let judgeMissed = 0;
+  let judgeFalse = 0;
+  let worseMissed = 0;
+  let worseFalse = 0;
   for (const { c, phrase } of rows) {
     let yes = 0;
     let no = 0;
@@ -79,17 +85,28 @@ try {
       else if (r.answer === "no") no++;
       else unknown++;
     }
-    // In the game an unknown is the phrase table's answer.
     const asYes = yes + (phrase ? unknown : 0);
-    const wrongRuns = c.dawn ? runs - asYes : asYes;
-    const phraseWrongRuns = phrase !== c.dawn ? runs : 0;
-    judgeWrong += wrongRuns;
-    if (wrongRuns > phraseWrongRuns + 1) worse++;
-    console.log(`  ${c.id}: yes ${yes}, no ${no}, unknown ${unknown}; wrong ${wrongRuns}/${runs} (phrase table ${phraseWrongRuns}/${runs})`);
+    const missed = c.dawn ? runs - asYes : 0;
+    const falseDawn = c.dawn ? 0 : asYes;
+    const phraseMissed = c.dawn && !phrase ? runs : 0;
+    const phraseFalse = !c.dawn && phrase ? runs : 0;
+    judgeMissed += missed;
+    judgeFalse += falseDawn;
+    if (missed > phraseMissed) worseMissed++;
+    if (falseDawn > phraseFalse + 1) worseFalse++;
+    console.log(`  ${c.id}: yes ${yes}, no ${no}, unknown ${unknown}; missed ${missed}/${runs} (table ${phraseMissed}), false ${falseDawn}/${runs} (table ${phraseFalse})`);
   }
-  const phraseTotal = phraseWrong * runs;
-  console.log(`\nJudge wrong runs: ${judgeWrong}. Phrase table wrong runs: ${phraseTotal}. Cases clearly worse than the table: ${worse}.`);
-  console.log(judgeWrong <= phraseTotal && worse === 0 ? "Verdict: the judge is no worse; safe to turn on." : "Verdict: do NOT turn the judge on.");
+  const tableMissed = rows.filter((r) => r.c.dawn && !r.phrase).length * runs;
+  const tableFalse = rows.filter((r) => !r.c.dawn && r.phrase).length * runs;
+  console.log(`
+Missed dawns: judge ${judgeMissed}, phrase table ${tableMissed}. False dawns: judge ${judgeFalse}, phrase table ${tableFalse}.`);
+  const weighted = (m, f) => MISSED_WEIGHT * m + f;
+  const ok =
+    judgeMissed <= tableMissed && // any rise in missed dawns fails the gate
+    worseMissed === 0 &&
+    worseFalse === 0 &&
+    weighted(judgeMissed, judgeFalse) <= weighted(tableMissed, tableFalse);
+  console.log(ok ? "Verdict: no rise in missed dawns and no worse overall (missed counted x3); safe to turn on." : "Verdict: do NOT turn the judge on (a rise in missed dawns, or worse overall).");
 } finally {
   await loader.close();
 }

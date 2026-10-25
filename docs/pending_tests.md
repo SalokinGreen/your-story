@@ -18,8 +18,8 @@ nothing changes for a player until this passes and the switch is turned on.
 - **Score the dawn judge.** `.env.eval` with `OPENROUTER_API_KEY`. `node scripts/eval-dawn.mjs`
   prints the 13 cases and where the phrase table is wrong (6) with no call. Then
   `node scripts/eval-dawn.mjs --go` (130 calls on Haiku 5.5). Expected: a
-  "Verdict: the judge is no worse; safe to turn on." line, with the judge wrong
-  on fewer runs than the table's 60 and no case clearly worse. Failure looks like:
+  "Verdict: no rise in missed dawns... safe to turn on." line (missed dawns no
+  higher than the table's 30, false dawns reported apart). Failure looks like:
   "do NOT turn the judge on" (read the per-case rows: a `yes` on the flashback,
   painting or plan cases is a false dawn; `no` on the dawn cases is a miss) or
   many `unknown` (the quote was not in the text: the prompt needs work).

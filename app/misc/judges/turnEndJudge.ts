@@ -4,7 +4,7 @@
  *
  * A phrase table cannot tell "dawn breaks over the rooftops" from "we plan to
  * leave at dawn", so the system declares a yes/no question instead ("did the
- * night end in this turn's prose?") and one cheap side call answers it. The
+ * night end in this turn's prose?") and one cheap side call answers it, with "unknown" for an unsettled text, because a false no costs more than a false yes. The
  * answer only decides whether the check is *pending*: the engine still checks
  * the tool result (`end_session`) in code, so a wrong "yes" costs one
  * conditional reminder the GM may decline, and a wrong "no" is the old
@@ -15,8 +15,8 @@
  * Observer's combined call, which runs after the turn; it is the same kind of
  * call (one `callSideModel` on the side-agent model at an explicit effort,
  * temperature 0, a keyed JSON reply with the reasoning before the verdict) and
- * is counted as one extra side call per turn, at most one per distinct final
- * prose. Anything that is not a clean, quoted "yes" or "no" is "unknown", and
+ * is counted as one extra side call per turn (the judge plan's ceiling: one
+ * reading per check per turn; later rounds use the phrase table). Anything that is not a clean, quoted "yes" or "no" is "unknown", and
  * the caller falls back to the phrase table. A Stop passes through.
  */
 import { callSideModel, type ProviderKeys } from "../sideModelCall";
@@ -40,14 +40,14 @@ export const TURN_END_JUDGE_SYSTEM = `You answer one yes/no question about one t
 How to decide:
 1. Find what the text says HAS HAPPENED by its end. A plan, a promise, a question, a memory, a flashback or a time still to come is not something that happened.
 2. Compare that with the question. Answer "yes" only if the text itself shows it happened this turn, in the prose or in what the player's line makes happen ("I sleep until dusk" does).
-3. If the text does not settle it, answer "no".
+3. If the text clearly shows it did not happen (a plan, a question, a memory, a time still to come), answer "no". If the text does not settle it either way, answer "unknown": a wrong "no" is costlier than a wrong "yes".
 4. A "yes" needs a quote: the exact words, copied from the text, that show it.
 
 Minimal pair for "did the night end?":
 - "Pale light creeps over the rooftops and the bells begin to ring." Answer yes (the quote is the whole sentence).
 - "We should be back before the pale light creeps over the rooftops." Answer no (a time still to come).
 
-Reply with one JSON object and nothing else: {"reasoning": "<one or two sentences: what has happened by the end of the text>", "answer": "yes" or "no", "quote": "<exact words from the text, empty on no>"}`;
+Reply with one JSON object and nothing else: {"reasoning": "<one or two sentences: what has happened by the end of the text>", "answer": "yes", "no" or "unknown", "quote": "<exact words from the text, empty on no>"}`;
 
 export function buildTurnEndJudgePrompt(input: TurnEndJudgeInput): string {
   const lines = input.playerLines.map((l) => l.trim()).filter(Boolean);

@@ -817,8 +817,9 @@ report's §11.3. The ones that shape play:
   (`judges/turnEndJudge.ts`: one `callSideModel` on the side-agent model at an
   explicit effort, temperature 0, a quoted `yes`) answers at the same place
   the phrase table runs, on the GM's final prose before narration (one extra
-  side call per distinct final prose, cached per turn). `pendingCheck` takes the
-  answer (`judged`): yes makes the check pending, no clears it, unknown or a
+  side call per check per turn at most, and none with fewer than three rounds
+  left; later rounds use the phrase table). `pendingCheck` takes the
+  answer (`judged`): yes makes the check pending, no clears it, unknown (an unsettled text is "unknown", not "no") or a
   failed call falls back to the phrase table, and the previous-turn
   suppression, the prompted set and the three reserved rounds are unchanged; a
   Stop passes through. **It ships dark:** `isTurnEndJudgeEnabled()` is true only

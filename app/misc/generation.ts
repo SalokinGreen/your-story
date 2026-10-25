@@ -2918,12 +2918,9 @@ async function generateStoryTurnOnce(
         // A system's turn-end checks (decision 183, turnEndChecks.ts): the ids
         // already sent back this turn. One reminder per check per turn.
         const turnEndChecksPrompted = new Set<string>();
-        // The model's reading of a "judge" check, by the text it read, so a
-        // later round that ends on the same prose does not ask again.
-        const turnEndJudgeCache = new Map<
-          string,
-          { textKey: string; reading: { answer: "yes" | "no" | "unknown"; quote?: string } }
-        >();
+        // The "judge" checks already read this turn: one reading per check
+        // per turn (judge plan ceiling); the phrase table decides after it.
+        const turnEndJudgeAsked = new Set<string>();
 
         // Rung 2 of the judge layer (judges/rung1.ts, design 11.1): one re-ask
         // of the GM per turn, sent when a verified rung-1 hit can be fixed with
@@ -4275,15 +4272,17 @@ async function generateStoryTurnOnce(
                 { answer: "yes" | "no" | "unknown"; quote?: string }
               > = {};
               if (resolved.usesSystemTools) {
-                for (const check of judgeChecksToAsk(resolved.system, turnEndTurn)) {
-                  const textKey = `${turnEndTurn.text.gmProse}\u0000${turnEndTurn.text.playerLines.join("\u0001")}`;
-                  const cached = turnEndJudgeCache.get(check.id);
-                  if (cached && cached.textKey === textKey) {
-                    judged[check.id] = cached.reading;
-                    continue;
-                  }
+                // Only while a "yes" could still act (three rounds left, as
+                // below), and at most one reading per check per turn: after
+                // it, the phrase table decides the rest of the turn.
+                const canAct = MAX_GM_ROUNDS - gmRound >= 3;
+                for (const check of canAct
+                  ? judgeChecksToAsk(resolved.system, turnEndTurn)
+                  : []) {
+                  if (turnEndJudgeAsked.has(check.id)) continue;
+                  turnEndJudgeAsked.add(check.id);
                   const sideKeys = pickProviderKeys(options);
-                  const reading = await askTurnEndJudge(
+                  judged[check.id] = await askTurnEndJudge(
                     {
                       question: check.trigger.question ?? "",
                       gmProse: turnEndTurn.text.gmProse,
@@ -4295,8 +4294,6 @@ async function generateStoryTurnOnce(
                       abortSignal: options.abortSignal,
                     },
                   );
-                  turnEndJudgeCache.set(check.id, { textKey, reading });
-                  judged[check.id] = reading;
                 }
               }
               const pending = resolved.usesSystemTools

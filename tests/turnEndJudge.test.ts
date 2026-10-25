@@ -58,6 +58,13 @@ describe("parseTurnEndAnswer", () => {
   });
 });
 
+describe("an unsettled text", () => {
+  it("is unknown, not no, so the phrase table decides", () => {
+    expect(TURN_END_JUDGE_SYSTEM).toContain('answer "unknown"');
+    expect(parseTurnEndAnswer(JSON.stringify({ answer: "unknown", quote: "" }), input).answer).toBe("unknown");
+  });
+});
+
 describe("askTurnEndJudge", () => {
   beforeEach(() => sideCallMock.mockReset());
   const api = { model: "m", reasoningEffort: "none" as const };

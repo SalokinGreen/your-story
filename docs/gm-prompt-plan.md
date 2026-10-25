@@ -411,3 +411,23 @@ Built on `claude/gm-prompts-g5`. Files: `ai_staged.ts`, `gmTools.ts`,
   false), pinned by `tests/dawnCases.test.ts`. The live run is owed.
 - **Not done:** no Settings control for the switch, and the judge reads Blood &
   Bone's check only (the only system with a turn-end check).
+
+### 2026-10-26, slice 5 after engine review
+
+- **No pointless call.** The judge is not asked when fewer than three rounds
+  remain (`MAX_GM_ROUNDS - gmRound < 3`), the same bar the reminder itself has; the
+  phrase result then feeds the log line.
+- **One reading per check per turn** (the judge plan's ceiling,
+  `judge-layer-v2-plan.md:246`): a `Set` of asked ids replaces the per-text cache.
+  After one reading (yes, no or unknown) the phrase table decides the rest of the
+  turn. CLAUDE.md said "per distinct prose" and was corrected.
+- **Unknown, not no.** The judge's prompt answers "unknown" for a text that does
+  not settle it, which falls back to the phrase table; a false "no" would mean
+  `end_session` never runs. `scripts/eval-dawn.mjs` now reports missed and false
+  dawns apart and fails on any rise in missed dawns (missed weighted 3 to 1).
+- **Known gap: no timeout.** Side calls have no timeout in this codebase, so a
+  hung dawn call stalls the turn until the player stops it. The revisions' "fails
+  or times out" is met for failure only; a timeout system is a separate change.
+- **Tool budget headroom:** the default tool list is now 9,997 of 10,000 tokens
+  (3 of headroom); the next tool text must make room first.
+

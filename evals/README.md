@@ -83,7 +83,7 @@ Generation fixtures live in `evals/generation/` (the first, from slice 3: full-m
 (what the phrase table says, pinned by `tests/dawnCases.test.ts`).
 `node scripts/eval-dawn.mjs` lists them and the table's errors with no call;
 `--go` asks the judge `--runs` (10) times per case on your keys and prints the
-verdict. It costs money and waits for the author's go.
+verdict: missed and false dawns separately, failing on any rise in missed dawns (they cost more: `end_session` never runs) and weighting them 3 to 1. It costs money and waits for the author's go.
 
 ## Drafting a turn from your own play
 

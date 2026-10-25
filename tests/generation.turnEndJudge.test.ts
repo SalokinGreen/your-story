@@ -105,4 +105,21 @@ describe("night-ended through generateStoryTurn with the judge", () => {
     expect(askMock).toHaveBeenCalledTimes(1);
     expect(reminded(calls[1])).toBe(true);
   });
+
+  it("asks nothing when fewer than three rounds are left (a yes could not act)", async () => {
+    on();
+    askMock.mockResolvedValue({ answer: "yes", quote: "Pale light" });
+    const mock = createMockGMFetch([{ content: prose }, { content: "more" }]);
+    global.fetch = mock.fetchMock as unknown as typeof fetch;
+    await generateStoryTurn(story(), "I keep watch", { ...options, maxToolLoops: 3 }, {});
+    expect(askMock).not.toHaveBeenCalled();
+    expect(mock.gmStageCalls()).toHaveLength(1);
+  });
+  it("reads once per turn: one call even when the turn runs several rounds", async () => {
+    on();
+    askMock.mockResolvedValue({ answer: "unknown", quote: "" });
+    const calls = await play("Dawn breaks over the cemetery.");
+    expect(askMock).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(3);
+  });
 });
