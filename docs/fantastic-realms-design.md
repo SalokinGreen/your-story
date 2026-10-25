@@ -1,11 +1,9 @@
 # Fantastic Realms — design
 
 **Status:** approved ("Build it", decision 219), revised after Codex's review
-([`research/codex-fantastic-realms-review-2026-10-25.md`](research/codex-fantastic-realms-review-2026-10-25.md)),
-for the author's go. Not approved for building yet. Decisions 201–218
-(`docs/decisions.md`). The implementation plan (files, signatures and slice
-order) is a second document, written after this one is approved
-(`workflow.md` Phase 3).
+([`research/codex-fantastic-realms-review-2026-10-25.md`](research/codex-fantastic-realms-review-2026-10-25.md)).
+Decisions 201–219 (`docs/decisions.md`). The implementation plan is
+[`fantastic-realms-plan.md`](fantastic-realms-plan.md).
 
 ## 1. What it is
 
