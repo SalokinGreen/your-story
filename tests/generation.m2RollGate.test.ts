@@ -29,7 +29,7 @@ import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import type { StoryData } from "@/app/misc/structs";
 
-const REPROMPT_TEXT = "This scene requires a roll before the turn can end";
+const REPROMPT_TEXT = "This scene is contested";
 
 function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
   return {
@@ -137,11 +137,11 @@ describe("M2 roll-invariant gate - generateStoryTurn integration", () => {
       ),
     ).toBe(false);
 
-    // toolChoice: "required" is set on exactly the rounds immediately after
+    // toolChoice: "auto" is set on exactly the rounds immediately after
     // a gate firing (2 and 3), not on round 1 (the gate hasn't fired yet).
     expect(calls[0].body.toolChoice).toBeUndefined();
-    expect(calls[1].body.toolChoice).toBe("required");
-    expect(calls[2].body.toolChoice).toBe("required");
+    expect(calls[1].body.toolChoice).toBe("auto");
+    expect(calls[2].body.toolChoice).toBe("auto");
   });
 
   it("does not fire when the gate is already satisfied by a roll tool call earlier this turn", async () => {

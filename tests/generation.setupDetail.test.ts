@@ -14,7 +14,7 @@ import { SETUP_APPROVED, SETUP_DISMISSED } from "@/app/misc/setupConfirmAnswer";
 import { setupEngineLine } from "@/app/misc/campaignPlan";
 import type { StoryData, StoryLore } from "@/app/misc/structs";
 
-const GATE_TEXT = "Setup is not finished and this turn has not moved it forward";
+const GATE_TEXT = "Next step:";
 
 function note(title: string, type: StoryLore["type"], content: string): StoryLore {
   return {

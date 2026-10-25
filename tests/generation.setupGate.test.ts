@@ -17,8 +17,8 @@ import { setSlotOverride } from "@/app/misc/reasoningTiers";
 import { CAMPAIGN_SPINE_BEATS, setupEngineLine } from "@/app/misc/campaignPlan";
 import type { StoryData, StoryLore } from "@/app/misc/structs";
 
-const GATE_TEXT = "Setup is not finished and this turn has not moved it forward";
-const M2_TEXT = "This scene requires a roll before the turn can end";
+const GATE_TEXT = "Next step:";
+const M2_TEXT = "This scene is contested";
 const PLAN_TEXT = "write the next beat before the turn can end";
 
 function createTestStory(overrides: Partial<StoryData> = {}): StoryData {

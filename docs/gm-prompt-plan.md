@@ -188,3 +188,38 @@ revised section, with the "beyond noise" rule there.
 ## Decisions made during implementation
 
 (Filled in as the slices land.)
+
+### 2026-10-25, slice 1
+
+- **`PINNED_NOTE_TYPES`** is `dm_instructions`, `character_sheet`, `gm_plan`
+  (`as const`, exported from `ai_staged.ts`); `gm_notes`, an alias of
+  `dm_instructions`, stays in the private list only. The table's text is
+  `PINNED_TYPES_LINE`, built from the constant and exported for the test.
+  `isPinnedNoteType(…, includeMechanics)` is unchanged: the GM stage still
+  skips `mechanics` from the title categories because it lists them in their
+  own "rules" section.
+- **The "duplicates around 2296 and 2341"** were found by content, not line:
+  the "Pinned types are loaded in FULL" line, "all loaded in full above" in the
+  plan intro, and "game rules are in the pinned notes" in IMPORTANT BEHAVIORS
+  (now says to `read_notes` the rules).
+- **The setup gate's `target_player_name`** is now absent whenever `multiPlayer`
+  is not set, including the default call, so "defaults keep today's text" holds
+  except for that mention (the plan's later rule wins).
+- **`classifySetupRejection` checks the note heading first**, then the question
+  mark: a plan can hold a "?", and the more specific cause says more. Its input
+  is `{ visibleText, toolNames? }`; the generation gate passes `toolNames: []`
+  because a rejected round is by definition one that called no tool.
+- **A rejected quote** is cut to whole sentences within 300 characters; when the
+  first sentence alone is longer, nothing is quoted.
+- **The M2 gate's offered tools** come from `gmBaseTools`' names, so
+  `progress_roll` (a `manage_track` action, not a tool) never appears in the
+  message. `ROLL_OR_ORACLE_TOOL_NAMES` is now exported from `reasoningTiers.ts`.
+- **The legacy setup blocks**: the START OF PLAY block and the overdue block's
+  `start_game` line are unreachable (both are blanked in session zero, which is
+  the only time `sessionZeroActive` holds); they were rewritten to the current
+  flow (`confirm_setup`) anyway. The now-unused `SETUP_REMINDER_URGENT_TURNS`
+  import was removed from `ai_staged.ts`.
+- **Existing tests** that matched the old M2 and setup-gate wording
+  (`generation.setupGate`, `setupDetail`, `m2RollGate`, `claudeCli`) were
+  updated to the new anchors ("This scene is contested", "Next step:"), and the
+  M2 tests now expect `toolChoice` `auto` (and an unforced CLI schema).

@@ -718,7 +718,7 @@ export function computeSceneKey(state: StoryData): string {
 // Tools whose successful call satisfies the M2 roll-invariant gate below -
 // deliberately narrow (this codebase's audit history repeatedly rules out
 // NLP-style grading of freeform narration as the alternative).
-const ROLL_OR_ORACLE_TOOL_NAMES = new Set([
+export const ROLL_OR_ORACLE_TOOL_NAMES = new Set([
   "formula_roll",
   // A roll behind the screen is still a roll - it settles the outcome with
   // dice rather than with narration, which is all this gate asks for.

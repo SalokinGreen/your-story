@@ -448,23 +448,103 @@ const SETUP_STEP_HANDBACK: Record<SetupStep, string> = {
 };
 
 /**
+ * Why the setup gate rejected a round: the GM asked the player a question in
+ * prose instead of through ask_question, wrote the sheet or the plan as prose
+ * instead of create_note, or ended with nothing to show.
+ */
+export type SetupGateCause = "prose_question" | "prose_note" | "nothing";
+
+/** Options for {@link setupGateMessage}. */
+export interface SetupGateOptions {
+  cause?: SetupGateCause;
+  /** The rejected round's visible text, quoted back in whole sentences. */
+  rejected?: string;
+  /** More than one player is at the table (couch, party, online). */
+  multiPlayer?: boolean;
+}
+
+// A heading (markdown or bold) shaped like a character sheet or a plan.
+const SETUP_NOTE_HEADING =
+  /^\s*(?:#{1,6}\s+|\*\*)[^\n]*\b(?:character sheet|campaign plan|spine|fronts?|current beat|opening image)\b/im;
+
+/**
+ * Names the cause of a rejected setup round from what it said and which tools
+ * it called. A sheet- or plan-shaped heading with no create_note is a note
+ * written as prose (checked first, since a plan can hold a question mark); a
+ * question mark with no ask_question is a question asked as prose; anything
+ * else is "nothing".
+ */
+export function classifySetupRejection(round: {
+  visibleText: string;
+  toolNames?: string[];
+}): SetupGateCause {
+  const tools = round.toolNames ?? [];
+  const text = round.visibleText ?? "";
+  if (SETUP_NOTE_HEADING.test(text) && !tools.includes("create_note")) {
+    return "prose_note";
+  }
+  if (text.includes("?") && !tools.includes("ask_question")) {
+    return "prose_question";
+  }
+  return "nothing";
+}
+
+/**
+ * The opening whole sentences of a rejected round, on one line, up to about
+ * `maxChars`. Never cut mid-sentence: when even the first sentence is longer
+ * than the limit, nothing is quoted.
+ */
+export function quoteWholeSentences(text: string, maxChars = 300): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (!flat) return "";
+  const sentences = flat.match(/[^.!?]+(?:[.!?]+["')\]]*|$)/g) ?? [];
+  let out = "";
+  for (const raw of sentences) {
+    const sentence = raw.trim();
+    if (!sentence) continue;
+    const next = out ? `${out} ${sentence}` : sentence;
+    if (next.length > maxChars) break;
+    out = next;
+  }
+  return out;
+}
+
+/**
  * The user message the setup gate adds when a session-zero turn is about to
- * end on prose without moving setup forward. Names the next step and the tool
- * that does it.
+ * end on prose without moving setup forward. Names what was wrong with the
+ * round (when the cause is known), then the next step and the tool that does
+ * it.
  */
 export function setupGateMessage(
   next: SetupStep | null,
   creation?: CreationProgress,
+  opts: SetupGateOptions = {},
 ): string {
-  const head =
-    "Setup is not finished and this turn has not moved it forward, so the turn cannot end on prose alone.";
+  const quote = opts.rejected ? quoteWholeSentences(opts.rejected) : "";
+  const said = quote ? ` You wrote: "${quote}"` : "";
+  let head: string;
+  switch (opts.cause) {
+    case "prose_question":
+      head = `A question for the player has to go through ask_question, so their answer is recorded and the turn moves on.${said}`;
+      break;
+    case "prose_note":
+      head = `The character sheet and the plan are saved only by create_note; text in the reply is not kept.${said}`;
+      break;
+    case "nothing":
+      head =
+        "This turn ended with no words and no tool call, and setup is not finished.";
+      break;
+    default:
+      head =
+        "Setup is not finished and this turn has not moved it forward, so the turn cannot end on prose alone.";
+  }
   switch (next) {
     case "interview": {
       const m = creation?.missing[0];
       if (!m) {
         return `${head} Next step: ask the player the next setup question with ask_question, tagged with its setup_step.`;
       }
-      return `${head} Next step: ask ${describeMissing(m)} with ask_question, tagged setup_step "${m.step.id}"${m.player ? ` and target_player_name "${m.player}" if the table has several players` : ""}. ${m.step.hint} Do not call confirm_setup yet.`;
+      return `${head} Next step: ask ${describeMissing(m)} with ask_question, tagged setup_step "${m.step.id}"${m.player && opts.multiPlayer ? ` and target_player_name "${m.player}"` : ""}. ${m.step.hint} Do not call confirm_setup yet.`;
     }
     case "concept":
       return `${head} Next step: ask the player your setup questions with ask_question (their answers set the concept), then continue.`;

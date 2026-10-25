@@ -23,7 +23,6 @@ import { formatTintLine } from "@/app/misc/primaMateria";
 import {
   getSetupProgress,
   getSetupReminder,
-  SETUP_REMINDER_URGENT_TURNS,
   type SetupProgress,
 } from "@/app/misc/campaignPlan";
 import { cleanString } from "@/app/misc/textUtils";
@@ -609,14 +608,23 @@ function getStatDescriptor(value: number): string {
 }
 
 // Note types that are pinned (loaded in full every turn) for every stage.
-const BASE_PINNED_NOTE_TYPES = [
+// The campaign plan/spine + per-player arcs is pinned so the GM re-reads the
+// beat it's currently running every turn (see docs/gm-plan-notes-design.md).
+// Exported: the note-type table in the system prompt names these same types
+// from this constant, so the text cannot drift from what the builder pins.
+export const PINNED_NOTE_TYPES = [
   "dm_instructions",
   "character_sheet",
-  "gm_notes",
-  // The campaign plan/spine + per-player arcs. Pinned so the GM re-reads the
-  // beat it's currently running every turn (see docs/gm-plan-notes-design.md).
   "gm_plan",
-];
+] as const;
+const BASE_PINNED_NOTE_TYPES: string[] = [...PINNED_NOTE_TYPES, "gm_notes"];
+
+/**
+ * The note-type table's one line about what the prompt carries in full, built
+ * from {@link PINNED_NOTE_TYPES} so the text cannot drift from what the
+ * builder pins. Exported for the tests.
+ */
+export const PINNED_TYPES_LINE = `Only ${PINNED_NOTE_TYPES.map((t) => `\`${t}\``).join(", ")} notes are carried in full every turn, so keep them short. Every other type, \`mechanics\` included, is listed by title: open it with \`read_notes\` when you need it.`;
 
 // Shared pinned-note-type check, parameterized so the GM-Stage/other-stage
 // difference is explicit instead of two copy-pasted closures silently
@@ -1809,7 +1817,7 @@ export function buildGMStagePrompt({
   if (gmPlanLore.length > 0) {
     const activeSideBeat = storyData.activeSideBeatTitle;
     const plan = storyData.planState;
-    loreSection += `\n## 📌 CAMPAIGN PLAN\nYour living plan for this campaign - a situation, not a script. Keep it current with edit_note.\n- The Spine is a PREDICTION of the drama, not a track: when play diverges, rewrite the remaining beats rather than steering players back.\n- Detail ONLY the current beat in full; future beats stay one-liners until you reach them.\n- Tick checklist items ([ ] -> [x]) as they happen. When the current beat's "advance-on" trigger (player action OR time/consequence) is met: call \`advance_plan\` (complete_current), then \`advance_plan\` (write_next) with the next beat detailed - do both before narrating onward.\n- Fronts advance on their own via their doom clocks (manage_timer); tick them on time triggers or failures, and rewrite a Front's steps when the players neutralize its cause.\n`;
+    loreSection += `\n## 📌 CAMPAIGN PLAN\nYour living plan for this campaign - a situation, not a script. Keep it current with edit_note.\n- The Spine is a PREDICTION of the drama, not a track: when play diverges, rewrite the remaining beats rather than steering players back.\n- Detail ONLY the current beat in full; future beats stay one-liners until you reach them.\n- Tick checklist items ([ ] -> [x]) as they happen. When the current beat's "advance-on" trigger (player action OR time/consequence) is met: call \`advance_plan\` (complete_current), then \`advance_plan\` (write_next) with the next beat detailed - do both before narrating onward.\n- You tick a front's clock yourself with \`manage_timer\`, on a time trigger or a failure, and rewrite a Front's steps when the players neutralize its cause.\n`;
     if (plan) {
       const beatName = plan.beats[plan.currentBeatIndex] ?? "?";
       loreSection += `- Current beat: **${beatName}** (${
@@ -1837,7 +1845,7 @@ export function buildGMStagePrompt({
 
   // Folder notes by category: Titles only
   if (noteCategories.npc.length > 0) {
-    loreSection += `\n## 👤 NPC NOTES (use read_notes to view, read them for details on NPCs beyond NPC summary.)\n`;
+    loreSection += `\n## 👤 NPC NOTES (NPC summaries; read the note for more)\n`;
     loreSection += renderNoteTitleList(noteCategories.npc, "NPC notes");
     loreSection += "\n";
   }
@@ -2051,8 +2059,6 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
         .join("\n")}`
     : "";
 
-  const gmTruncateDesc = (desc: string, max = 200) =>
-    desc.length > max ? desc.slice(0, max).trim() + "..." : desc;
   const gmActiveThreads = (storyData.threads || []).filter(
     (t) => t.status === "active",
   );
@@ -2060,9 +2066,7 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
     ? `## 🧵 Active Story Threads\n${gmActiveThreads
         .map(
           (t) =>
-            `- [${t.priority || "side"}] ${t.title}: ${gmTruncateDesc(
-              t.description,
-            )}`,
+            `- [${t.priority || "side"}] ${t.title}: ${t.description}`,
         )
         .join("\n")}`
     : "";
@@ -2088,11 +2092,10 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
   const freshStorySetupBlock =
     characterSheetLore.length === 0
       ? `\n## 🆕 FRESH STORY - SETUP NEEDED
-This is a brand-new story with no established setting or character yet - the player skipped adventure creation to talk to you directly.
-- If the player's message doesn't give you enough to go on (genre, tone, character concept), ask up to 1-3 concise, friendly questions before creating anything. Do NOT narrate a full opening scene yet - just respond conversationally (use OOC round-brackets or plain text).
-- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (the character sheet - from the CHARACTER SHEET TEMPLATE below when there is one, otherwise fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one). Then call \`start_game\` with a title for the story and a short premise summary, and narrate the opening scene. The plan note must come BEFORE \`start_game\` - \`start_game\` is blocked until it exists.
-- If ANY lore/mechanics/dm_instructions notes already exist on this story (e.g. from an adventure template), \`read_notes\` or \`search_notes\` them before writing the character sheet, mechanics, or plan notes - ground what you create in what's already established instead of inventing a setting from scratch. This is ENFORCED for the plan: \`create_note\` will refuse to create the "Campaign Plan" note until you've called \`read_notes\`/\`search_notes\` this turn, if any such notes exist.
-- Keep the interview short - one or two exchanges at most before diving in.
+This story has no character sheet yet.
+- If the player's message gives no genre, tone or character concept, ask up to three short questions with \`ask_question\` and do not narrate an opening scene yet.
+- \`read_notes\` any notes the story already holds, then write the \`character_sheet\` note (from the CHARACTER SHEET TEMPLATE below when there is one) and the "Campaign Plan" note (type \`gm_plan\`, only the Opening Image beat detailed), both with \`create_note\`.
+- Then narrate the opening scene.
 `
       : "";
 
@@ -2102,7 +2105,7 @@ This is a brand-new story with no established setting or character yet - the pla
   // to call start_game before narrating the opening scene.
   const sessionZeroStartGameReminder =
     storyData.sessionZeroActive && characterSheetLore.length > 0
-      ? `\n## 🎬 START OF PLAY\nThis story already has its setup (character sheet/premise) from the creation wizard, but hasn't formally started yet. Two things, in this order, before you narrate the opening scene:\n1. Create the campaign spine - \`read_notes\`/\`search_notes\` the existing notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: ..., ... })\` with ONLY the Opening Image beat detailed (see the CAMPAIGN PLAN section).\n2. Call \`start_game\` with a title for the story (and a short premise summary if useful) to kick off play. **\`start_game\` is BLOCKED until the Campaign Plan note exists** - it will return an error if you call it first.\n`
+      ? `\n## 🎬 START OF PLAY\nThis story has its character sheet but not its campaign plan. \`read_notes\` the notes it holds, write the "Campaign Plan" note (type \`gm_plan\`, only the Opening Image beat detailed) with \`create_note\`, then call \`confirm_setup\` so the player can approve the setup and start the game.\n`
       : "";
 
   // ⏳ Setup-overdue reminder (getSetupReminder, campaignPlan.ts): the two
@@ -2116,23 +2119,19 @@ This is a brand-new story with no established setting or character yet - the pla
         setupReminder.level === "urgent"
           ? `🚨 SETUP OVERDUE - FINISH IT THIS TURN (${setupReminder.turns} turns in)`
           : `⏳ SETUP UNFINISHED (${setupReminder.turns} turns in)`
-      }\nThis story is ${setupReminder.turns} player turns old and setup still isn't done:
+      }\nThis story is ${setupReminder.turns} player turns old and setup is not done:
 ${
   setupReminder.missingPlan
-    ? `- **No campaign plan exists.** \`read_notes\`/\`search_notes\` any existing lore/mechanics/dm_instructions notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the current/Opening Image beat detailed - later beats stay one-line placeholders. See the CAMPAIGN PLAN section.\n`
+    ? `- **No campaign plan exists.** \`read_notes\` the notes the story holds, then write the "Campaign Plan" note (type \`gm_plan\`, only the Opening Image beat detailed) with \`create_note\`.\n`
     : ""
 }${
         setupReminder.missingStart
-          ? `- **\`start_game\` has not been called**, so this story is still unnamed and stuck in session zero (which pins your reasoning tier at maximum every turn). Call it with a title once the plan exists.${
-              setupReminder.missingPlan
-                ? " It is BLOCKED until the Campaign Plan note exists, so do the plan first."
-                : ""
-            }\n`
+          ? `- **The player has not approved the setup.** Call \`confirm_setup\` so they can review the sheet and the plan and start the game.\n`
           : ""
       }${
         setupReminder.level === "urgent"
-          ? `Do this NOW, in this turn's tool calls, before any further narration - setup should have been finished by turn ${SETUP_REMINDER_URGENT_TURNS} at the very latest.`
-          : `Handle it this turn alongside your normal narration - don't put it off again.`
+          ? `Do this in this turn's tool calls, before any further narration.`
+          : `Do this alongside this turn's narration.`
       }\n`
     : "";
 
@@ -2319,24 +2318,24 @@ When using \`create_note\`, always set the \`type\` parameter:
 
 | Type | Use For | Example Titles |
 |------|---------|----------------|
-| \`npc\` | Character details, stats | "Captain Aldric", "The Merchant Zara" |
-| \`location\` | Places, regions, buildings | "The Frozen Wastes", "Tavern of the Lost" |
-| \`item\` | Artifacts, equipment | "Sword of Flames", "Ancient Amulet" |
-| \`faction\` | Organizations, guilds | "The Shadow Guild", "Royal Guard" |
-| \`event\` | Historical events | "The Fall of the Empire" |
-| \`lore\` | General world-building | "Elven Customs", "The Great War" |
+| \`npc\` | Character details, stats | "<NPC name>", "<NPC name and role>" |
+| \`location\` | Places, regions, buildings | "<Region name>", "<Building name>" |
+| \`item\` | Artifacts, equipment | "<Item name>", "<Item name and place>" |
+| \`faction\` | Organizations, guilds | "<Faction name>", "<Faction name and rank>" |
+| \`event\` | Historical events | "<Event name>" |
+| \`lore\` | General world-building | "<Custom or topic>", "<War or era name>" |
 | \`secret\` | GM-only hidden info | "The villain's true identity" |
-| \`dm_instructions\` | 📌 GM guidance (always loaded) | "Combat Rules", "Session Guidelines" |
-| \`character_sheet\` | 📌 Player character (always loaded) | "Hero Stats", "Character Background" |
-| \`mechanics\` | 📌 Game rules (always loaded) | "Magic System", "Dice Formulas" |
-| \`gm_plan\` | 📌 Campaign spine + per-player arcs (always loaded) | "Campaign Plan", "Arc — Kael" |
+| \`dm_instructions\` | GM guidance | "<Rule set> Guidelines" |
+| \`character_sheet\` | The player character | "<Character name>" |
+| \`mechanics\` | Game rules | "<System> Rules" |
+| \`gm_plan\` | Campaign spine and per-player arcs | "Campaign Plan", "Arc - <Character name>" |
 
-**📌 Pinned types** are loaded in FULL every turn - use sparingly!
+${PINNED_TYPES_LINE}
 
-**Example:** \`create_note({ title: "Captain Aldric", content: "...", type: "npc" })\`
+**Example:** \`create_note({ title: "<NPC name>", content: "...", type: "npc" })\`
 
 ## 📋 CAMPAIGN PLAN (situations, not scripts)
-You keep a living plan the way a modern tabletop GM does: it describes a **situation** the players act on, not a **plot** they get marched through. It's the single \`gm_plan\` note titled "Campaign Plan", plus one \`gm_plan\` arc note per player - all loaded in full above and visible to the player. The plan has four parts: a **Spine** (your prediction of the drama), **Fronts** (threats that move on their own), **Secrets & Clues** (facts to discover), and **Character Arcs**.
+You keep a living plan the way a modern tabletop GM does: it describes a **situation** the players act on, not a **plot** they get marched through. It's the single \`gm_plan\` note titled "Campaign Plan", plus one \`gm_plan\` arc note per player, all visible to the player. The plan has four parts: a **Spine** (your prediction of the drama), **Fronts** (threats that move on their own), **Secrets & Clues** (facts to discover), and **Character Arcs**.
 - **Escalate reasoning for plan-shaping work.** Creating or editing the plan (including \`advance_plan\`), refreshing character arcs, standing up or advancing a Front, and opening/closing a side beat are campaign-shaping calls, not ordinary narration - call \`set_reasoning_tier({ tier: 3, reason: "..." })\` (the top tier) before making them. You don't need to set it back down - it decays toward baseline on its own.
 - **Read before you plan (ENFORCED).** Before creating the spine, \`read_notes\`/\`search_notes\` any existing \`lore\`, \`mechanics\`, and \`dm_instructions\` notes for this adventure - the beats, Fronts, and character arcs must reflect the established setting, tone, and rules, not a generic plan invented in a vacuum. If any such notes exist, \`create_note\` will refuse to create "Campaign Plan" until you've called \`read_notes\`/\`search_notes\` this turn - do that first, THEN create the plan in the same or a later turn.
 - **Let the oracle seed what you're unsure of.** Writing the premise, a beat's likely shape, a Front's motive, or a candidate arc direction often means inventing something you don't actually know yet (who the antagonist really is, how a complication resolves, which of a character's directions the fiction is leaning toward). Don't just default to the first idea that comes to mind - call \`fate_question\` (with an honestly calibrated likelihood) or \`roll_table\` for it, same discipline as CORE STANCE's "manufactured certainty" rule, just applied to plan-writing instead of in-scene narration.
@@ -2360,7 +2359,7 @@ You keep a living plan the way a modern tabletop GM does: it describes a **situa
 ### Fronts - threats that advance on their own
 A Front is a danger with its own agenda that moves in the background whether or not the players engage it. This is how you avoid railroading: rather than scripting what the players do, you set volatile forces in motion and react logically to their interventions.
 - **Build a Front from existing tools, not plan prose:** \`create_thread\` (priority "background") carries its motive + cast; \`manage_timer\` is its **doom clock** (its \`description\` = what happens when it fills). Give the thread 2-4 **escalation steps** (Step 1 -> 2 -> 3) in its description, each tied to a clock position.
-- **Advance a Front** by ticking its clock (\`manage_timer\`) on a time trigger or a player failure, and telegraph the next step before it lands. When the players neutralize a Front's cause, **rewrite or resolve/abandon** its steps - a defused threat does not limp forward to the next one.
+- **Advance a Front** by ticking its clock yourself with \`manage_timer\` on a time trigger or a player failure, and telegraph the next step before it lands. When the players neutralize a Front's cause, **rewrite or resolve/abandon** its steps - a defused threat does not limp forward to the next one.
 - The plan note's **Fronts** section only INDEXES each active Front (name, motive, current step, clock state) - the real state lives in the thread + timer, the same way you index threads/goals rather than restating them.
 
 ### Secrets & Clues - facts, decoupled from how they're found
@@ -2376,7 +2375,7 @@ A Front is a danger with its own agenda that moves in the background whether or 
 - Look up notes BEFORE making assumptions about enemy stats or NPC details
 - If no stat sheet exists for an enemy, create one before combat rolls
 - Record significant moments so you remember them in future turns
-- The player's character sheet and game rules are in the pinned notes - reference them
+- The player's character sheet is in the pinned notes - reference it; read the rules notes with \`read_notes\` when a check needs them
 
 Write immersive prose. The player should experience the story, not see game mechanics.
 Keep every turn tight and short: one action, one consequence, then stop and hand control back - never decide what the player character does next, and never write more than the moment calls for.`;
