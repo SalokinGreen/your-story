@@ -1355,7 +1355,9 @@ review in `docs/research/codex-judge-layer-review-2026-10-24.md`).
 `DEFAULT_OBSERVER_SETTINGS` (frozen; every reader gets a copy, `settingsFor`,
 `cloneDefaultObserverSettings`) has **every judge on** (decision 220): the three
 prose judges (`REWRITABLE_FLAG_TYPES`: length, agency, outcome) rewrite a
-flagged turn automatically (`triggersReset`), the other three flag. A stored
+flagged turn automatically (`triggersReset`), the others flag (and the three
+judges of the record added by judge layer v2, world consistency, secret leak
+and lines and veils, flag only for now). A stored
 config without `observerSettingsVersion: 3` (`OBSERVER_SETTINGS_VERSION`) is
 replaced by the defaults once, with a Debug Logs line (`getObserverSettings`,
 `layerSettings.ts`); a player's later choices are kept, and the flag-only table
@@ -1451,7 +1453,41 @@ given back if the GM answers with no words), while a tools-only contract re-ask
 keeps the draft and drops the acknowledgement. After narration the same checks
 run once more for the Debug Logs; the pacing hits make a GM-only
 `ScenePart.pacingNote`, carried into the next live block under the story-progress
-check-in (decision 235). Judge-based rewrites are unchanged in this slice.
+check-in (decision 235).
+
+**Judge layer v2, slice J2: the combined judge call** (`docs/judge-layer-v2-plan.md`
+slice 2; confirmation and the rewrite with facts are J3 and not built).
+`runObserver` no longer makes one call per judge: every judge whose
+precondition holds (`selectJudges`: length past the ceiling, agency with a
+player line, outcome with a typed ruling, world consistency when the prose names
+a person or place of the record, secret leak with an unrevealed secret, lines
+and veils with a line or veil, the oracle judge when no oracle ran, the tier
+judge below the top tier) goes into **one** `callSideModel` call per pass (the rewriting judges before release, the rest in the background wave, one more per pause)
+(`judges/combined.ts`, prompts in `judges/prompts.ts`) on the side-agent model
+at its explicit effort. The prompt is written to the prompt rules (decision
+238): each judge a numbered decision chain with a minimal pair (`RUBRICS`; the
+agency chain is the shared `AGENCY_CHAIN`), the turn's facts first, each in its
+own fields (`collectTurnFacts` now tags `topic` and `names`, adds the character
+sheet and the record's people-at-locations; `selectFactsFor` hands a judge only
+its kinds), the narration last, and a keyed JSON reply whose facts-shaped
+fields and reasoning come before the verdict. `parseJudgeVerdicts` trusts a
+verdict only when its severity is in the set, its quote is really in the
+narration (the player's line for the tier judge) and every fact id exists;
+anything else, a missing key and malformed JSON included, is "unknown": no flag,
+a Debug Logs line. Facts are never truncated: past about 3,000 tokens the call
+splits into two by judge group (`planCalls`). A judge's free-text `fix` goes to the corrective prompt and the Debug Logs only: every flag `detail` the player can see is a fixed sentence per judge. A Stop passes through; a failed
+call is unknown. The scene-increment question is a free phrase check
+(`sceneIncrementFlag`), not a judge. The per-judge calls survive as
+`runObserverSplit`, reachable only from the eval runner (J4), never Settings.
+**Every correction goes through one path:** the speculative length rewrite is
+gone, several major flags are acted on in `FLAG_PRIORITY` order (lines and veils,
+secret leak, outcome, world, agency, length; `pickMajorFlag`), and the full-turn
+tier retry is refused when the turn already threw dice (`executedRandomness`).
+The three new judges are flag-only (`FLAG_ONLY_FLAG_TYPES`) until slice 3; an
+older stored config that does not name them reads their defaults
+(`ObserverSettings` lets the newer types be absent), so no settings-version
+bump. A secret-leak flag is generic and never quotes the secret; the quote
+stays in the Debug Logs.
 
 ## BYOK, no accounts, local storage, native shells
 

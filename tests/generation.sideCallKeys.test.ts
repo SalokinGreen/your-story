@@ -27,6 +27,7 @@ import { NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import type { MemoryEntry, StoryData } from "@/app/misc/structs";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import { isJudgeCall } from "./helpers/combinedJudges";
 
 const MISTRAL_KEY = "mistral-test-key";
 const ZAI_KEY = "zai-test-key";
@@ -96,7 +97,7 @@ const isStoryProgress = (call: SideCall) =>
 const isDirectorAssistant = (call: SideCall) =>
   call.body.messages[0]?.content?.includes("spotlight-tracking layer") ?? false;
 const isObserverJudge = (call: SideCall) =>
-  call.body.messages[0]?.content?.includes("took a decision away from the player") ?? false;
+  isJudgeCall(call.body);
 
 /**
  * Non-streaming /api/generate side calls get canned answers keyed on their

@@ -9,6 +9,7 @@
  * callReflectionApi's fetch call.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { judgeReply } from "./helpers/combinedJudges";
 import {
   checkResponseLength,
   checkPlayerAgencyViolation,
@@ -16,6 +17,7 @@ import {
   checkToolUsageGaps,
   checkTierEscalation,
   runObserver,
+  runObserverSplit,
   prospectiveLengthFlag,
   observerSuspensionReason,
   hasCharacterSheetNote,
@@ -74,12 +76,12 @@ function verdict(
 }
 
 /**
- * runObserver with every judge on and allowed to rewrite - what the defaults
+ * runObserverSplit (the eval runner's split form) with every judge on and rewriting - what the defaults
  * were before decision 187. The suites below exercise the judges themselves;
  * the defaults have their own describe block.
  */
-function runAllJudges(params: Parameters<typeof runObserver>[0]) {
-  return runObserver({ settings: LEGACY_OBSERVER_SETTINGS, ...params });
+function runAllJudges(params: Parameters<typeof runObserverSplit>[0]) {
+  return runObserverSplit({ settings: LEGACY_OBSERVER_SETTINGS, ...params });
 }
 
 describe("checkResponseLength", () => {
@@ -1787,7 +1789,7 @@ describe("character context reaches the judges", () => {
   });
 });
 
-describe("runObserver", () => {
+describe("runObserverSplit (the version-1 judges, one call each)", () => {
   const originalFetch = global.fetch;
 
   afterEach(() => {
@@ -2417,10 +2419,10 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
   });
 
   it("counts the calls the enabled judges can add, for the cost line", () => {
-    // Defaults: every judge on and the prose judges rewrite.
+    // Defaults: the agency judge rewrites (a pass before release) and the oracle and tier judges run in the background wave.
     expect(countJudgeCalls(cloneDefaultObserverSettings())).toEqual({
-      always: 3,
-      sometimes: 2,
+      always: 2,
+      sometimes: 0,
       rewrites: true,
     });
     // The flag-only table: the outcome judge only, and only on a turn with a ruling.
@@ -2430,8 +2432,8 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
       rewrites: false,
     });
     expect(countJudgeCalls(LEGACY_OBSERVER_SETTINGS)).toEqual({
-      always: 3,
-      sometimes: 2,
+      always: 2,
+      sometimes: 0,
       rewrites: true,
     });
   });
@@ -2464,12 +2466,14 @@ describe("runObserver with the flag-only settings (decision 187's table)", () =>
   });
 
   it("judges only the outcome, once, on a turn with a ruling", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn().mockImplementation(async (_url, init) => ({
       ok: true,
       json: async () => ({
-        content: JSON.stringify({ mismatch: true, reason: "Result 1 was a miss." }),
+        content: judgeReply(JSON.parse(init.body), {
+          outcome: { severity: "major", fix: "Result 1 was a miss." },
+        }),
       }),
-    });
+    }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const flags = await runObserver({

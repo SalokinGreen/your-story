@@ -25,6 +25,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import { isJudgeCall, judgeReply, requestedJudges } from "./helpers/combinedJudges";
 import type { ObserverSettings } from "@/app/misc/observer";
 import {
   applyBackgroundFlags,
@@ -114,7 +115,7 @@ function isRewrite(call: ObserverCall): boolean {
 }
 
 function isAgencyJudge(call: ObserverCall): boolean {
-  return call.body.messages[0]?.content?.includes("took a decision away from the player") ?? false;
+  return isJudgeCall(call.body) && requestedJudges(call.body).includes("agency");
 }
 
 /**
@@ -135,7 +136,7 @@ function createFetchMock(
     if (String(url) === "/api/generate") {
       const call: ObserverCall = { body: JSON.parse(init!.body as string) };
       observerCalls.push(call);
-      const content = await respond(call);
+      const content = judgeAware(call, await respond(call));
       return { ok: true, json: async () => ({ content }) } as unknown as Response;
     }
     const gmFetch = gm.fetchMock as unknown as (
@@ -166,6 +167,24 @@ const AGENCY_VIOLATION = JSON.stringify({
   severity: "major",
   reason: "Spoke for the player.",
 });
+
+/**
+ * The judges are one call answering a keyed verdict per judge. The scripted
+ * strings above and below stand for "this judge says major"; anything else is
+ * a clean sheet for a judge call, and passes through for any other side call.
+ */
+function judgeAware(call: ObserverCall, scripted: unknown): unknown {
+  if (!isJudgeCall(call.body)) return scripted;
+  const text = typeof scripted === "string" ? scripted : "";
+  return judgeReply(call.body, {
+    ...(text === AGENCY_VIOLATION && {
+      agency: { severity: "major" as const, fix: "Spoke for the player." },
+    }),
+    ...(text.includes('"should_escalate":true') && {
+      tier_gap: { severity: "major" as const, fix: "This turn needed more careful adjudication." },
+    }),
+  });
+}
 
 /** Lets the fire-and-forget background wave settle before asserting on it. */
 async function flushBackground(): Promise<void> {
@@ -263,7 +282,7 @@ describe("observer deferral - generateStoryTurn integration", () => {
     expect(result.content).toBe(LONG_NARRATION);
     expect(
       observerCalls.filter((call) =>
-        call.body.messages[0]?.content?.includes("usual ceiling of ~"),
+        isJudgeCall(call.body) && requestedJudges(call.body).includes("length"),
       ).length,
     ).toBe(1);
   });
@@ -355,7 +374,7 @@ describe("the background observer never rewrites (decision 221) - generateStoryT
       SHORT_NARRATION,
       async (call) => {
         if (isRewrite(call)) return REWRITTEN;
-        if (call.body.messages[0]?.content?.includes("reasoning tier")) {
+        if (isJudgeCall(call.body) && requestedJudges(call.body).includes("tier_gap")) {
           return JSON.stringify({
             should_escalate: true,
             reason: "This turn needed more careful adjudication.",
@@ -401,16 +420,15 @@ describe("the background observer never rewrites (decision 221) - generateStoryT
     // before the player gets it back and the full-turn retry at a higher tier
     // is still on the table - the case the check was built for.
     const RETRY_NARRATION = "You parry, and the blade skates off your bracer.";
-    // Two rounds per attempt: a roll (combat is a gated scene, so the M2
-    // roll-invariant gate would force another round without one) and then the
-    // prose that ends the turn. Two attempts, because the first gets reset.
-    const rollRound = {
-      toolCalls: [{ name: "formula_roll", arguments: { formulas: ["1d20"] } }],
-    };
+    // Two rounds per attempt: the prose, then the same prose again once the M2
+    // roll-invariant gate (combat is a gated scene) has asked for a roll and the
+    // GM has declined. No dice are thrown, which is what lets the retry run: a
+    // turn that threw dice is never re-run (judge layer v2). Two attempts,
+    // because the first gets reset.
     const gm = createMockGMFetch([
-      rollRound,
       { content: SHORT_NARRATION },
-      rollRound,
+      { content: SHORT_NARRATION },
+      { content: RETRY_NARRATION },
       { content: RETRY_NARRATION },
     ]);
     const observerCalls: ObserverCall[] = [];
@@ -422,16 +440,20 @@ describe("the background observer never rewrites (decision 221) - generateStoryT
         // Only the FIRST attempt is flagged - the retry has to be allowed to
         // finish, or the turn would loop until the reset budget ran out.
         const isTierJudge =
-          call.body.messages[0]?.content?.includes("reasoning tier") ?? false;
+          isJudgeCall(call.body) && requestedJudges(call.body).includes("tier_gap");
         const escalate = isTierJudge && !escalationIssued;
         if (escalate) escalationIssued = true;
         return {
           ok: true,
           json: async () => ({
-            content: escalate
-              ? JSON.stringify({
-                  should_escalate: true,
-                  reason: "A boss fight deserves careful adjudication.",
+            content: isJudgeCall(call.body)
+              ? judgeReply(call.body, {
+                  ...(escalate && {
+                    tier_gap: {
+                      severity: "major" as const,
+                      fix: "A boss fight deserves careful adjudication.",
+                    },
+                  }),
                 })
               : ALL_CLEAR,
           }),

@@ -25,6 +25,7 @@ import {
   type ScriptedGMRound,
 } from "./helpers/mockGMFetch";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import { isJudgeCall, judgeReply } from "./helpers/combinedJudges";
 import { expectAlternatingRoles } from "./helpers/roles";
 import type { StoryData } from "@/app/misc/structs";
 
@@ -431,8 +432,9 @@ async function runTurn(narration: string, lengthJudgeJustified: boolean, gmRound
       if (last.includes("flagged by an automated reviewer")) {
         rewriteCalls.push(req);
         content = REWRITTEN;
-      } else if (messages[0]?.content?.includes("usual ceiling of ~")) {
-        content = judge(lengthJudgeJustified);
+      } else if (isJudgeCall(req.body)) {
+        // The judges are one call answering a keyed verdict per judge.
+        content = judgeReply(req.body, lengthJudgeJustified ? {} : { length: "major" });
       }
       return { ok: true, json: async () => ({ content }) } as unknown as Response;
     }

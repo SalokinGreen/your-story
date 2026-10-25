@@ -10,6 +10,37 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Judge layer J2: the combined judge call
+
+Every item needs a live model and the author's go; the parsing, the
+preconditions, the facts and the wiring are covered by `tests/judges.combined.test.ts`,
+`tests/generation.judgeFacts.test.ts` and `tests/generation.lengthRewrite.test.ts`.
+The labelled set (J4) is what will measure these properly.
+
+- **The combined call answers in the shape the parser wants.** Play five turns
+  with a Haiku side agent and the default judges (a player line each turn). In
+  the Debug Logs, "Judge … : unknown" lines should be rare. Failure looks like
+  every judge "unknown" with "the reply was not a JSON object" (the model wraps
+  the object in prose or breaks the JSON), or "the quote is not in the
+  narration" on a clean turn (it paraphrases instead of quoting).
+- **No new false flags from the prose judges.** On those turns, a turn that
+  narrates only the declared action ("go on", "I climb down") must not get an
+  agency flag, and a long setup answer must not get a length rewrite. Failure
+  looks like "Revised after a check" on an ordinary turn.
+- **The judges of the record.** In a campaign with an unrevealed secret, a line
+  and a dead person (the Designer does not write them yet: add them by hand to
+  `StoryData.campaign`), play a turn where the narration states the secret and
+  one where a dead person speaks. Expected: a Secret Leak or World Consistency
+  flag in the turn's details, no rewrite (they flag only in this slice), and the
+  Debug Logs show the quote. Failure looks like no flag (the judge answered
+  "none") or a flag on a turn that only hints.
+- **One call per pass.** In the Debug Logs' cost breakdown, a normal turn shows
+  one "judges (…)" observer call (two when a rewriting judge and a background
+  judge both run), not five. Failure looks like the old per-judge labels.
+- **Length rewrite latency.** A turn well over the length ceiling now waits for
+  the judge and then for the rewrite (the speculative rewrite is gone). Note the
+  wait; it should be one judge call plus one rewrite.
+
 ## 2026-10-25 — Campaign slice 3: session zero builds the campaign
 
 Needs a live model and the author's go (or a screenshot session for the card);

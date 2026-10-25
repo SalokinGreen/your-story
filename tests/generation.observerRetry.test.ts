@@ -13,6 +13,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import { isJudgeCall, judgeReply, requestedJudges } from "./helpers/combinedJudges";
 import type { ResolvedTier } from "@/app/misc/reasoningTiers";
 import type { StoryData } from "@/app/misc/structs";
 
@@ -105,30 +106,35 @@ async function runFlaggedTurn(
     dispatchEvent: vi.fn(),
   });
 
-  const rollRound = {
-    toolCalls: [{ name: "formula_roll", arguments: { formulas: ["1d20"] } }],
-  };
+  // The scene is gated, so the roll gate asks for a roll after the prose and
+  // the GM declines with the same prose again. No dice are thrown: a turn that
+  // threw dice is never re-run (judge layer v2), and this test is about the
+  // tier the re-run lands on.
   const gm = createMockGMFetch([
-    rollRound,
     { content: FIRST_NARRATION },
-    rollRound,
+    { content: FIRST_NARRATION },
+    { content: RETRY_NARRATION },
     { content: RETRY_NARRATION },
   ]);
   let escalationIssued = false;
   global.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
     if (String(url) === "/api/generate") {
       const body = JSON.parse(init!.body as string) as {
-        messages: { content: string }[];
+        messages: { role: string; content: string }[];
       };
-      const isTierJudge = body.messages[0]?.content?.includes("reasoning tier") ?? false;
+      const isTierJudge = isJudgeCall(body) && requestedJudges(body).includes("tier_gap");
       // Only the FIRST attempt is flagged, so the retry can finish.
       const escalate = isTierJudge && !escalationIssued;
       if (escalate) escalationIssued = true;
       return {
         ok: true,
         json: async () => ({
-          content: escalate
-            ? JSON.stringify({ should_escalate: true, reason: "This needed more care." })
+          content: isJudgeCall(body)
+            ? judgeReply(body, {
+                ...(escalate && {
+                  tier_gap: { severity: "major" as const, fix: "This needed more care." },
+                }),
+              })
             : ALL_CLEAR,
         }),
       } as unknown as Response;

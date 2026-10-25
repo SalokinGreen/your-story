@@ -12,6 +12,7 @@ import type { GenerationCallbacks } from "@/app/misc/generation";
 import { createMockGMFetch, sseStreamResponse } from "./helpers/mockGMFetch";
 import { expectAlternatingRoles } from "./helpers/roles";
 import { FLAG_ONLY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import { isJudgeCall, judgeReply, requestedJudges } from "./helpers/combinedJudges";
 import { cloneDefaultObserverSettings } from "@/app/misc/observer";
 import type { StoryData } from "@/app/misc/structs";
 import type { ObserverSettings } from "@/app/misc/observer";
@@ -109,13 +110,15 @@ interface Call {
 const first = (c: Call) => c.body.messages[0]?.content ?? "";
 const last = (c: Call) => c.body.messages[c.body.messages.length - 1]?.content ?? "";
 const isRewrite = (c: Call) => last(c).includes("flagged by an automated reviewer");
-const isLengthJudge = (c: Call) => first(c).includes("usual ceiling of ~");
-const isAgencyJudge = (c: Call) => first(c).includes("took a decision away from the player");
+const judgesOf = (c: Call): string[] => (isJudgeCall(c.body) ? requestedJudges(c.body) : []);
+const isLengthJudge = (c: Call) => judgesOf(c).includes("length");
+const isAgencyJudge = (c: Call) => judgesOf(c).includes("agency");
 const isChoices = (c: Call) =>
   c.url === "/api/generate-stream" && !c.body.tools && first(c).includes("choice designer");
 
 let choicesFail = false;
 let storyStageContent: string | null = null;
+// The pass the player waits on (the rewriting judges); the background wave is a separate call.
 const isAnyJudge = (c: Call) => isLengthJudge(c) || isAgencyJudge(c);
 
 /** One shared, ordered log of what the judges were asked and what the player was shown. */
@@ -133,7 +136,17 @@ function installFetch(
       if (isRewrite(call)) events.push("call:rewrite");
       else if (isAnyJudge(call)) events.push("call:judge");
       else events.push("call:other");
-      const content = await respond(call);
+      const scripted = await respond(call);
+      // The judges are one call answering a keyed verdict per judge: the
+      // scripted strings stand for "this judge says major".
+      const content = isJudgeCall(call.body)
+        ? judgeReply(call.body, {
+            ...(scripted === LENGTH_UNJUSTIFIED && { length: "major" as const }),
+            ...(scripted === AGENCY_VIOLATION && {
+              agency: { severity: "major" as const, fix: "Spoke for the player." },
+            }),
+          })
+        : scripted;
       return { ok: true, json: async () => ({ content }) } as unknown as Response;
     }
     if (isChoices(call)) {
@@ -682,12 +695,11 @@ describe("prose before a pause is released before the pause shows (decision 240)
 
   it("judges a stretch released unjudged, flag only, in the background", async () => {
     const events: string[] = [];
-    const OUTCOME_JUDGE = "mechanically resolved";
     const settings: ObserverSettings = {
       ...AGENCY_OFF,
       outcome_narration_mismatch: { enabled: true, triggersReset: true, sensitivity: 2 },
     };
-    const isOutcomeJudge = (c: Call) => first(c).includes(OUTCOME_JUDGE);
+    const isOutcomeJudge = (c: Call) => judgesOf(c).includes("outcome");
     const { calls } = installFetch(
       events,
       [
