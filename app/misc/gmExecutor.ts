@@ -770,6 +770,8 @@ export interface GMFeatRollResult {
   successes: number;
   outcome: FeatTier;
   magnitude: number;
+  /** The foe the roll struck, when the GM named one (judge layer, event contracts). */
+  target?: string;
 }
 
 export interface GMInitiativeRollResult {
@@ -7038,6 +7040,9 @@ async function executeFeatRoll(
       successes,
       outcome: result.tier,
       magnitude: result.magnitude,
+      ...(typeof params.target === "string" && params.target.trim()
+        ? { target: params.target.trim() }
+        : {}),
     } as GMFeatRollResult,
     contextForStory: ctx,
   };

@@ -7,6 +7,7 @@
  * registration is its own step.
  */
 import type { BuiltinNote, BuiltinPack, BuiltinSystem } from "../types";
+import { FANTASTIC_REALMS_EVENT_CONTRACTS } from "./contracts";
 import { CORE_NOTE, FANTASTIC_REALMS_CORE_ID } from "./core";
 import { CREATION_NOTE } from "./creation";
 import { FOES_NOTE, LEVELS_NOTE } from "./foes";
@@ -83,6 +84,7 @@ export const FANTASTIC_REALMS: BuiltinSystem = {
     // above all run through end_session.
     "end_session",
   ],
+  eventContracts: FANTASTIC_REALMS_EVENT_CONTRACTS,
   coreNoteId: FANTASTIC_REALMS_CORE_ID,
   defaultSetting: CROSSROADS_SCOPE,
   crossSettingScope: CROSSROADS_SCOPE,

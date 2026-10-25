@@ -648,6 +648,8 @@ export interface FeatRollParams {
   burn?: string; // one of `feats`: one sure success, spent until a rest
   reason: string;
   dice?: number[]; // manual dice mode: one face per die, 1 + feats.length
+  /** The foe the roll strikes. A hit then owes a Hearts change on that foe (an event contract). */
+  target?: string;
 }
 
 export interface InitiativeRollParams {
@@ -2085,6 +2087,7 @@ const featRollTool: ToolSchema = {
         burn: { type: "string", description: "One of feats, to burn it" },
         reason: { type: "string" },
         dice: { type: "array", items: { type: "number" }, description: "Manual dice: the faces reported, 1 + feats" },
+        target: { type: "string", description: "The foe struck, if any" },
       },
       required: ["hero", "feats", "dc", "reason"],
     },

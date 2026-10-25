@@ -53,7 +53,7 @@ const OTHER_SUBJECT = /\b[A-Z][a-z]+/;
 
 export function checkNarrationConsistency(
   narration: string,
-  storyData: StoryData
+  storyData: Pick<StoryData, "npcs">
 ): ConsistencyWarning[] {
   const warnings: ConsistencyWarning[] = [];
   if (!narration.trim()) return warnings;

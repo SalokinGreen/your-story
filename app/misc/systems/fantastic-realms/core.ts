@@ -45,7 +45,7 @@ Each hero has meters: Hearts (3 to start), Level and XP.
 
 ## 6. Fights
 - Initiative, once, when the fight starts: initiative_roll with each hero and their edge_feats (feats that help them get the edge). A hero's number is 1d6 plus 1 per edge feat. A foe's number is its DC plus 1 per edge word (Fast, Ambusher), with no roll. Highest goes first; ties go to the heroes.
-- A hero's turn: they say what they do and feat_roll against the foe's DC. A foe loses hearts by the result: weak hit 1 (and the hero pays a cost), hit 1, strong hit 2, plus 1 for each magnitude. A DC 1 action counts as a hit: 1 heart.
+- A hero's turn: they say what they do and feat_roll against the foe's DC. A foe loses hearts by the result: weak hit 1 (and the hero pays a cost), hit 1, strong hit 2, plus 1 for each magnitude. A DC 1 action counts as a hit: 1 heart. Pass the foe's name as target, and record the loss on its Hearts meter (manage_meter: create it with the foe's hearts when the fight starts, then adjust by the loss).
 - A foe's turn: foes never roll. Narrate its threat (a charge, a spell, an ambush) aimed at one or more heroes. Each targeted hero who has not yet acted rolls to answer it: feat_roll against the foe's DC, with the feats that help. A miss takes the harm (section 4). A weak hit takes it partly or pays another cost. A hit or better avoids it. A strong hit can also turn it back on the foe. Heroes who beat the foe's number act before its threat lands.
 - At 0 hearts a foe is beaten, or flees or yields if its nature allows. After the first round, go back to ordinary turn-taking and move the spotlight.
 

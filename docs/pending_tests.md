@@ -10,6 +10,32 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Judge layer J1: rung 1 and the re-ask
+
+All of this needs a live model and the author's go; the engine side is covered
+by `tests/judges.rung1.test.ts` and `tests/generation.reask.test.ts`.
+
+- **Fantastic Realms fight, with a real GM.** Start Wolfwillow Crossing, get
+  into a fight, strike a foe. Expected: the GM's `feat_roll` carries `target`
+  (the foe's name) and the foe's Hearts meter drops by the damage on the same
+  turn. Failure looks like a `feat_roll` with no `target` (no contract applies,
+  nothing is checked) or, in Debug Logs, "Rung 1 hit (event_contract) - re-asking
+  the GM once" on most hits, meaning the GM is not recording damage unprompted.
+- **After such a re-ask.** The turn's prose is the GM's first draft, with the
+  damage recorded; the Hearts meter lost the right number. Failure looks like the
+  story reading "Recorded." (the acknowledgement kept instead of the draft).
+- **A campaign with a line.** Add a line with a keyword (`campaign` tool, safety
+  lines) and steer a scene toward it. Expected: the keyword never reaches the
+  screen, or Debug Logs show the re-ask and the GM's rewritten passage. Failure
+  looks like a passage that keeps the word, or a GM that answers "same text".
+- **The pacing note is saved.** After a turn that trips a pacing counter, save
+  and reload the story: the last GM part still carries the note (Copy GM
+  context on the next turn shows it). The page copies `pacingNote` in three
+  `onComplete` handlers, which no headless test reaches.
+- **Pacing note.** In a couch or party game with two players, leave one unnamed
+  for four turns. Expected: the next turn's GM prompt (Copy GM context) carries a
+  "has not been addressed by name" line under the story-progress check-in.
+
 ## 2026-10-25 — Engine-review fixes on the campaign slice
 
 - **Play one turn on a Gemini model (Google AI Studio key) in a story that has a

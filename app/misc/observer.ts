@@ -2171,7 +2171,7 @@ export function buildObserverCorrectionNote(
  *  Returns "" when the string carried no reasoning (e.g. a reasoning-tier
  *  model whose chain of thought lived in the separate `reasoning` field and
  *  whose `content` was pure prose). */
-function extractGmReasoning(raw: string | undefined): string {
+export function extractGmReasoning(raw: string | undefined): string {
   if (!raw) return "";
   return parseTaggedContent(raw)
     .filter((b) => b.kind === "thinking")

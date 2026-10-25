@@ -2929,6 +2929,15 @@ function StoryPageContent() {
               };
             }
 
+            // The pacing counters' GM-only note (judges/rung1.ts, decision
+            // 235): without this copy the next turn never reads it.
+            if (lastIdx >= 0 && result.scenePart?.pacingNote) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                pacingNote: result.scenePart.pacingNote,
+              };
+            }
+
             // Copy the story stage's own native reasoning too - it streams
             // live via onStoryReasoning, but without this it never reaches
             // the persisted part, so it vanishes once the live timeline
@@ -3471,6 +3480,15 @@ function StoryPageContent() {
               storyData.scene.parts[lastIdx] = {
                 ...storyData.scene.parts[lastIdx],
                 gmConversation: result.scenePart.gmConversation,
+              };
+            }
+
+            // The pacing counters' GM-only note (judges/rung1.ts, decision
+            // 235): without this copy the next turn never reads it.
+            if (lastIdx >= 0 && result.scenePart?.pacingNote) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                pacingNote: result.scenePart.pacingNote,
               };
             }
 
@@ -4479,6 +4497,15 @@ function StoryPageContent() {
               storyData.scene.parts[lastIdx] = {
                 ...storyData.scene.parts[lastIdx],
                 gmConversation: result.scenePart.gmConversation,
+              };
+            }
+
+            // The pacing counters' GM-only note (judges/rung1.ts, decision
+            // 235): without this copy the next turn never reads it.
+            if (lastIdx >= 0 && result.scenePart?.pacingNote) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                pacingNote: result.scenePart.pacingNote,
               };
             }
 

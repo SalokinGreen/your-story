@@ -1380,6 +1380,27 @@ and the context viewer. "Undo revision" is attached to each revised turn
 (`onUndoRevision`, `restoreObserverOriginal(partIndex)`). Read `docs/architecture-frontier.md` before proposing new
 work in any of these layers — it tracks what was tried and reverted, and why.
 
+**Judge layer v2, slice J1: rung 1 and the re-ask** (`docs/judge-layer-v2-design.md`
+§11, plan slice 1; the combined judge call, confirmation and the rewrite with
+facts are J2/J3 and not built). `app/misc/judges/` holds the facts
+(`collectTurnFacts`, ids `f1…fn` with source and time), the pure rung-1 checks
+(`runRung1`: event contracts, dead or departed people, campaign lines, secret
+key phrases, and the pacing counters) and `buildReask`. A system declares event
+contracts (`BuiltinSystem.eventContracts`); Fantastic Realms' `foe-damage` says
+a landed `feat_roll` that names a `target` foe owes that foe's Hearts meter the
+damage `foeDamage` gives (the *requested* change, so a clamp is no violation).
+`generateStoryTurnOnce` runs rung 1 on the GM's final round beside the turn-end
+checks: a **verified** hit with a fix sends the GM back **once per turn** (one
+appended user message, `tool_choice: "auto"`, at least two rounds left, off in
+session zero and for a repetitive round), the re-ask round **never runs a dice
+tool** (a refused call gets an `[ERROR]` result, `mergeRefusedDiceCalls`), and a
+line's re-ask is answered with new prose that replaces the draft (the draft is
+given back if the GM answers with no words), while a tools-only contract re-ask
+keeps the draft and drops the acknowledgement. After narration the same checks
+run once more for the Debug Logs; the pacing hits make a GM-only
+`ScenePart.pacingNote`, carried into the next live block under the story-progress
+check-in (decision 235). Judge-based rewrites are unchanged in this slice.
+
 ## BYOK, no accounts, local storage, native shells
 
 - **There is no auth, no account and no database of the player's data.**
