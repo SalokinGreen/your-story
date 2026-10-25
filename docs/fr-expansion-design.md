@@ -1,7 +1,7 @@
 # Fantastic Realms, grown — design
 
 **Status:** design, for the author's review. Not approved for building.
-Decisions 243–249 (`docs/decisions.md`). The base system is
+Decisions 243–253 (`docs/decisions.md`). The base system is
 [`fantastic-realms-design.md`](fantastic-realms-design.md) (decisions
 201–219); everything here builds on it and changes none of its rules unless a
 section says so. The implementation plan comes after approval.
@@ -398,12 +398,11 @@ Each realm note, the three old and the three new, gains:
 
 Slices 2–5 are prose the author reads in the PR.
 
-## 13. Open points for the author
+## 13. The open points, decided (2026-10-25)
 
-Each has a proposal; say if you want otherwise.
-
-- **Three conditions put a hero down** (§4), scars not counted.
-- **Team burns twice per rest per party** (§9).
-- **The three new realms** (§6): Thornmere, Emberhold and the Hollow Sky, as
-  written, or your own.
-- **Path feats outside one's calling need the GM's nod** (§5).
+- **Three conditions put a hero down,** scars not counted (§4; decision 250).
+- **Team burns: twice per rest, per party** (§9; decision 251).
+- **The new realms are Thornmere, Emberhold and the Hollow Sky,** as drafted
+  (§6; decision 252).
+- **A path feat outside one's calling needs the GM's nod** and a reason in the
+  story (§5; decision 253).

@@ -431,4 +431,8 @@ The author: "We need to grow the Endless Realms rules a lot more." (Fantastic Re
 | 247 | "Conditions: hearts were chosen over statuses (decision 203). How should conditions sit beside hearts?" | **"Words that cost a die (Recommended)."** A condition takes one die from a roll it gets in the way of (never below 1); the GM may give one instead of a heart; most clear at a rest; hearts stay the main harm. Rejected: story only; replacing hearts. |
 | 248 | "How should gear work?" | **"Gear as feats (Recommended)."** A good item is a feat that can be lost, broken or stolen, with a quality word; plain gear is fiction. Rejected: a separate inventory. |
 | 249 | "How should callings (Knight, Witch, Rogue…) work?" | **"Optional paths (Recommended)."** A starting kit, a signature feat and level-up path feats; a hero may stay freeform; each realm adds local callings. Rejected: required classes. |
+| 250 | "Conditions each cost a die on rolls they hinder. Should piling them up put a hero down?" | **"Three puts you down (Recommended)."** Three conditions at once, scars not counted, put a hero down, as at 0 hearts. Rejected: never down from conditions; four. |
+| 251 | "How often may a party make a team burn (two heroes each burn a feat on one roll)?" | **"Twice per rest (Recommended)."** Twice per rest per party. Rejected: once per rest; no limit. |
+| 252 | "The design adds three new realms. Keep these, or name your own?" | **"Keep all three (Recommended)."** Thornmere, Emberhold and the Hollow Sky, as drafted. |
+| 253 | "Can a hero take a path feat from another calling?" | **"With the GM's nod (Recommended)."** Allowed when the story gives a reason and the GM agrees. Rejected: freely; own calling only. |
 
