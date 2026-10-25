@@ -28,19 +28,38 @@ import {
   MeterSet,
   FantasticRealmsState,
   FantasticRealmsHero,
+  HeroCondition,
   HeroFeat,
+  ItemQuality,
 } from "./structs";
 import {
   FALLBACK_HERO_SET,
   HERO_SET_NAME,
+  HUNGRY_CURE,
+  HUNGRY_WORD,
+  ITEM_QUALITIES,
+  TEAM_BURNS_PER_REST,
   applyXp,
+  attackDamage,
   countSuccesses,
-  foeDamage,
+  describeConditions,
+  describeFeat,
+  describeScars,
+  featUsable,
+  isDown,
+  isSwiftItem,
+  itemQualities,
   levelCost,
   normaliseFeat,
+  poolSize,
+  resetCountersOnState,
+  resetUses,
   resultFor,
+  tallyScore,
   tierWord,
+  usageKey,
   type FeatTier,
+  type UsePer,
 } from "./systems/fantastic-realms/engine";
 import {
   ACTION_ADDS_CAP,
@@ -118,6 +137,7 @@ import {
   EndSessionParams,
   ActionRollParams,
   ManageFeatsParams,
+  ManageFeatsAction,
   FeatRollParams,
   InitiativeRollParams,
   AwardXpParams,
@@ -466,7 +486,7 @@ export interface GMOpposedFormulaResult {
 
 export interface GMChallengeResultRecord {
   type: "record_challenge_result";
-  outcome: "success" | "failure" | "strong_hit" | "weak_hit" | "miss";
+  outcome: "success" | "failure" | "strong_hit" | "weak_hit" | "hit" | "miss";
   description: string;
   target?: string; // Hardness dimension: who the failure consequence lands on
   forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
@@ -758,8 +778,9 @@ export interface GMActionRollResult {
 export interface GMManageFeatsResult {
   type: "manage_feats";
   hero: string;
-  action: "add" | "rename" | "remove";
-  feats: { id: string; wording: string; burned: boolean }[];
+  action: ManageFeatsAction;
+  feats: HeroFeat[];
+  conditions?: HeroCondition[];
 }
 
 export interface GMFeatRollResult {
@@ -775,6 +796,14 @@ export interface GMFeatRollResult {
   magnitude: number;
   /** The foe the roll struck, when the GM named one (judge layer, event contracts). */
   target?: string;
+  /** Hearts the foe loses, Keen included: set on a hit that named a target; contracts.ts reads it. */
+  damage?: number;
+  /** A spell feat was named: a miss is a miscast. */
+  magic?: boolean;
+  helper?: { hero: string; feat: string };
+  teamBurn?: { hero: string; feat: string; ownFeat: string };
+  /** Condition words that took a die. */
+  hindrances?: string[];
 }
 
 export interface GMInitiativeRollResult {
@@ -801,6 +830,8 @@ export interface GMTakeRestResult {
   rested: string[];
   realm?: string;
   condition?: string;
+  /** True when every hero in the state rested: the team burns are renewed. */
+  partyRest?: boolean;
 }
 
 export interface GMTriggerTimerResult {
@@ -2936,15 +2967,18 @@ async function executeOpposedFormula(
 function recordTallyResult(
   toolCallId: string,
   params: RecordChallengeResultParams,
-  challenge: SceneChallenge
+  challenge: SceneChallenge,
+  allowHit = false
 ): GMToolResult {
+  // Fantastic Realms scores its four tiers with tallyScore (design 14); every
+  // other system keeps the three-tier table, and "hit" is an error there.
   const delta =
-    params.outcome === "strong_hit"
-      ? 1
+    params.outcome === "strong_hit" || (allowHit && params.outcome === "hit")
+      ? tallyScore(params.outcome === "hit" ? "hit" : "strong_hit")
       : params.outcome === "weak_hit"
-        ? 0
+        ? tallyScore("weak_hit")
         : params.outcome === "miss"
-          ? -1
+          ? tallyScore("miss")
           : null;
   if (delta === null) {
     return {
@@ -2956,7 +2990,7 @@ function recordTallyResult(
         outcome: params.outcome,
         description: params.description,
       } as GMChallengeResultRecord,
-      contextForStory: `[ERROR: "${challenge.name}" is a tally challenge: record strong_hit, weak_hit or miss (the action_roll outcome), not "${params.outcome}"]`,
+      contextForStory: `[ERROR: "${challenge.name}" is a tally challenge: record ${allowHit ? "strong_hit, hit, weak_hit or miss (the feat_roll outcome)" : "strong_hit, weak_hit or miss (the action_roll outcome)"}, not "${params.outcome}"]`,
     };
   }
 
@@ -2977,9 +3011,11 @@ function recordTallyResult(
   const label =
     params.outcome === "strong_hit"
       ? "STRONG HIT"
-      : params.outcome === "weak_hit"
-        ? "WEAK HIT"
-        : "MISS";
+      : params.outcome === "hit"
+        ? "HIT"
+        : params.outcome === "weak_hit"
+          ? "WEAK HIT"
+          : "MISS";
   let contextForStory = `[Challenge Check ${label}: ${params.description}]`;
   contextForStory += `\n[Challenge "${challenge.name}": round ${challenge.recorded} of ${challenge.rounds}, tally ${formatSigned(challenge.tally)}]`;
   if (completed) {
@@ -3056,8 +3092,24 @@ function executeRecordChallengeResult(
     };
   }
 
+  // "hit" is Fantastic Realms' middle tier; no other system has one.
+  const allowHit = resolveSystem(storyData).tools.includes("feat_roll");
+  if (params.outcome === "hit" && !allowHit) {
+    return {
+      toolName: "record_challenge_result",
+      toolCallId,
+      success: false,
+      result: {
+        type: "record_challenge_result",
+        outcome: params.outcome,
+        description: params.description,
+      } as GMChallengeResultRecord,
+      contextForStory: `[ERROR: "hit" is not an outcome in this story: record ${challenge.mode === "tally" ? "strong_hit, weak_hit or miss (the action_roll outcome)" : "success or failure"}]`,
+    };
+  }
+
   if (challenge.mode === "tally") {
-    return recordTallyResult(toolCallId, params, challenge);
+    return recordTallyResult(toolCallId, params, challenge, allowHit);
   }
 
   // In a first_to challenge a strong or weak hit is a success and a miss a
@@ -3065,7 +3117,8 @@ function executeRecordChallengeResult(
   const succeeded =
     params.outcome === "success" ||
     params.outcome === "strong_hit" ||
-    params.outcome === "weak_hit";
+    params.outcome === "weak_hit" ||
+    params.outcome === "hit";
 
   // Update challenge progress
   if (succeeded) {
@@ -6711,6 +6764,9 @@ function executeEndSession(
   sys.sessionCount += 1;
   const sceneCount = storyData.agmtState?.sceneCount ?? 0;
   sys.dedupKeys = pruneDedupKeys(sys.dedupKeys, sceneCount, sys.sessionCount);
+  // Fantastic Realms: the adventure's counted uses (and the hearth's) start
+  // over. A no-op for a story with no Fantastic Realms state.
+  resetCountersOnState(sys.fantasticRealms, "adventure");
 
   const reset: string[] = [];
   storyData.meters = (storyData.meters ?? []).map((m) => {
@@ -6908,20 +6964,97 @@ function frDisplayName(storyData: StoryData, key: string): string {
   return m?.owner ?? key;
 }
 
-function frFeatList(hero: FantasticRealmsHero): string {
-  return hero.feats.length > 0
-    ? hero.feats.map((f) => (f.burned ? `${f.wording} (burned)` : f.wording)).join(", ")
-    : "none yet";
+function frStr(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
 }
 
-/** The hero set the system carries by name, else the plan's definition. */
-function frHeroSet(storyData: StoryData): MeterSet {
-  const sets = resolveSystem(storyData).meterSets;
-  return (
-    sets.find((s) => normalizeKey(s.name) === normalizeKey(HERO_SET_NAME)) ??
-    FALLBACK_HERO_SET
-  );
+function frFindFeat(feats: HeroFeat[], wording: string): HeroFeat | undefined {
+  return feats.find((f) => normaliseFeat(f.wording) === normaliseFeat(wording));
 }
+
+function frNextFeatId(feats: HeroFeat[], prefix: string): string {
+  const n =
+    feats.reduce((mx, f) => Math.max(mx, Number(/(\d+)$/.exec(f.id)?.[1] ?? 0)), 0) + 1;
+  return `${prefix}-${n}`;
+}
+
+/** A hero's hearts, when the story tracks them; undefined means unknown (never "0"). */
+function frHearts(storyData: StoryData, who: string): number | undefined {
+  return findMeter(storyData.meters ?? [], who, "Hearts")?.value;
+}
+
+function frIsDown(storyData: StoryData, who: string, hero: FantasticRealmsHero | undefined): boolean {
+  return isDown(frHearts(storyData, who), hero?.conditions);
+}
+
+/** `; conditions: Wounded; scars: Fear of Fire; down`, or nothing for a hero with none of them. */
+function frHeroTail(storyData: StoryData, who: string, hero: FantasticRealmsHero): string {
+  const parts: string[] = [];
+  const conditions = describeConditions(hero.conditions);
+  if (conditions) parts.push(`conditions: ${conditions}`);
+  const scars = describeScars(hero.conditions);
+  if (scars) parts.push(`scars: ${scars}`);
+  if (frIsDown(storyData, who, hero)) parts.push("down");
+  return parts.length > 0 ? `; ${parts.join("; ")}` : "";
+}
+
+/** Validates the item qualities of an `add`: items only, known words, at most two. */
+function frCleanQualities(
+  kind: HeroFeat["kind"],
+  raw: unknown
+): { qualities: ItemQuality[] | undefined } | { error: string } {
+  if (raw === undefined || raw === null) return { qualities: undefined };
+  if (!Array.isArray(raw) || raw.some((q) => typeof q !== "string")) {
+    return { error: `"qualities" must be a list of quality words` };
+  }
+  if (raw.length === 0) return { qualities: undefined };
+  if (kind !== "item") return { error: `Only an item can carry qualities (kind: "item")` };
+  const out: ItemQuality[] = [];
+  for (const q of raw as string[]) {
+    const word = q.trim().toLowerCase();
+    if (!(ITEM_QUALITIES as readonly string[]).includes(word)) {
+      return { error: `Unknown quality "${q}". Qualities: ${ITEM_QUALITIES.join(", ")}` };
+    }
+    if (!out.includes(word as ItemQuality)) out.push(word as ItemQuality);
+  }
+  if (out.length > 2) return { error: `An item carries at most two qualities` };
+  return { qualities: out };
+}
+
+/** A new feat from an add-style call, or a message. */
+function frBuildFeat(
+  existing: HeroFeat[],
+  prefix: string,
+  wording: string,
+  kindParam: unknown,
+  qualitiesParam: unknown
+): { feat: HeroFeat } | { error: string } {
+  if (!normaliseFeat(wording)) return { error: `A feat needs words` };
+  let kind: HeroFeat["kind"];
+  if (kindParam !== undefined && kindParam !== null) {
+    if (kindParam !== "skill" && kindParam !== "spell" && kindParam !== "item") {
+      return { error: `kind must be skill, spell or item` };
+    }
+    // A plain skill stays the absent default, so an old-shaped feat is unchanged.
+    kind = kindParam === "skill" ? undefined : kindParam;
+  }
+  const q = frCleanQualities(kind, qualitiesParam);
+  if ("error" in q) return { error: q.error };
+  const feat: HeroFeat = {
+    id: frNextFeatId(existing, prefix),
+    wording,
+    burned: false,
+    ...(kind ? { kind } : {}),
+    ...(q.qualities && q.qualities.length > 0 ? { qualities: q.qualities } : {}),
+  };
+  return { feat };
+}
+
+function frFeatList(hero: FantasticRealmsHero): string {
+  return hero.feats.length > 0 ? hero.feats.map(describeFeat).join(", ") : "none yet";
+}
+
+const FR_USE_PERS: readonly UsePer[] = ["scene", "rest", "adventure"];
 
 function executeManageFeats(
   toolCallId: string,
@@ -6931,72 +7064,327 @@ function executeManageFeats(
   const fail = (m: string) => frFail("manage_feats", toolCallId, m);
   const off = frNotOffered("manage_feats", toolCallId, storyData);
   if (off) return off;
+  const action = params.action;
+  const isParty = action === "add_party_feat" || action === "remove_party_feat";
   const name = frHeroName(params);
-  if (!name) return fail(`manage_feats needs "hero"`);
-  const feat = typeof params.feat === "string" ? params.feat.trim() : "";
-  if (!feat) return fail(`manage_feats needs "feat"`);
+  if (!isParty && !name) return fail(`manage_feats needs "hero"`);
+  const feat = frStr(params.feat);
+  const needsFeat = !(
+    action === "add_condition" ||
+    action === "clear_condition" ||
+    action === "add_scar" ||
+    action === "scar_to_feat" ||
+    action === "retire" ||
+    action === "rejoin"
+  );
+  if (needsFeat && !feat) return fail(`manage_feats needs "feat"`);
   const key = normalizeKey(name);
   const state = frState(storyData);
   const existing = state.heroes[key];
   const match = (w: string) => normaliseFeat(w);
+  const result = (
+    hero: FantasticRealmsHero | undefined,
+    line: string,
+    tail: string
+  ): GMToolResult => ({
+    toolName: "manage_feats",
+    toolCallId,
+    success: true,
+    result: {
+      type: "manage_feats",
+      hero: isParty ? "party" : name,
+      action,
+      feats: (hero ? hero.feats : (state.partyFeats ?? [])).map((f) => ({ ...f })),
+      ...(hero?.conditions ? { conditions: hero.conditions.map((c) => ({ ...c })) } : {}),
+    } as GMManageFeatsResult,
+    contextForStory: `[Feats: ${line}. ${isParty ? "Party feats" : `${name}'s feats`}: ${
+      hero ? frFeatList(hero) : (state.partyFeats ?? []).map(describeFeat).join(", ") || "none yet"
+    }${tail}]`,
+  });
+
+  // The party's feats (hearth improvements, decision 256) need no hero.
+  if (isParty) {
+    const list = state.partyFeats ?? [];
+    if (action === "add_party_feat") {
+      const built = frBuildFeat(list, "party", feat, undefined, undefined);
+      if ("error" in built) return fail(built.error);
+      if (list.some((f) => match(f.wording) === match(feat))) {
+        return fail(`The party already has the feat "${feat}"`);
+      }
+      state.partyFeats = [...list, built.feat];
+      return result(undefined, `The party gained the feat "${feat}"`, "");
+    }
+    const target = frFindFeat(list, feat);
+    if (!target) {
+      return fail(
+        `The party has no feat "${feat}". Party feats: ${list.map(describeFeat).join(", ") || "none"}`
+      );
+    }
+    state.partyFeats = list.filter((f) => f.id !== target.id);
+    if (state.partyUses) {
+      const kept = Object.fromEntries(
+        Object.entries(state.partyUses).filter(([k]) => !k.startsWith(`${target.id}:`))
+      );
+      if (Object.keys(kept).length > 0) state.partyUses = kept;
+      else delete state.partyUses;
+    }
+    return result(undefined, `The party lost the feat "${target.wording}"`, "");
+  }
 
   let hero: FantasticRealmsHero;
   let line: string;
-  if (params.action === "add") {
+  const needExisting = () =>
+    existing ? null : fail(`${name} has no feats recorded. Add them with manage_feats first.`);
+  const needFeat = (): HeroFeat | GMToolResult => {
+    const target = existing ? frFindFeat(existing.feats, feat) : undefined;
+    return (
+      target ??
+      fail(`${name} has no feat "${feat}". Feats: ${existing ? frFeatList(existing) : "none yet"}`)
+    );
+  };
+  const isFail = (v: HeroFeat | GMToolResult): v is GMToolResult => "toolName" in v;
+  const patchFeat = (base: FantasticRealmsHero, id: string, patch: (f: HeroFeat) => HeroFeat) => ({
+    ...base,
+    feats: base.feats.map((f) => (f.id === id ? patch(f) : f)),
+  });
+  const withoutStatus = (f: HeroFeat): HeroFeat => {
+    const rest = { ...f };
+    delete rest.status;
+    return rest;
+  };
+
+  if (action === "add") {
     hero = existing ?? { name, feats: [], rewards: [] };
     if (!hero.name) hero = { ...hero, name };
     if (!match(feat)) return fail(`A feat needs words`);
     if (hero.feats.some((f) => match(f.wording) === match(feat))) {
       return fail(`${name} already has the feat "${feat}"`);
     }
-    const n =
-      hero.feats.reduce((mx, f) => Math.max(mx, Number(/(\d+)$/.exec(f.id)?.[1] ?? 0)), 0) + 1;
-    hero = { ...hero, feats: [...hero.feats, { id: `feat-${n}`, wording: feat, burned: false }] };
+    const built = frBuildFeat(hero.feats, "feat", feat, params.kind, params.qualities);
+    if ("error" in built) return fail(built.error);
+    hero = { ...hero, feats: [...hero.feats, built.feat] };
     line = `${name} gained the feat "${feat}"`;
-  } else if (params.action === "rename" || params.action === "remove") {
-    if (!existing) {
-      return fail(`${name} has no feats recorded. Add them with manage_feats first.`);
-    }
-    const target = existing.feats.find((f) => match(f.wording) === match(feat));
-    if (!target) {
-      return fail(`${name} has no feat "${feat}". Feats: ${frFeatList(existing)}`);
-    }
-    if (params.action === "remove") {
-      hero = { ...existing, feats: existing.feats.filter((f) => f.id !== target.id) };
+  } else if (action === "rename" || action === "remove") {
+    const missing = needExisting();
+    if (missing) return missing;
+    const target = needFeat();
+    if (isFail(target)) return target;
+    if (action === "remove") {
+      hero = { ...existing!, feats: existing!.feats.filter((f) => f.id !== target.id) };
+      // A later feat may reuse the id: it must not inherit this one's counters.
+      if (hero.uses) {
+        const kept = Object.fromEntries(
+          Object.entries(hero.uses).filter(([k]) => !k.startsWith(`${target.id}:`))
+        );
+        if (Object.keys(kept).length > 0) hero.uses = kept;
+        else delete hero.uses;
+      }
       line = `${name} lost the feat "${target.wording}"`;
     } else {
-      const next = typeof params.new_wording === "string" ? params.new_wording.trim() : "";
+      const next = frStr(params.new_wording);
       if (!match(next)) return fail(`rename needs "new_wording"`);
-      if (existing.feats.some((f) => f.id !== target.id && match(f.wording) === match(next))) {
+      if (existing!.feats.some((f) => f.id !== target.id && match(f.wording) === match(next))) {
         return fail(`${name} already has the feat "${next}"`);
       }
-      hero = {
-        ...existing,
-        feats: existing.feats.map((f) => (f.id === target.id ? { ...f, wording: next } : f)),
-      };
+      hero = patchFeat(existing!, target.id, (f) => ({ ...f, wording: next }));
       line = `${name}'s feat "${target.wording}" is now "${next}"${target.burned ? " (still burned)" : ""}`;
     }
+  } else if (action === "burn") {
+    const missing = needExisting();
+    if (missing) return missing;
+    const target = needFeat();
+    if (isFail(target)) return target;
+    const usable = featUsable(target);
+    if (!usable.ok) return fail(`${name}'s feat "${target.wording}" ${usable.reason}`);
+    hero = patchFeat(existing!, target.id, (f) => ({ ...f, burned: true }));
+    line = `${name}'s feat "${target.wording}" is burned without a roll: it adds nothing until a rest`;
+  } else if (action === "break" || action === "lose" || action === "recover" || action === "mend") {
+    const missing = needExisting();
+    if (missing) return missing;
+    const target = needFeat();
+    if (isFail(target)) return target;
+    if (target.kind !== "item") {
+      return fail(`"${target.wording}" is not an item; only an item can be broken, lost, recovered or mended`);
+    }
+    if (action === "break") {
+      if (target.status === "broken") return fail(`"${target.wording}" is already broken`);
+      if (target.status === "lost") return fail(`"${target.wording}" is lost; recover it first`);
+      hero = patchFeat(existing!, target.id, (f) => ({ ...f, status: "broken" }));
+      line = `${name}'s "${target.wording}" is broken: it cannot be named in a roll until it is mended`;
+    } else if (action === "lose") {
+      if (target.status === "lost") return fail(`"${target.wording}" is already lost`);
+      hero = patchFeat(existing!, target.id, (f) => ({ ...f, status: "lost" }));
+      line = `${name}'s "${target.wording}" is lost: it keeps its place and qualities until it is recovered`;
+    } else if (action === "recover") {
+      if (target.status !== "lost") return fail(`"${target.wording}" is not lost`);
+      hero = patchFeat(existing!, target.id, withoutStatus);
+      line = `${name} recovered "${target.wording}"`;
+    } else {
+      if (target.status !== "broken") {
+        return fail(
+          target.status === "lost"
+            ? `"${target.wording}" is lost, not broken; recover it first`
+            : `"${target.wording}" is not broken`
+        );
+      }
+      hero = patchFeat(existing!, target.id, withoutStatus);
+      line = `${name} mended "${target.wording}"${target.burned ? " (still burned until a rest)" : ""}`;
+    }
+  } else if (action === "add_condition" || action === "add_scar") {
+    const word = frStr(params.condition);
+    if (!match(word)) return fail(`${action} needs "condition"`);
+    // Only an existing hero takes a condition: a foe or an NPC is not a hero.
+    const missing = needExisting();
+    if (missing) return missing;
+    hero = existing!;
+    if (!hero.name) hero = { ...hero, name };
+    const have =(hero.conditions ?? []).find((c) => match(c.word) === match(word));
+    if (have) {
+      // Each word is stored once; giving it again does nothing (design 14).
+      state.heroes[key] = hero;
+      return result(
+        hero,
+        `${name} already has ${have.scar ? "the scar" : "the condition"} "${have.word}"; nothing changed`,
+        frHeroTail(storyData, name, hero)
+      );
+    }
+    if (action === "add_scar") {
+      if (!frIsDown(storyData, name, hero)) {
+        return fail(`Only a hero who is down may take a scar, and ${name} is not down`);
+      }
+      hero = { ...hero, conditions: [...(hero.conditions ?? []), { word, scar: true }] };
+      line = `${name} took the scar "${word}": it never clears on its own`;
+    } else {
+      const cureParam = frStr(params.cure);
+      const cure = cureParam || (match(word) === HUNGRY_WORD ? HUNGRY_CURE : "");
+      const added: HeroCondition = { word, ...(cure ? { cure } : {}) };
+      hero = { ...hero, conditions: [...(hero.conditions ?? []), added] };
+      line = `${name} is now ${word}${cure ? ` (needs ${cure})` : ""}: it costs a die where it gets in the way`;
+    }
+  } else if (action === "clear_condition") {
+    const missing = needExisting();
+    if (missing) return missing;
+    const word = frStr(params.condition);
+    if (!match(word)) return fail(`clear_condition needs "condition"`);
+    const target = (existing!.conditions ?? []).find((c) => match(c.word) === match(word));
+    if (!target) {
+      return fail(
+        `${name} has no condition "${word}". Conditions: ${(existing!.conditions ?? []).map((c) => c.word).join(", ") || "none"}`
+      );
+    }
+    if (target.scar) {
+      return fail(
+        `"${target.word}" is a scar and never clears on its own; scar_to_feat turns it into a feat at a level`
+      );
+    }
+    const wasDown = frIsDown(storyData, name, existing);
+    const remaining = (existing!.conditions ?? []).filter((c) => c !== target);
+    hero = { ...existing! };
+    if (remaining.length > 0) hero.conditions = remaining;
+    else delete hero.conditions;
+    line = `${name} is no longer ${target.word}`;
+    if (wasDown && !frIsDown(storyData, name, hero)) line += `, and is up again`;
+  } else if (action === "scar_to_feat") {
+    const missing = needExisting();
+    if (missing) return missing;
+    const word = frStr(params.condition);
+    if (!match(word)) return fail(`scar_to_feat needs "condition" (the scar)`);
+    const scar = (existing!.conditions ?? []).find((c) => match(c.word) === match(word));
+    if (!scar || !scar.scar) {
+      return fail(
+        `${name} has no scar "${word}". Scars: ${describeScars(existing!.conditions) || "none"}`
+      );
+    }
+    const next = frStr(params.new_wording);
+    if (!match(next)) return fail(`scar_to_feat needs "new_wording" (the feat that replaces it)`);
+    if (existing!.feats.some((f) => match(f.wording) === match(next))) {
+      return fail(`${name} already has the feat "${next}"`);
+    }
+    const built = frBuildFeat(existing!.feats, "feat", next, params.kind, params.qualities);
+    if ("error" in built) return fail(built.error);
+    const remaining = (existing!.conditions ?? []).filter((c) => c !== scar);
+    hero = { ...existing!, feats: [...existing!.feats, built.feat] };
+    if (remaining.length > 0) hero.conditions = remaining;
+    else delete hero.conditions;
+    line = `${name}'s scar "${scar.word}" became the feat "${next}"`;
+  } else if (action === "retire" || action === "rejoin") {
+    // A hero who died or left the party is kept for history but is out of the
+    // party rest, the default hero selections and the hero line.
+    const missing = needExisting();
+    if (missing) return missing;
+    if (action === "retire") {
+      if (existing!.retired) return fail(`${name} has already left the party`);
+      hero = { ...existing!, retired: true };
+      line = `${name} left the party: kept for history, out of party rests, awards and the hero line`;
+    } else {
+      if (!existing!.retired) return fail(`${name} has not left the party`);
+      hero = { ...existing! };
+      delete hero.retired;
+      line = `${name} rejoined the party`;
+    }
+  } else if (action === "use") {
+    const missing = needExisting();
+    if (missing) return missing;
+    const per = params.per;
+    if (!per || !FR_USE_PERS.includes(per)) return fail(`use needs "per": scene, rest or adventure`);
+    if (
+      params.limit !== undefined &&
+      (typeof params.limit !== "number" ||
+        !Number.isInteger(params.limit) ||
+        params.limit < 1 ||
+        params.limit > 99)
+    ) {
+      return fail(`limit must be a whole number from 1 up`);
+    }
+    const ownFeat = frFindFeat(existing!.feats, feat);
+    const partyFeat = ownFeat ? undefined : frFindFeat(state.partyFeats ?? [], feat);
+    if (ownFeat?.status) {
+      const usable = featUsable(ownFeat);
+      if (!usable.ok) return fail(`${name}'s feat "${ownFeat.wording}" ${usable.reason}`);
+    }
+    // A feat counts by its id, a hearth improvement by its party id, and any
+    // other name (a calling's move) by its words under a "~" prefix.
+    const id = ownFeat?.id ?? partyFeat?.id ?? `~${normaliseFeat(feat)}`;
+    const label = ownFeat?.wording ?? partyFeat?.wording ?? feat;
+    const counterKey = usageKey(id, per);
+    const book = partyFeat ? state.partyUses ?? {} : existing!.uses ?? {};
+    const spent = book[counterKey] ?? 0;
+    // The limit is fixed by the first use (kept beside the counter, so it
+    // resets with it) and a later call may not choose another.
+    const limitKey = `${id}:limit:${per}`;
+    const storedLimit = book[limitKey];
+    if (storedLimit !== undefined && params.limit !== undefined && params.limit !== storedLimit) {
+      return fail(
+        `"${label}" is counted at ${storedLimit} per ${per}; the limit cannot change until it resets`
+      );
+    }
+    const limit = storedLimit ?? params.limit ?? 1;
+    if (spent >= limit) {
+      return fail(
+        `"${label}" has already been used ${spent} of ${limit} ${limit === 1 ? "time" : "times"} this ${per}`
+      );
+    }
+    const nextBook = { ...book, [counterKey]: spent + 1, [limitKey]: limit };
+    if (partyFeat) {
+      state.partyUses = nextBook;
+      hero = existing!;
+    } else {
+      hero = { ...existing!, uses: nextBook };
+    }
+    line = `${name} used "${label}" (${spent + 1} of ${limit} this ${per})`;
   } else {
-    return fail(`manage_feats action must be add, rename or remove`);
+    return fail(
+      `manage_feats action must be add, rename, remove, burn, break, lose, recover, mend, add_condition, clear_condition, add_scar, scar_to_feat, use, retire, rejoin, add_party_feat or remove_party_feat`
+    );
   }
   state.heroes[key] = hero;
-  return {
-    toolName: "manage_feats",
-    toolCallId,
-    success: true,
-    result: {
-      type: "manage_feats",
-      hero: name,
-      action: params.action,
-      feats: hero.feats.map((f) => ({ ...f })),
-    } as GMManageFeatsResult,
-    contextForStory: `[Feats: ${line}. ${name}'s feats: ${frFeatList(hero)}]`,
-  };
+  return result(hero, line, frHeroTail(storyData, name, hero));
 }
 
 /**
  * Resolves the named feats against a hero's list: each must be one of the
- * hero's, unburned and named once. Returns the matched feats or a message.
+ * hero's, usable (featUsable: not burned, broken or lost) and named once.
+ * Returns the matched feats or a message.
  */
 function frResolveFeats(
   hero: FantasticRealmsHero,
@@ -7008,17 +7396,52 @@ function frResolveFeats(
   }
   const out: HeroFeat[] = [];
   for (const w of named as string[]) {
-    const f = hero.feats.find((x) => normaliseFeat(x.wording) === normaliseFeat(w));
+    const f = frFindFeat(hero.feats, w);
     if (!f) return { error: `${who} has no feat "${w}". Feats: ${frFeatList(hero)}` };
-    if (f.burned) {
-      return { error: `${who}'s feat "${f.wording}" is burned and adds nothing until a rest` };
-    }
+    const usable = featUsable(f);
+    if (!usable.ok) return { error: `${who}'s feat "${f.wording}" ${usable.reason}` };
     if (out.some((x) => x.id === f.id)) {
       return { error: `The feat "${f.wording}" is named twice; each feat counts once per roll` };
     }
     out.push(f);
   }
   return { feats: out };
+}
+
+/** One other hero's feat, for a help or a team burn: owned, usable, and the hero not down. */
+function frResolveContributor(
+  storyData: StoryData,
+  state: FantasticRealmsState,
+  rollerKey: string,
+  role: "help" | "team_burn",
+  raw: unknown
+): { key: string; name: string; hero: FantasticRealmsHero; feat: HeroFeat } | { error: string } {
+  const label = role === "help" ? "help" : "team_burn";
+  const o = (raw ?? {}) as { hero?: unknown; feat?: unknown };
+  const heroName = frStr(o.hero);
+  const featName = frStr(o.feat);
+  if (!heroName || !featName) return { error: `${label} needs "hero" and "feat"` };
+  const key = normalizeKey(heroName);
+  if (key === rollerKey) {
+    return {
+      error:
+        role === "help"
+          ? `A hero cannot help their own roll`
+          : `The team-burn partner must be another hero, not the roller`,
+    };
+  }
+  const hero = state.heroes[key];
+  if (!hero) return { error: `${heroName} has no feats recorded. Add them with manage_feats first.` };
+  const who = frDisplayName(storyData, key);
+  if (hero.retired) return { error: `${who} has left the party` };
+  if (frIsDown(storyData, who, hero)) {
+    return { error: `${who} is down and cannot ${role === "help" ? "help" : "burn a feat"}` };
+  }
+  const feat = frFindFeat(hero.feats, featName);
+  if (!feat) return { error: `${who} has no feat "${featName}". Feats: ${frFeatList(hero)}` };
+  const usable = featUsable(feat);
+  if (!usable.ok) return { error: `${who}'s feat "${feat.wording}" ${usable.reason}` };
+  return { key, name: who, hero, feat };
 }
 
 async function executeFeatRoll(
@@ -7038,6 +7461,14 @@ async function executeFeatRoll(
   if (!hero) {
     return fail(`${name} has no feats recorded. Add them with manage_feats first.`);
   }
+  // Refusals, in order. None of them writes anything: the burns, the team-burn
+  // counter and the helper are recorded only once the faces exist.
+  if (hero.retired) return fail(`${name} has left the party`);
+  if (frIsDown(storyData, name, hero)) {
+    return fail(
+      `${name} is down and cannot roll, help or burn a feat until a rest or a healing spell lifts them`
+    );
+  }
   const dc = params.dc;
   if (typeof dc !== "number" || !Number.isInteger(dc) || dc < 2 || dc > 6) {
     return fail(`dc must be a whole number from 2 to 6 (DC 1 needs no roll: it happens, as a hit)`);
@@ -7045,8 +7476,14 @@ async function executeFeatRoll(
   const resolved = frResolveFeats(hero, name, params.feats ?? []);
   if ("error" in resolved) return fail(resolved.error);
   const used = resolved.feats;
+  const wantsBurn =
+    params.burn !== undefined && params.burn !== null && String(params.burn).trim() !== "";
+  const wantsTeamBurn = params.team_burn !== undefined && params.team_burn !== null;
+  if (wantsBurn && wantsTeamBurn) {
+    return fail(`Name either burn or team_burn, not both: a team burn takes the place of the roller's own burn`);
+  }
   let burned: HeroFeat | undefined;
-  if (params.burn !== undefined && params.burn !== null && String(params.burn).trim() !== "") {
+  if (wantsBurn) {
     burned = used.find((f) => normaliseFeat(f.wording) === normaliseFeat(String(params.burn)));
     if (!burned) {
       return fail(
@@ -7057,7 +7494,66 @@ async function executeFeatRoll(
     }
   }
 
-  const poolSize = 1 + used.length;
+  let helper: ReturnType<typeof frResolveContributor> | undefined;
+  if (params.help !== undefined && params.help !== null) {
+    helper = frResolveContributor(storyData, state, key, "help", params.help);
+    if ("error" in helper) return fail(helper.error);
+  }
+
+  let partner: ReturnType<typeof frResolveContributor> | undefined;
+  let ownBurn: HeroFeat | undefined;
+  if (wantsTeamBurn) {
+    partner = frResolveContributor(storyData, state, key, "team_burn", params.team_burn);
+    if ("error" in partner) return fail(partner.error);
+    const ownName = frStr(params.team_burn?.own_feat);
+    if (!ownName) return fail(`team_burn needs "own_feat": the roller's feat to burn`);
+    ownBurn = frFindFeat(hero.feats, ownName);
+    if (!ownBurn) return fail(`${name} has no feat "${ownName}". Feats: ${frFeatList(hero)}`);
+    const usable = featUsable(ownBurn);
+    if (!usable.ok) return fail(`${name}'s feat "${ownBurn.wording}" ${usable.reason}`);
+    if (
+      helper &&
+      !("error" in helper) &&
+      helper.key === partner.key &&
+      helper.feat.id === partner.feat.id
+    ) {
+      return fail(`${partner.name}'s feat "${partner.feat.wording}" cannot both help and be burned in one roll`);
+    }
+    if ((state.teamBurnsUsed ?? 0) >= TEAM_BURNS_PER_REST) {
+      return fail(
+        `The party has used both team burns; they return at a party rest (a take_rest that includes every hero)`
+      );
+    }
+  }
+
+  let hindrances: HeroCondition[] = [];
+  if (params.hindered_by !== undefined && params.hindered_by !== null) {
+    if (!Array.isArray(params.hindered_by) || params.hindered_by.some((w) => typeof w !== "string")) {
+      return fail(`"hindered_by" must be a list of condition words`);
+    }
+    for (const w of params.hindered_by) {
+      const c = (hero.conditions ?? []).find((x) => normaliseFeat(x.word) === normaliseFeat(w));
+      if (!c) {
+        return fail(
+          `${name} has no condition "${w}". Conditions: ${(hero.conditions ?? []).map((x) => x.word).join(", ") || "none"}`
+        );
+      }
+      if (hindrances.includes(c)) {
+        return fail(`The condition "${c.word}" is named twice; each costs one die once`);
+      }
+      hindrances = [...hindrances, c];
+    }
+  }
+
+  // A feat burned in a team burn adds no die, so a roller who also named it
+  // in `feats` does not count it in the pool.
+  const poolFeats = ownBurn ? used.filter((f) => f.id !== ownBurn.id) : used;
+  const poolDice = poolSize({
+    feats: poolFeats.length,
+    helped: !!helper,
+    hindrances: hindrances.length,
+    teamBurn: !!partner,
+  });
   let dice: number[];
   if (params.dice !== undefined) {
     if (storyData.diceMode !== "manual") {
@@ -7068,16 +7564,16 @@ async function executeFeatRoll(
     const d = params.dice;
     if (
       !Array.isArray(d) ||
-      d.length !== poolSize ||
+      d.length !== poolDice ||
       d.some((x) => typeof x !== "number" || !Number.isInteger(x) || x < 1 || x > 6)
     ) {
-      return fail(`dice must be ${poolSize} faces (1-6), one per die in the pool`);
+      return fail(`dice must be ${poolDice} faces (1-6), one per die in the pool`);
     }
     dice = [...d];
   } else {
     try {
       const [r] = await rollFormulasMaybePhysical(
-        [`${poolSize}d6`],
+        [`${poolDice}d6`],
         { reason: params.reason || "Feat roll" },
         interaction
       );
@@ -7088,23 +7584,57 @@ async function executeFeatRoll(
   }
 
   const rolled = countSuccesses(dice, dc);
-  const successes = rolled + (burned ? 1 : 0);
+  const sure = (burned ? 1 : 0) + (partner ? 2 : 0);
+  const successes = rolled + sure;
   const result = resultFor(successes);
-  // The burn is recorded only now that the faces exist.
-  if (burned) {
-    const burnedId = burned.id;
+  // Only now that the faces exist are the burns and the counter written.
+  const burnedIds = new Set<string>();
+  if (burned) burnedIds.add(burned.id);
+  if (ownBurn) burnedIds.add(ownBurn.id);
+  if (burnedIds.size > 0) {
     state.heroes[key] = {
       ...hero,
-      feats: hero.feats.map((f) => (f.id === burnedId ? { ...f, burned: true } : f)),
+      feats: hero.feats.map((f) => (burnedIds.has(f.id) ? { ...f, burned: true } : f)),
     };
   }
+  if (partner && !("error" in partner)) {
+    const partnerNow = state.heroes[partner.key];
+    state.heroes[partner.key] = {
+      ...partnerNow,
+      feats: partnerNow.feats.map((f) => (f.id === partner.feat.id ? { ...f, burned: true } : f)),
+    };
+    state.teamBurnsUsed = (state.teamBurnsUsed ?? 0) + 1;
+  }
+
+  const spells = [...poolFeats, ...(ownBurn ? [ownBurn] : [])].filter((f) => f.kind === "spell");
+  const magic = spells.length > 0;
+  const qualities = [...poolFeats, ...(ownBurn ? [ownBurn] : [])].flatMap(itemQualities);
+  const damage = attackDamage(result, qualities);
+  const target = typeof params.target === "string" ? params.target.trim() : "";
+  const keenBonus = damage > 0 && damage > attackDamage(result, []);
   const word = tierWord(result.tier) + (result.magnitude > 0 ? ` +${result.magnitude}` : "");
-  const pool = used.length > 0 ? ` (${used.map((f) => f.wording).join(", ")})` : "";
-  let ctx = `[Feat roll - ${name}${pool} DC ${dc}: ${poolSize}d6 [${dice.join(", ")}] → ${rolled} ${rolled === 1 ? "success" : "successes"}${burned ? ` + burned ${burned.wording} (1 sure success) = ${successes}` : ""} → ${word}]`;
+  const pool = poolFeats.length > 0 ? ` (${poolFeats.map((f) => f.wording).join(", ")})` : "";
+  let ctx = `[Feat roll - ${name}${pool} DC ${dc}: ${poolDice}d6 [${dice.join(", ")}] → ${rolled} ${rolled === 1 ? "success" : "successes"}${burned ? ` + burned ${burned.wording} (1 sure success) = ${successes}` : ""}${partner ? ` + team burn (2 sure successes) = ${successes}` : ""} → ${word}]`;
   if (burned) ctx += `\n[Burned: ${burned.wording} adds nothing until a rest]`;
+  if (helper && !("error" in helper)) {
+    ctx += `\n[Help: ${helper.name} adds a die with "${helper.feat.wording}". A cost on a miss may fall on ${helper.name} instead of, or as well as, ${name}; the roll still has one cost budget]`;
+  }
+  if (hindrances.length > 0) {
+    ctx += `\n[Hindered: ${hindrances.map((c) => c.word).join(", ")} cost ${hindrances.length === 1 ? "a die" : `${hindrances.length} dice`}${poolDice === 1 ? " (the pool never drops below 1)" : ""}]`;
+  }
+  if (partner && !("error" in partner) && ownBurn) {
+    const left = TEAM_BURNS_PER_REST - (state.teamBurnsUsed ?? 0);
+    ctx += `\n[Team burn: ${name}'s "${ownBurn.wording}" and ${partner.name}'s "${partner.feat.wording}" are burned: two sure successes, and neither adds its die. ${left} of ${TEAM_BURNS_PER_REST} team burns left until a party rest]`;
+  }
   if (result.tier !== "miss") {
-    const dmg = foeDamage(result);
-    ctx += `\n[If this struck a foe: it loses ${dmg} ${dmg === 1 ? "heart" : "hearts"}]`;
+    const hearts = `${damage} ${damage === 1 ? "heart" : "hearts"}`;
+    ctx += `\n[If this struck a foe: it loses ${hearts}${keenBonus ? " (Keen +1)" : ""}]`;
+  }
+  if (magic && result.tier === "miss") {
+    ctx += `\n[Miscast: this was magic. Its cost is a miscast from the realm's table]`;
+  }
+  if (result.tier === "miss" || result.tier === "weak_hit") {
+    ctx += `\n[Cost budget: one heart or condition (two with a harm word), shared by everyone in this roll]`;
   }
   ctx += `\n[Reason: ${params.reason}]`;
   return {
@@ -7115,16 +7645,23 @@ async function executeFeatRoll(
     result: {
       type: "feat_roll",
       hero: name,
-      feats: used.map((f) => f.wording),
+      feats: poolFeats.map((f) => f.wording),
       burned: burned?.wording,
       dc,
       dice,
       successes,
       outcome: result.tier,
       magnitude: result.magnitude,
-      ...(typeof params.target === "string" && params.target.trim()
-        ? { target: params.target.trim() }
+      ...(target ? { target } : {}),
+      ...(target && result.tier !== "miss" ? { damage } : {}),
+      ...(magic ? { magic: true } : {}),
+      ...(helper && !("error" in helper)
+        ? { helper: { hero: helper.name, feat: helper.feat.wording } }
         : {}),
+      ...(partner && !("error" in partner) && ownBurn
+        ? { teamBurn: { hero: partner.name, feat: partner.feat.wording, ownFeat: ownBurn.wording } }
+        : {}),
+      ...(hindrances.length > 0 ? { hindrances: hindrances.map((c) => c.word) } : {}),
     } as GMFeatRollResult,
     contextForStory: ctx,
   };
@@ -7146,14 +7683,22 @@ async function executeInitiativeRoll(
   for (const e of entries) {
     const name = frHeroName(e);
     if (!name) return fail(`every initiative entry needs a "hero"`);
+    const hero = state.heroes[normalizeKey(name)];
+    if (hero?.retired) return fail(`${name} has left the party`);
+    if (frIsDown(storyData, name, hero)) {
+      return fail(`${name} is down and takes no part in the fight until a rest or a healing spell lifts them`);
+    }
     const edgeNames = e.edge_feats ?? [];
     let edges: string[] = [];
     if (edgeNames.length > 0) {
-      const hero = state.heroes[normalizeKey(name)];
       if (!hero) return fail(`${name} has no feats recorded. Add them with manage_feats first.`);
       const r = frResolveFeats(hero, name, edgeNames);
       if ("error" in r) return fail(r.error);
       edges = r.feats.map((f) => f.wording);
+    }
+    // A usable Swift item counts as an edge feat of its own.
+    for (const f of hero?.feats ?? []) {
+      if (isSwiftItem(f) && !edges.includes(f.wording)) edges.push(f.wording);
     }
     plan.push({ name, edges });
   }
@@ -7207,12 +7752,23 @@ async function executeInitiativeRoll(
   };
 }
 
+/** The hero set the system carries by name, else the plan's definition. */
+function frHeroSet(storyData: StoryData): MeterSet {
+  const sets = resolveSystem(storyData).meterSets;
+  return (
+    sets.find((s) => normalizeKey(s.name) === normalizeKey(HERO_SET_NAME)) ??
+    FALLBACK_HERO_SET
+  );
+}
+
 /** The heroes a call names (default all) as keys, or a message. */
 function frSelectHeroes(
   storyData: StoryData,
   named: unknown
 ): { keys: string[] } | { error: string } {
-  const all = Object.keys(frState(storyData).heroes);
+  const heroes = frState(storyData).heroes;
+  // A hero who left the party is kept but not selected by default.
+  const all = Object.keys(heroes).filter((k) => !heroes[k].retired);
   if (named === undefined || named === null) {
     return all.length > 0
       ? { keys: all }
@@ -7224,6 +7780,9 @@ function frSelectHeroes(
   const keys: string[] = [];
   for (const n of named as string[]) {
     const k = normalizeKey(n);
+    if (heroes[k]?.retired) {
+      return { error: `${frDisplayName(storyData, k)} has left the party (manage_feats rejoin brings them back)` };
+    }
     const hasMeters = (storyData.meters ?? []).some((m) => normalizeKey(m.owner) === k);
     if (!all.includes(k) && !hasMeters) {
       return {
@@ -7364,14 +7923,41 @@ function executeTakeRest(
   let meters: Meter[] = storyData.meters ?? [];
   const rested: string[] = [];
   const healed: string[] = [];
+  const conditionLines: string[] = [];
   for (const key of picked.keys) {
     const who = frDisplayName(storyData, key);
     const hero = state.heroes[key];
     if (hero) {
-      state.heroes[key] = {
+      const next: FantasticRealmsHero = {
         ...hero,
         feats: hero.feats.map((f) => (f.burned ? { ...f, burned: false } : f)),
       };
+      if (hero.conditions) {
+        // A rest clears the conditions that name no cure. A scar never clears,
+        // and Hungry stays until a meal whether or not it carries the cure.
+        const kept: HeroCondition[] = [];
+        const cleared: string[] = [];
+        for (const c of hero.conditions) {
+          if (c.scar || c.cure || normaliseFeat(c.word) === HUNGRY_WORD) kept.push(c);
+          else cleared.push(c.word);
+        }
+        if (kept.length > 0) next.conditions = kept;
+        else delete next.conditions;
+        const bits: string[] = [];
+        if (cleared.length > 0) bits.push(`cleared ${cleared.join(", ")}`);
+        const keptNote = [
+          ...kept.filter((c) => !c.scar).map((c) => (c.cure ? `${c.word} (needs ${c.cure})` : c.word)),
+          ...kept.filter((c) => c.scar).map((c) => `scar ${c.word}`),
+        ];
+        if (keptNote.length > 0) bits.push(`kept ${keptNote.join(", ")}`);
+        if (bits.length > 0) conditionLines.push(`${who} ${bits.join("; ")}`);
+      }
+      if (hero.uses) {
+        const uses = resetUses(hero.uses, "rest");
+        if (uses) next.uses = uses;
+        else delete next.uses;
+      }
+      state.heroes[key] = next;
     }
     const hearts = findMeter(meters, who, "Hearts");
     if (hearts) {
@@ -7382,8 +7968,31 @@ function executeTakeRest(
     rested.push(who);
   }
   storyData.meters = meters;
+  // A rest that includes every hero in the state is a party rest: it renews
+  // the team burns and the hearth's per-rest uses. A partial rest does not.
+  const allKeys = Object.keys(state.heroes).filter((k) => !state.heroes[k].retired);
+  const partyRest = allKeys.length > 0 && allKeys.every((k) => picked.keys.includes(k));
+  if (partyRest) {
+    delete state.teamBurnsUsed;
+    if (state.partyUses) {
+      const uses = resetUses(state.partyUses, "rest");
+      if (uses) state.partyUses = uses;
+      else delete state.partyUses;
+    }
+  }
   const condition = realm && knowsRealm(realm) ? rests[realm] : undefined;
   let ctx = `[Rest: ${rested.join(", ")} rested. Every heart is healed${healed.length > 0 ? ` (${healed.join(", ")})` : ""} and every feat is un-burned.]`;
+  for (const l of conditionLines) ctx += `\n[Conditions: ${l}]`;
+  const stillDown = picked.keys
+    .map((k) => ({ k, who: frDisplayName(storyData, k) }))
+    .filter(({ k, who }) => frIsDown(storyData, who, state.heroes[k]))
+    .map(({ who }) => who);
+  if (stillDown.length > 0) {
+    ctx += `\n[Still down after the rest (three conditions that need a cure): ${stillDown.join(", ")}]`;
+  }
+  ctx += partyRest
+    ? `\n[Party rest: every hero rested, so the team burns are renewed (${TEAM_BURNS_PER_REST} of ${TEAM_BURNS_PER_REST} left)]`
+    : `\n[Partial rest: ${allKeys.filter((k) => !picked.keys.includes(k)).map((k) => frDisplayName(storyData, k)).join(", ")} did not rest, so the team burns are not renewed (${Math.max(0, TEAM_BURNS_PER_REST - (state.teamBurnsUsed ?? 0))} of ${TEAM_BURNS_PER_REST} left)]`;
   if (condition) {
     ctx += `\n[Rest condition in ${realm}: ${condition} Whether the fiction allows it is your call.]`;
   } else if (realm) {
@@ -7400,6 +8009,7 @@ function executeTakeRest(
       rested,
       realm,
       condition,
+      partyRest,
     } as GMTakeRestResult,
     contextForStory: ctx,
   };

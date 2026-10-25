@@ -636,11 +636,43 @@ export interface SystemState {
   fantasticRealms?: FantasticRealmsState;
 }
 
-/** One feat of a Fantastic Realms hero: a stable id, its wording, whether it is burned. */
+/**
+ * One feat of a Fantastic Realms hero: a stable id, its wording, whether it is
+ * burned. Every field past `burned` is optional (docs/fr-expansion-plan.md E1),
+ * so a feat saved before the expansion reads as a plain skill.
+ */
 export interface HeroFeat {
   id: string;
   wording: string;
   burned: boolean;
+  /** Absent means a skill. A spell makes a roll magic; an item can be lost or broken. */
+  kind?: "skill" | "spell" | "item";
+  /** Items only, at most two (a wonder). Keen and Swift change engine numbers. */
+  qualities?: ItemQuality[];
+  /** Items only. A broken or lost item cannot be named in a roll. */
+  status?: "broken" | "lost";
+}
+
+export type ItemQuality =
+  | "keen"
+  | "sturdy"
+  | "warded"
+  | "swift"
+  | "bright"
+  | "cursed"
+  | "hardy"
+  | "silent"
+  | "blessed"
+  | "returning"
+  | "masterwork"
+  | "heirloom";
+
+/** A word on a hero that costs a die where it gets in the way. A scar never clears on its own. */
+export interface HeroCondition {
+  word: string;
+  /** What clears it, when a rest does not ("an antidote"). */
+  cure?: string;
+  scar?: boolean;
 }
 
 export interface FantasticRealmsHero {
@@ -649,6 +681,11 @@ export interface FantasticRealmsHero {
   feats: HeroFeat[];
   /** Award sources already credited to this hero (award_xp refuses repeats). */
   rewards: string[];
+  conditions?: HeroCondition[];
+  /** Died or left the party: kept for history, out of party rests, default selections and the hero line. */
+  retired?: boolean;
+  /** Counted uses spent, keyed "<featId>:<scene|rest|adventure>". */
+  uses?: Record<string, number>;
 }
 
 export interface FantasticRealmsState {
@@ -656,6 +693,12 @@ export interface FantasticRealmsState {
   heroes: Record<string, FantasticRealmsHero>;
   /** The realm id the story is in (take_rest). */
   realm?: string;
+  /** Hearth improvements: any hero may name one (decision 256). */
+  partyFeats?: HeroFeat[];
+  /** Team burns spent since the last party rest. */
+  teamBurnsUsed?: number;
+  /** Counted uses of party feats, keyed "<partyFeatId>:<per>". */
+  partyUses?: Record<string, number>;
 }
 
 // ============================================

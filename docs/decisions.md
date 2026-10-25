@@ -443,3 +443,24 @@ The author: "I also want us to look in depth at campaign setup, the whole format
 | 241 | The three designs (the campaign format, the judge layer v2, the GM's prompts) | **"All three and then let codex review them."** All three approved; the implementation plans are [`campaign-format-plan.md`](campaign-format-plan.md), [`judge-layer-v2-plan.md`](judge-layer-v2-plan.md) and [`gm-prompt-plan.md`](gm-prompt-plan.md), reviewed by Codex before building. |
 | 242 | Campaign slice 1 measured the new `campaign` tool at 135 tokens (bare schema), taking the default tool list to 10,034 against its 10,000 budget. "The new campaign tool puts the GM's tool list 34 tokens over its 10,000-token budget … What should we do?" | **"Trim other tools (Recommended)."** `manage_timer`'s description was cut and its unused `auto_advance` parameter dropped; the default list is 9,977 tokens with the campaign tool, under the one budget, with no separate allowance. Rejected: a 150-token allowance; offering the tool only to campaign stories. |
 
+### Interview — Fantastic Realms, grown (2026-10-25)
+
+The author: "We need to grow the Endless Realms rules a lot more." (Fantastic Realms.) Design: [`fr-expansion-design.md`](fr-expansion-design.md). Decisions 222–236, 238–239 and 241–242 are on the redesign branches.
+
+| # | question | decision |
+|---|---|---|
+| 243 | "Which areas should Fantastic Realms grow?" (two questions, several allowed) | **All eight:** magic; gear and treasure; conditions and harm; callings and paths; travel and the realms; a bestiary; downtime and the hearth; group play. |
+| 244 | "How big a step should this be?" | **"A full rules book (Recommended)."** A pinned core under ~3,000 tokens plus many on-demand notes; several PRs, one area each. |
+| 245 | "Who writes the new rules text?" | **"I draft, you approve (Recommended)."** |
+| 246 | "How should magic cost something?" | **"Feats + miscasts (Recommended)."** A spell is a feat; a magic miss is a miscast from the realm's table; no new meter. Rejected: costing hearts; a focus meter. |
+| 247 | "Conditions: hearts were chosen over statuses (decision 203). How should conditions sit beside hearts?" | **"Words that cost a die (Recommended)."** A condition takes one die from a roll it gets in the way of (never below 1); the GM may give one instead of a heart; most clear at a rest; hearts stay the main harm. Rejected: story only; replacing hearts. |
+| 248 | "How should gear work?" | **"Gear as feats (Recommended)."** A good item is a feat that can be lost, broken or stolen, with a quality word; plain gear is fiction. Rejected: a separate inventory. |
+| 249 | "How should callings (Knight, Witch, Rogue…) work?" | **"Optional paths (Recommended)."** A starting kit, a signature feat and level-up path feats; a hero may stay freeform; each realm adds local callings. Rejected: required classes. |
+| 250 | "Conditions each cost a die on rolls they hinder. Should piling them up put a hero down?" | **"Three puts you down (Recommended)."** Three conditions at once, scars not counted, put a hero down, as at 0 hearts. Rejected: never down from conditions; four. |
+| 251 | "How often may a party make a team burn (two heroes each burn a feat on one roll)?" | **"Twice per rest (Recommended)."** Twice per rest per party. Rejected: once per rest; no limit. |
+| 252 | "The design adds three new realms. Keep these, or name your own?" | **"Keep all three (Recommended)."** Thornmere, Emberhold and the Hollow Sky, as drafted. |
+| 253 | "Can a hero take a path feat from another calling?" | **"With the GM's nod (Recommended)."** Allowed when the story gives a reason and the GM agrees. Rejected: freely; own calling only. |
+| 254 | After Codex's review: "The base rules say hearts come back only by resting. Can healing magic restore hearts?" | **"Conditions only (Recommended)."** Healing magic clears conditions and can lift a hero who is down; hearts still return only at a rest. Rejected: one heart per hit; hearts freely. |
+| 255 | "A team burn (two sure successes) measured as very strong. How strong should it be?" | **"Both feats, one sure success each (Recommended)."** Two sure successes, but neither burned feat adds its usual die: a sure hit, while a strong hit still needs the dice. Rejected: as drafted; one sure success and two dice. |
+| 256 | "Should hearth improvements work in the dice, or only in the fiction?" | **"Party feats (Recommended)."** Each improvement is a shared feat any hero may name, freely at the hearth and once per adventure away from it, tracked by the engine. Rejected: fiction only. |
+

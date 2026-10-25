@@ -834,7 +834,36 @@ report's §11.3. The ones that shape play:
   Crossroads (Aurelane, Larkenfell, Gloamreach, each with its own rest); the
   starter is *Wolfwillow Crossing*, an arrival in a Larkenfell village on
   Lantern Eve, which copies every realm (a starter's story is seeded as already
-  offered every note, so the loader would never add one). Its campaign is an
+  offered every note, so the loader would never add one). **The engine grown
+  (slice E1 of `docs/fr-expansion-plan.md`, decisions 243–256; the rules notes
+  are E2–E5, not yet written):** every new field is optional, so an old save
+  rolls exactly as before (`tests/systems.fantasticRealms.grown.test.ts`).
+  A feat may be a `spell` or an `item` (`qualities`, at most two; `status`
+  `broken` or `lost`, which keep the item's id and burn); a hero has
+  `conditions` (`{word, cure?, scar?}`, each word stored once, a scar never
+  cleared by `clear_condition` or a rest) and counted `uses` (`"<featId>:scene|rest|adventure"`);
+  the party has `partyFeats` (hearth improvements), `teamBurnsUsed` and
+  `partyUses`. **Down is derived** (`isDown`: hearts 0, or three conditions
+  that are not scars), never stored. `featUsable` is the one check a feat
+  passes in `feat_roll`, `initiative_roll`, helping and team burns. `manage_feats`
+  grew `burn`, `break`/`lose`/`recover`/`mend`, `add_condition`/`clear_condition`/`add_scar`/`scar_to_feat`,
+  `retire`/`rejoin` (a hero who died or left is out of party rests and defaults), `use` (a feat, a hearth improvement or a named move, with `per` and a `limit` fixed by the first use)
+  and `add_party_feat`/`remove_party_feat`. `feat_roll` takes `hindered_by`
+  (a die each, pool floor 1), `help` (one helper, +1 die) and `team_burn` (two
+  sure successes, no dice from the two burned feats, twice per party rest);
+  its refusals come first and write nothing, and it reports `damage` (Keen
+  adds a heart on a strong hit; `contracts.ts` reads that number), `magic`
+  (a miscast line on a miss) and the one cost budget on a miss or weak hit.
+  `take_rest` clears conditions that name no cure (never a scar; Hungry
+  stays until a meal), resets `:rest` counters, and renews team burns only
+  for a party rest (every hero in the state). `increment_scene` resets
+  `:scene` counters (a hook in `toolExecutor`), `end_session` the
+  `:adventure` ones. `record_challenge_result` takes `hit` only in a story
+  that runs Fantastic Realms (`tallyScore`). The "Fantastic Realms party" set
+  holds Supplies (world, 0–6, start 3). The tool list for a Fantastic Realms
+  story is 11,449 tokens against the 11,500 limit: a new parameter needs text
+  moved out of the schemas first.
+  **Its campaign** is an
   `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
   Week, the barrow king's front (a hidden clock on `rest`) and the goblins'
   flight (a visible clock on `scene`), two secrets with three clues each, and
