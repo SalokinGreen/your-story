@@ -431,21 +431,22 @@ always runs **before** the story stage:
    (`buildNarrationContext`, `campaign/narrationContext.ts`; campaign slice
    2, design 14.1), not the GM's conversation: a fixed narrator system message;
    a stable user block marked `"prefix"` (premise, the player's character, the
-   campaign's tone, lines and veils, the enabled `story_instructions` notes);
-   a live user block marked `"turn"` (the last turns' visible prose, the
+   campaign's tone, lines and veils, every enabled `character_sheet` note, the enabled `story_instructions` notes);
+   a live user block marked `"turn"` (a short roster of living NPCs by name,
+   role and public description, the last turns' visible prose, the
    player's line, and each tool result's `publicSummary`, an allowlist by tool
    name in `turnTimeline.ts`: dice, oracles, meters, challenges, combat and the
-   player's answers; never a note read, a memory search, the campaign tool, a
-   hidden roll, a hidden clock or an error); then `buildStoryContinuationPrompt()`,
+   player's answers, and a visible timer or clock that fired; never a note
+   read, a memory search, the campaign tool, a hidden roll, a hidden timer or
+   clock, or an error); then `buildStoryContinuationPrompt()`,
    streamed. It never holds the GM's reasoning, tool arguments, read notes,
-   secrets, unfound clues or the running summary. The Observer's rewrite and the
+   secrets, unfound clues, `gm_plan` or `dm_instructions` notes, NPC notes or the running summary. The Observer's rewrite and the
    pre-pause rewrite continue the same context (`GenerationResult.narrationContext`;
    the narrator's own reasoning, `narrationOwnThoughts`, is the only reasoning
    a rewrite sees, and only on this path). Claude's cache marks apply to
    tool-carrying requests only, so this tool-less call keeps just the
    `session_id` (`:narration`) and the stable block's byte-identity. The narrator
-   no longer sees the character sheet, NPCs, lore or the summary (a quality risk
-   plan G4 revisits). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
+   no longer sees lore, memory or the summary (a quality risk plan G4 revisits). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
    default GLM 5.3 through OpenRouter, decision 50), not the GM's tier model.
 3. **The choices stage** — a separate call on the narration model
    (`generateChoicesWithRetry` → `parseChoices`), only when

@@ -20,11 +20,9 @@ Needs a live model and the author's go; the allowlist itself is covered by
   Expected: the prose still names the character and the place correctly and
   follows a `story_instructions` note (try "write in clipped noir"). Failure
   looks like generic prose that forgets the character's name or look, or invents
-  names: the narrator no longer sees the character sheet, NPCs or lore, and the
-  fix is adding the player's sheet to `stableBlock` (`narrationContext.ts`).
-- **A fired timer on that path.** Let a legacy timer trigger on a turn the GM
-  writes no prose for. Expected: the narration mentions it; failure looks like
-  silence (timer results are not in the narrator's context).
+  names: the narrator sees the character sheet(s) and a short NPC roster but
+  not the lore, memory or summary, so a place or past event only the lore holds
+  may be invented.
 - **Rewrite after a flag.** Turn a prose judge to "rewrite automatically", play
   a turn it flags. Expected: the rewrite reads as the same scene, same roll
   outcome, no new secrets; the Debug Logs show a rewrite request.

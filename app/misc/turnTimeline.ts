@@ -151,6 +151,24 @@ export interface PublicSummarySource {
   hiddenFromPlayer?: boolean;
   /** Clock ticks the result caused (campaign/clocks.ts ClockReport). */
   clockReports?: Array<{ visible: boolean; line: string }>;
+  /** The typed result; a timer result names its timer here. */
+  result?: unknown;
+}
+
+/** Tells whether the player can see the named timer or clock. */
+export interface PublicSummaryContext {
+  timerVisible?: (name: string) => boolean;
+}
+
+/** The timer a timer-tool result is about, when the result is its firing. */
+function timerFiring(result: PublicSummarySource): { name: string } | null {
+  const r = result.result as
+    | { type?: string; timer?: unknown; triggered?: unknown }
+    | undefined;
+  if (!r || typeof r.timer !== "string") return null;
+  if (r.type === "trigger_timer") return { name: r.timer };
+  if (r.type === "advance_timer" && r.triggered === true) return { name: r.timer };
+  return null;
 }
 
 /**
@@ -163,7 +181,10 @@ export interface PublicSummarySource {
  * [[HIDDEN_LORE]] markers is replaced the way the player's own view replaces
  * it (redactForPlayer).
  */
-export function publicSummary(result: PublicSummarySource): string | null {
+export function publicSummary(
+  result: PublicSummarySource,
+  context: PublicSummaryContext = {},
+): string | null {
   if (result.hiddenFromPlayer === true || HIDDEN_FROM_PLAYER_TOOLS.has(result.toolName)) {
     return null;
   }
@@ -172,6 +193,17 @@ export function publicSummary(result: PublicSummarySource): string | null {
     .map((r) => r.line);
   const text = result.contextForStory ?? "";
   if (/^\s*\[ERROR/.test(text) || /\*\*ERROR\*\*/.test(text)) return null;
+  // A timer or clock that fires lands in the story, so the narrator hears it,
+  // but only when the player can see that timer: a hidden one stays the GM's.
+  const firing = result.success === false ? null : timerFiring(result);
+  if (firing && context.timerVisible?.(firing.name) === true) {
+    const t = redactForPlayer(text, result.toolName).trim();
+    if (t) {
+      return t.length > PUBLIC_SUMMARY_MAX_CHARS
+        ? `${t.slice(0, PUBLIC_SUMMARY_MAX_CHARS)}…`
+        : t;
+    }
+  }
   if (!NARRATOR_VISIBLE_TOOLS.has(result.toolName)) {
     return visibleClockLines.length > 0 ? visibleClockLines.join("\n") : null;
   }

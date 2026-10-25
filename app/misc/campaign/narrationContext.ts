@@ -15,6 +15,9 @@
  *  - each tool result's public summary (turnTimeline.ts publicSummary), never
  *    its full result;
  *  - the tone, the lines and veils, and the story_instructions notes;
+ *  - the player character sheet(s) and a short roster of the NPCs the player
+ *    knows (name, role, the description the NPCs page shows; never GM notes);
+ *  - a visible timer or clock that fired this turn (a hidden one never);
  *  - the last turns' visible prose.
  *
  * It never holds the GM's reasoning, a tool call's arguments, a note the GM
@@ -31,6 +34,7 @@ import type { ChatMessage } from "../chatMessage";
 import type { StoryData } from "../structs";
 import { stripHiddenLoreContent } from "../ai_staged";
 import { estimateTokens } from "../tokenCounter";
+import { isHiddenFromPlayerNote } from "../noteVisibility";
 import { cleanString } from "../textUtils";
 import {
   extractVisibleText,
@@ -60,6 +64,11 @@ export const NARRATION_RECENT_PROSE_TOKENS = 2500;
 export const NARRATION_RECENT_PARTS = 6;
 /** One style note is cut at this many characters. */
 const STYLE_NOTE_MAX_CHARS = 12000;
+/** One character sheet is cut at this many characters. */
+const SHEET_MAX_CHARS = 12000;
+/** The roster lists this many NPCs at most, each description cut short. */
+const ROSTER_MAX = 15;
+const ROSTER_DESC_CHARS = 240;
 
 export const NARRATOR_SYSTEM_PROMPT = `You are the narrator of an interactive story. A separate game master has already decided what happens this turn and run the dice; you write the prose the player reads.
 
@@ -123,6 +132,30 @@ function stableBlock(story: StoryData): string {
     sections.push(`The player's character: ${story.player_name.trim()}`);
   }
 
+  // The player character sheet(s), so the narrator keeps names, looks and
+  // voice. Every enabled sheet: in couch and party play, every player's. A
+  // sheet the story marks hidden is left out. Byte-stable while unchanged.
+  const sheets = (story.lore ?? []).filter(
+    (n) =>
+      n.type === "character_sheet" &&
+      n.enabled !== false &&
+      n.content?.trim() &&
+      !isHiddenFromPlayerNote(n),
+  );
+  if (sheets.length > 0) {
+    sections.push(
+      `## Character sheet${sheets.length > 1 ? "s" : ""}\n${sheets
+        .map(
+          (n) =>
+            `### ${n.title}\n${stripHiddenLoreContent(cleanString(n.content)).slice(
+              0,
+              SHEET_MAX_CHARS,
+            )}`,
+        )
+        .join("\n\n")}`,
+    );
+  }
+
   const campaign = story.campaign;
   const tone = campaign?.pitch?.tone?.filter((t) => t.trim()) ?? [];
   if (tone.length > 0) sections.push(`## Tone\n${tone.join(", ")}`);
@@ -167,13 +200,37 @@ function liveBlock(turn: NarrationTurn, story: StoryData): string {
   const recent = recentProse(story, turn.scenePartId);
   if (recent) sections.push(`# Earlier in the story\n${recent}`);
 
+  // The people the player has met: name, role and the description the NPCs
+  // page shows them. Never `notes` (GM notes), and nothing from the campaign
+  // record's people (their wants and secrets).
+  const roster = (story.npcs ?? [])
+    .filter((n) => n.name?.trim() && n.status !== "dead")
+    .slice(-ROSTER_MAX)
+    .map((n) => {
+      const desc = stripHiddenLoreContent(cleanString(n.description || "")).slice(
+        0,
+        ROSTER_DESC_CHARS,
+      );
+      const role = n.role?.trim() ? ` (${n.role.trim()})` : "";
+      return `- ${n.name.trim()}${role}${desc ? `: ${desc}` : ""}`;
+    });
+  if (roster.length > 0) sections.push(`# People the player knows\n${roster.join("\n")}`);
+
+  const timerVisible = (name: string): boolean => {
+    const lower = name.toLowerCase();
+    const clock = story.campaign?.clocks.find((c) => c.name.toLowerCase() === lower);
+    if (clock) return clock.visible;
+    const timer = (story.timers ?? []).find((t) => t.name.toLowerCase() === lower);
+    return timer?.visibility === "visible";
+  };
+
   const thisTurn: string[] = [
     `Player's action: ${turn.playerLine.trim() || "(none: this is the opening scene)"}`,
   ];
   const prose = turn.gmProse ? visibleProse(turn.gmProse) : "";
   if (prose) thisTurn.push(`The game master's text so far this turn:\n${prose}`);
   const summaries = turn.results
-    .map((r) => publicSummary(r))
+    .map((r) => publicSummary(r, { timerVisible }))
     .filter((s): s is string => Boolean(s));
   if (summaries.length > 0) {
     thisTurn.push(
