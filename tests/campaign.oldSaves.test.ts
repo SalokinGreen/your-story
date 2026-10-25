@@ -66,10 +66,15 @@ function promptDigests(story: StoryData): string[] {
 // manage_timer. That text is identical for every story, with or without a
 // record, so it is a prompt change shared by all stories, not a record leak;
 // the other thirteen digests are untouched.
+// 2026-10-25 (GM prompt slice 2): three digests were retaken by design, the
+// system prompt (the roll and agency chains replace the dice, oracle, agency and
+// thinking rules), the "Ready." acknowledgement, and the last user message (the
+// YOUR ROLL TOOL section and the new turn message). They change for every story,
+// with or without a record; the other twelve are untouched.
 const BEFORE: string[] = [
-  "system:27181:6eb3f9c692730311",
+  "system:26373:fcde7b34d5e6d168",
   "user:9575:ec82a88c82afe716",
-  "assistant:129:bbb8f4a3710e013a",
+  "assistant:39:44c002ba5a7f3e3a",
   "user:65:21f6cbf4db8f7103",
   "assistant:966:a277570106a134ba",
   "user:65:5652c6a9dca12c36",
@@ -80,7 +85,7 @@ const BEFORE: string[] = [
   "assistant:171:3c8914881ba4c61a",
   "tool:158:62279d34a94c796d",
   "assistant:992:7ffd2be89ef124c3",
-  "user:17856:d1ba86728d3f32bb",
+  "user:17650:d404d05b99430bd8",
   "assistant:82:75356dc26d8e4df6",
 ];
 

@@ -8,8 +8,8 @@
  *   facts, the typed rulings and the key-phrase hits are rebuilt from these by
  *   the same code the app runs, so a fixture never stores a derived fact.
  * - a **generation fixture** (`kind: "generation"`): a story snapshot and what
- *   the GM should (or should not) call. The format is defined here so the
- *   exporter can write it; the GM prompt plan's slices (G2, G5) own the runner.
+ *   the GM should (or should not) call or write. `generationEval.ts` runs it
+ *   (GM prompt plan slice G2, `scripts/eval-generation.mjs`).
  *
  * Nothing here calls a model. `parseFixture` never throws: it returns the
  * problems it found, so a loader can say which file is wrong and why.
@@ -92,9 +92,47 @@ export interface GenerationFixture {
   storySnapshot: Record<string, unknown>;
   playerLine: string;
   settings?: Record<string, unknown>;
-  /** Scripted provider answers, in order, for a mocked run. */
+  /**
+   * What the engine answers when the GM calls a tool, so a run can go on to its
+   * prose: `{ tool, result }`, the first unused entry for that tool name.
+   */
   scriptedToolResponses?: Record<string, unknown>[];
-  expect: { calls?: string[]; noCalls?: string[] };
+  expect: GenerationExpect;
+  /** Rules about the arguments of one tool's calls (the judge scorer ignores it). */
+  expectArguments?: GenerationArgumentRules;
+}
+
+/**
+ * Rules for the `questions` of every call to `tool` (written for ask_question
+ * in session zero). Each rule that is present must hold on every such call.
+ */
+export interface GenerationArgumentRules {
+  tool: string;
+  /** At most this many distinct `setup_step` tags in one call. */
+  maxDistinctSetupStepsPerCall?: number;
+  /** For each distinct tag in a call, its first question carries each of these fields, non-empty. */
+  everyFirstItemPerTagHas?: string[];
+  /** Every `setup_step` tag used is one of these. */
+  setupStepIn?: string[];
+}
+
+/** What a generation case asserts about the GM's turn. Every listed rule must hold. */
+export interface GenerationExpect {
+  /** Every one of these tools is called. */
+  calls?: string[];
+  /** At least one of these tools is called. */
+  callsAny?: string[];
+  /** None of these tools is called. */
+  noCalls?: string[];
+  /** Regular expressions (case-insensitive) the visible prose must match. */
+  proseMatching?: string[];
+  /** Regular expressions (case-insensitive) the visible prose must not match. */
+  proseNotMatching?: string[];
+  /**
+   * Phrases (case-insensitive substrings) the narration must not contain. The
+   * runner checks them against the visible prose it collected.
+   */
+  narrationExcludes?: string[];
 }
 
 export type EvalFixture = JudgeFixture | GenerationFixture;
@@ -244,21 +282,53 @@ function parseJudgeFixture(o: Record<string, unknown>, errors: string[]): JudgeF
 function parseGenerationFixture(o: Record<string, unknown>, errors: string[]): GenerationFixture | null {
   if (!isRecord(o.storySnapshot)) errors.push("storySnapshot must be an object");
   if (typeof o.playerLine !== "string") errors.push("playerLine must be a string");
-  if (!isRecord(o.expect)) {
+  const expectRaw = o.expect;
+  if (!isRecord(expectRaw)) {
     errors.push("expect must be an object with calls and/or noCalls");
   } else {
-    for (const key of ["calls", "noCalls"] as const) {
-      const v = o.expect[key];
+    const keys = ["calls", "callsAny", "noCalls", "proseMatching", "proseNotMatching", "narrationExcludes"] as const;
+    for (const key of keys) {
+      const v = expectRaw[key];
       if (v !== undefined && (!Array.isArray(v) || v.some((x) => typeof x !== "string"))) {
-        errors.push(`expect.${key} must be a list of tool names`);
+        errors.push(`expect.${key} must be a list of strings`);
       }
     }
-    if (o.expect.calls === undefined && o.expect.noCalls === undefined) {
-      errors.push("expect needs calls or noCalls");
+    for (const key of ["proseMatching", "proseNotMatching"] as const) {
+      const v = expectRaw[key];
+      if (!Array.isArray(v)) continue;
+      for (const source of v) {
+        try {
+          new RegExp(String(source), "i");
+        } catch {
+          errors.push(`expect.${key} holds an invalid regular expression: ${String(source)}`);
+        }
+      }
+    }
+    if (keys.every((k) => expectRaw[k] === undefined)) {
+      errors.push("expect needs at least one of calls, callsAny, noCalls, proseMatching, proseNotMatching, narrationExcludes");
     }
   }
   if (o.scriptedToolResponses !== undefined && !Array.isArray(o.scriptedToolResponses)) {
     errors.push("scriptedToolResponses must be a list");
+  }
+  if (o.expectArguments !== undefined) {
+    const r = o.expectArguments;
+    if (!isRecord(r) || typeof r.tool !== "string") {
+      errors.push("expectArguments must be an object with a tool name");
+    } else {
+      if (
+        r.maxDistinctSetupStepsPerCall !== undefined &&
+        (typeof r.maxDistinctSetupStepsPerCall !== "number" || r.maxDistinctSetupStepsPerCall < 1)
+      ) {
+        errors.push("expectArguments.maxDistinctSetupStepsPerCall must be a number from 1");
+      }
+      for (const key of ["everyFirstItemPerTagHas", "setupStepIn"] as const) {
+        const v = r[key];
+        if (v !== undefined && (!Array.isArray(v) || v.some((x) => typeof x !== "string"))) {
+          errors.push(`expectArguments.${key} must be a list of strings`);
+        }
+      }
+    }
   }
   return errors.length > 0 ? null : (o as unknown as GenerationFixture);
 }

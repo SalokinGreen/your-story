@@ -970,7 +970,8 @@ const formulaRollTool: ToolSchema = {
         stakes: {
           type: "string",
           enum: ["low", "medium", "high", "deadly"],
-          description: "Consequence tier on failure",
+          description:
+            "Consequence on failure. high or deadly lasts the scene and raises the model tier.",
         },
         target: {
           type: "string",

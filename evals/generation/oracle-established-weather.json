@@ -1,0 +1,41 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "oracle-established-weather",
+  "published": true,
+  "note": "Roll chain, step 3 NO: an earlier scene established the sleet, so the GM narrates it and does not ask the oracle.",
+  "storySnapshot": {
+    "story_name": "The Tallow Gate",
+    "premise": "A mountain toll-town in winter. Ilse Varrow, a courier, carries a sealed tin to the toll-house at the far end of the Pim causeway.",
+    "player_name": "Ilse Varrow",
+    "difficulty": "medium",
+    "scene": {
+      "parts": [
+        {
+          "content": "Sleet has hammered the pass since dawn, and the lamps along the Pim causeway gutter in it.",
+          "imageUrl": "",
+          "user": false,
+          "role": "assistant"
+        }
+      ]
+    },
+    "lore": [
+      {
+        "title": "Character: Ilse Varrow",
+        "type": "character_sheet",
+        "content": "Ilse Varrow, courier. Quick, stubborn, owes the Hobnail Guild a debt. Carries a sealed tin she has not opened.",
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": [],
+        "enabled": true
+      }
+    ],
+    "npcs": []
+  },
+  "playerLine": "I step outside the inn. What is the weather like?",
+  "expect": {
+    "noCalls": ["fate_question", "roll_table", "formula_roll", "gm_roll"],
+    "proseMatching": ["sleet"]
+  }
+}

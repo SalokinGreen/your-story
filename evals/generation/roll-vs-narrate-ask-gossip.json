@@ -1,0 +1,51 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "roll-vs-narrate-ask-gossip",
+  "published": true,
+  "note": "Roll chain, step 2 NO: a plain question to an NPC who will answer freely. The GM narrates; any dice or oracle call is a failure.",
+  "storySnapshot": {
+    "story_name": "The Tallow Gate",
+    "premise": "A mountain toll-town in winter. Ilse Varrow, a courier, carries a sealed tin to the toll-house at the far end of the Pim causeway.",
+    "player_name": "Ilse Varrow",
+    "difficulty": "medium",
+    "scene": {
+      "parts": [
+        {
+          "content": "The Kettle & Rook is warm and loud. A stranger in a saffron cloak sits alone by the stove, and Odrell Pim wipes a tankard behind the bar.",
+          "imageUrl": "",
+          "user": false,
+          "role": "assistant"
+        }
+      ]
+    },
+    "lore": [
+      {
+        "title": "Character: Ilse Varrow",
+        "type": "character_sheet",
+        "content": "Ilse Varrow, courier. Quick, stubborn, owes the Hobnail Guild a debt. Carries a sealed tin she has not opened.",
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": [],
+        "enabled": true
+      }
+    ],
+    "npcs": [
+      {
+        "id": "npc-odrell-pim",
+        "name": "Odrell Pim",
+        "description": "Round-shouldered innkeeper of the Kettle & Rook. Fond of gossip. He tells anyone who asks that the stranger in the saffron cloak is Wen Tarrow, the ferryman's cousin, here for a wedding.",
+        "role": "Innkeeper",
+        "status": "alive",
+        "relationship": "Stranger",
+        "attitude": "friendly",
+        "createdAt": 1
+      }
+    ]
+  },
+  "playerLine": "I ask Odrell Pim who the stranger in the saffron cloak is.",
+  "expect": {
+    "noCalls": ["formula_roll", "opposed_formula", "gm_roll", "ask_for_roll", "npc_roll", "fate_question", "roll_table"]
+  }
+}

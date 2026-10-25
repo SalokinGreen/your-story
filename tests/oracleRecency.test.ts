@@ -222,11 +222,12 @@ describe("CORE STANCE oracle framing", () => {
     });
     const prompt = messages.map((m) => m.content).join("\n");
 
-    expect(prompt).toContain("Roll dice only when they matter");
-    expect(prompt).toContain("Ask the oracle whenever you don't already know");
-    // The old wording lumped dice and oracle into one restraint rule, which
-    // is what made the oracle guidance read as a footnote to "don't call
-    // tools out of habit".
+    // One chain: a dice step (a YES means a roll) and a separate oracle step.
+    expect(prompt).toContain("WHEN TO ROLL, ASK THE ORACLE, OR NARRATE");
+    expect(prompt).toContain("whose failure would change the fiction");
+    expect(prompt).toContain("ask `fate_question` with honest odds");
+    // The old wording lumped dice and oracle into one restraint rule.
     expect(prompt).not.toContain("Call a dice or oracle tool ONLY when");
+    expect(prompt).not.toContain("This is the opposite instruction");
   });
 });
