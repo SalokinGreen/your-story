@@ -162,12 +162,26 @@ export function pendingCheck(
     prompted: ReadonlySet<string>;
     /** The story's parts before this turn, for satisfiedOnLastTurn. */
     priorParts?: Parameters<typeof satisfiedOnLastTurn>[1];
+    /**
+     * The model's reading of each "judge" check this turn, by check id
+     * (`judgeAnswerFor`). "yes" makes the check pending, "no" clears it, and
+     * "unknown" or an absent entry falls back to the phrase table.
+     */
+    judged?: Readonly<Record<string, { answer: "yes" | "no" | "unknown"; quote?: string }>>;
   },
 ): PendingTurnEndCheck | null {
   for (const check of system?.turnEndChecks ?? []) {
     if (turn.prompted.has(check.id)) continue;
     if (checkSatisfied(check, turn.results)) continue;
     if (turn.priorParts && satisfiedOnLastTurn(check, turn.priorParts)) continue;
+    const reading = check.trigger.kind === "judge" ? turn.judged?.[check.id] : undefined;
+    if (reading?.answer === "yes") {
+      return {
+        check,
+        match: { source: "prose", phrase: reading.quote || "(judge: yes)" },
+      };
+    }
+    if (reading?.answer === "no") continue;
     const match = textCrosses(check, turn.text);
     if (match) return { check, match };
   }
@@ -191,4 +205,49 @@ export function splitPlayerLines(userChoice: string | undefined): string[] {
     }
   }
   return lines.map((l) => l.trim()).filter(Boolean);
+}
+
+/** localStorage key for the switch that turns the "judge" triggers on. */
+export const TURN_END_JUDGE_KEY = "ys:turnEndJudge";
+
+/**
+ * Whether "judge" triggers use their model reading. Off unless the stored
+ * value is "on": the dawn judge ships dark, with the phrase table live, until
+ * its behavioural cases (evals/dawn/) show no rise in missed or false dawns
+ * (GM prompt plan slice 5). No Settings control yet.
+ */
+export function isTurnEndJudgeEnabled(): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(TURN_END_JUDGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The "judge" checks that still need a reading this turn: not prompted, not
+ * satisfied, not suppressed by the previous turn, and with something to read.
+ * The caller asks each one's `trigger.question` and passes the answers to
+ * `pendingCheck`'s `judged`. Empty when the judge is off, so no call is made.
+ */
+export function judgeChecksToAsk(
+  system: Pick<BuiltinSystem, "turnEndChecks"> | undefined,
+  turn: {
+    text: TurnEndText;
+    results: readonly TurnEndToolResult[];
+    prompted: ReadonlySet<string>;
+    priorParts?: Parameters<typeof satisfiedOnLastTurn>[1];
+  },
+  enabled: boolean = isTurnEndJudgeEnabled(),
+): SystemTurnEndCheck[] {
+  if (!enabled) return [];
+  if (!turn.text.gmProse.trim() && turn.text.playerLines.length === 0) return [];
+  return (system?.turnEndChecks ?? []).filter(
+    (check) =>
+      check.trigger.kind === "judge" &&
+      Boolean(check.trigger.question) &&
+      !turn.prompted.has(check.id) &&
+      !checkSatisfied(check, turn.results) &&
+      !(turn.priorParts && satisfiedOnLastTurn(check, turn.priorParts)),
+  );
 }

@@ -64,6 +64,16 @@ export interface BuiltinAdventure {
 export interface SystemTurnEndCheck {
   id: string; // "night-ended"
   trigger: {
+    /**
+     * "phrases" (the default) reads the phrase table below. "judge" asks
+     * `question` of one cheap model call (judges/turnEndJudge.ts) when the
+     * judge is switched on, and uses the phrase table as the fallback when the
+     * call fails or is unsure, and always while the judge is off (GM prompt
+     * plan slice 5). Either way the tool result is checked in code.
+     */
+    kind?: "phrases" | "judge";
+    /** The yes/no question a "judge" trigger asks ("Did the night end in this turn's text?"). */
+    question?: string;
     /** Phrases that count in the GM's visible prose and in a player's line. */
     phrases: RegExp[];
     /** Phrases that count only in a player's line ("in the morning" is a plan in prose). */

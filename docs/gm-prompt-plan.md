@@ -362,3 +362,52 @@ Built on `claude/gm-prompts-g2`. Files: `app/misc/gmPromptChains.ts` (new),
   they override the default person. `author_notes` (the Designer's private GM
   notes) are deliberately not carried. Rewrites get both, as they continue the
   same context.
+
+### 2026-10-25, slice 5 (G5)
+
+Built on `claude/gm-prompts-g5`. Files: `ai_staged.ts`, `gmTools.ts`,
+`systems/types.ts`, `systems/blood-and-bone/turnEndChecks.ts`, `turnEndChecks.ts`,
+`judges/turnEndJudge.ts` (new), `generation.ts`, `evals/dawn/cases.json`,
+`scripts/eval-dawn.mjs`, `tests/turnEndJudge.test.ts`,
+`tests/generation.turnEndJudge.test.ts`, `tests/dawnCases.test.ts`.
+
+- **Length.** Each bracket now names beats and sentences ("one beat, 1-2
+  sentences (roughly 15-45 words)"; climax at most three beats), and the "Cut the
+  flavor" section has a second example pair (a second beat nobody asked for).
+  The system prompt's digest in `campaign.oldSaves` was retaken (26,373 to 27,021
+  characters), for every story.
+- **`set_reasoning_tier`** lists its triggers (boss or multi-sided fight 2-3, an
+  unsettled rules clash 2, NPC goals colliding 2, a pivotal plot or secret decision
+  3, never ordinary narration). The two parameter descriptions were shortened
+  ("0 lightest, 3 heaviest."; "One line: why.") to hold the 10,000-token default
+  budget and the 11,500 Fantastic Realms budget.
+- **The dawn question is not a judge in the Observer's combined call.** The
+  revised plan puts the reading before the final round's narration, where the
+  turn-end checks run; the combined call runs after the turn. So the judge is its
+  own small call (`askTurnEndJudge`), the same kind (side-agent model, explicit
+  effort, temperature 0, reasoning before the keyed verdict, a quote that must be
+  in the text, anything else unknown), not a ninth `JudgeId`: that would have added
+  a Settings flag type, a stored setting and a preconditions branch for a
+  system-declared check. It is one extra side call per distinct final prose,
+  cached per turn, and only for a system that declares a `judge` trigger and only
+  when the switch is on.
+- **The trigger.** `SystemTurnEndCheck.trigger` gained `kind?: "phrases"|"judge"`
+  (unset means phrases) and `question?`. The phrase table stays on a judge check
+  as the fallback. `pendingCheck` takes `judged`; `judgeChecksToAsk` lists the
+  checks to read (none when off, prompted, satisfied, suppressed by the previous
+  turn or with no text).
+- **Ships dark.** `isTurnEndJudgeEnabled()` reads localStorage `ys:turnEndJudge`
+  (`"on"`), default off, no Settings control, until the live run passes. With it
+  off the behaviour is byte for byte today's, which the existing
+  `generation.turnEndChecks` tests still prove.
+- **The behavioural cases** are `evals/dawn/cases.json` (13: five dawns, eight
+  non-dawns, among them a flashback, a plan, a question, a "before dawn", a
+  painting of a sunrise). They are not generation fixtures (no GM round to run) nor
+  judge turns (`evals/turns/public/` is counted by a test), so they have their own
+  tiny format and runner, `scripts/eval-dawn.mjs`, which prints the phrase table's
+  verdict for each (free) and, with `--go`, asks the judge N times and scores
+  missed and false dawns against the table, counting an unknown as the table's
+  answer. The phrase table is wrong on 6 of the 13 (three missed dawns, three
+  false), pinned by `tests/dawnCases.test.ts`. The live run is owed.
+- **Not done:** no Settings control for the switch, and the judge reads Blood &
+  Bone's check only (the only system with a turn-end check).
