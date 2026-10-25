@@ -628,7 +628,9 @@ removing a catalog entry is safe for saved and synced settings; a retired key
 can instead be aliased to its successor (`LEGACY_MODEL_KEY_ALIASES`, read by
 every saved-choice reader through `resolveModelKeyAlias()`), so a saved choice
 keeps working, which the retired Mistral models rely on for a player whose only
-key is Mistral's. The catalog was
+key is Mistral's, and the retired DeepInfra models for a player whose only key is
+DeepInfra's (refreshed 2026-10-25, the dated note at the end of
+`docs/research/gm-models-2026-10-21.md`). The catalog was
 checked against OpenRouter and each vendor on 2026-10-21 (see the dated note in
 `docs/research/gm-models-2026-10-21.md` §6); `DeepSeek V4 Flash` is kept as a
 key only for the fallback and saved settings, and calls `deepseek-flash`.
