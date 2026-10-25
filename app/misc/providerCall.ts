@@ -240,6 +240,8 @@ export const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "record_challenge_result",
   "cancel_challenge",
   "increment_scene",
+  // The campaign record (clocks, fronts, secrets, clues)
+  "campaign",
   // System tools (only present for stories that use a system, decision 79).
   "manage_meter",
   "manage_track",

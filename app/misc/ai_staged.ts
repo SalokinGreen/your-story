@@ -45,6 +45,7 @@ import {
 } from "@/app/misc/contextLimits";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { estimateTokens } from "@/app/misc/tokenCounter";
+import { formatCampaignBrief } from "@/app/misc/campaign/brief";
 import {
   estimateRenderedPartTokens,
   renderHistoryPart,
@@ -1220,6 +1221,8 @@ export interface LiveBlockInput {
   // Meters, tracks and the active challenge (default-systems slices 2 and 4);
   // per-turn state, so they live here and never in the stable block.
   metersSection?: string;
+  // The campaign brief (campaign/brief.ts): per-turn, so it lives here.
+  campaignBrief?: string;
   challengeSection?: string;
   pendingEventsSection: string;
   pendingMovesSection: string;
@@ -1539,6 +1542,7 @@ export function buildLiveBlock(input: LiveBlockInput): string {
   if (input.combatSection) out += input.combatSection + "\n";
   if (input.timersSection) out += input.timersSection + "\n";
   if (input.metersSection) out += input.metersSection + "\n";
+  if (input.campaignBrief) out += input.campaignBrief + "\n";
   if (input.challengeSection) out += input.challengeSection + "\n";
   // Pending random events / director moves - must be addressed
   if (input.pendingEventsSection) out += input.pendingEventsSection + "\n\n";
@@ -1901,7 +1905,10 @@ export function buildGMStagePrompt({
   const combatSection = formatCombatState(storyData.combatState);
 
   // Format timers state for context
-  const timersSection = formatTimersState(storyData.timers);
+  // With a campaign record the timers are clocks, shown in the campaign brief.
+  const timersSection = storyData.campaign
+    ? ""
+    : formatTimersState(storyData.timers);
 
   // Meters, tracks and the active challenge: shown whenever there is
   // something to show, whether or not the system tools are offered.
@@ -2432,6 +2439,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "npc_reaction",
     // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
     "manage_timer",
+    // The campaign record (always offered, so the tool list is one stable list)
+    "campaign",
     // Session-zero -> real-play handoff: names the story and clears
     // sessionZeroActive. The START OF PLAY / fresh-story-setup prompt blocks
     // instruct the GM to call this, so it MUST be offered here - without it the
@@ -2523,6 +2532,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     combatSection,
     timersSection,
     metersSection,
+    campaignBrief: formatCampaignBrief(storyData),
     challengeSection,
     pendingEventsSection: gmStagePendingEventsSection,
     pendingMovesSection: gmStagePendingDirectorMovesSection,

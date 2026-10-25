@@ -526,6 +526,34 @@ export type ManageTimerAction =
   | "cancel"
   | "trigger";
 
+// ============================================
+// CAMPAIGN TOOL (docs/campaign-format-design.md section 7)
+// ============================================
+
+export type CampaignAction =
+  | "read"
+  | "add"
+  | "edit"
+  | "tick"
+  | "pause"
+  | "resume"
+  | "reveal_secret"
+  | "place_clue"
+  | "find_clue"
+  | "advance_front"
+  | "set_beat"
+  | "open_side_beat"
+  | "close_side_beat";
+
+export interface CampaignParams {
+  action: CampaignAction;
+  part?: string; // style, pitch, safety, faction, front, clock, person, secret, location, beat, end_state
+  id?: string; // the part's id (a clock, front or secret may also be named)
+  data?: Record<string, unknown>; // the part, validated per part
+  by?: number; // tick / advance_front: segments, signed (default 1)
+  reason?: string; // tick / advance_front: why
+}
+
 export interface ManageTimerParams {
   action: ManageTimerAction;
   timer?: string; // Timer name or ID - required for advance/toggle_pause/cancel/trigger
@@ -713,6 +741,7 @@ export type GMToolParams =
   | { name: "get_game_state"; params: GetGameStateParams }
   // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
   | { name: "manage_timer"; params: ManageTimerParams }
+  | { name: "campaign"; params: CampaignParams }
   // System tools (meters, tracks, sessions, action rolls)
   | { name: "manage_meter"; params: ManageMeterParams }
   | { name: "manage_track"; params: ManageTrackParams }
@@ -1844,6 +1873,47 @@ const manageTimerTool: ToolSchema = {
 };
 
 // ============================================
+// CAMPAIGN TOOL SCHEMA
+// ============================================
+
+const campaignTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "campaign",
+    description: `Read and keep the campaign record. The engine ticks clocks itself; a hand tick needs a reason. read an empty part for its data shape.`,
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: [
+            "read",
+            "add",
+            "edit",
+            "tick",
+            "pause",
+            "resume",
+            "reveal_secret",
+            "place_clue",
+            "find_clue",
+            "advance_front",
+            "set_beat",
+            "open_side_beat",
+            "close_side_beat",
+          ],
+        },
+        part: { type: "string" },
+        id: { type: "string" },
+        data: { type: "object" },
+        by: { type: "number" },
+        reason: { type: "string" },
+      },
+      required: ["action"],
+    },
+  },
+};
+
+// ============================================
 // SYSTEM TOOL SCHEMAS (meters, tracks, sessions, action rolls)
 // ============================================
 
@@ -2292,6 +2362,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   getGameStateTool,
   // Countdown timer tool (create/advance/toggle_pause/cancel/trigger via `action`)
   manageTimerTool,
+  // The campaign record: clocks, fronts, secrets, clues, beats (always offered, so the list is stable)
+  campaignTool,
   // System tools: offered only to stories that use a system (decision 79, see buildGMStagePrompt)
   manageMeterTool,
   manageTrackTool,

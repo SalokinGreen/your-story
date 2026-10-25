@@ -53,6 +53,7 @@ export const TOOL_LABELS: Record<string, string> = {
 
   // Timers
   manage_timer: "Managing timer",
+  campaign: "Campaign",
 
   // Systems (meters, tracks, sessions, action rolls)
   manage_meter: "Updating a meter",

@@ -58,6 +58,21 @@ const KEEP_WHOLE_TOOLS = new Set([
   "manage_track",
 ]);
 
+/**
+ * Whether a past result is kept whole whatever its size. Most tools in
+ * KEEP_WHOLE_TOOLS are; a `campaign` result is too (a tick, a reveal, a found
+ * clue is what a later turn needs), except a `read`, which can be long and is
+ * stubbed by size like any note read. Checked before the unconditional
+ * keep-whole return in stubToolResult.
+ */
+export function stubPolicy(
+  toolName: string,
+  args: Record<string, unknown> | undefined,
+): "whole" | "by_size" {
+  if (toolName === "campaign") return args?.action === "read" ? "by_size" : "whole";
+  return KEEP_WHOLE_TOOLS.has(toolName) ? "whole" : "by_size";
+}
+
 function formatTokens(n: number): string {
   return n.toLocaleString("en-US");
 }
@@ -82,7 +97,7 @@ export function stubToolResult(
   args: Record<string, unknown> | undefined,
   content: string,
 ): string {
-  if (KEEP_WHOLE_TOOLS.has(toolName)) return content;
+  if (stubPolicy(toolName, args) === "whole") return content;
   const tokens = estimateTokens(content);
   if (tokens <= STUB_RESULT_THRESHOLD_TOKENS) return content;
 

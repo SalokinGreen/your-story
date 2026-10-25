@@ -388,4 +388,81 @@ reported in the PR.
 
 ## Decisions made during implementation
 
-(Filled in as the slices land.)
+### 2026-10-25 — slice 1 (`claude/campaign-c1`)
+
+Where this entry and the plan above disagree, this entry is what was built.
+
+- **The tool budget does not hold with the plan's schema, and the author
+  should decide.** Measured with `estimateTokens` over the default list:
+  9,899 tokens before; 10,385 with the schema as the plan sketched it (a
+  486-token `campaign` with described properties and enums); 10,034 with a bare
+  schema (135 tokens: the 13-action enum alone is about 50). A schema that fits
+  the 101 tokens of headroom is not possible with 13 actions. What was built:
+  the bare schema (no property descriptions, `part` and `data` untyped beyond
+  `string` and `object`), the data shapes moved out of the schema into
+  `PART_SHAPES` (`validate.ts`), which `read` on an empty part and a refused
+  write return, and `tests/toolBudget.test.ts` holding the rest of the list to
+  the old 10,000 plus a separate `CAMPAIGN_TOOL_EXTRA = 150` bound for the
+  campaign tool, the way Manual Dice Mode and the system tools have their own
+  bounds. The choice for the author is to accept that (default stories pay 135
+  tokens a round), or trim 35 tokens from other tool descriptions, or offer
+  `campaign` only to stories with a record (which breaks the stable list: a
+  story would change its tools mid-play at its first `add`).
+- **The ledger is not on the clock.** The plan put `createdOrder` on a clock;
+  an order is only meaningful inside one turn, so a persisted value would
+  suppress events on the next turn. `TurnLedger.clockCreatedAt` (clock id to
+  the order that was next at its creation) is on the ledger instead.
+  `executeGMTools` takes the ledger in `GMToolContext.turnLedger`, works on a
+  copy, and returns the updated one as `GMExecutionResult.turnLedger`;
+  `generation.ts` keeps it in a local beside the GM round loop, so an aborted
+  batch commits nothing to it. (`GenerationTurnState` does not exist in the
+  code, so there is no such type.)
+- **Ticks apply after each tool, not each batch**, and the `[Clock … → …]` lines
+  are appended to the triggering tool's own result (not the batch's last), with
+  the structured reports on `GMToolResult.clockReports` for the narration
+  context's public summary (slice 2), which must drop `visible: false` ones.
+- **`tickClock`** returns `{clock, crossed, filled, applied, refused?, reason?}`
+  (`applied` and `refused` added). A paused or cancelled clock is refused for a
+  hand tick too, not only for triggers; the GM resumes it first. A hand tick
+  needs `reason`.
+- **Portents.** A portent with `at: 0` means "not set"; if any portent has no
+  `at`, all are spread evenly (`effectivePortents`), so a portent never fires at
+  fill zero. `crossed` stores the effective `at`.
+- **Timers once a record exists.** The legacy `timers` array is kept and goes
+  stale; clocks are the truth. Consequences, all gated on `story.campaign`:
+  `formatTimersState` is skipped (the brief shows the clocks), `get_game_state`
+  "timers" lists clocks, the director skips a timer the migration already
+  turned into a clock, and `adjustTension` counts a clock one segment from full.
+  `manage_timer create` on such a story makes only a clock; its visibility
+  defaults from the style when `visibility` is not given.
+- **`migrateTimers`** also runs when `campaign add` creates the first record
+  (the executor calls it), but then the record has no `origin`. A migrated
+  record loses `origin` when it gains a style (`campaign edit style`).
+- **`storyProgress`** derives from the record only when the record has a style;
+  a record the timer migration made (no style) keeps the chapter-based value.
+- **`campaign` results are `hiddenFromPlayer`** (added to
+  `HIDDEN_FROM_PLAYER_TOOL_NAMES`), since reads and secrets are the GM's. The
+  player's own view is slice 6.
+- **Action semantics the plan left open.** `advance_front` ticks the front's
+  clock by `by`, or with `data: {status}` sets the front's status; a front with
+  no clock says how to add one. `set_beat` is refused while a side beat is
+  open. `open_side_beat` takes `data: {title, summary}` and creates the beat.
+  Beats need the `adventure_path` style. A person is added by `npcId` (or
+  `npc`, a name) and an unknown NPC lists the valid ids. `edit` of a secret
+  cannot change `clues` or `revealed`. New clock sizes are 4, 6 or 8; an edit
+  allows any whole number from 1 to 100, so a migrated clock stays editable.
+- **Ids.** Short: `prefix_` plus the first 8 hex characters of
+  `crypto.randomUUID()`, checked unique inside the record. Two prefixes the plan
+  did not name: `bt_` for beats and `saf_` for lines and veils.
+- **"People here" in the brief** is the people attached to a location whose name
+  appears in the latest scene part (no current-location state exists). It is
+  the last priority and is dropped first.
+- **The no-record snapshot** (`tests/campaign.oldSaves.test.ts`) stores digests
+  (length and SHA-256) of every message of `buildGMStagePrompt` for a fixture
+  story with timers, taken from `claude/redesign-base` (`git archive` into a
+  scratch copy sharing `node_modules`) before the change. Only the tool list
+  differs, and the tool budget test holds that.
+- **Not done in this slice.** The `engine-review` agent was not run (it is the
+  caller's to launch). The GM prompt's "Fronts advance on their own" line was
+  left alone, as briefed. Live brief size: a full brief grows the live block by
+  771 tokens on the fixture (`tests/campaign.brief.test.ts`).

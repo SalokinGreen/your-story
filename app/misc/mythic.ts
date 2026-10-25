@@ -19,6 +19,7 @@ import type {
 } from "./structs";
 import { pickTagFocusExamples } from "./tagFocusExamples";
 import { rollComplication } from "./primaMateria";
+import { deriveStoryProgress } from "./campaign/progress";
 
 // "Normal Yes"/"Normal No" rather than a bare "Yes"/"No": the answer string
 // is handed straight to the model, and a bare "Yes" next to "Exceptional Yes"
@@ -382,6 +383,10 @@ export function formatOracleRecencyLine(storyData: StoryData): string {
  * (max_chapters <= 0) rather than dividing by zero.
  */
 export function storyProgress(storyData: StoryData): number {
+  // A story with a campaign record that has a style derives its progress from
+  // the record (beats, secrets or fronts); every other story keeps the
+  // chapter-based value below.
+  if (storyData.campaign?.style) return deriveStoryProgress(storyData.campaign);
   const maxChapters = storyData.max_chapters || 0;
   if (maxChapters <= 0) return 0;
   return Math.max(
@@ -657,7 +662,40 @@ export function selectDirectorMove(
     (t) => t.status === "active"
   );
 
-  const nearZeroTimer = activeTimers.find((t) => t.currentTicks <= 1);
+  // Campaign clocks first (a clock one segment from full, linked to a thread
+  // when it has one), then the legacy timers. A timer the migration already
+  // turned into a clock is not offered twice.
+  const nearFullClock = (storyData.campaign?.clocks ?? []).find(
+    (c) =>
+      !c.paused &&
+      !c.cancelled &&
+      c.filled < c.segments &&
+      c.segments - c.filled <= 1
+  );
+  if (nearFullClock) {
+    const linkedThread = activeThreads.find(
+      (t) =>
+        t.linkedTimerId === nearFullClock.id ||
+        (nearFullClock.link?.kind === "thread" && nearFullClock.link.id === t.id)
+    );
+    return {
+      id: crypto.randomUUID(),
+      move: "tick_a_clock",
+      targetClockId: nearFullClock.id,
+      targetThreadId: linkedThread?.id,
+      context: `Clock "${nearFullClock.name}" is about to fill (${nearFullClock.filled}/${nearFullClock.segments})`,
+      createdAt: Date.now(),
+    };
+  }
+
+  const migratedIds = new Set(
+    (storyData.campaign?.clocks ?? [])
+      .map((c) => c.migratedFromTimerId)
+      .filter((id): id is string => !!id)
+  );
+  const nearZeroTimer = activeTimers.find(
+    (t) => t.currentTicks <= 1 && !migratedIds.has(t.id)
+  );
   if (nearZeroTimer) {
     const linkedThread = activeThreads.find(
       (t) => t.linkedTimerId === nearZeroTimer.id

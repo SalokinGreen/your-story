@@ -68,6 +68,18 @@ import {
   type RollOutcome,
 } from "./metersAndTracks";
 import { resolveSystem } from "./systems/resolve";
+import { executeCampaign, makeId } from "./campaign/executor";
+import {
+  applyTurnEvents,
+  defaultClockVisibility,
+  describeTick,
+  newTurnLedger,
+  tickClock,
+  type ClockReport,
+  type TurnLedger,
+} from "./campaign/clocks";
+import { turnEventsFrom } from "./campaign/events";
+import type { Clock } from "./campaign/types";
 import {
   StartChallengeParams,
   CancelChallengeParams,
@@ -95,6 +107,7 @@ import {
   CancelTimerParams,
   TriggerTimerParams,
   ManageTimerParams,
+  CampaignParams,
   ManageMeterParams,
   ManageMeterAction,
   ManageTrackParams,
@@ -206,6 +219,11 @@ export interface GMToolContext {
   // better than StoryData does (party seats). Default: couch players, else
   // one sheet (getSetupProgress).
   setupPlayers?: { id: string; name: string }[];
+  // The turn's clock event ledger so far (campaign clocks tick once per
+  // trigger per turn, across the GM's rounds). The batch works on a copy and
+  // hands the updated one back as `turnLedger`; the caller keeps it with the
+  // story it commits.
+  turnLedger?: TurnLedger;
 }
 
 /**
@@ -233,6 +251,10 @@ export interface GMToolResult {
   // views filter these out entirely; the GM's own context keeps them, since
   // the whole point is that the GM knows what the player doesn't.
   hiddenFromPlayer?: boolean;
+  // Clock ticks this result caused (campaign clocks, see campaign/clocks.ts).
+  // The GM sees their lines appended to contextForStory; the narration
+  // context's public summary reads this field and drops hidden clocks.
+  clockReports?: ClockReport[];
   result:
     | GMChallengeResult
     | GMCancelChallengeResult
@@ -261,6 +283,8 @@ export interface GMToolResult {
     | GMToggleTimerPauseResult
     | GMCancelTimerResult
     | GMTriggerTimerResult
+    // Campaign
+    | GMCampaignResult
     // System results
     | GMManageMeterResult
     | GMManageTrackResult
@@ -288,6 +312,14 @@ export interface GMToolResult {
     | GMNPCReactionResult
 ;
   contextForStory: string; // Formatted bracket notation for story stage
+}
+
+export interface GMCampaignResult {
+  type: "campaign";
+  action: string;
+  part?: string;
+  id?: string;
+  message: string;
 }
 
 export interface GMStateChangeResult {
@@ -891,6 +923,8 @@ export interface GMExecutionResult {
   // not committed: modifiedStoryData is the story as it came in, and the
   // caller must not treat it as this turn's result.
   aborted?: boolean;
+  // The turn's clock event ledger after this batch (see GMToolContext).
+  turnLedger?: TurnLedger;
 }
 
 // What the setup card needs (confirm_setup, session zero). The sheet and plan
@@ -947,7 +981,9 @@ const OUTCOME_BEARING_TOOL_NAMES = new Set([
  * tool log as a `gm_roll` row, announcing the secret roll the tool exists to
  * conceal. Every result for these tools is stamped on the way out.
  */
-const HIDDEN_FROM_PLAYER_TOOL_NAMES = new Set(["gm_roll"]);
+// "campaign" is here because its reads, its secrets and its hidden clocks are
+// the GM's; the player's view of the campaign is built separately (slice 6).
+const HIDDEN_FROM_PLAYER_TOOL_NAMES = new Set(["gm_roll", "campaign"]);
 
 /**
  * The name the M2 roll gate and the Observer's outcome check see for a
@@ -1018,6 +1054,9 @@ export async function executeGMTools(
   // JSON.parse(JSON.stringify(...)) round-trip) is both faster and doesn't
   // silently drop values JSON can't represent (undefined, Map/Set, etc.).
   const modified = structuredClone(storyData);
+  let ledger: TurnLedger = toolContext.turnLedger
+    ? structuredClone(toolContext.turnLedger)
+    : newTurnLedger();
   const results: GMToolResult[] = [];
   const contextParts: string[] = [];
   const signal = toolContext.abortSignal;
@@ -1147,6 +1186,7 @@ export async function executeGMTools(
     }
 
     let result: GMToolResult;
+    const clockIdsBefore = new Set((modified.campaign?.clocks ?? []).map((c) => c.id));
 
     try {
       switch (call.function.name) {
@@ -1346,6 +1386,9 @@ export async function executeGMTools(
             params as ManageTimerParams,
             modified
           );
+          break;
+        case "campaign":
+          result = executeCampaign(call.id, params as CampaignParams, modified);
           break;
         // System tools (meters, tracks, sessions, action rolls)
         case "manage_meter":
@@ -1590,6 +1633,35 @@ export async function executeGMTools(
     if (isHiddenFromPlayerTool(result.toolName)) {
       result.hiddenFromPlayer = true;
     }
+
+    // Campaign clocks tick here, at the tool boundary and in call order, so a
+    // pause earlier in a batch is honoured by a miss later in it (design
+    // 14.2). A clock made by this tool starts ticking from the next event.
+    if (modified.campaign) {
+      for (const c of modified.campaign.clocks) {
+        if (!clockIdsBefore.has(c.id)) {
+          ledger.clockCreatedAt[c.id] = ledger.nextOrder;
+        }
+      }
+      const kinds = turnEventsFrom(result);
+      if (kinds.length > 0) {
+        const applied = applyTurnEvents(
+          modified.campaign,
+          ledger,
+          kinds.map((kind) => ({ kind, toolCallId: call.id }))
+        );
+        ledger = applied.ledger;
+        if (applied.reports.length > 0) {
+          result.clockReports = applied.reports;
+          result.contextForStory = [
+            result.contextForStory,
+            ...applied.reports.map((r) => r.line),
+          ]
+            .filter(Boolean)
+            .join("\n");
+        }
+      }
+    }
     results.push(result);
     if (result.contextForStory) {
       contextParts.push(result.contextForStory);
@@ -1646,6 +1718,7 @@ export async function executeGMTools(
     results,
     modifiedStoryData: modified,
     storyContext: contextParts.join("\n"),
+    turnLedger: ledger,
   };
 }
 
@@ -3744,7 +3817,20 @@ function executeGetGameState(
     }
   }
 
-  if (requested.includes("timers")) {
+  if (requested.includes("timers") && storyData.campaign) {
+    // With a campaign record the timers are clocks.
+    const clocks = storyData.campaign.clocks.filter((c) => !c.cancelled);
+    if (clocks.length > 0) {
+      const lines = clocks.map(
+        (c) =>
+          `- ${c.name}: ${c.filled}/${c.segments}${c.paused ? " (paused)" : ""}${
+            c.visible ? "" : " [hidden]"
+          }${c.onFill ? ` — ${c.onFill}` : ""}`
+      );
+      blocks.push(`### ⏳ Clocks\n${lines.join("\n")}`);
+      includedSections.push("timers");
+    }
+  } else if (requested.includes("timers")) {
     const timers = (storyData.timers || []).filter(
       (t) => t.status === "active" || t.status === "paused"
     );
@@ -5738,6 +5824,210 @@ function executeTriggerTimer(
 }
 
 /**
+ * manage_timer on a story with a campaign record: the same five actions, on
+ * clocks. The results keep the timer result types (remaining ticks, not filled
+ * segments), so the timeline and the labels are unchanged.
+ *   create -> a manual clock, at any capacity; advance -> a tick;
+ *   toggle_pause -> toggles `paused`; cancel -> paused with `cancelled`;
+ *   trigger -> fills the clock at once and reports its fill.
+ */
+function executeManageTimerOnClocks(
+  toolCallId: string,
+  params: ManageTimerParams,
+  storyData: StoryData
+): GMToolResult {
+  const record = storyData.campaign!;
+  const fail = (message: string, ctx?: string): GMToolResult => ({
+    toolName: "manage_timer",
+    toolCallId,
+    success: false,
+    result: { type: "state_change", message, command: "manage_timer" },
+    contextForStory: ctx ?? `[ERROR: ${message}]`,
+  });
+  const find = (ref: string): Clock | undefined => {
+    const lower = ref.toLowerCase();
+    return record.clocks.find((c) => c.id === ref || c.name.toLowerCase() === lower);
+  };
+  const remaining = (c: Clock) => c.segments - c.filled;
+  const done = (
+    result: GMToolResult["result"],
+    contextForStory: string
+  ): GMToolResult => ({
+    toolName: "manage_timer",
+    toolCallId,
+    success: true,
+    result,
+    contextForStory,
+  });
+
+  if (params.action === "create") {
+    if (!params.name || params.ticks === undefined) {
+      return fail(`manage_timer action "create" requires "name" and "ticks"`);
+    }
+    if (find(params.name)) {
+      const existing = find(params.name)!;
+      return fail(
+        `Timer "${params.name}" already exists`,
+        `[Timer Error: Timer "${params.name}" already exists with ${remaining(existing)} ticks remaining]`
+      );
+    }
+    const segments = Math.floor(params.ticks);
+    if (!Number.isFinite(segments) || segments < 1) {
+      return fail(`manage_timer action "create": "ticks" must be a whole number, 1 or more`);
+    }
+    const clock: Clock = {
+      id: makeId("clk", record.clocks.map((c) => c.id)),
+      name: params.name,
+      segments,
+      filled: 0,
+      triggers: ["manual"],
+      visible: params.visibility
+        ? params.visibility !== "hidden"
+        : defaultClockVisibility(record.style),
+      paused: false,
+      crossed: [],
+    };
+    if (params.description) clock.onFill = params.description;
+    record.clocks.push(clock);
+    return done(
+      {
+        type: "create_timer",
+        timer: {
+          id: clock.id,
+          name: clock.name,
+          description: clock.onFill,
+          totalTicks: segments,
+          currentTicks: segments,
+          autoAdvance: false,
+          visibility: clock.visible ? "visible" : "hidden",
+        },
+      } as GMCreateTimerResult,
+      `[Timer Created: "${clock.name}" - ${segments} ticks (a campaign clock: advance it yourself)${
+        clock.visible ? "" : " (hidden from player)"
+      }${clock.onFill ? ` - ${clock.onFill}` : ""}]`
+    );
+  }
+
+  if (
+    params.action !== "advance" &&
+    params.action !== "toggle_pause" &&
+    params.action !== "cancel" &&
+    params.action !== "trigger"
+  ) {
+    return fail(
+      `manage_timer called with unknown action "${params.action}" (expected create/advance/toggle_pause/cancel/trigger)`
+    );
+  }
+  if (!params.timer) {
+    return fail(`manage_timer action "${params.action}" requires "timer"`);
+  }
+  const clock = find(params.timer);
+  if (!clock) {
+    return fail(`Timer "${params.timer}" not found`, `[Timer Error: Timer "${params.timer}" not found]`);
+  }
+  const idx = record.clocks.findIndex((c) => c.id === clock.id);
+  const isFull = clock.filled >= clock.segments;
+  const stateWord = clock.cancelled ? "cancelled" : isFull ? "triggered" : clock.paused ? "paused" : "active";
+
+  switch (params.action) {
+    case "advance": {
+      if (clock.cancelled || isFull) {
+        return fail(`Timer "${clock.name}" is ${stateWord}`, `[Timer Error: Timer "${clock.name}" is ${stateWord}]`);
+      }
+      if (clock.paused) {
+        return fail(
+          `Timer "${clock.name}" is paused`,
+          `[Timer Error: Timer "${clock.name}" is paused - use toggle_pause first]`
+        );
+      }
+      const by = params.ticks || 1;
+      const before = clock.filled;
+      const t = tickClock(clock, by, "manage_timer advance", record);
+      record.clocks[idx] = t.clock;
+      return done(
+        {
+          type: "advance_timer",
+          timer: clock.name,
+          previousTicks: clock.segments - before,
+          currentTicks: remaining(t.clock),
+          ticksAdvanced: by,
+          triggered: t.filled,
+        } as GMAdvanceTimerResult,
+        t.filled || t.crossed.length > 0
+          ? describeTick(t.clock, before, t, record, "manage_timer")
+          : `[Timer: "${clock.name}" ${segmentsLeft(before, clock)} → ${remaining(t.clock)} ticks remaining]`
+      );
+    }
+    case "toggle_pause": {
+      if (clock.cancelled || isFull) {
+        return fail(
+          `Timer "${clock.name}" is ${stateWord}, cannot toggle pause`,
+          `[Timer Error: Timer "${clock.name}" is ${stateWord}, cannot toggle pause]`
+        );
+      }
+      const wasPaused = clock.paused;
+      clock.paused = !wasPaused;
+      return done(
+        {
+          type: "toggle_timer_pause",
+          timer: clock.name,
+          newStatus: clock.paused ? "paused" : "active",
+        } as GMToggleTimerPauseResult,
+        `[Timer ${wasPaused ? "Resumed" : "Paused"}: "${clock.name}" at ${remaining(clock)} ticks]`
+      );
+    }
+    case "cancel": {
+      if (clock.cancelled || isFull) {
+        return fail(
+          `Timer "${clock.name}" is already ${stateWord}`,
+          `[Timer Error: Timer "${clock.name}" is already ${stateWord}]`
+        );
+      }
+      const left = remaining(clock);
+      clock.paused = true;
+      clock.cancelled = true;
+      return done(
+        {
+          type: "cancel_timer",
+          timer: clock.name,
+          reason: params.reason,
+          ticksRemaining: left,
+        } as GMCancelTimerResult,
+        `[Timer Cancelled: "${clock.name}"${params.reason ? ` - ${params.reason}` : ""} (had ${left} ticks remaining)]`
+      );
+    }
+    default: {
+      // trigger
+      if (clock.cancelled || isFull) {
+        return fail(
+          `Timer "${clock.name}" is already ${stateWord}`,
+          `[Timer Error: Timer "${clock.name}" is already ${stateWord}]`
+        );
+      }
+      const left = remaining(clock);
+      const before = clock.filled;
+      // Fills the clock at once, even if it was paused.
+      const t = tickClock({ ...clock, paused: false }, left, params.reason, record);
+      record.clocks[idx] = { ...t.clock, paused: clock.paused };
+      return done(
+        {
+          type: "trigger_timer",
+          timer: clock.name,
+          reason: params.reason,
+          ticksRemaining: left,
+          description: clock.onFill,
+        } as GMTriggerTimerResult,
+        describeTick(t.clock, before, t, record, `triggered early${params.reason ? `: ${params.reason}` : ""}`)
+      );
+    }
+  }
+}
+
+function segmentsLeft(filledBefore: number, clock: Clock): number {
+  return clock.segments - filledBefore;
+}
+
+/**
  * Unified timer tool entry point (manage_timer). Dispatches to the
  * create/advance/toggle_pause/cancel/trigger executors above based on
  * `params.action`, reusing their existing tested logic unchanged and only
@@ -5764,6 +6054,12 @@ function executeManageTimer(
     },
     contextForStory: `[ERROR: ${message}]`,
   });
+
+  // A story with a campaign record keeps its timers as clocks: the same
+  // actions, translated onto them (design section 4).
+  if (storyData.campaign) {
+    return executeManageTimerOnClocks(toolCallId, params, storyData);
+  }
 
   let result: GMToolResult;
 

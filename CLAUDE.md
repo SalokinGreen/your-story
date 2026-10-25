@@ -32,7 +32,9 @@ Windows (#193); stories from Designer-made adventures no longer crashing
 (#197); the terms page rewritten (#199); the copied Prima Materia tables
 stripped (#200); a text invite and system-browser OpenRouter sign-in in the
 native apps (#198, #201). **Still open from §6:** `auto_advance` timers never
-tick (6.1), Fronts never linked to their clocks (6.2), random ids and keys
+tick on a story with no campaign record (6.1; campaign clocks do, slice C1 of
+2026-10-25), threads never linked to timers (6.2; clocks link to fronts,
+factions and threads), random ids and keys
 during render (6.3–6.5), the dead Embeddings toggle (6.9), online guests
 receiving the GM's secrets (6.12), and the
 stale Google tool filter (6.14, partly fixed 2026-10-22: `start_game` and the
@@ -857,8 +859,23 @@ report's §11.3. The ones that shape play:
   (open plotlines) and `create_goal` / `update_goal` / `complete_goal` /
   `fail_goal` / `delete_goal` (player-facing objectives). **No points or XP
   attach to any of this.**
-- `manage_timer` — countdown timers. **`auto_advance` timers never tick
-  (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
+- `campaign` — the campaign record (`StoryData.campaign?: CampaignRecord`,
+  `app/misc/campaign/`, `docs/campaign-format-design.md`, plan slice 1):
+  factions, fronts, clocks, people, secrets and clues, locations, beats, end
+  states. One always-offered tool with a bare schema (135 tokens of the list;
+  the data shapes come from `read` on an empty part and from the repair a
+  refused write names, `PART_SHAPES` in `validate.ts`). **The engine ticks
+  clocks** (`applyTurnEvents` in `clocks.ts`, called by `executeGMTools` after
+  each tool, events from typed results in `events.ts`, a `TurnLedger` carried
+  across the turn's rounds in `generation.ts`): once per trigger per clock per
+  turn. `migrateTimers` turns countdown timers into manual clocks on load, and
+  `manage_timer` is translated onto clocks once a record exists. The GM sees
+  `formatCampaignBrief` (about 800 tokens, in priority order) in the live
+  block. A story with no record is byte-identical to before
+  (`tests/campaign.oldSaves.test.ts`). The narration context, session zero, the
+  Designer, the starters and the player view are later slices.
+- `manage_timer` — countdown timers. **On a story with no campaign record,
+  `auto_advance` timers never tick (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
   behind `end_gm_thinking`) and was deleted on 2026-10-23 (decision 128).
 - `read_notes` / `search_notes` / `create_note` / `edit_note` / `delete_note`
   and the `edit_lore_*` / `merge_lore` / `duplicate_lore` family — the GM's
