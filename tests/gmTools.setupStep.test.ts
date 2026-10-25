@@ -70,6 +70,7 @@ const call = (name: string, args: Record<string, unknown>) => ({
 
 const q = (extra: Record<string, unknown> = {}) => ({
   question: "Which?",
+  intro: "Why it matters.",
   options: OPTS,
   ...extra,
 });

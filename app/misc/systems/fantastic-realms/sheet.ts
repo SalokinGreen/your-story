@@ -30,12 +30,15 @@ export const FANTASTIC_REALMS_SHEET_TEMPLATE = `# {{Name | Your hero's name | Un
 **You want:** {{You want | What you hope to get from this adventure | A place to call home}}
 `;
 
+// Every Fantastic Realms step is the player's own words, so each is creative
+// and a custom answer is always allowed.
 const step = (id: string, label: string, hint: string): CreationStep => ({
   id,
   label,
   group: "character",
   scope: "player",
   hint,
+  kind: "creative",
 });
 
 export const FANTASTIC_REALMS_CREATION_STEPS: CreationStep[] = [

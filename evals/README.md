@@ -37,6 +37,8 @@ may); `tests/judges.evalSet.test.ts` asserts it for free. A generation fixture
 (`kind: "generation"`) is defined for the GM prompt plan's runner and is skipped
 by this one.
 
+Generation fixtures live in `evals/generation/` (the first, from slice 3: full-mode setup asks one player step per call). Their `expect` is tool names; a case that needs argument checks adds an `expectArguments` key for the runner to read.
+
 ## Drafting a turn from your own play
 
 ```

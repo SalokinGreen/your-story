@@ -219,6 +219,7 @@ import {
   getCreationProgress,
   getCreationSteps,
   setupParticipants,
+  stepKind,
   type MissingCreationStep,
 } from "./setupSteps";
 
@@ -2608,6 +2609,44 @@ async function executeAskForRoll(
 }
 
 /**
+ * Session zero's questions, set up by code rather than by the model
+ * (gm-prompt-plan slice 3): an item tagged with a creative step gets
+ * `allow_custom: true` whatever the model sent, and in full mode the first
+ * item under each known tag must carry an `intro` or the call is refused
+ * (`error`) before the player sees anything. Untagged items and items under an
+ * unknown tag are left alone. Never mutates its input.
+ */
+export function prepareSetupQuestions(
+  story: StoryData,
+  questions: AskQuestionItem[],
+  setupPlayers?: { id: string; name: string }[]
+): { questions: AskQuestionItem[]; error?: string } {
+  const steps = getCreationSteps(story, setupPlayers);
+  const fullMode = story.setup?.mode === "full";
+  const seenTags = new Set<string>();
+  const missingIntro: string[] = [];
+  const prepared = questions.map((q) => {
+    const tag = q.setup_step?.trim() ?? "";
+    const step = tag ? steps.find((s) => s.id === tag) : undefined;
+    if (!step) return q;
+    if (fullMode && !seenTags.has(tag)) {
+      seenTags.add(tag);
+      if (!q.intro?.trim()) missingIntro.push(tag);
+    }
+    return stepKind(step) === "creative" && q.allow_custom !== true
+      ? { ...q, allow_custom: true }
+      : q;
+  });
+  if (missingIntro.length > 0) {
+    return {
+      questions: prepared,
+      error: `[ERROR: Step-by-step setup needs an \`intro\` on the first question of each setup step: one or two sentences on what is being chosen and why it matters. Missing for: ${missingIntro.join(", ")}. Nothing was asked; ask again with the intro.]`,
+    };
+  }
+  return { questions: prepared };
+}
+
+/**
  * Execute ask_question: pause the GM loop and wait for the player(s) to
  * answer one or more questions (predefined option, free text, or skipped).
  * The injected `interaction.requestPlayerAnswer` handler resolves with one
@@ -2641,9 +2680,22 @@ async function executeAskQuestion(
     };
   }
 
-  const answer = await interaction.requestPlayerAnswer({
-    questions: params.questions,
-  });
+  let questions = params.questions;
+  if (storyData && storyData.sessionZeroActive === true) {
+    const prepared = prepareSetupQuestions(storyData, questions, setupPlayers);
+    if (prepared.error) {
+      return {
+        toolName: "ask_question",
+        toolCallId,
+        success: false,
+        result: emptyResult,
+        contextForStory: prepared.error,
+      };
+    }
+    questions = prepared.questions;
+  }
+
+  const answer = await interaction.requestPlayerAnswer({ questions });
 
   if (answer === null) {
     return {
@@ -2656,7 +2708,7 @@ async function executeAskQuestion(
     };
   }
 
-  const answers = params.questions.map((q, i) => {
+  const answers = questions.map((q, i) => {
     const item = answer.answers[i];
     let text = "";
     // How the answer reads in the GM's context: every pick quoted.

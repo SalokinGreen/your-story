@@ -59,7 +59,7 @@ const askStep = (step: string) => ({
   name: "ask_question",
   arguments: {
     questions: [
-      { question: `About ${step}?`, options: [{ label: "A" }, { label: "B" }], setup_step: step },
+      { question: `About ${step}?`, options: [{ label: "A" }, { label: "B" }], setup_step: step, intro: "Why it matters." },
     ],
   },
 });
