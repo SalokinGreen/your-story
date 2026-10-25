@@ -441,3 +441,26 @@ Judgment calls the plan left to the builder. None changes the plan's scope.
 - **Sizes (cl100k):** core 2,256 (limit 3,000); Magic, Gear, Conditions,
   Callings, Bestiary, Legends, Travel, Downtime and Group play are printed by
   `tests/systems.fantasticRealms.rules.test.ts`, all under 2,500.
+
+### 2026-10-25 — E2 engine-review fixes
+
+- **The history is the full shipped record.** It was rebuilt by extracting
+  `app/misc` at each of the 40 commits on master that touched
+  `app/misc/systems`, loading `BUILTIN_SYSTEMS` there and hashing every note
+  text (oldest first, current last). The FR core now has three entries (the
+  first release, bcc2c735, hash `85639573ad5c6de4-7118`; the pre-E2 text; the
+  current one), so stories started on the first release update. **Blood & Bone
+  is no longer "current hash only":** 60-odd of its notes changed on master
+  since they first shipped, so an older story that never edited one now gets
+  the current text on load (an edited one is kept, with the Debug Logs line).
+  That is the intended behaviour of the update, and the one change to B&B
+  stories this slice makes. The first-release core is frozen in
+  `tests/helpers/frPreE2Notes.ts` (`FIRST_RELEASE_CORE`) and tested.
+- **A hit that cannot hurt a foe leaves `target` out of the `feat_roll`**
+  (Bestiary strange words, and one line in the core), because a roll that names
+  a foe is owed damage by J1's `foe-damage` contract. Test: the contract stays
+  silent for a landed roll with no target.
+- **Realm sections are hedged** in Magic and Callings (and Travel's road
+  tables) as arriving with the realms in a later release (E3).
+- **Travel** says rounds = the days, 2 to 5 (a one-day trip is one roll).
+  **Downtime's** away-from-hearth `use` names the `hero`.
