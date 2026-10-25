@@ -154,29 +154,32 @@ export interface ObserverCheckSettings {
 export type ObserverSettings = Record<ObserverFlagType, ObserverCheckSettings>;
 
 /**
- * The stored-settings version the current defaults belong to (decision 187).
- * Before it, every judge was on and three could rewrite or reroll a turn by
- * default; a config saved then would keep that behaviour for good, because a
- * stored config overrides the defaults. layerSettings.ts replaces a stored
- * config that lacks this version, once, and keeps the player's choices after.
+ * The stored-settings version the current defaults belong to. A stored config
+ * overrides the defaults, so a change of defaults would never reach a player
+ * who had saved one. layerSettings.ts replaces a stored config that lacks this
+ * version, once, and keeps the player's choices after. Version 2 was the
+ * flag-only defaults (decision 187); version 3 turns every judge back on
+ * (decision 220).
  */
-export const OBSERVER_SETTINGS_VERSION = 2;
+export const OBSERVER_SETTINGS_VERSION = 3;
 
 function frozenCheckSettings(
   enabled: boolean,
   sensitivity: number,
+  rewrite = false,
 ): Readonly<ObserverCheckSettings> {
-  return Object.freeze({ enabled, triggersReset: false, sensitivity });
+  return Object.freeze({ enabled, triggersReset: rewrite, sensitivity });
 }
 
 /**
- * Decision 187: flag only, no rewrites. Nothing rewrites or rerolls a turn on
- * its own by default; only the outcome-mismatch judge stays on, as a flag in
- * the turn's details (its input is typed verdicts now, see
- * extractOutcomeVerdicts). The other five judges are off, and Settings can turn
- * each back on. With every `triggersReset` false, canObserverTriggerReset is
- * false: no blocking judge, no reset, no background rewrite and no speculative
- * shortening.
+ * Decision 220 (revising 187's "flag only"): every judge is on. The three
+ * prose judges (REWRITABLE_FLAG_TYPES) rewrite a flagged turn automatically,
+ * the "Rewrite automatically" choice Settings offers, through the checked
+ * rewrite path decisions 187-189 built: a rewrite is validated before it
+ * replaces anything, a failed one keeps the turn with its flag, nothing is
+ * rerolled, and the turn carries "Undo revision". The other three only flag:
+ * the two tool-usage gaps are flag-only by type, and tier_escalation_missed's
+ * heavier-tier retry stays off. Settings can turn each one off or down.
  *
  * Frozen, and every reader gets a copy (settingsFor, layerSettings.ts): the
  * first edit in Settings used to assign into this very object, so the
@@ -185,12 +188,12 @@ function frozenCheckSettings(
  */
 export const DEFAULT_OBSERVER_SETTINGS: Readonly<ObserverSettings> =
   Object.freeze({
-    response_length: frozenCheckSettings(false, 5),
-    player_agency: frozenCheckSettings(false, 3),
-    outcome_narration_mismatch: frozenCheckSettings(true, 2),
-    missing_oracle_or_table: frozenCheckSettings(false, 5),
-    missing_scene_increment: frozenCheckSettings(false, 5),
-    tier_escalation_missed: frozenCheckSettings(false, 5),
+    response_length: frozenCheckSettings(true, 5, true),
+    player_agency: frozenCheckSettings(true, 3, true),
+    outcome_narration_mismatch: frozenCheckSettings(true, 2, true),
+    missing_oracle_or_table: frozenCheckSettings(true, 5),
+    missing_scene_increment: frozenCheckSettings(true, 5),
+    tier_escalation_missed: frozenCheckSettings(true, 5),
   });
 
 /**

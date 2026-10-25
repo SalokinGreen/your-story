@@ -381,3 +381,12 @@ The author: "I'm also not a fan of the default adventures. They just throw you i
 | 199 | "What should Grave Watcher's first day look like?" | **"Town, then the tower (Recommended)."** Founders' Day morning in Hollins Ferry: the diner, the crew, the paperwork, the keys to Tower Nine; the climb at dusk for the first watch. The green light in the Old Lot ends the first night instead of opening it. Rejected: straight to the tower. |
 | 200 | "How should I go about it?" | **"Build it now (Recommended)."** The answers are the plan; the new prose is read in the PR. |
 
+### The judges, back on (2026-10-25)
+
+The author: "Okay why did we turn the judges off? They were very useful for not much cost." Decision 187 had made the layer flag-only and switched five of the six judges off, after Codex found rewrites replacing read text, races and double mechanics; those bugs were fixed by the judge-layer build (decisions 188–189). Decisions 201–219 are the Fantastic Realms interview, on its own branch.
+
+| # | question | decision |
+|---|---|---|
+| 220 | "Which judges should be on by default?" | **"All on, prose judges rewrite."** All six judges run every turn; the three prose judges (length, agency, outcome) rewrite a flagged turn automatically, the other three flag. Settings version 3 resets stored settings to these defaults once. Revises decision 187. Rejected: all on, flag only; pick per judge. |
+| 221 | The author, unprompted: "Also rewrites happen only when judging gets apperent enough. So when rewrite is possible, it should hold the output back until the judging is done and rewrite if necessary." | **A turn's text is held while a rewrite is possible.** When a rewriting judge is on, nothing streams, is read aloud or reaches guests until the judges that could rewrite this turn have run; the final text is released once, with "Writing…", "Checking the turn…" and "Revising…" shown meanwhile. The background judges only flag: no rewrite ever replaces text the player has seen. |
+
