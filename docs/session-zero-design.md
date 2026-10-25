@@ -88,7 +88,9 @@ Why it could do that:
    - If it tries to narrate the story before setup is done, the engine sends
      it back to the next unfinished step, up to twice a turn. After that the
      turn ends with "(Let's finish setting up first: next is …)", never with
-     story narration.
+     story narration. *(2026-10-25, decision 195: the line now hands the
+     floor back, "Next up: your character sheet. Anything you want me to know
+     before I write it? Or just say go on.")*
    - A rejected reply is never shown to you, sent to guests or read aloud.
    - If it tries to start the story before the sheet, the plan and your OK
      exist, `start_game` refuses and names what is missing.
@@ -240,7 +242,11 @@ of these is a violation.
 - This happens up to **2** times (`MAX_SETUP_PROMPTS`).
 - **It does not fail open.** After the cap, the turn ends with an engine
   line in the GM's voice, "(Let's finish setting up first: next is
-  <step>.)", with no narration and no story continuation.
+  <step>.)", with no narration and no story continuation. *(2026-10-25,
+  decisions 195–196: the line now names the step and asks whether the player
+  wants to add anything, or just say go on; and a round cut off at the output
+  cap with nothing usable is asked again at double the cap before the gate
+  sees it.)*
 - The round-limit fallback is blocked from narrating as well.
 - When approval is given but `start_game` has not been called, the next
   step is `start_game`, and the gate asks for exactly that.

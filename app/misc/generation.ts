@@ -14,6 +14,7 @@ import { providerFetch } from "@/app/misc/providerFetch";
 import {
   GenerateRequestBody,
   modelRejectsForcedToolChoice,
+  sentMaxTokens,
 } from "@/app/misc/providerCall";
 import {
   StoryData,
@@ -56,6 +57,7 @@ import {
   GM_STAGE_DEFAULT_BUDGET,
   computeGMStageBudget,
   getGMStageOutputTokens,
+  roundCutOffEmpty,
   getHistoryParts,
   CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
@@ -2435,6 +2437,9 @@ async function generateStoryTurnOnce(
         // a tool call outright rather than relying on prose alone to ask for
         // one. Consumed (read then cleared) at the top of the next round.
         let forceToolChoiceNextRound: "required" | "auto" | undefined;
+        // The output cap's one raise per turn (roundCutOffEmpty, decision 196).
+        let gmOutputCapRetryUsed = false;
+        let gmOutputCapMultiplier = 1;
         // A system's turn-end checks (decision 183, turnEndChecks.ts): the ids
         // already sent back this turn. One reminder per check per turn.
         const turnEndChecksPrompted = new Set<string>();
@@ -2607,7 +2612,11 @@ async function generateStoryTurnOnce(
               // per GM round - it used to be ignored here, which is why lowering
               // it had no effect on normal play (the GM stage's own output IS the
               // player-visible story, see gmFinalStoryContent below).
-              maxTokens: getGMStageOutputTokens(options.customMaxOutput, model),
+              maxTokens: getGMStageOutputTokens(
+                options.customMaxOutput,
+                model,
+                gmOutputCapMultiplier,
+              ),
               // Base 0.4 for natural GM thinking, nudged by the story's
               // Chaos Factor (§2.4) - this is the GM stage's own request,
               // and its output IS the player-visible story on the common
@@ -2818,6 +2827,7 @@ async function generateStoryTurnOnce(
             const maxTokensCap = getGMStageOutputTokens(
               options.customMaxOutput,
               gmModel,
+              gmOutputCapMultiplier,
             );
             logger.action(`GM stage round ${gmRound} finish diagnostic`, {
               finishReason,
@@ -2865,6 +2875,45 @@ async function generateStoryTurnOnce(
             }
             totalTokenCost += gmResult.meta.tokenCost || 0;
             finalBalance = gmResult.meta.balance;
+          }
+
+          // Cut off at the output cap with nothing usable (decision 196):
+          // ask the same round again, once per turn, at double the cap, which
+          // then holds for the rest of the turn. Billed above like any round;
+          // it does not count against the round limit or the setup gate.
+          if (
+            !gmOutputCapRetryUsed &&
+            roundCutOffEmpty(
+              gmResult.meta?.finishReason,
+              extractVisibleText(gmCleanedContent),
+              gmToolCalls,
+            )
+          ) {
+            gmOutputCapRetryUsed = true;
+            // Compared as sent: a thinking model's 4,096 floor can swallow
+            // the raise at a small Response Length.
+            const cap = sentMaxTokens(
+              gmModel,
+              getGMStageOutputTokens(options.customMaxOutput, gmModel),
+            );
+            const raised = sentMaxTokens(
+              gmModel,
+              getGMStageOutputTokens(options.customMaxOutput, gmModel, 2),
+            );
+            if (raised > cap) {
+              gmOutputCapMultiplier = 2;
+              gmRound--;
+              forceToolChoiceNextRound = toolChoiceThisRound;
+              logger.action(
+                "GM stage round cut off at the output cap with nothing usable - asking again at a higher cap",
+                { round: gmRound + 1, model: gmModel, cap, raised },
+              );
+              continue gmRoundLoop;
+            }
+            logger.action(
+              "GM stage round cut off at the output cap with nothing usable - already at the model's limit, not retried",
+              { round: gmRound, model: gmModel, cap },
+            );
           }
 
           // Before the game starts a setup turn shows only the GM's latest

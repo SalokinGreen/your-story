@@ -438,7 +438,7 @@ describe("setup gate - a session-zero turn may not end on prose alone", () => {
     expect(gmStageCalls()).toHaveLength(3);
     expect(result.content).toBe(setupEngineLine("concept"));
     expect(result.content).toBe(
-      "(Let's finish setting up first: next is a few questions about the game.)",
+      "Next up: a few questions about the game. Anything you want to tell me first? Or just say go on.",
     );
     expect(rec.storyComplete).toEqual([result.content]);
     expect(JSON.stringify(result.scenePart.gmConversation ?? null)).not.toContain("REJECTED");
