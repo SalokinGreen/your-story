@@ -436,6 +436,55 @@ export const set_character_sheet_template: ToolDefinition = {
 };
 
 // ============================================
+// CAMPAIGN RECORD
+// ============================================
+
+export const write_campaign: ToolDefinition = {
+  name: "write_campaign",
+  description:
+    "Write the adventure's campaign record: the structured situation the GM runs (style, pitch and tone, lines and veils, factions, fronts, clocks, people, secrets with clues, locations, beats, end states). Add one part at a time, edit one by id, or remove one. Write a clock before the front or faction that names it (or link it with the clock's `link`). A person must be an NPC you already wrote with write_npcs. Every part is validated and a refusal names the repair.",
+  parameters: {
+    type: "object",
+    properties: {
+      action: {
+        type: "string",
+        description:
+          "add a new part, edit an existing one by id (style, pitch and safety have no id), or remove it.",
+        enum: ["add", "edit", "remove"],
+      },
+      part: {
+        type: "string",
+        description: "Which part of the record.",
+        enum: [
+          "style",
+          "pitch",
+          "safety",
+          "faction",
+          "front",
+          "clock",
+          "person",
+          "secret",
+          "location",
+          "beat",
+          "end_state",
+        ],
+      },
+      id: {
+        type: "string",
+        description:
+          "The part's id or name, for edit and remove (a person's id is its NPC id).",
+      },
+      data: {
+        type: "object",
+        description:
+          "The part's fields. style {style: sandbox|adventure_path|mystery|horror|episodic|slice_of_life|solo}; pitch {premise, tone[]}; safety {lines[{text, keywords}], veils[...]}; faction {name, goal, methods?, clockId?}; front {name, doom, dangers[{name, impulse}], portents[], stakes[], clockId?}; clock {name, segments 4|6|8, triggers[miss|scene|rest|session|manual], link?{kind, id}, onFill?, visible?}; person {npcId, want?, secret?, voice?}; secret {title, truth, keyPhrases[], clues[{text, where?}]} (three clues); location {name, features[], npcIds[]}; beat {title, summary} (adventure_path only); end_state {text}.",
+      },
+    },
+    required: ["action", "part"],
+  },
+};
+
+// ============================================
 // REGISTRY
 // ============================================
 
@@ -452,6 +501,7 @@ export const DESIGNER_TOOLS: ToolDefinition[] = [
   write_presets,
   delete_presets,
   set_character_sheet_template,
+  write_campaign,
 ];
 
 export function getDesignerToolsForAPI(): {

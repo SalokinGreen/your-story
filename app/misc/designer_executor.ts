@@ -35,6 +35,9 @@ import {
 } from "@/app/misc/systems";
 import { createCharacterSheetTemplate } from "@/app/misc/characterSheetTemplate";
 import { migrateCustomTablesToNotes } from "@/app/misc/tableNotes";
+import { applyDesignerCampaignWrite } from "@/app/misc/campaign/designer";
+import type { CampaignRecord } from "@/app/misc/campaign/types";
+import { campaignWarnings } from "@/app/misc/campaign/validate";
 
 // ============================================
 // DRAFT
@@ -71,6 +74,11 @@ export interface AdventureDraft {
   // no field for, and saving would silently drop them.
   meters?: Meter[];
   progressTracks?: ProgressTrack[];
+  // The campaign record (docs/campaign-format-design.md): written by the
+  // `write_campaign` tool and the inspector, carried into the adventure's
+  // storyTemplate and so into every story started from it. Absent on drafts
+  // made before the format existed.
+  campaign?: CampaignRecord;
 }
 
 /** A trailing warning for the Designer when a note sent to the GM in full every turn is long (decision 96). */
@@ -530,6 +538,25 @@ export function executeDesignerTool(
       );
     }
 
+    case "write_campaign": {
+      // The GM's `campaign` executor and validatePart, run on a deep clone of
+      // the record against a stand-in story. A refusal returns the draft
+      // untouched (fail() hands back the original object).
+      const outcome = applyDesignerCampaignWrite(draft.campaign, args, {
+        npcs: draft.npcs,
+        lore: draft.lore,
+        systemState: draft.systemState,
+      });
+      if (!outcome.ok) return fail(outcome.error);
+      next.campaign = outcome.campaign;
+      const warnings = campaignWarnings(outcome.campaign);
+      return ok(
+        `Campaign: ${outcome.message}.${
+          warnings.length ? ` Still open: ${warnings.join(" ")}` : ""
+        }`,
+      );
+    }
+
     default:
       return fail(`Unknown tool "${call.name}".`);
   }
@@ -603,6 +630,7 @@ export function draftToAdventure(draft: AdventureDraft): Partial<Adventure> {
     ...(draft.progressTracks?.length
       ? { progressTracks: draft.progressTracks }
       : {}),
+    ...(draft.campaign ? { campaign: structuredClone(draft.campaign) } : {}),
     ...(draft.systemState?.usesSystemTools !== undefined ||
     draft.systemState?.setting !== undefined ||
     draft.systemState?.systemId !== undefined
@@ -672,6 +700,7 @@ export function adventureToDraft(adventure: Partial<Adventure>): AdventureDraft 
     ...(story.progressTracks?.length
       ? { progressTracks: story.progressTracks }
       : {}),
+    ...(story.campaign ? { campaign: structuredClone(story.campaign) } : {}),
     ...(story.systemState?.usesSystemTools !== undefined ||
     story.systemState?.setting !== undefined ||
     story.systemState?.systemId !== undefined
@@ -693,6 +722,59 @@ export function adventureToDraft(adventure: Partial<Adventure>): AdventureDraft 
 // ============================================
 // SUMMARY (for the Designer's context)
 // ============================================
+
+/**
+ * The campaign record as the Designer sees it: every part with its id (the
+ * Designer edits by id) and the authoring warnings. The author is the reader,
+ * so secrets are listed in full.
+ */
+function summarizeCampaign(draft: AdventureDraft): string[] {
+  const c = draft.campaign;
+  if (!c) {
+    return [
+      "Campaign record: none yet (write_campaign: style, pitch and tone, lines and veils, then factions, fronts with clocks, people, secrets with clues, locations)",
+    ];
+  }
+  const npcName = (id: string): string => draft.npcs.find((n) => n.id === id)?.name ?? "(missing)";
+  const out: string[] = [`Campaign record: style ${c.style ?? "NOT SET"}`];
+  out.push(
+    `  Pitch: ${c.pitch ? `${c.pitch.premise} [${c.pitch.tone.join(", ")}]` : "(not written yet)"}`,
+  );
+  out.push(
+    `  Lines: ${c.safety?.lines.length ? c.safety.lines.map((l) => l.text).join("; ") : c.safety ? "none" : "(not asked yet)"}`,
+  );
+  out.push(
+    `  Veils: ${c.safety?.veils.length ? c.safety.veils.map((l) => l.text).join("; ") : c.safety ? "none" : "(not asked yet)"}`,
+  );
+  const list = (label: string, items: string[]) =>
+    out.push(`  ${label} (${items.length}): ${items.length ? items.join(" | ") : "(none)"}`);
+  list("Factions", c.factions.map((f) => `${f.id} "${f.name}": ${f.goal}`));
+  list(
+    "Fronts",
+    c.fronts.map((f) => `${f.id} "${f.name}" (${f.status}) doom: ${f.doom}; clock: ${f.clockId ?? "none"}`),
+  );
+  list(
+    "Clocks",
+    c.clocks.map(
+      (k) => `${k.id} "${k.name}" ${k.filled}/${k.segments} [${k.triggers.join("/")}]${k.visible ? "" : " hidden"}`,
+    ),
+  );
+  list(
+    "People",
+    c.people.map((p) => `${p.npcId} "${npcName(p.npcId)}"${p.want ? ` wants: ${p.want}` : ""}`),
+  );
+  list(
+    "Secrets",
+    c.secrets.map((s) => `${s.id} "${s.title}": ${s.truth} (${s.clues.length} clues)`),
+  );
+  list("Locations", c.locations.map((l) => `${l.id} "${l.name}"`));
+  if (c.style === "adventure_path" || (c.beats?.list.length ?? 0) > 0) {
+    list("Beats", (c.beats?.list ?? []).map((b) => `${b.id} "${b.title}"`));
+  }
+  list("End states", c.endStates.map((e) => `${e.id} ${e.text}`));
+  for (const w of campaignWarnings(c)) out.push(`  WARNING: ${w}`);
+  return out;
+}
 
 /**
  * Compact snapshot of the draft injected into the system prompt so the
@@ -766,6 +848,8 @@ export function summarizeDraft(draft: AdventureDraft): string {
       draft.characterSheetTemplate?.template ? "set" : "not set"
     }`,
   );
+
+  lines.push(...summarizeCampaign(draft));
 
   const resolved = resolveSystem({
     lore: draft.lore,
