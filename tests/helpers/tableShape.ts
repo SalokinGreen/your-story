@@ -150,7 +150,7 @@ export function checkTableShape(title: string, content: string): string[] {
       return;
     }
     const sides = Number(die.slice(1));
-    if (![6, 10, 20, 100].includes(sides)) {
+    if (![6, 10, 12, 20, 100].includes(sides)) {
       problems.push(`${label}: unsupported die`);
       return;
     }

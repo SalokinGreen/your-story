@@ -881,6 +881,15 @@ report's §11.3. The ones that shape play:
   with a Debug Logs line, and a note with one recorded version (Blood & Bone's)
   never changes. **Changing a built-in note's text means appending its new hash**
   (`tests/systems.noteUpdate.test.ts` fails when the last entry is not current).
+  **The original realms grown (slice E3, `world/realms/`, one file per realm,
+  ids unchanged):** each of Aurelane, Larkenfell and Gloamreach is a realm note
+  (a "Magic here" section, two local callings in the Callings format, and twelve
+  foes, each stat line followed by a `*Tactics:*` line) and a new tables note,
+  `builtin:fantastic-realms:realm-<id>-tables` (type `table`: a d12 miscast
+  table, a d20 treasure table and a d20 "On the road" table); the shared
+  treasure and foes tables grew (`checkTableShape` now accepts a d12). Magic,
+  Callings and Travel point at them. The three new notes ride in the Crossroads
+  pack, so the loader offers them to existing stories.
   **Its campaign** is an
   `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
   Week, the barrow king's front (a hidden clock on `rest`) and the goblins'
