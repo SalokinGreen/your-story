@@ -15,6 +15,22 @@ import { cloneDefaultObserverSettings } from "@/app/misc/observer";
 import type { StoryData } from "@/app/misc/structs";
 import type { ObserverSettings } from "@/app/misc/observer";
 
+// The de-AI-ify swap is random. This stand-in leaves "testament" alone on its
+// first call and swaps it on every later one, which is exactly the case where a
+// second polish of already-released prose would change the text.
+const deAiify = vi.hoisted(() => ({ active: false, calls: 0 }));
+vi.mock("@/app/misc/deAiify", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/app/misc/deAiify")>();
+  return {
+    ...actual,
+    deAiifyText: (text: string): string => {
+      if (!deAiify.active) return actual.deAiifyText(text);
+      const first = deAiify.calls++ === 0;
+      return first ? text : text.replace(/testament/g, "marker");
+    },
+  };
+});
+
 const SHORT = "The lock clicks open. The corridor beyond is dark.";
 const LONG = Array(400).fill("word").join(" ");
 const REWRITTEN = "You force the lock. It gives.";
@@ -164,6 +180,8 @@ afterEach(() => {
   global.fetch = originalFetch;
   choicesFail = false;
   storyStageContent = null;
+  deAiify.active = false;
+  deAiify.calls = 0;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -481,6 +499,218 @@ describe("prose before a pause is released before the pause shows (decision 240)
     // The page is told the turn was revised, after its part exists.
     expect(firstIndex(events, "rewrite-applied")).toBeGreaterThan(firstIndex(events, "shown:story"));
     expect(result.scenePart.observerRewriteOriginal?.content).toBe(PRE + "\n\n" + POST);
+  });
+
+  it("does not polish released prose a second time (the swap is random)", async () => {
+    deAiify.active = true;
+    const events: string[] = [];
+    const PRE_T = "You stand at the door, a testament to patience.";
+    installFetch(events, [{ content: PRE_T, toolCalls: [ASK] }, { content: POST }], () => ALL_CLEAR);
+    const gmText: string[] = [];
+    const result = await generateStoryTurn(
+      story(),
+      "I wait",
+      baseOptions,
+      watching(events, {
+        onGMContent: (_c, full) => gmText.push(full),
+        onAskQuestion: async () => answer,
+      }),
+    );
+    await settle();
+
+    // The player read PRE_T; the saved part begins with exactly that.
+    expect(gmText[0]).toBe(PRE_T);
+    expect(result.scenePart.content.startsWith(PRE_T)).toBe(true);
+    expect(result.content).toBe(PRE_T + "\n\n" + POST);
+    expect(result.content).not.toContain("marker");
+  });
+
+  it("keeps the raw pre-pause thinking in raw and in the narration thoughts", async () => {
+    const events: string[] = [];
+    installFetch(
+      events,
+      [{ content: "<thinking>the guard is bluffing</thinking>" + PRE, toolCalls: [ASK] }, { content: POST }],
+      () => ALL_CLEAR,
+    );
+    const result = await generateStoryTurn(
+      story(),
+      "I wait",
+      baseOptions,
+      watching(events, { onAskQuestion: async () => answer }),
+    );
+    await settle();
+
+    expect(result.content).toBe(PRE + "\n\n" + POST);
+    expect(result.scenePart.raw).toContain("the guard is bluffing");
+    expect(result.narrationThoughts).toContain("the guard is bluffing");
+  });
+
+  it("puts a pause rewrite into the GM's saved and replayed history, keeping its thinking and tool call", async () => {
+    const events: string[] = [];
+    const { calls } = installFetch(
+      events,
+      [
+        { content: "<thinking>plan the beat</thinking>" + PRE, toolCalls: [ASK] },
+        { content: POST },
+      ],
+      (call) => {
+        if (isRewrite(call)) return PRE_FIXED;
+        if (isAgencyJudge(call) && JSON.stringify(call.body.messages).includes("say you will wait")) {
+          return AGENCY_VIOLATION;
+        }
+        return ALL_CLEAR;
+      },
+    );
+    const result = await generateStoryTurn(
+      story(),
+      "I wait",
+      baseOptions,
+      watching(events, { onAskQuestion: async () => answer }),
+    );
+    await settle();
+
+    const saved = result.scenePart.gmConversation ?? [];
+    const firstAssistant = saved.find((m) => m.role === "assistant");
+    expect(firstAssistant?.content).toContain("plan the beat");
+    expect(firstAssistant?.content).toContain(PRE_FIXED);
+    expect(firstAssistant?.content).not.toContain("say you will wait");
+    expect(firstAssistant?.tool_calls?.length).toBe(1);
+    expect(result.scenePart.gmThinking?.[0]).toContain(PRE_FIXED);
+    expect(result.scenePart.gmThinking?.[0]).not.toContain("say you will wait");
+    // The round after the pause replays the corrected prose, not the draft.
+    const gmCalls = calls.filter((c) => c.url === "/api/generate-stream" && c.body.tools);
+    expect(gmCalls.length).toBeGreaterThanOrEqual(2);
+    const replay = JSON.stringify(gmCalls[1].body.messages);
+    expect(replay).toContain(PRE_FIXED);
+    expect(replay).not.toContain("say you will wait");
+    // The next turn may be told the history is fixed, because it is.
+    expect(result.scenePart.correctedObserverFlags?.length).toBe(1);
+    // Undo puts the first draft's round back.
+    const original = result.scenePart.observerRewriteOriginal?.gmConversation?.find(
+      (m) => m.role === "assistant",
+    );
+    expect(original?.content).toContain("say you will wait");
+    expect(original?.content).toContain("plan the beat");
+  });
+
+  it("tells the tail rewrite what the player already read, and asks for a continuation", async () => {
+    const events: string[] = [];
+    const { calls } = installFetch(
+      events,
+      [{ content: PRE, toolCalls: [ASK] }, { content: LONG }],
+      (call) => {
+        if (isRewrite(call)) return REWRITTEN;
+        if (isLengthJudge(call)) return LENGTH_UNJUSTIFIED;
+        return ALL_CLEAR;
+      },
+    );
+    const result = await generateStoryTurn(
+      story(),
+      "I wait",
+      baseOptions,
+      watching(events, { onAskQuestion: async () => answer }),
+    );
+    await settle();
+
+    const rewrite = calls.filter(isRewrite);
+    expect(rewrite).toHaveLength(1);
+    const prompt = last(rewrite[0]);
+    expect(prompt).toContain("already read");
+    expect(prompt).toContain(PRE);
+    expect(prompt).toContain("Rewrite only the continuation");
+    expect(prompt).toContain("only part of the turn");
+    expect(result.content).toBe(PRE + "\n\n" + REWRITTEN);
+  });
+
+  it("tells a pause rewrite a question or roll follows", async () => {
+    const events: string[] = [];
+    const { calls } = installFetch(
+      events,
+      [{ content: PRE, toolCalls: [ASK] }, { content: POST }],
+      (call) => {
+        if (isRewrite(call)) return PRE_FIXED;
+        if (isAgencyJudge(call) && JSON.stringify(call.body.messages).includes("say you will wait")) {
+          return AGENCY_VIOLATION;
+        }
+        return ALL_CLEAR;
+      },
+    );
+    await generateStoryTurn(
+      story(),
+      "I wait",
+      baseOptions,
+      watching(events, { onAskQuestion: async () => answer }),
+    );
+    await settle();
+
+    const prompt = last(calls.filter(isRewrite)[0]);
+    expect(prompt).toContain("pauses on the player");
+    expect(prompt).toContain("about as long as the text you were given");
+  });
+
+  it("runs the length judge, flag only, on the whole of a paused turn no part of which was long", async () => {
+    const events: string[] = [];
+    const A100 = Array(100).fill("alpha").join(" ");
+    const B100 = Array(100).fill("beta").join(" ");
+    const { calls } = installFetch(
+      events,
+      [{ content: A100, toolCalls: [ASK] }, { content: B100 }],
+      (call) => (isLengthJudge(call) ? LENGTH_UNJUSTIFIED : ALL_CLEAR),
+    );
+    const flagged: string[] = [];
+    const result = await generateStoryTurn(
+      story(),
+      "I wait",
+      baseOptions,
+      watching(events, {
+        onAskQuestion: async () => answer,
+        onBackgroundObserverFlags: (flags) => flagged.push(...flags.map((f) => f.type)),
+      }),
+    );
+    await settle();
+
+    expect(result.content).toBe(A100 + "\n\n" + B100);
+    const lengthCalls = calls.filter(isLengthJudge);
+    expect(lengthCalls).toHaveLength(1);
+    expect(JSON.stringify(lengthCalls[0].body.messages)).toContain("alpha");
+    expect(JSON.stringify(lengthCalls[0].body.messages)).toContain("beta");
+    expect(flagged).toContain("response_length");
+    expect(calls.filter(isRewrite)).toHaveLength(0);
+  });
+
+  it("judges a stretch released unjudged, flag only, in the background", async () => {
+    const events: string[] = [];
+    const OUTCOME_JUDGE = "mechanically resolved";
+    const settings: ObserverSettings = {
+      ...AGENCY_OFF,
+      outcome_narration_mismatch: { enabled: true, triggersReset: true, sensitivity: 2 },
+    };
+    const isOutcomeJudge = (c: Call) => first(c).includes(OUTCOME_JUDGE);
+    const { calls } = installFetch(
+      events,
+      [
+        { content: PRE, toolCalls: [ASK] },
+        { content: "", toolCalls: [{ name: "calculate", arguments: { expression: "17+3 >= 15", reason: "the climb" } }] },
+        { content: POST },
+      ],
+      () => ALL_CLEAR,
+    );
+    const result = await generateStoryTurn(
+      story(),
+      "I wait",
+      { ...baseOptions, observerSettings: settings },
+      watching(events, { onAskQuestion: async () => answer }),
+    );
+    await settle();
+
+    expect(result.content).toBe(PRE + "\n\n" + POST);
+    const outcomeCalls = calls.filter(isOutcomeJudge);
+    // The tail was judged before release, and the stretch released unjudged afterwards.
+    expect(outcomeCalls).toHaveLength(2);
+    const texts = outcomeCalls.map((c) => JSON.stringify(c.body.messages));
+    expect(texts.filter((t) => t.includes("say you will wait"))).toHaveLength(1);
+    expect(texts.filter((t) => t.includes("A cold draught"))).toHaveLength(1);
+    expect(calls.filter(isRewrite)).toHaveLength(0);
   });
 });
 

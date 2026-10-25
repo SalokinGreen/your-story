@@ -1272,6 +1272,9 @@ verdicts so far, rewrites it on a major flag, and the prose is then shown
 through `onGMContent` / `onLiveNarrationUpdate` and kept as the first entry of
 the accumulation. The end-of-turn pass judges and rewrites only the tail after
 it, and `held.release(text, pause.text)` adds only the tail to the live view.
+The released prose goes into the finished text verbatim (never polished twice),
+and a pause rewrite is applied to the GM's own rounds in `conversationHistory`
+(`replaceVisibleProse`; thinking, tool calls and `reasoning_details` kept).
 A tier retry is refused once anything is on screen. A choices call that fails
 no longer throws the turn away (`runChoicesGeneration` logs and uses none). See
 `docs/judge-layer-design.md`'s 2026-10-25 note.

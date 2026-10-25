@@ -429,6 +429,8 @@ export function plausibleResetFlagTypes(params: {
 export function splitObserverSettings(
   settings: ObserverSettings | undefined,
   blockingRuns: boolean,
+  /** When given, only these types count as blocking (a pause runs the prose judges alone). */
+  blockingTypes?: ReadonlySet<ObserverFlagType>,
 ): { blocking: ObserverSettings; background: ObserverSettings } {
   const blocking = {} as ObserverSettings;
   const background = {} as ObserverSettings;
@@ -436,12 +438,32 @@ export function splitObserverSettings(
     DEFAULT_OBSERVER_SETTINGS,
   ) as ObserverFlagType[]) {
     const s = settingsFor(settings, type);
-    const rewriting = s.enabled && s.triggersReset;
+    const rewriting =
+      s.enabled && s.triggersReset && (!blockingTypes || blockingTypes.has(type));
     blocking[type] = rewriting ? s : { ...s, enabled: false };
     background[type] =
       blockingRuns && rewriting ? { ...s, enabled: false } : s;
   }
   return { blocking, background };
+}
+
+/**
+ * A copy of a config with only the judges `keep` accepts left on, each as the
+ * player set it. Used for the flag-only passes over text a blocking pass did not
+ * read (a paused turn's whole length, a stretch released unjudged).
+ */
+export function restrictObserverSettings(
+  settings: ObserverSettings | undefined,
+  keep: (type: ObserverFlagType) => boolean,
+): ObserverSettings {
+  const out = {} as ObserverSettings;
+  for (const type of Object.keys(
+    DEFAULT_OBSERVER_SETTINGS,
+  ) as ObserverFlagType[]) {
+    const s = settingsFor(settings, type);
+    out[type] = keep(type) ? s : { ...s, enabled: false };
+  }
+  return out;
 }
 
 function clampSensitivity(sensitivity: number): number {
@@ -903,6 +925,14 @@ export interface RewriteNarrationParams {
   alsoFixIfPresent?: ObserverFlagType[];
   /** Swap the AI vocabulary tics in the result, like the story stage does (default on). */
   deAiifyWords?: boolean;
+  /**
+   * Prose the player has already read (released at a pause, decision 240). It is
+   * final: `narration` is only the continuation after it, and the rewrite is
+   * told so and asked for a continuation-sized answer, not a whole turn.
+   */
+  alreadyRead?: string;
+  /** `narration` ends where the turn pauses on the player (a question, a roll, a dice tray). */
+  endsAtPause?: boolean;
   apiOptions: ObserverApiOptions;
 }
 
@@ -966,6 +996,17 @@ export async function rewriteFlaggedNarration(
   const storytellerMode = params.storytellerMode || "narrator";
   const { paragraphs } = getLengthGuidance(replyLength);
   const band = PACING_BANDS[replyLength] ?? PACING_BANDS.medium;
+  const alreadyRead = params.alreadyRead?.trim() ?? "";
+  // A stretch of a turn is not a turn: never ask it for a whole turn's length.
+  const lengthLine =
+    alreadyRead || params.endsAtPause
+      ? `This is only part of the turn, so do not write a whole turn's length: stay about as long as the text you were given${
+          flag.type === "response_length" ? ", or shorter, as the flag asks" : ""
+        }.`
+      : paragraphs;
+  const pauseLine = params.endsAtPause
+    ? `\n- This text ends where the turn pauses on the player: a question, a roll or a dice throw follows it. Keep the lead-in to that, so the question or roll still makes sense after it.`
+    : "";
 
   const voiceGuidance =
     storytellerMode === "dm"
@@ -997,10 +1038,20 @@ export async function rewriteFlaggedNarration(
 - Same moment, same scene, same events, same outcome. Do NOT advance the story, start a new scene, skip time, or introduce people, places, or events that weren't already in it.
 - Any dice rolls, checks, and state changes this turn already resolved are ground truth - the rewrite must stay consistent with them. They are NOT re-rolled.
 - Keep everything that was already correct (the tone, the details, the beat it lands on). Fix only what was flagged.${alsoFixBlock}
-- ${paragraphs} ${voiceGuidance}
+- ${lengthLine} ${voiceGuidance}${pauseLine}
 - Output ONLY the corrected narration prose - no meta-commentary, no explanation of what you changed, no notes to yourself, no tool calls.`;
 
-  const flaggedBlock = `Your previous narration for this turn was flagged by an automated reviewer.
+  const readBlock = alreadyRead
+    ? `The player has already read this opening of the turn, and it stays exactly as it is:
+"""
+${alreadyRead}
+"""
+Rewrite only the continuation that follows it. Do not repeat, change or summarise what the player has read.
+
+`
+    : "";
+
+  const flaggedBlock = `${readBlock}Your previous narration for this turn was flagged by an automated reviewer.
 
 What you wrote (FLAGGED - do not repeat it as-is):
 """
@@ -2184,6 +2235,33 @@ export function reconcileGmThinkingAfterRewrite(
   const inner = [lastReasoning, marker].filter(Boolean).join("\n\n");
   stripped[lastIdx] = `<thinking>\n${inner}\n</thinking>\n\n${rewritten}`;
   return stripped;
+}
+
+/**
+ * A prose rewrite made at a pause (decision 240), applied to the raw text of
+ * the GM rounds it covers: each keeps its <thinking> reasoning, and the first
+ * one that carried visible prose gets the rewrite (and the correction marker,
+ * inside <thinking>); the others lose their visible prose. Rounds with no
+ * visible prose pass through. Returns the same array when none had any, so the
+ * caller can tell nothing was fixed.
+ */
+export function replaceVisibleProse(
+  raws: string[],
+  rewritten: string,
+  flag: ObserverFlag,
+): string[] {
+  const firstWithProse = raws.findIndex((r) => extractVisibleText(r || "") !== "");
+  if (firstWithProse < 0) return raws;
+  const marker = observerRewriteMarker(flag);
+  return raws.map((raw, i) => {
+    if (i < firstWithProse || extractVisibleText(raw || "") === "") return raw;
+    const reasoning = extractGmReasoning(raw);
+    if (i !== firstWithProse) {
+      return reasoning ? `<thinking>\n${reasoning}\n</thinking>` : "";
+    }
+    const inner = [reasoning, marker].filter(Boolean).join("\n\n");
+    return `<thinking>\n${inner}\n</thinking>\n\n${rewritten.trim()}`;
+  });
 }
 
 // ============================================================

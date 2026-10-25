@@ -42,6 +42,14 @@ released once, the Stop); not played on the APK or against a real model:
   question over an empty turn, or the first paragraphs changing after you
   answered. Also try it as an online guest: the host's question should not show
   the previous turn's text as "being written".
+- **A pause rewrite with Claude (decision 240, engine-review fixes).** With a
+  Claude model as the GM at a thinking effort, play until the GM asks a
+  question after a stretch of prose that a judge rewrites (agency is the easy
+  one). Answer. Expected: the turn continues with no 400 from OpenRouter about
+  thinking blocks, the second round's request (Debug Logs) shows the rewritten
+  prose beside the tool call, and the next turn's GM does not repeat the first
+  draft's habit. Failure looks like: a 400 naming `thinking` or `signature`
+  after the answer.
 - **A failed suggestions call keeps the turn.** With Suggested Choices on, turn
   the network off just as the turn's text is about to appear (or use a model
   that rejects the choices call). Expected: the narration still appears, with

@@ -30,6 +30,8 @@ import {
   settingsFor,
   plausibleResetFlagTypes,
   splitObserverSettings,
+  restrictObserverSettings,
+  replaceVisibleProse,
   DEFAULT_OBSERVER_SETTINGS,
   FLAG_ONLY_FLAG_TYPES,
   canObserverTriggerReset,
@@ -3006,5 +3008,107 @@ describe("splitObserverSettings: each judge runs once", () => {
     const { background } = splitObserverSettings(cloneDefaultObserverSettings(), false);
     expect(background.player_agency.enabled).toBe(true);
     expect(background.response_length.enabled).toBe(true);
+  });
+});
+
+describe("prose released at a pause (decision 240): rewrite prompt and history", () => {
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  const flag: ObserverFlag = {
+    type: "player_agency",
+    severity: "major",
+    detail: "The GM spoke for the player.",
+    correctivePrompt: "Do not speak for the player.",
+  };
+
+  async function promptOf(extra: {
+    alreadyRead?: string;
+    endsAtPause?: boolean;
+  }): Promise<string> {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "A cleaner continuation." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await rewriteFlaggedNarration({
+      narration: "A first draft of the continuation.",
+      playerChoice: "I wait",
+      flag,
+      alreadyRead: extra.alreadyRead,
+      endsAtPause: extra.endsAtPause,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    return body.messages.map((m: { content: string }) => m.content).join("\n");
+  }
+
+  it("tells a tail rewrite the read prefix is final and asks for a segment, not a turn", async () => {
+    const prompt = await promptOf({ alreadyRead: "You reach the door." });
+    expect(prompt).toContain("already read");
+    expect(prompt).toContain("You reach the door.");
+    expect(prompt).toContain("Rewrite only the continuation");
+    expect(prompt).toContain("only part of the turn");
+  });
+
+  it("tells a pause rewrite a question or roll follows and to stay the same length", async () => {
+    const prompt = await promptOf({ endsAtPause: true });
+    expect(prompt).toContain("pauses on the player");
+    expect(prompt).toContain("about as long as the text you were given");
+  });
+
+  it("leaves a whole-turn rewrite prompt without either", async () => {
+    const prompt = await promptOf({});
+    expect(prompt).not.toContain("already read");
+    expect(prompt).not.toContain("only part of the turn");
+  });
+
+  it("splitObserverSettings with blockingTypes leaves the other rewriting judges in the background", () => {
+    const settings = {
+      ...cloneDefaultObserverSettings(),
+      tier_escalation_missed: { enabled: true, triggersReset: true, sensitivity: 5 },
+    };
+    const prose = new Set<keyof ObserverSettings>([
+      "response_length",
+      "player_agency",
+      "outcome_narration_mismatch",
+    ]);
+    const { blocking, background } = splitObserverSettings(settings, true, prose);
+    expect(blocking.tier_escalation_missed.enabled).toBe(false);
+    expect(background.tier_escalation_missed.enabled).toBe(true);
+    expect(blocking.player_agency.enabled).toBe(true);
+    expect(background.player_agency.enabled).toBe(false);
+  });
+
+  it("restrictObserverSettings keeps only the chosen judges, as configured", () => {
+    const only = restrictObserverSettings(
+      cloneDefaultObserverSettings(),
+      (t) => t === "response_length",
+    );
+    expect(only.response_length.enabled).toBe(true);
+    expect(only.player_agency.enabled).toBe(false);
+    expect(only.tier_escalation_missed.enabled).toBe(false);
+  });
+
+  it("replaceVisibleProse swaps the first prose-bearing round and keeps every round's thinking", () => {
+    const out = replaceVisibleProse(
+      ["", "<thinking>plan A</thinking>\n\nDraft one.", "<thinking>plan B</thinking>\n\nDraft two."],
+      "Fixed text.",
+      flag,
+    );
+    expect(out[0]).toBe("");
+    expect(out[1]).toContain("plan A");
+    expect(out[1]).toContain("OBSERVER CORRECTION");
+    expect(extractVisibleText(out[1])).toBe("Fixed text.");
+    expect(out[2]).toContain("plan B");
+    expect(extractVisibleText(out[2])).toBe("");
+  });
+
+  it("replaceVisibleProse hands back the same array when no round had prose", () => {
+    const raws = ["", "<thinking>only thoughts</thinking>"];
+    expect(replaceVisibleProse(raws, "Fixed.", flag)).toBe(raws);
   });
 });

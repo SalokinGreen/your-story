@@ -310,11 +310,10 @@ is owed.
   text then begins with the released prose (it is kept as the first entry of the
   GM's accumulation, and both paths share `polishGMProse`), and
   `held.release(text, pause.text)` adds only the tail to the live timeline.
-- **A pause rewrite does not reconcile the GM's saved history.** Its
-  `gmConversation` still holds the first draft; "Undo revision" restores the
-  draft (`undoPauseRewrites`). The rewrite there runs without the turn's
-  conversation (`conversationMessages`), on the standalone rewrite prompt,
-  because the conversation does not exist yet mid-turn.
+- **A pause rewrite is applied to the GM's own history (fix 2, below).** The
+  rewrite there still runs without the turn's conversation
+  (`conversationMessages`), on the standalone rewrite prompt, because the
+  conversation does not exist yet mid-turn.
 - **The reset budget is shared.** A pause rewrite spends the turn's one
   `MAX_OBSERVER_RESETS`, so the end-of-turn pass will not rewrite again.
 - **No heavier-tier retry once anything is on screen.** A
@@ -322,3 +321,53 @@ is owed.
   flag.
 - **If the finished text does not begin with the released prose** (a story
   stage that rewrote it), the end-of-turn pass judges nothing more and logs it.
+
+## Decisions made during implementation (2026-10-25, engine review of the held-turn fixes)
+
+An engine review of b6bc8d8d found seven problems; all are fixed.
+
+1. **Released prose is assembled verbatim, never polished twice.** With a
+   pause release, `storyContent` is the released entry plus `polishGMProse` of
+   the rounds after it only (`pauseReleasedText`, `postPauseRawParts`). The
+   de-AI-ify swap is random, so a second pass over the whole text could differ
+   from what the player read: the `startsWith` check failed, the tail went
+   unjudged, the prefix showed twice and "Undo revision" could not find its
+   text. `finish` in the pause hook trims, so `pause.text` is literally the
+   prefix.
+2. **A pause rewrite edits the GM's own history.** `releaseBeforePause`
+   replaces the visible prose of the assistant rounds since the last release
+   (`replaceVisibleProse`, observer.ts): each keeps its `<thinking>`, tool
+   calls and `reasoning_details`; the first round that had prose gets the
+   rewrite plus the correction marker (inside `<thinking>`); the others lose
+   their visible prose. Later rounds of the turn, the saved `gmConversation`,
+   `gmThinking` and Reword all agree with the screen, and `correctedObserverFlags`
+   is truthful. **Signed reasoning:** `providerCall.ts` sends `reasoning_details`
+   as its own message field and only for the current turn; Claude's signature
+   covers the thinking block, not the text content beside it, so editing
+   `content` is accepted and the details are not touched. This was read from the
+   code (lines 943-953 of `providerCall.ts`) and the Anthropic rule, not
+   exercised against a real Claude call (see `pending_tests.md`). If no round
+   had prose to replace (`PauseHistoryEdit.fixed` false), the correction is
+   recorded as an advisory `observerFlags` entry instead of a "your history is
+   already fixed" note. "Undo revision" puts the first draft's rounds back by
+   assistant ordinal (the stored conversation drops the engine's user nudges).
+3. **The tail rewrite is told the prefix is final.** Both the end-of-turn and
+   the speculative rewrite pass `alreadyRead`; the prompt shows the read text,
+   says to rewrite only the continuation, and asks for a segment's length, not
+   a turn's. The pause rewrite passes `endsAtPause`: keep the lead-in to the
+   question or roll, and stay about the same length.
+4. **The length judge reads a whole paused turn.** When a pause released text
+   and a blocking pass ran, a flag-only length check runs in the background on
+   the whole `result.content` (each part alone may be under the ceiling).
+5. **A pause runs the prose judges only** (`splitObserverSettings(..., true,
+   REWRITABLE_FLAG_TYPES)`); a stored config with the tier judge set to reset
+   no longer runs it at every pause. When only the pause ran, the tier judge
+   stays in the background wave.
+6. **Raw pre-pause text is kept.** `pauseRawPrefix` feeds `rawStoryContent`,
+   `scenePart.raw` and `narrationThoughts`, while the polished released text is
+   what is shown and saved as content.
+7. **A stretch released unjudged** (nothing plausible at its pause) is read in
+   the background wave by the other rewriting judges, flag-only
+   (`pause.unjudged`), when a blocking pass ran. The length judge is excluded
+   there because the whole-turn check covers it. Each judge still runs once per
+   text it judges.

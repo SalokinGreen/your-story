@@ -25,6 +25,7 @@ import {
   GMConversationMessage,
   ReasoningDetail,
   ObserverFlag,
+  ObserverFlagType,
   ObserverRewriteOriginal,
   SceneImageRef,
 } from "@/app/misc/structs";
@@ -83,6 +84,8 @@ import {
   canObserverTriggerReset,
   plausibleResetFlagTypes,
   splitObserverSettings,
+  restrictObserverSettings,
+  replaceVisibleProse,
   buildObserverCharacterContext,
   observerSuspensionReason,
   hasCharacterSheetNote,
@@ -358,11 +361,33 @@ export interface GenerationOptions {
   // judges it, rewrites it if a major flag lands, and returns the text to show;
   // the turn then releases that text and lets the pause appear. Never in
   // session zero, which has its own rules.
-  beforePause?: (ctx: PauseReleaseContext) => Promise<string>;
+  beforePause?: (ctx: PauseReleaseContext) => Promise<PauseRelease>;
+  // Set internally with beforePause: told what the turn did to its own saved
+  // history when a pause rewrite replaced prose (the GM's replayed rounds).
+  onPauseHistoryEdit?: (edit: PauseHistoryEdit) => void;
   // Set internally by generateStoryTurn from imageJobDeps and the image
   // settings (see imageJobs.ts ImageToolContext): the GM is offered
   // generate_image only when this is present and enabled.
   imageToolContext?: ImageToolContext;
+}
+
+/** What the pause hook hands back: the text to show, and the flag a rewrite fixed. */
+export interface PauseRelease {
+  text: string;
+  rewrittenBy?: ObserverFlag;
+}
+
+/**
+ * A pause rewrite applied to the turn's saved history. `fixed` is false when no
+ * round carried visible prose to replace. The originals let "Undo revision"
+ * put the first draft's rounds back: `history` by assistant-message ordinal
+ * (the stored conversation drops the engine's user nudges), `thinking` by
+ * position.
+ */
+export interface PauseHistoryEdit {
+  fixed: boolean;
+  history: { index: number; original: string }[];
+  thinking: { index: number; original: string }[];
 }
 
 /** What generateStoryTurn's pause hook is given (decision 240). */
@@ -1067,6 +1092,12 @@ export async function generateStoryTurn(
       flags: [] as ObserverFlag[],
       corrected: undefined as ObserverFlag | undefined,
       swaps: [] as { rewritten: string; original: string }[],
+      /** Stretches released with no judge run (nothing plausible there). */
+      unjudged: [] as string[],
+      /** Rounds of the saved history a pause rewrite edited, with their first drafts. */
+      historyEdits: [] as PauseHistoryEdit[],
+      /** A pause rewrite whose first draft could not be taken out of the saved history. */
+      historyUnfixed: false,
     };
     // The first draft of any pause-rewritten stretch put back, for "Undo revision".
     const undoPauseRewrites = (text: string): string =>
@@ -1074,16 +1105,48 @@ export async function generateStoryTurn(
         (acc, swap) => acc.replace(swap.rewritten, () => swap.original),
         text,
       );
+    // The first draft's rounds put back in a saved gmConversation / gmThinking.
+    // By assistant ordinal, because the stored conversation drops the engine's
+    // own user nudges and so shifts positions.
+    const undoPauseHistory = <T extends { role: string; content: string }>(
+      conversation: T[] | undefined,
+    ): T[] | undefined => {
+      if (!conversation || !pause.historyEdits.some((e) => e.history.length > 0)) {
+        return conversation;
+      }
+      const originals = pause.historyEdits.flatMap((e) => e.history);
+      let ordinal = -1;
+      return conversation.map((msg) => {
+        if (msg.role !== "assistant") return msg;
+        ordinal++;
+        const hit = originals.find((h) => h.index === ordinal);
+        return hit ? { ...msg, content: hit.original } : msg;
+      });
+    };
+    const undoPauseThinking = (
+      thinking: string[] | undefined,
+    ): string[] | undefined =>
+      thinking && pause.historyEdits.some((e) => e.thinking.length > 0)
+        ? thinking.map((t, i) => {
+            const hit = pause.historyEdits
+              .flatMap((e) => e.thinking)
+              .find((h) => h.index === i);
+            return hit ? hit.original : t;
+          })
+        : thinking;
     // The turn is about to pause on the player (ask_question, ask_for_roll, a
     // dice throw, confirm_setup). Judge the prose written so far with the
     // verdicts so far, rewrite it if a major flag lands, and hand back what the
     // player should read before the pause shows. Released text is final: the
     // end-of-turn pass only judges and rewrites what comes after it.
-    const pauseHook = async (ctx: PauseReleaseContext): Promise<string> => {
-      const finish = (text: string): string => {
-        pause.text = [pause.text, text].filter(Boolean).join("\n\n");
+    const pauseHook = async (ctx: PauseReleaseContext): Promise<PauseRelease> => {
+      const finish = (text: string, rewrittenBy?: ObserverFlag): PauseRelease => {
+        // Trimmed here, as the release trims it, so pause.text is literally the
+        // prefix of the finished text.
+        const shown = text.trim();
+        pause.text = [pause.text, shown].filter(Boolean).join("\n\n");
         callbacks.onTurnPhase?.("writing");
-        return text;
+        return { text: shown, rewrittenBy };
       };
       const pauseToolNames = ctx.gmResults.map((r) => r.toolName);
       const pauseVerdicts = extractOutcomeVerdicts(ctx.gmResults);
@@ -1105,7 +1168,11 @@ export async function generateStoryTurn(
         playerChoice: playerLine,
         settings: observerSettings,
       }).filter((type) => REWRITABLE_FLAG_TYPES.has(type));
-      if (pausePlausible.length === 0) return finish(ctx.prose);
+      if (pausePlausible.length === 0) {
+        // Released without a judge: the background wave reads it flag-only.
+        if (ctx.prose.trim()) pause.unjudged.push(ctx.prose.trim());
+        return finish(ctx.prose);
+      }
 
       callbacks.onTurnPhase?.("checking");
       pause.ranJudges = true;
@@ -1120,7 +1187,13 @@ export async function generateStoryTurn(
           rollResults: pauseVerdicts,
           gmStoryContext: ctx.gmStoryContext,
           characterContext: pauseCharacterContext,
-          settings: splitObserverSettings(observerSettings, true).blocking,
+          // The prose judges alone: a stored config that lets the tier judge
+          // reset must not run it at every pause and again at the end.
+          settings: splitObserverSettings(
+            observerSettings,
+            true,
+            REWRITABLE_FLAG_TYPES,
+          ).blocking,
           apiOptions: observerApiOptions,
         });
       } catch (pauseError) {
@@ -1148,6 +1221,7 @@ export async function generateStoryTurn(
           settingsFor(observerSettings, f.type).triggersReset,
       );
       let released = ctx.prose;
+      let rewrittenBy: ObserverFlag | undefined;
       if (pauseMajor && resetAttempts < MAX_OBSERVER_RESETS) {
         resetAttempts++;
         callbacks.onTurnPhase?.("revising");
@@ -1163,6 +1237,8 @@ export async function generateStoryTurn(
             characterContext: pauseCharacterContext,
             apiOptions: observerRewriteApiOptions,
             deAiifyWords: options.deAiifyWords,
+            alreadyRead: pause.text,
+            endsAtPause: true,
           });
         } catch (rewriteError) {
           if (isAbortError(rewriteError) || options.abortSignal?.aborted) {
@@ -1186,10 +1262,11 @@ export async function generateStoryTurn(
           pause.corrected ??= pauseMajor;
           pauseFlags = pauseFlags.filter((f) => f !== pauseMajor);
           released = rewritten;
+          rewrittenBy = pauseMajor;
         }
       }
       pause.flags.push(...pauseFlags);
-      return finish(released);
+      return finish(released, rewrittenBy);
     };
 
     const result = await generateStoryTurnOnce(
@@ -1199,6 +1276,12 @@ export async function generateStoryTurn(
         ...options,
         holdLiveText: holdTurnText,
         beforePause: held ? pauseHook : undefined,
+        onPauseHistoryEdit: held
+          ? (edit) => {
+              pause.historyEdits.push(edit);
+              if (!edit.fixed) pause.historyUnfixed = true;
+            }
+          : undefined,
         observerNote,
         storyProgressNote,
         repetitionNote,
@@ -1518,6 +1601,7 @@ export async function generateStoryTurn(
           return s.enabled && s.triggersReset;
         }),
         deAiifyWords: options.deAiifyWords,
+        alreadyRead: pause.text || undefined,
         apiOptions: { ...observerRewriteApiOptions, abortSignal: speculationAbort.signal },
       })
         // Attached immediately, before anything awaits this: a speculation
@@ -1545,10 +1629,14 @@ export async function generateStoryTurn(
 
     // Each enabled judge runs once per turn: the rewriting ones before release
     // (here, or at a pause), the others in the background wave below.
+    // A pause ran only the prose judges, so when the end-of-turn pass does not
+    // run, the others (the tier judge) are still the background wave's.
     const observerSplit = splitObserverSettings(
       observerSettings,
       resetPossible || pause.ranJudges,
+      resetPossible ? undefined : REWRITABLE_FLAG_TYPES,
     );
+    const blockingPassRan = resetPossible || pause.ranJudges;
     let flags: ObserverFlag[] = [];
     if (resetPossible) {
       if (held) callbacks.onTurnPhase?.("checking");
@@ -1693,6 +1781,7 @@ export async function generateStoryTurn(
               // would silently skip that pin.
               apiOptions: observerRewriteApiOptions,
               deAiifyWords: options.deAiifyWords,
+              alreadyRead: pause.text || undefined,
             });
           } catch (rewriteError) {
             if (isAbortError(rewriteError) || options.abortSignal?.aborted) {
@@ -1750,8 +1839,8 @@ export async function generateStoryTurn(
           const rewriteOriginal: ObserverRewriteOriginal = {
             content: undoPauseRewrites(result.content),
             flag: majorFlag,
-            gmConversation: result.scenePart.gmConversation,
-            gmThinking: result.scenePart.gmThinking,
+            gmConversation: undoPauseHistory(result.scenePart.gmConversation),
+            gmThinking: undoPauseThinking(result.scenePart.gmThinking),
             choices: result.choices,
           };
 
@@ -1814,6 +1903,8 @@ export async function generateStoryTurn(
           // though this turn's own narration already reads clean.
           result.scenePart = {
             ...result.scenePart,
+            // The reconcile above rewrote every round's prose, so the history
+            // is fixed whatever the pause could do with its own rounds.
             correctedObserverFlags: [
               ...(pause.corrected ? [pause.corrected] : []),
               majorFlag,
@@ -1920,13 +2011,23 @@ export async function generateStoryTurn(
       const pauseOriginal: ObserverRewriteOriginal = {
         content: undoPauseRewrites(result.content),
         flag: pause.corrected,
-        gmConversation: result.scenePart.gmConversation,
-        gmThinking: result.scenePart.gmThinking,
+        gmConversation: undoPauseHistory(result.scenePart.gmConversation),
+        gmThinking: undoPauseThinking(result.scenePart.gmThinking),
         choices: result.choices,
       };
+      // The saved rounds already hold the rewrite (releaseBeforePause edited
+      // them), so the next turn is truthfully told its history is fixed. When
+      // no round had prose to edit, the correction is only an advisory flag.
       result.scenePart = {
         ...result.scenePart,
-        correctedObserverFlags: [pause.corrected],
+        ...(pause.historyUnfixed
+          ? {
+              observerFlags: [
+                ...(result.scenePart.observerFlags ?? []),
+                pause.corrected,
+              ],
+            }
+          : { correctedObserverFlags: [pause.corrected] }),
         observerRewriteOriginal: pauseOriginal,
       };
       callbacks.onObserverRewrite?.(
@@ -2011,6 +2112,69 @@ export async function generateStoryTurn(
                   : String(observerError),
             },
           );
+        }
+      }
+
+      // Text a blocking pass never read (decision 240): the whole length of a
+      // paused turn, and any stretch released with no judge run. Flag-only, and
+      // each judge still runs once per text it reads.
+      if (!suspensionReason && pause.text && blockingPassRan) {
+        const lengthCheck = settingsFor(observerSettings, "response_length");
+        const extraRuns: { label: string; narration: string; keep: (t: ObserverFlagType) => boolean }[] = [];
+        if (lengthCheck.enabled && lengthCheck.triggersReset) {
+          extraRuns.push({
+            label: "whole-turn length",
+            narration: result.content,
+            keep: (t) => t === "response_length",
+          });
+        }
+        if (pause.unjudged.length > 0) {
+          extraRuns.push({
+            label: "stretch released unjudged",
+            narration: pause.unjudged.join("\n\n"),
+            keep: (t) =>
+              REWRITABLE_FLAG_TYPES.has(t) && t !== "response_length",
+          });
+        }
+        for (const run of extraRuns) {
+          try {
+            const extraFlags = await runObserver({
+              narration: run.narration,
+              playerChoice: playerLine,
+              replyLength: options.replyLength,
+              toolNames: turnToolNames,
+              rollResults: outcomeVerdicts,
+              tierUsed: tierUsedThisTurn,
+              gmStoryContext: result.gmStoryContext,
+              characterContext: observerCharacterContext,
+              narrationThoughts: result.narrationThoughts,
+              settings: restrictObserverSettings(observerSettings, run.keep),
+              apiOptions: observerApiOptions,
+            });
+            if (extraFlags.length > 0) {
+              logger.action(`Observer: ${run.label} flagged (background)`, {
+                flags: extraFlags.map((f) => ({
+                  type: f.type,
+                  severity: f.severity,
+                  detail: f.detail,
+                })),
+              });
+              if (!options.abortSignal?.aborted) {
+                callbacks.onBackgroundObserverFlags?.(
+                  extraFlags,
+                  result.scenePart.id ?? scenePartId,
+                );
+              }
+            }
+          } catch (extraError) {
+            logger.action("Background observer check failed, skipping (fail open)", {
+              pass: run.label,
+              error:
+                extraError instanceof Error
+                  ? extraError.message
+                  : String(extraError),
+            });
+          }
         }
       }
 
@@ -2255,6 +2419,10 @@ async function generateStoryTurnOnce(
     let gmResults: GMToolResult[] = [];
     let gmStoryContext = "";
     let gmFinalStoryContent = ""; // NEW: GM's final prose content (when no tool calls)
+    // Decision 240: the prose a pause released (polished, verbatim) and the raw
+    // text of the rounds written after it; both empty when no pause released.
+    let pauseReleasedText = "";
+    let postPauseRawParts: string[] = [];
     let gmMeta: GenerationMeta | undefined;
     const gmThinking: string[] = []; // Capture GM's private <thinking> reasoning text
     let gmBaseMessages: ChatMessage[] = []; // Base GM prompt for story continuation
@@ -2600,6 +2768,12 @@ async function generateStoryTurnOnce(
         // The prose a pause already released (decision 240), as the first entry
         // of gmAccumulatedStory; empty until a pause releases something.
         let pauseReleasedEntry = "";
+        // The raw text of those released rounds (inline <thinking> kept), and
+        // where the saved history and the thinking list stood at the last
+        // release, so a pause rewrite edits only the rounds it covered.
+        let pauseRawPrefix = "";
+        let pauseHistoryMark = 0;
+        let pauseThinkingMark = 0;
         // Local conversation history (will be copied to outer scope at end)
         let conversationHistory: ChatMessage[] = [];
         let isComplete = false;
@@ -2672,16 +2846,75 @@ async function generateStoryTurnOnce(
             options.deAiifyWords !== false,
           );
           if (!segment) return;
-          const shown = (
-            await options.beforePause({
-              prose: segment,
-              gmResults: [...gmResults],
-              gmStoryContext: allGMContextParts.join("\n\n"),
-            })
-          ).trim();
+          const release = await options.beforePause({
+            prose: segment,
+            gmResults: [...gmResults],
+            gmStoryContext: allGMContextParts.join("\n\n"),
+          });
+          const shown = release.text.trim();
           if (options.abortSignal?.aborted) {
             throw new Error("Generation cancelled by user");
           }
+          // A rewrite replaces the prose of the rounds it covered in the GM's
+          // own history, so this turn's later rounds, the saved conversation
+          // and Reword all agree with the screen. Only the visible text of an
+          // assistant message changes: its <thinking>, tool calls and signed
+          // reasoning_details are kept byte for byte (providerCall replays
+          // reasoning_details as its own field, and Claude's signature covers
+          // the thinking block, not the text next to it).
+          if (release.rewrittenBy && shown) {
+            const edit: PauseHistoryEdit = {
+              fixed: false,
+              history: [],
+              thinking: [],
+            };
+            const assistantAt: number[] = [];
+            let assistantOrdinal = -1;
+            const ordinals: number[] = [];
+            conversationHistory.forEach((m, i) => {
+              if (m.role !== "assistant") return;
+              assistantOrdinal++;
+              if (i >= pauseHistoryMark) {
+                assistantAt.push(i);
+                ordinals.push(assistantOrdinal);
+              }
+            });
+            const before = assistantAt.map((i) => conversationHistory[i].content || "");
+            const after = replaceVisibleProse(before, shown, release.rewrittenBy);
+            if (after !== before) {
+              assistantAt.forEach((at, k) => {
+                if (after[k] !== before[k]) {
+                  edit.history.push({ index: ordinals[k], original: before[k] });
+                  conversationHistory[at].content = after[k];
+                }
+              });
+              edit.fixed = true;
+            }
+            const thinkingBefore = gmThinking.slice(pauseThinkingMark);
+            const thinkingAfter = replaceVisibleProse(
+              thinkingBefore,
+              shown,
+              release.rewrittenBy,
+            );
+            if (thinkingAfter !== thinkingBefore) {
+              thinkingAfter.forEach((t, k) => {
+                if (t !== thinkingBefore[k]) {
+                  edit.thinking.push({
+                    index: pauseThinkingMark + k,
+                    original: thinkingBefore[k],
+                  });
+                  gmThinking[pauseThinkingMark + k] = t;
+                }
+              });
+              edit.fixed = true;
+            }
+            options.onPauseHistoryEdit?.(edit);
+          }
+          pauseHistoryMark = conversationHistory.length;
+          pauseThinkingMark = gmThinking.length;
+          // The raw round text (inline <thinking> included) for rawStoryContent
+          // and the narration thoughts; the polished prose is what is shown.
+          pauseRawPrefix = [pauseRawPrefix, ...fresh].filter(Boolean).join("\n\n");
           const whole = [pauseReleasedEntry, shown]
             .filter(Boolean)
             .join("\n\n");
@@ -3808,7 +4041,22 @@ async function generateStoryTurnOnce(
         // This allows GM to write prose incrementally while calling tools
         if (gmAccumulatedStory.length > 0) {
           // Join all accumulated parts - preserve <thinking> tags for UI to process
-          gmFinalStoryContent = gmAccumulatedStory.join("\n\n");
+          // After a pause release the first entry is the released prose
+          // itself; the raw text of those rounds stands in for it here, so the
+          // inline <thinking> a pause polished away still reaches rawStoryContent
+          // and the narration thoughts. The polished prefix is put back verbatim
+          // where the story is assembled below.
+          pauseReleasedText = pauseReleasedEntry;
+          postPauseRawParts = pauseReleasedEntry
+            ? gmAccumulatedStory.slice(1)
+            : [];
+          gmFinalStoryContent = (
+            pauseReleasedEntry
+              ? [pauseRawPrefix, ...gmAccumulatedStory.slice(1)]
+              : gmAccumulatedStory
+          )
+            .filter(Boolean)
+            .join("\n\n");
           logger.action("Combined accumulated GM story", {
             parts: gmAccumulatedStory.length,
             totalLength: gmFinalStoryContent.length,
@@ -3879,10 +4127,22 @@ async function generateStoryTurnOnce(
       // truncated/dangling <thinking> tag (unlike the old stripThinkingTags
       // call this replaced, which only ran at final-save time and could
       // leak a raw tag fragment if generation was cut off mid-tag).
-      storyContent = polishGMProse(
-        gmFinalStoryContent,
-        options.deAiifyWords !== false,
-      );
+      // The prose a pause released is the text the player read and the judges
+      // judged: it goes in verbatim, never polished a second time (the
+      // vocabulary swap is random, so a second pass could differ from what was
+      // shown). Only what came after it is polished here.
+      if (pauseReleasedText) {
+        const rest = polishGMProse(
+          postPauseRawParts.join("\n\n"),
+          options.deAiifyWords !== false,
+        );
+        storyContent = [pauseReleasedText, rest].filter(Boolean).join("\n\n");
+      } else {
+        storyContent = polishGMProse(
+          gmFinalStoryContent,
+          options.deAiifyWords !== false,
+        );
+      }
 
       // Stream the content to the UI in one chunk
       callbacks.onStoryContent?.(storyContent, storyContent);
