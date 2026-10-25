@@ -30,6 +30,7 @@ import {
 } from "../multiplayer/floorControl";
 import { PLAYER_PALETTE } from "../multiplayer/palette";
 import { buildTurnText } from "./turnText";
+import { publicCampaignView } from "../campaign/publicView";
 import {
   PARTY_ARCHETYPES,
   PARTY_MAX_LINE_CHARS,
@@ -824,6 +825,7 @@ function requestView(req: PartyRequest): PartyRequestView {
 // the player's own name and colour, their own character sheet, the roster with
 // spotlight and cooldown state, the queue, the turn state, the suggested
 // choices, this player's pending rolls and questions, and the latest narration.
+// The campaign's player view (publicCampaignView, the one projection) is there too.
 // It never holds StoryData, other notes (secrets, gm_plan, dm_instructions,
 // anything not always_reveal), other players' sheets, or any key.
 // tests/party.redaction.test.ts proves it.
@@ -863,6 +865,7 @@ export function buildPlayerView(
       choices: [],
       requests: [],
       narration: "",
+      campaign: null,
       join: {
         palette: [...PLAYER_PALETTE],
         archetypes: PARTY_ARCHETYPES.map((id) => ({ id, label: ARCHETYPE_INFO[id].label })),
@@ -888,6 +891,7 @@ export function buildPlayerView(
     choices: story ? currentChoices(story) : [],
     requests: s.requests.filter((r) => r.playerId === me.id).map(requestView),
     narration: story ? narrationExcerpt(story) : "",
+    campaign: story?.campaign ? publicCampaignView(story.campaign) : null,
     join: null,
   };
 }

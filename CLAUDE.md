@@ -950,8 +950,17 @@ report's §11.3. The ones that shape play:
   block. A story with no record is byte-identical to before
   (`tests/campaign.oldSaves.test.ts`). The Designer writes the record too
   (slice 4, below), and the GM builds it in session zero (slice 3, "Session
-  zero" below). The starters ship records (slice 5, above); the player view is
-  a later slice.
+  zero" below). The starters ship records (slice 5, above). **The player's
+  view (slice 6)** is built only from `publicCampaignView`: the Lore page's
+  Campaign panel (`app/story/CampaignPanel.tsx`, markup in `CampaignBody.tsx`,
+  which takes the projection and cannot be handed the record) shows the pitch
+  and tone, lines and veils, visible clocks and "What we know"; `PlayerView.campaign`
+  (`buildPlayerView`) gives a seated party phone the same projection, shown in
+  a collapsed "Campaign" section; and the online host's snapshot carries
+  `guestCampaignRecord(record)` (`campaign/guestView.ts`, rebuilt from the
+  projection, so secrets, dooms, portents, people, hidden clocks, beats and end
+  states are empty on a guest). Every other part of the §6.12 leak (secret and
+  `gm_plan` notes, the rest of `StoryData`) is unchanged.
 - `manage_timer` — countdown timers. **On a story with no campaign record,
   `auto_advance` timers never tick (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
   behind `end_gm_thinking`) and was deleted on 2026-10-23 (decision 128).
