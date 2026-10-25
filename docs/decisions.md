@@ -395,4 +395,11 @@ The author: "I also want us to look in depth at campaign setup, the whole format
 | 227 | "Which new checks should the judge layer grow?" | **All four:** world consistency, secret leaks, rules adherence, pacing and spotlight. |
 | 228 | "Should judges use more than one model family?" | **"One cheap judge, panel for rewrites (Recommended)."** Haiku judges every turn; before a rewrite, a second judge from another family must agree. |
 | 229 | "How do we know a judge actually helps?" | **"Labelled turn set (Recommended)."** A set of real turns from the author's Debug Logs and story exports, each labelled good or with the problem it has, and a runner that scores every judge on it; each run costs model calls on the author's key, so it waits for the author's go. (The author first clicked "Player signals only" by accident and asked again: "Last question I clicked by accident".) |
+| 230 | The designs' open questions. "Should clocks be able to tick on in-world time (days passing)?" | **"Not yet (Recommended)."** Triggers are a miss, a scene, a rest, a session or by hand; an in-world calendar is a later design. |
+| 231 | "Should the player see the campaign's clocks?" | **"Per clock, style default (Recommended)."** Sandbox, adventure path and slice of life show them; mystery and horror hide them. |
+| 232 | "Should Blood & Bone's Heat, Unrest and Vacancy stay meters or become clocks?" | **"Stay meters (Recommended)."** |
+| 233 | "Where should the labelled turn set live?" | **"Only turns you approve (Recommended)."** The runner and format in the repository; a turn goes in only once the author approves it for publishing; the rest in a private folder outside the repository. |
+| 234 | "Which model family confirms a rewrite before it happens?" | **"Let the player pick."** A picker under Settings → AI → Advanced, GLM 5.3 by default. |
+| 235 | "Should a pacing note ever reach the player?" | **"GM only (Recommended)."** |
+| 236 | "What next?" | **"Codex review, then plans (Recommended)."** |
 

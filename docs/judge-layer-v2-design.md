@@ -198,14 +198,10 @@ Slices 1–2 depend on the campaign record (lines, veils, secrets and people)
 for their facts. They can start with today's NPCs, sheet and notes, and
 widen when the record lands.
 
-## 10. Open questions for the author
+## 10. Settled
 
-- **Should the set live in the public repository?** Proposed: only turns you
-  agree to publish; the rest in a private folder outside the repository.
-- **Which model family confirms rewrites?** Proposed: GLM 5.3 through
-  OpenRouter, which every default player can reach. The first judge is
-  Haiku, a different family. GLM is also the default narrator, so it may lean
-  towards keeping GLM-written prose. That bias errs towards fewer rewrites,
-  which is the safe side.
-- **Should a pacing note ever reach the player?** ("No clock has moved in 12
-  turns.") Proposed: no, GM only.
+| # | Decision |
+|---|---|
+| 233 | The labelled set: the runner and format live in the repository. A turn goes in only once the author approves it for publishing; the rest stay in a private folder outside the repository. |
+| 234 | The confirming judge is the player's pick, under Settings → AI → Advanced, with GLM 5.3 as the default. |
+| 235 | Pacing notes are for the GM only. |

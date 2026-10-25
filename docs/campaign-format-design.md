@@ -92,7 +92,6 @@ A clock has 4, 6 or 8 segments and **triggers**, chosen from:
 | `scene` | `increment_scene`. |
 | `rest` | `take_rest` or a Blood & Bone rest. |
 | `session` | `end_session`. |
-| `time` | When the story's in-world date moves on. Only if a later decision adds a calendar; off for now. |
 | `manual` | Only the GM ticks it. |
 
 **What the engine does:**
@@ -264,11 +263,10 @@ The views that apply the same rule:
 Each engine slice gets the `engine-review` agent; the tool budget test holds
 the one new tool.
 
-## 13. Open questions for the author
+## 13. Settled
 
-- **Should `time` be a clock trigger?** That needs an in-world calendar,
-  which the app does not have.
-- **Should the player see the clocks by default?** Blades shows them; a
-  horror campaign hides them.
-- **Do Blood & Bone's meters (Heat, Unrest, Vacancy) become clocks,** or stay
-  meters? Proposed: stay meters. They move both ways, and clocks only fill.
+| # | Decision |
+|---|---|
+| 230 | No `time` trigger yet; an in-world calendar is a later design. |
+| 231 | Clocks are visible or hidden per clock, with the style's default: shown for sandbox, adventure path and slice of life; hidden for mystery and horror. |
+| 232 | Blood & Bone's Heat, Unrest and Vacancy stay meters. |
