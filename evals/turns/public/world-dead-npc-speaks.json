@@ -1,0 +1,56 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "world-dead-npc-speaks",
+  "published": true,
+  "note": "A dead woman is narrated setting down a lamp and speaking.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [
+      {
+        "id": "n1",
+        "name": "Marta",
+        "description": "Marta, known on the quay.",
+        "role": "local",
+        "status": "dead",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [
+      {
+        "id": "n1",
+        "name": "Marta",
+        "description": "Marta, known on the quay.",
+        "role": "local",
+        "status": "dead",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I follow the light along the corridor.",
+  "narration": "The corridor bends twice and the light ahead grows steadier. Marta sets the lamp on the sill and tells you to hurry, the tide will not wait, and the door at the end is already unbolted.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": [
+      "Marta"
+    ]
+  },
+  "labels": [
+    {
+      "judge": "world_consistency",
+      "severity": "major",
+      "span": "Marta sets the lamp on the sill and tells you to hurry"
+    }
+  ]
+}

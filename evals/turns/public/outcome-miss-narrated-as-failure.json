@@ -1,0 +1,50 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "outcome-miss-narrated-as-failure",
+  "published": true,
+  "note": "A MISS, narrated as a failure.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [
+    {
+      "toolName": "action_roll",
+      "toolCallId": "r1",
+      "success": false,
+      "contextForStory": "[Action roll - climb the seawall: score 6 against 7 and 9 -> MISS]",
+      "result": {
+        "type": "action_roll",
+        "statName": "Nerve",
+        "statValue": 2,
+        "adds": 0,
+        "addsApplied": 0,
+        "penalty": 0,
+        "actionDie": 4,
+        "challengeDice": [
+          7,
+          9
+        ],
+        "score": 6,
+        "capped": false,
+        "outcome": "miss",
+        "match": false
+      }
+    }
+  ],
+  "playerLine": "I climb the seawall before the patrol comes round.",
+  "narration": "Your fingers find the ledge, the stone crumbles, and you fall back onto the quay with a jolt that rattles your teeth. Behind you the patrol's lantern swings into the lane.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

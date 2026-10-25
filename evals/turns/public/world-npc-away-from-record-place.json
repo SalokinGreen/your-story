@@ -1,0 +1,121 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "world-npc-away-from-record-place",
+  "published": true,
+  "note": "The record puts Orsolya at the inn; the narration has her in the ferry office.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [
+      {
+        "id": "n4",
+        "name": "Orsolya",
+        "description": "Orsolya, known on the quay.",
+        "role": "local",
+        "status": "alive",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      },
+      {
+        "id": "n5",
+        "name": "Dov",
+        "description": "Dov, known on the quay.",
+        "role": "local",
+        "status": "alive",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": [],
+    "campaign": {
+      "version": 1,
+      "factions": [],
+      "fronts": [],
+      "clocks": [],
+      "people": [],
+      "secrets": [],
+      "locations": [
+        {
+          "id": "loc1",
+          "name": "Lantern Inn",
+          "features": [
+            "a long bar",
+            "a banked fire"
+          ],
+          "npcIds": [
+            "n4"
+          ]
+        }
+      ],
+      "endStates": []
+    }
+  },
+  "storyAfter": {
+    "npcs": [
+      {
+        "id": "n4",
+        "name": "Orsolya",
+        "description": "Orsolya, known on the quay.",
+        "role": "local",
+        "status": "alive",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      },
+      {
+        "id": "n5",
+        "name": "Dov",
+        "description": "Dov, known on the quay.",
+        "role": "local",
+        "status": "alive",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": [],
+    "campaign": {
+      "version": 1,
+      "factions": [],
+      "fronts": [],
+      "clocks": [],
+      "people": [],
+      "secrets": [],
+      "locations": [
+        {
+          "id": "loc1",
+          "name": "Lantern Inn",
+          "features": [
+            "a long bar",
+            "a banked fire"
+          ],
+          "npcIds": [
+            "n4"
+          ]
+        }
+      ],
+      "endStates": []
+    }
+  },
+  "toolResults": [],
+  "playerLine": "I push open the ferry office door.",
+  "narration": "The ferry office is a cramped room with a stove and a counter. Orsolya looks up from a pile of tickets and stamps one without a word. Dov leans in the corner, whittling.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": [
+      "Orsolya",
+      "Dov"
+    ]
+  },
+  "labels": [
+    {
+      "judge": "world_consistency",
+      "severity": "minor",
+      "span": "Orsolya looks up from a pile of tickets and stamps one without a word"
+    }
+  ]
+}

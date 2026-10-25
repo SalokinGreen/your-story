@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "agency-no-player-line",
+  "published": true,
+  "note": "An opening with no player line: there is nothing to judge.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "",
+  "narration": "The Gannet Rest is a long, low inn that smells of woodsmoke and wet wool. A fire burns at the far end. A woman behind the bar looks up as the door shuts behind the newcomer, and the room's murmur falters, then resumes.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

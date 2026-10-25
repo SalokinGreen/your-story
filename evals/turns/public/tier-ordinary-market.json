@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "tier-ordinary-market",
+  "published": true,
+  "note": "An ordinary look around, at the lowest tier.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I look at the fish stalls.",
+  "narration": "Silver mackerel are laid in rows on crushed ice. A woman is shouting prices over the heads of the crowd. A boy darts between the stalls with a net of crabs.",
+  "replyLength": "medium",
+  "tierUsed": 0,
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

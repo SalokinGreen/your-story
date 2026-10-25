@@ -1,0 +1,56 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "agency-pc-speaks-a-promise",
+  "published": true,
+  "note": "The narration voices a promise the player never made.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [
+      {
+        "id": "n1",
+        "name": "Maren",
+        "description": "Maren, known on the quay.",
+        "role": "local",
+        "status": "alive",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [
+      {
+        "id": "n1",
+        "name": "Maren",
+        "description": "Maren, known on the quay.",
+        "role": "local",
+        "status": "alive",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I step down into the cellar.",
+  "narration": "The cellar steps are slick with condensation, and the cold rises to meet you. At the bottom the lantern light finds barrels stacked three high and a drain in the floor. \"I'll stay down here and guard the stairs until you're back,\" you tell Maren, and she nods, relieved, and presses the spare key into your palm.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": [
+      "Maren"
+    ]
+  },
+  "labels": [
+    {
+      "judge": "agency",
+      "severity": "major",
+      "span": "\"I'll stay down here and guard the stairs until you're back,\" you tell Maren"
+    }
+  ]
+}

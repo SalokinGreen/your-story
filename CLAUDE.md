@@ -1534,7 +1534,7 @@ a Debug Logs line. Facts are never truncated: past about 3,000 tokens the call
 splits into two by judge group (`planCalls`). A judge's free-text `fix` goes to the corrective prompt and the Debug Logs only: every flag `detail` the player can see is a fixed sentence per judge. A Stop passes through; a failed
 call is unknown. The scene-increment question is a free phrase check
 (`sceneIncrementFlag`), not a judge. The per-judge calls survive as
-`runObserverSplit`, reachable only from the eval runner (J4), never Settings.
+`runObserverSplit`, reachable only from the eval runner (J4, below), never Settings.
 **Every correction goes through one path:** the speculative length rewrite is
 gone, several major flags are acted on in `FLAG_PRIORITY` order (lines and veils,
 secret leak, outcome, world, agency, length; `pickMajorFlag`), and the full-turn
@@ -1596,6 +1596,32 @@ check", "Undo revision"); and `withoutPrivateFindings` strips
 `observerFlags`, `correctedObserverFlags` and the replaced draft from what the
 host sends online guests (`broadcastSnapshot`; `buildPlayerView` never had
 them). The turn's details do not show the notice yet (slice 5).
+
+**Judge layer v2, slice J4: the labelled turn set and its runner**
+(`docs/judge-layer-v2-plan.md` slice 4, decisions 229 and 233; `evals/README.md`).
+A turn is a versioned JSON fixture (`judges/evalFormat.ts`: `kind: "judge"`
+holds the story before and after, the tool results, the player's line, the
+narration and `labels` of `{judge, severity, span}`; `kind: "generation"` is
+defined for the GM prompt plan's runner and not run here). The facts, typed
+rulings and key-phrase hits are rebuilt from it by the app's own code
+(`judgeInputsOf`), so a fixture never stores a derived fact; a file with
+key-shaped text is refused. **`evals/turns/public/` holds 45 invented turns**
+(`labelStatus: "drafted"` until the author checks each label), every judge with
+problem and good turns; the author's own turns go in only once approved (decision
+233), the rest in a folder outside the repository named by `EVAL_TURNS_DIR`.
+`scripts/export-eval-turn.mjs` drafts a fixture (`labels: []`, `published: false`)
+from a story export or a "Copy GM context" download (`judges/evalExport.ts`).
+`scripts/eval-judges.mjs` runs each judge in its combined form
+(`runCombinedJudges`) and its split form (`runObserverSplit`, five judges) on
+every turn, `--runs 20`, through `callSideModel` on the keys in a gitignored
+`.env.eval`; **it makes no call without `--go`, never runs in CI, and every real
+run waits for the author's go**. It prints and writes `evals/results.json`
+(`judges/evalRunner.ts`, `evalScore.ts`): per judge precision (any flag and
+major only), recall and false-flag rate as counts with denominators, the failing
+runs per turn, a judge under 0.7 precision at major marked flag-only, cost,
+tokens, cache hits and p50/p95 time by turn kind, and combined against split. A
+private turn is counted, never named. The deterministic rung-1 checks are
+asserted over the published turns by `tests/judges.evalSet.test.ts` (free).
 
 ## BYOK, no accounts, local storage, native shells
 

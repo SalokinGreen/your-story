@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "length-second-scene-chained",
+  "published": true,
+  "note": "A short check answered with a second scene chained on.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I check the tide table pinned inside the harbour office.",
+  "narration": "The tide table is written in a careful clerk's hand: low water at the ninth bell, the bar passable by the eleventh. That gives you two hours. As you turn from the board, a delivery boy bangs in with a crate of lemons and an argument, and the argument is with the harbour clerk, who says the lemons are bruised and the boy says the clerk is bruised. They go at it for a while about the price of freight, the cost of the new customs stamp, the clerk's nephew who was promised a berth on the Marigold and never got it, and who really ought to be paying for the broken crate. The boy storms out. The clerk mutters, straightens his sleeve garters, and starts sorting a stack of manifests into three piles by colour. Outside the window a gull steals a lemon from the spilled crate and wins the argument for everyone.",
+  "replyLength": "short",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "length",
+      "severity": "major",
+      "span": "a delivery boy bangs in with a crate of lemons and an argument"
+    }
+  ]
+}

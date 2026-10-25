@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "tier-top-already",
+  "published": true,
+  "note": "The same accusation, already at the top tier: nothing to escalate to.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I accuse the harbourmaster before the whole guild and call the watch to witness.",
+  "narration": "The hall falls quiet in widening rings. The harbourmaster does not move, and a vein stands out on his temple. At the back two members of the watch exchange a look and step forward.",
+  "replyLength": "medium",
+  "tierUsed": 3,
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

@@ -1,0 +1,50 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "world-dead-npc-remembered",
+  "published": true,
+  "note": "The same dead woman, only her lamp is present.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [
+      {
+        "id": "n1",
+        "name": "Marta",
+        "description": "Marta, known on the quay.",
+        "role": "local",
+        "status": "dead",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [
+      {
+        "id": "n1",
+        "name": "Marta",
+        "description": "Marta, known on the quay.",
+        "role": "local",
+        "status": "dead",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I follow the light along the corridor.",
+  "narration": "The corridor bends twice and the light ahead grows steadier. It is the lamp Marta left behind on the sill; its flame has burned low but not out. The door at the end is already unbolted.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": [
+      "Marta"
+    ]
+  },
+  "labels": []
+}

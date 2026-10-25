@@ -1,0 +1,50 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "outcome-weak-hit-with-cost",
+  "published": true,
+  "note": "A WEAK HIT, narrated as success at a price.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [
+    {
+      "toolName": "action_roll",
+      "toolCallId": "r1",
+      "success": true,
+      "contextForStory": "[Action roll - cross the plank: score 8 against 7 and 9 -> WEAK HIT]",
+      "result": {
+        "type": "action_roll",
+        "statName": "Nerve",
+        "statValue": 2,
+        "adds": 0,
+        "addsApplied": 0,
+        "penalty": 0,
+        "actionDie": 4,
+        "challengeDice": [
+          7,
+          9
+        ],
+        "score": 6,
+        "capped": false,
+        "outcome": "weak_hit",
+        "match": false
+      }
+    }
+  ],
+  "playerLine": "I carry the cask across the plank.",
+  "narration": "You get the cask across, but the plank bucks halfway and a stave cracks against the rail. By the time your boots hit the deck the cask is leaking a dark thread of wine down your sleeve, and you will not get it all home.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}

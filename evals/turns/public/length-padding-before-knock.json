@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "length-padding-before-knock",
+  "published": true,
+  "note": "A one-line action answered with scenery before anything happens.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I knock on the door.",
+  "narration": "The lane behind the net-loft is narrower than it looks from the quay, and the rain has turned the cobbles to a slick of green. A gutter chokes somewhere above you and spits a thin rope of water onto the step. Two doors down, a kettle begins to scream and is silenced. The wallpaper in the passage, what you can see of it through the cracked window, was once a pattern of blue herons, though damp has taken most of their legs. Somebody has stacked crab pots against the wall in a tower that leans toward the road, and a cat sits on the highest one, washing a paw with great seriousness. The air smells of tar, boiled cabbage and old rope. A cart rumbles past on the next street, and its driver sings half a verse of something rude. Eventually, after a time long enough for the cat to finish its paw, the door opens a hand's width.",
+  "replyLength": "short",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "length",
+      "severity": "major",
+      "span": "The wallpaper in the passage, what you can see of it through the cracked window, was once a pattern of blue herons"
+    }
+  ]
+}

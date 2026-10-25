@@ -1,0 +1,56 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "world-departed-npc-present",
+  "published": true,
+  "note": "A captain who sailed away is narrated giving orders on deck.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [
+      {
+        "id": "n3",
+        "name": "Captain Ilse",
+        "description": "Captain Ilse, known on the quay.",
+        "role": "local",
+        "status": "departed",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [
+      {
+        "id": "n3",
+        "name": "Captain Ilse",
+        "description": "Captain Ilse, known on the quay.",
+        "role": "local",
+        "status": "departed",
+        "relationship": "acquaintance",
+        "attitude": "neutral",
+        "createdAt": 0
+      }
+    ],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I climb aboard the Marigold.",
+  "narration": "You swing over the rail and land on a deck that smells of fresh paint. Captain Ilse stands at the wheel, barking orders at two deckhands, and does not so much as glance toward you before she turns the ship toward open water.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": [
+      "Captain Ilse"
+    ]
+  },
+  "labels": [
+    {
+      "judge": "world_consistency",
+      "severity": "major",
+      "span": "Captain Ilse stands at the wheel, barking orders at two deckhands"
+    }
+  ]
+}

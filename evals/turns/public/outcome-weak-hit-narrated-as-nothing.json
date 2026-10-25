@@ -1,0 +1,56 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "outcome-weak-hit-narrated-as-nothing",
+  "published": true,
+  "note": "A WEAK HIT, narrated as if the goal never came.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [
+    {
+      "toolName": "action_roll",
+      "toolCallId": "r1",
+      "success": true,
+      "contextForStory": "[Action roll - pick the lock: score 8 against 7 and 9 -> WEAK HIT]",
+      "result": {
+        "type": "action_roll",
+        "statName": "Nerve",
+        "statValue": 2,
+        "adds": 0,
+        "addsApplied": 0,
+        "penalty": 0,
+        "actionDie": 4,
+        "challengeDice": [
+          7,
+          9
+        ],
+        "score": 6,
+        "capped": false,
+        "outcome": "weak_hit",
+        "match": false
+      }
+    }
+  ],
+  "playerLine": "I pick the lock on the chandler's side door.",
+  "narration": "The pick skates uselessly over the pins. The lock gives nothing, not a click, and after a minute of scraping you straighten with a cramped hand and the door exactly as shut as before.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "outcome",
+      "severity": "major",
+      "span": "The lock gives nothing, not a click"
+    }
+  ]
+}

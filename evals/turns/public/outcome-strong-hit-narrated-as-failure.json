@@ -1,0 +1,56 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "outcome-strong-hit-narrated-as-failure",
+  "published": true,
+  "note": "A STRONG HIT, narrated as a flop.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [
+    {
+      "toolName": "action_roll",
+      "toolCallId": "r1",
+      "success": true,
+      "contextForStory": "[Action roll - talk past the dockhand: score 10 against 3 and 5 -> STRONG HIT]",
+      "result": {
+        "type": "action_roll",
+        "statName": "Nerve",
+        "statValue": 2,
+        "adds": 0,
+        "addsApplied": 0,
+        "penalty": 0,
+        "actionDie": 4,
+        "challengeDice": [
+          7,
+          9
+        ],
+        "score": 6,
+        "capped": false,
+        "outcome": "strong_hit",
+        "match": false
+      }
+    }
+  ],
+  "playerLine": "I talk the dockhand into letting us through.",
+  "narration": "The dockhand folds his arms and shakes his head. \"Not on my watch,\" he says, and plants himself in the gap. Nothing you say moves him, and you are left on the wrong side of the gate.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": [
+    {
+      "judge": "outcome",
+      "severity": "major",
+      "span": "Nothing you say moves him, and you are left on the wrong side of the gate"
+    }
+  ]
+}

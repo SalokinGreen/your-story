@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "kind": "judge",
+  "id": "oracle-plainly-seen",
+  "published": true,
+  "note": "Narration of what the character plainly sees.",
+  "labelStatus": "drafted",
+  "storyBefore": {
+    "npcs": [],
+    "meters": []
+  },
+  "storyAfter": {
+    "npcs": [],
+    "meters": []
+  },
+  "toolResults": [],
+  "playerLine": "I look around the hall.",
+  "narration": "A long table runs down the middle of the hall, set for eight and laid with pewter. Banners hang from the beams, faded to the colour of weak tea. A fire burns at the far end.",
+  "replyLength": "medium",
+  "characterContext": {
+    "playerName": "Wren",
+    "playerSummary": "A ferry-hand with a borrowed name.",
+    "npcNames": []
+  },
+  "labels": []
+}
