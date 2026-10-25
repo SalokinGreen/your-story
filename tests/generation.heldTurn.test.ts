@@ -10,6 +10,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import type { GenerationCallbacks } from "@/app/misc/generation";
 import { createMockGMFetch, sseStreamResponse } from "./helpers/mockGMFetch";
+import { expectAlternatingRoles } from "./helpers/roles";
 import { FLAG_ONLY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
 import { cloneDefaultObserverSettings } from "@/app/misc/observer";
 import type { StoryData } from "@/app/misc/structs";
@@ -644,6 +645,7 @@ describe("prose before a pause is released before the pause shows (decision 240)
     await settle();
 
     const prompt = last(calls.filter(isRewrite)[0]);
+    expectAlternatingRoles(calls.filter(isRewrite)[0].body.messages);
     expect(prompt).toContain("pauses on the player");
     expect(prompt).toContain("about as long as the text you were given");
   });

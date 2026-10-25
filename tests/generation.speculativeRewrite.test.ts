@@ -295,11 +295,12 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
     expect(observerCalls.filter(isLengthJudge)).toHaveLength(0);
   });
 
-  it("hands the rewrite the reasoning behind the draft it's cutting", async () => {
-    // A shortening pass that can't see why the draft said what it said cuts by
-    // feel, and there's no reason for it to be blind: the reasoning was already
-    // collected during the turn. Both channels a model can use are covered -
-    // native reasoning tokens, and thinking written inline in <thinking> tags.
+  it("does not hand the rewrite the GM's reasoning behind the draft it's cutting", async () => {
+    // The GM's reasoning (native tokens, or thinking written inline in
+    // <thinking> tags) can name a secret, so a rewrite is built from the
+    // allowlisted narration context and never sees either channel (campaign
+    // design 14.1). Only a separate narrator's own reasoning is passed on, and
+    // that is tested below.
     const { fetchMock, observerCalls } = createFetchMock(
       [
         {
@@ -328,9 +329,9 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
       .filter(isRewrite)[0]
       .body.messages.map((m) => m.content)
       .join("\n");
-    expect(rewritePrompt).toContain("Your reasoning while writing it");
-    expect(rewritePrompt).toContain("NATIVE_COT");
-    expect(rewritePrompt).toContain("TAGGED_COT");
+    expect(rewritePrompt).not.toContain("Your reasoning while writing it");
+    expect(rewritePrompt).not.toContain("NATIVE_COT");
+    expect(rewritePrompt).not.toContain("TAGGED_COT");
   });
 
   it("does not reuse the speculation for a different major flag", async () => {
@@ -509,11 +510,11 @@ describe("the narration turn in the rewrite's conversation", () => {
     expect(narrationTurn.content).toBe(LONG_NARRATION);
     expect(messages[messages.length - 3].role).toBe("user");
 
-    // The turn's tool round trip is still in there ahead of all that - the
-    // narration turn is appended to the conversation, not a replacement for it.
+    // The GM's tool round trip is NOT in there: the rewrite continues the
+    // allowlisted narration context, which holds public summaries only.
     expect(
       messages.some((m) => m.role === "tool" || Boolean((m as { tool_calls?: unknown[] }).tool_calls)),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("carries the story stage's own reasoning into the rewrite prompt", async () => {

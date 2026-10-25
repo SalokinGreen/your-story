@@ -10,6 +10,23 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Campaign slice 2: the narration context
+
+Needs a live model and the author's go; the allowlist itself is covered by
+`tests/campaign.narrationContext.test.ts`.
+
+- **Prose quality of the separate narration call.** Play a few turns where the
+  GM only calls tools (a roll, then no prose), so the narrator writes the turn.
+  Expected: the prose still names the character and the place correctly and
+  follows a `story_instructions` note (try "write in clipped noir"). Failure
+  looks like generic prose that forgets the character's name or look, or invents
+  names: the narrator sees the character sheet(s) and a short NPC roster but
+  not the lore, memory or summary, so a place or past event only the lore holds
+  may be invented.
+- **Rewrite after a flag.** Turn a prose judge to "rewrite automatically", play
+  a turn it flags. Expected: the rewrite reads as the same scene, same roll
+  outcome, no new secrets; the Debug Logs show a rewrite request.
+
 ## 2026-10-25 — Judge layer J1: rung 1 and the re-ask
 
 All of this needs a live model and the author's go; the engine side is covered

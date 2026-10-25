@@ -41,14 +41,14 @@ stale Google tool filter (6.14, partly fixed 2026-10-22: `start_game` and the
 challenge and scene tools now reach Gemini, the rest of the list is still
 dropped). The unoffered GM tools (6.10) were deleted on 2026-10-23 (decision 128). Four more were found on 2026-10-22 (decision 65): rules notes listed
 by title only while the prompt, comments and docs say pinned (6.15), hidden
-note text reaching the narrator (6.16), `calculate` evaluating `min(12,10)`
+note text reaching the narrator (6.16, fixed for the separate narration call and rewrites by campaign slice 2, 2026-10-25), `calculate` evaluating `min(12,10)`
 as 1210 (6.17), and `search_notes` returning disabled notes (6.18); and
 three from the token measurements: a thinking-only turn saving an empty
 story (6.19), story falling between the history window and the summary
 (6.20, fixed by the token-savings PR T1: history has a fixed start at the
 summary's end), and memory trimming upsetting reflection's index (6.21); and one
 while planning that build: `story_instructions` notes, documented as the
-narrator's style guide, never reaching the narrator (6.22). There is still
+narrator's style guide, never reaching the narrator (6.22, partly fixed by slice 2: the separate narration call and rewrites get them; prose the GM writes inline does not). There is still
 no CI on pull requests.
 
 **The product is the native apps (decision 1).** Tauri desktop and Capacitor
@@ -426,9 +426,27 @@ always runs **before** the story stage:
    capped by the model's own maximum; `GM_STAGE_DEFAULT_OUTPUT` (12,000) is
    only the helper's fallback when no Response Length is given.
 2. **The story stage** — the narrator. If the GM's final round already wrote
-   prose (no tool call that round), that content *is* the story. Otherwise the
-   same conversation is continued with `buildStoryContinuationPrompt()`,
-   streamed — but on the **narration model** (`getEffectiveNarrationModelKey()`,
+   prose (no tool call that round), that content *is* the story. Otherwise a
+   separate call writes it from the **narration context**
+   (`buildNarrationContext`, `campaign/narrationContext.ts`; campaign slice
+   2, design 14.1), not the GM's conversation: a fixed narrator system message;
+   a stable user block marked `"prefix"` (premise, the player's character, the
+   campaign's tone, lines and veils, every enabled `character_sheet` note, the enabled `story_instructions` notes);
+   a live user block marked `"turn"` (a short roster of living NPCs by name,
+   role and public description, the last turns' visible prose, the
+   player's line, and each tool result's `publicSummary`, an allowlist by tool
+   name in `turnTimeline.ts`: dice, oracles, meters, challenges, combat and the
+   player's answers, and a visible timer or clock that fired; never a note
+   read, a memory search, the campaign tool, a hidden roll, a hidden timer or
+   clock, or an error); then `buildStoryContinuationPrompt()`,
+   streamed. It never holds the GM's reasoning, tool arguments, read notes,
+   secrets, unfound clues, `gm_plan` or `dm_instructions` notes, NPC notes or the running summary. The Observer's rewrite and the
+   pre-pause rewrite continue the same context (`GenerationResult.narrationContext`;
+   the narrator's own reasoning, `narrationOwnThoughts`, is the only reasoning
+   a rewrite sees, and only on this path). Claude's cache marks apply to
+   tool-carrying requests only, so this tool-less call keeps just the
+   `session_id` (`:narration`) and the stable block's byte-identity. The narrator
+   no longer sees lore, memory or the summary (a quality risk plan G4 revisits). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
    default GLM 5.3 through OpenRouter, decision 50), not the GM's tier model.
 3. **The choices stage** — a separate call on the narration model
    (`generateChoicesWithRetry` → `parseChoices`), only when
@@ -1268,8 +1286,9 @@ guest sees "Picture on the host's screen" (decision 60; guests are PR I2).
 `story_instructions` and `gm_plan`, plus six legacy aliases; notes have a
 two-pass `visibility`: `always_reveal` (the default when unset), `hidden`,
 `to_be_revealed` and `check_per_turn`. `read_notes` wraps the hidden kinds in
-`[[HIDDEN_LORE]]` markers, but the function meant to strip them before the
-narrator has no caller, so the narrator receives that text (§6.16). Fields
+`[[HIDDEN_LORE]]` markers; `stripHiddenLoreContent` is called by the narration
+context (§6.16), so a narrator or rewrite never receives that text, though the
+GM's own inline prose is written with it in view. Fields
 marked `DEPRECATED` are back-compat only — grep for it before assuming a
 field is live.
 
