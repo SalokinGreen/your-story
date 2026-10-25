@@ -381,3 +381,18 @@ The author: "I'm also not a fan of the default adventures. They just throw you i
 | 199 | "What should Grave Watcher's first day look like?" | **"Town, then the tower (Recommended)."** Founders' Day morning in Hollins Ferry: the diner, the crew, the paperwork, the keys to Tower Nine; the climb at dusk for the first watch. The green light in the Old Lot ends the first night instead of opening it. Rejected: straight to the tower. |
 | 200 | "How should I go about it?" | **"Build it now (Recommended)."** The answers are the plan; the new prose is read in the PR. |
 
+### Interview — campaigns and the judge layer, grown (2026-10-25)
+
+The author: "I also want us to look in depth at campaign setup, the whole format and parts, and also on the judge layer. And I want us to improve and grow those 2 features because they're major. Ai needs judging and help, and it also needs a nice structure with a lot of options. We should look at how other people make AI supervise itself and how the best TTRPG adventures are designed and used." Research: [`research/ai-supervision-2026-10-25.md`](research/ai-supervision-2026-10-25.md), [`research/adventure-design-2026-10-25.md`](research/adventure-design-2026-10-25.md), [`research/campaign-and-judges-audit-2026-10-25.md`](research/campaign-and-judges-audit-2026-10-25.md). Decisions 201–219 (Fantastic Realms) and 220–221 (the judges back on, output held) are on their own branches.
+
+| # | question | decision |
+|---|---|---|
+| 222 | "What should a campaign be built from?" | **"Situations + styles (Recommended)."** A campaign is a menu of parts (pitch and tone, a starting situation, factions with goals, fronts with clocks, NPCs with wants and secrets, secrets and clues, locations, tables, end states); a style (sandbox, adventure path, mystery, horror, episodic, slice of life, solo) picks which parts it uses; beats become optional, for the adventure-path style. Rejected: keep the beat spine and add parts; a few fixed templates. |
+| 223 | "How should clocks and fronts move?" | **"Engine ticks them (Recommended)."** Clocks are engine objects linked to their front, ticked by the engine on the triggers the campaign sets (a miss, a scene, a rest, time); the engine says when a portent or doom lands; the GM can tick them too. Replaces the timers that never tick. |
+| 224 | "Who should be able to write the campaign structure?" | **The GM in session zero, the Game Designer, and the starters** (which ship complete campaigns). Not chosen: the player editing it. |
+| 225 | "Should session zero include safety tools?" | **"Lines and veils (Recommended)."** Asked in session zero, stored in the campaign, carried to the GM every turn, checked by a judge. |
+| 226 | "Which direction for the judge layer?" | **"Facts first, then judges (Recommended)."** Deterministic checks on engine facts first, cheap LLM judges with rubrics and examples for what code cannot see, and a rewrite always handed the specific facts it must match. |
+| 227 | "Which new checks should the judge layer grow?" | **All four:** world consistency, secret leaks, rules adherence, pacing and spotlight. |
+| 228 | "Should judges use more than one model family?" | **"One cheap judge, panel for rewrites (Recommended)."** Haiku judges every turn; before a rewrite, a second judge from another family must agree. |
+| 229 | "How do we know a judge actually helps?" | **"Player signals only."** Count Undo revision, Retry and Feedback per judge in the app; no labelled test set. |
+
