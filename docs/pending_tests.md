@@ -10,6 +10,20 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Starters welcome you in (decisions 197–200)
+
+Seen in the browser preview (the welcome first, the opening not shown); not
+played to start_game against a real model:
+
+- **Play Grave Watcher to the start.** Play → a Watcher → Quick setup → answer
+  → approve the setup card. Expected: the GM's first story turn gives a short
+  briefing (Hollins Ferry, the Watch, Tower Nine), then plays Founders' Day
+  morning in town (pancakes, Walt, June with the keys, Cora and the pie table)
+  and ends on a choice; no green light before dusk. Failure looks like: the GM
+  opens on the tower or the green light, or never mentions the pancake
+  breakfast (then the opening did not reach it: the Debug Logs' start_game
+  result should end with "The adventure's author wrote the opening scene").
+
 ## 2026-10-25 — Session zero hands back; the output-cap retry (decisions 195–196)
 
 Covered by the suite against scripted rounds; not played against a real model

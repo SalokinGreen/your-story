@@ -21,7 +21,7 @@ The cast. The family is the roster in The Last Resort — The family: Dara (the 
 
 Treat the Masquerade as comedy first: the guests invent explanations ("old building", "clever staging") until one of them does not.
 
-If there is no Campaign Plan note yet, write one before the first week: a medium spine, seven beats, from The Last Resort — The season (read the secrets first). Then session zero builds the characters (B&B — Character creation, or the five pre-made family members), the setup card is approved, and start_game runs. Open on the lobby, the bell ringing by itself, Mr. Pell at the desk.`;
+If there is no Campaign Plan note yet, write one before the first week: a medium spine, seven beats, from The Last Resort — The season (read the secrets first). Then session zero builds the characters (B&B — Character creation, or the five pre-made family members), the setup card is approved, and start_game runs. Open on the arrival: the family pulls up at the Belhaven on the last Friday of August and the lawyer hands over the will on the steps (the opening scene). Let them walk in, look round the lobby and start reading; the bell ringing by itself and Mr. Pell at the desk are the first night's surprise, not the first line.`;
 
 const SEASON = `The Last Resort — The season (the GM's outline; the players have This season)
 

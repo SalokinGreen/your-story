@@ -369,3 +369,15 @@ The author, with a screenshot and the GM context of a quick Blood & Bone setup: 
 |---|---|---|
 | 195 | "When the GM goes quiet between setup steps, what should the player see instead of the dead-end '(Let's finish setting up first…)' line?" | **"A hand-back question (Recommended)."** The engine line names the next step and gives the floor back: "Next up: your character sheet. Anything you want me to know before I write it? Or just say go on." Any reply continues setup. Rejected: re-prompting until the step is done; both. |
 | 196 | "How should a round cut off at the output limit (nothing left to write) be handled?" | **"Retry with a bigger cap (Recommended)."** A GM round with finish reason `length`, no visible words and no tool call whose arguments finished is asked again once per turn at double the cap (up to the model's maximum), which then holds for the rest of the turn. It does not count against the setup gate's re-prompts or the round limit, and applies to every turn. Rejected: a bigger cap in session zero only; lower effort in session zero. |
+
+### Starters that welcome you in (2026-10-25)
+
+The author: "I'm also not a fan of the default adventures. They just throw you in the middle of the game without the GM giving you an introduction and proper joining to the game. Especially the Grave Watcher adventure should start with us arriving for our first day." The first thing a starter showed was its authored opening, mid-crisis (a green light in the graves, a ghost at the desk, a tunnel nest), before setup; the GM then continued from it.
+
+| # | question | decision |
+|---|---|---|
+| 197 | "When should a starter's authored opening appear?" | **"After setup (Recommended)."** The first screen is a welcome: what the adventure is, who you'll be, and the setup choice. After start_game the GM gives a briefing, then plays the authored opening as the first scene. Applies to every adventure, not only the starters. Rejected: first, as now, rewritten calm. |
+| 198 | "Which starters get a new arrival opening?" | **"All three (Recommended)."** Grave Watcher, The Last Resort and The Hollow Hour each start with arriving and being introduced; their "Running it" notes stop saying "open in motion", and the hook comes later in the first session. |
+| 199 | "What should Grave Watcher's first day look like?" | **"Town, then the tower (Recommended)."** Founders' Day morning in Hollins Ferry: the diner, the crew, the paperwork, the keys to Tower Nine; the climb at dusk for the first watch. The green light in the Old Lot ends the first night instead of opening it. Rejected: straight to the tower. |
+| 200 | "How should I go about it?" | **"Build it now (Recommended)."** The answers are the plan; the new prose is read in the PR. |
+
