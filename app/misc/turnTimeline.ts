@@ -457,6 +457,7 @@ interface SavedGMConversationMessage {
   role: "assistant" | "tool";
   content: string;
   reasoning?: string;
+  tool_call_id?: string;
   tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
 }
 
@@ -543,6 +544,20 @@ export function buildSavedTimeline(
   }
   const blocks: TimelineBlock[] = [];
 
+  // Calls a re-ask refused were never part of the turn: their tool messages
+  // say so, and the player's timeline leaves them out (as the live one did).
+  const refusedIds = new Set<string>();
+  for (const m of gmConversation || []) {
+    if (
+      m.role === "tool" &&
+      m.tool_call_id &&
+      typeof m.content === "string" &&
+      m.content.includes(REASK_REFUSAL_TAG)
+    ) {
+      refusedIds.add(m.tool_call_id);
+    }
+  }
+
   for (const msg of gmConversation || []) {
     if (msg.role !== "assistant") continue;
 
@@ -565,6 +580,7 @@ export function buildSavedTimeline(
 
     if (msg.tool_calls) {
       for (const tc of msg.tool_calls) {
+        if (refusedIds.has(tc.id)) continue;
         const result = toolResults?.get(tc.id);
         const toolName = result?.toolName || tc.function.name;
         const hidden = isHiddenFromPlayer(toolName, result);
@@ -596,3 +612,6 @@ export function buildSavedTimeline(
 
   return blocks;
 }
+
+/** What a re-ask's refusal message says (generation.ts, mergeRefusedDiceCalls): the saved timeline hides these calls. */
+export const REASK_REFUSAL_TAG = "(re-ask refusal)";

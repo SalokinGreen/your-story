@@ -17,6 +17,7 @@ import {
   storyHasLineKeywords,
 } from "@/app/misc/generation";
 import { FLAG_ONLY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import { REASK_REFUSAL_TAG } from "@/app/misc/turnTimeline";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import { emptyCampaign } from "@/app/misc/campaign/types";
 import { logger } from "@/app/misc/logger";
@@ -311,6 +312,12 @@ describe("rung 2 re-ask: Fantastic Realms foe-damage", () => {
     expect(
       toolMessages.find((m) => m.tool_call_id === "reroll")?.content,
     ).toContain("[ERROR]");
+    // The tag the saved timeline hides these calls by.
+    for (const id of ["reroll", "oracle", "track", "ask"]) {
+      expect(toolMessages.find((m) => m.tool_call_id === id)?.content).toContain(
+        REASK_REFUSAL_TAG,
+      );
+    }
     // The damage still landed once.
     expect(
       (result.gmResults ?? []).filter((r) => r.toolName === "manage_meter" && r.success),
@@ -418,6 +425,60 @@ describe("rung 2 re-ask: a campaign line", () => {
     expect(saved.map(proseOf).join("\n")).not.toContain("The torture begins.");
     expect(saved.map(proseOf).join("\n").split("The gate opens.").length - 1).toBe(1);
     expect(saved.some((m) => m.role === "assistant" && m.tool_calls?.length)).toBe(true);
+  });
+
+  type Saved = Msg & { tool_calls?: unknown[] };
+  const noEmptyAssistant = (saved: Saved[]) =>
+    saved.filter(
+      (m) => m.role === "assistant" && !(m.content ?? "").trim() && !m.tool_calls?.length,
+    );
+
+  it("leaves no empty assistant message behind after a worded reply", async () => {
+    const { result } = await play(lineStory(), "I question the guard", [
+      { content: "The gate opens.", toolCalls: [STATE] },
+      { content: "The torture begins." },
+      { content: "The guard talks, quickly, before it comes to that." },
+    ]);
+    const saved = (result.scenePart?.gmConversation ?? []) as Saved[];
+    expect(noEmptyAssistant(saved)).toEqual([]);
+    // The prose-only draft message is gone; the one with a tool call stays.
+    expect(saved.some((m) => m.role === "assistant" && m.tool_calls?.length)).toBe(true);
+    expect(saved.filter((m) => m.content?.includes("The torture begins."))).toHaveLength(0);
+    // Nor does the next round of the same turn send one.
+    const mock = createMockGMFetch([
+      { content: "The torture begins." },
+      { content: "", toolCalls: [STATE] },
+      { content: "The guard talks, before it comes to that." },
+    ]);
+    global.fetch = mock.fetchMock as unknown as typeof fetch;
+    await generateStoryTurn(lineStory(), "I question the guard", baseOptions, {});
+    const last = mock.gmStageCalls()[2].body.messages as Saved[];
+    expect(noEmptyAssistant(last)).toEqual([]);
+  });
+
+  it("keeps only the answering round: a preamble on a tool round is not story", async () => {
+    const { result, calls } = await play(lineStory(), "I question the guard", [
+      { content: "The torture begins." },
+      { content: "I'll rewrite it now.", toolCalls: [STATE] },
+      { content: "The guard talks, quickly, before it comes to that." },
+    ]);
+    expect(calls).toHaveLength(3);
+    expect(result.content).toBe("The guard talks, quickly, before it comes to that.");
+    const saved = (result.scenePart?.gmConversation ?? []) as Saved[];
+    expect(saved.some((m) => m.content?.includes("I'll rewrite it now."))).toBe(false);
+    expect(noEmptyAssistant(saved)).toEqual([]);
+  });
+
+  it("gives the draft back when the reply is an introduction, not the passage", async () => {
+    const { result } = await play(lineStory(), "I question the guard", [
+      { content: "The torture begins." },
+      { content: "Here is the revised passage:\n\nThe guard talks." },
+    ]);
+    expect(result.content).toBe("The torture begins.");
+    expect(result.content).not.toContain("Here is");
+    const saved = (result.scenePart?.gmConversation ?? []) as Saved[];
+    expect(saved.some((m) => m.content?.includes("Here is the revised"))).toBe(false);
+    expect(noEmptyAssistant(saved)).toEqual([]);
   });
 
   it("catches a line's word in an earlier round, not only the final one", async () => {

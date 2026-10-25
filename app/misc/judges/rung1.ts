@@ -192,9 +192,9 @@ function turnsSinceClockMoved(parts: readonly PriorPartView[]): number {
 }
 
 function pacingClockHit(turn: Rung1Turn, facts: Fact[]): Rung1Hit[] {
-  // A record a timer migration made, and clocks only the GM ticks by hand, are
-  // not pressure the engine moves on its own: they would nag forever.
-  if (turn.storyAfter.campaign?.origin === "migrated") return [];
+  // Clocks from migrated timers, and clocks only the GM ticks by hand, are not
+  // pressure the engine moves on its own: they would nag forever. (Per clock:
+  // a migrated record that later gains an auto-ticking clock counts again.)
   const clocks = (turn.storyAfter.campaign?.clocks ?? []).filter(
     (c) =>
       !c.cancelled &&
