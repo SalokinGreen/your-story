@@ -306,3 +306,64 @@ describe("buildPlayerView: a built-in system story (Blood & Bone)", () => {
     expect(Object.keys(view).sort()).toEqual(ALLOWED_KEYS);
   });
 });
+
+describe("buildPlayerView: Fantastic Realms hero state (E1)", () => {
+  // The grown hero state: conditions, scars, items, counters, the hearth.
+  const frStory = {
+    ...story(),
+    systemState: {
+      systemId: "fantastic-realms",
+      sessionCount: 0,
+      dedupKeys: [],
+      fantasticRealms: {
+        heroes: {
+          mara: {
+            name: "Mara",
+            rewards: [],
+            feats: [
+              { id: "feat-1", wording: "LEAK_FEAT_WORDING", burned: true },
+              {
+                id: "feat-2",
+                wording: "LEAK_ITEM_WORDING",
+                burned: false,
+                kind: "item",
+                qualities: ["keen"],
+                status: "broken",
+              },
+            ],
+            conditions: [
+              { word: "LEAK_CONDITION", cure: "LEAK_CURE" },
+              { word: "LEAK_SCAR", scar: true },
+            ],
+            uses: { "feat-1:rest": 1 },
+          },
+        },
+        partyFeats: [{ id: "party-1", wording: "LEAK_HEARTH", burned: false }],
+        teamBurnsUsed: 1,
+        partyUses: { "party-1:adventure": 1 },
+      },
+    },
+  } as unknown as StoryData;
+  const s = seated();
+
+  for (const who of ["mara", "tom", null] as const) {
+    it(`sends ${who ?? "the lobby"}'s phone no hero feats, conditions, scars, items, counters or hearth`, () => {
+      const view = buildPlayerView(s, frStory, who, 0);
+      const json = JSON.stringify(view);
+      for (const marker of [
+        "LEAK_FEAT_WORDING",
+        "LEAK_ITEM_WORDING",
+        "LEAK_CONDITION",
+        "LEAK_CURE",
+        "LEAK_SCAR",
+        "LEAK_HEARTH",
+        "teamBurnsUsed",
+        "partyUses",
+        "fantasticRealms",
+      ]) {
+        expect(json, marker).not.toContain(marker);
+      }
+      expect(Object.keys(view).sort()).toEqual(ALLOWED_KEYS);
+    });
+  }
+});

@@ -10,6 +10,26 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Fantastic Realms E1 (the engine)
+
+The engine is covered by `tests/systems.fantasticRealms.grown.test.ts`; the
+Meters panel renders to static markup in that test. What no session could do:
+
+- **Screenshot of the Meters panel.** In the browser preview, open a Fantastic
+  Realms story (or seed `systemState.fantasticRealms` with a hero holding a
+  poison condition with a cure, a scar, a broken item with a quality and a
+  lost item, and 0 Hearts). Expected: a red "Down" badge, a red "Poisoned" chip
+  (tooltip "Needs an antidote"), a muted scar chip, the broken item struck
+  through in red with its quality in muted text, and the lost item absent.
+  Failure looks like chips in a non-theme colour, or the Down badge missing for
+  a hero at 0 Hearts whose name differs in case from the Hearts meter's owner.
+- **How a real GM uses help, team burns, hindrances and `use`.** With the
+  author's go, play a Fantastic Realms fight with two heroes. Expected: the GM
+  names a helper's feat, a team burn and a condition it says hinders the roll;
+  a refusal's message is enough for it to retry once. Failure looks like the
+  GM rolling plain `feat_roll`s and ignoring the new parameters (the core note
+  that teaches them is slice E2).
+
 ## 2026-10-25 — Campaign slice 2: the narration context
 
 Needs a live model and the author's go; the allowlist itself is covered by

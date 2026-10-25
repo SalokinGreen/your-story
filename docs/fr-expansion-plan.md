@@ -306,4 +306,63 @@ caps, and that every foe line parses (`foes.ts`'s format).
 
 ## Decisions made during implementation
 
-(Filled in by the builder, dated.)
+### 2026-10-25 — E1 (the engine)
+
+Judgment calls the plan left to the builder. None changes the plan's scope.
+
+- **`hit` is in the shared `record_challenge_result` enum.** The tool list is
+  one stable list for every story (decision 92), so the enum cannot differ per
+  story; it gained `"hit"` (about 2 tokens, for every story). The executor
+  refuses `hit` outside Fantastic Realms (a story whose resolved system lists
+  `feat_roll`), naming only `success`/`failure` or `strong_hit`/`weak_hit`/`miss`.
+  In a Fantastic Realms `first_to` challenge a `hit` counts as a success.
+- **`manage_feats`' schema no longer requires `hero` and `feat`** (only
+  `action`): the party-feat actions need no hero and the condition actions need
+  no feat. The executor still refuses a missing one with the old messages.
+  `qualities` is `string[]` in the schema and validated in the executor
+  (the twelve words are listed in its error), to keep the schema bare.
+- **A team burn's `own_feat` that is also named in `feats` is not counted as a
+  die** (no refusal): neither burned feat adds its die (decision 255), and a
+  wasted round on a refusal costs more than the leniency.
+- **The team-burn partner may be the helper** (design 14) but not with the
+  same feat in the same roll (refused).
+- **Magic is detected from the roller's pool feats and their own burned feat**,
+  not from a helper's or partner's feat.
+- **The helper writes nothing.** Their feat adds a die and is named in the
+  result; it is not burned (design 9), so the "helper written after the
+  faces" step has nothing to persist.
+- **The damage line is unchanged.** `[If this struck a foe: it loses N hearts]`
+  stays verbatim (with ` (Keen +1)` when it applies), so an old save's roll
+  text is identical. The result's `damage` is set only on a hit that names a
+  `target`; `contracts.ts` reads it and falls back to `foeDamage` for a result
+  without one.
+- **Down is derived with unknown hearts counting as not down.** A hero with no
+  Hearts meter is down only by three conditions.
+- **A duplicate condition succeeds with "already … nothing changed"** (design
+  14: "giving it again does nothing"); a duplicate feat still fails. `add_scar`
+  refuses a hero who is not down, and a scar does not lift the Down state
+  (hearts or the third condition do that). `Hungry` is given `cure: "a meal"`
+  by the engine when the GM adds it without one, and `take_rest` also keeps a
+  hand-set `Hungry` with no cure.
+- **`use`** counts a hero's feat by its id, a hearth improvement by its party
+  id (`partyUses`), and any other name (a calling's move) under a `~` plus the
+  normalised words. A broken or lost item refuses a use; a burned one does not
+  (Warded and Bright are qualities, not dice). An adventure's end clears every
+  `partyUses` counter and a scene's end only the `:scene` ones; a rest clears
+  a hero's `:rest` counters for the heroes who rested, and `partyUses`
+  `:rest` counters only at a party rest.
+- **A party rest** is a `take_rest` whose picked heroes include every hero in
+  `systemState.fantasticRealms.heroes`. The result always says "Party rest"
+  or "Partial rest" with the team burns left, and names any hero still down
+  (three cure-needing conditions) after it.
+- **The hero line's `Party:` line** appears only when the party has feats or a
+  team burn has been spent, so a story with neither reads as before.
+- **The Meters panel** hides a lost item, strikes a broken one through in
+  `ys-danger` (a burned one stays struck through and dimmed), and shows
+  qualities in `ys-muted`. Party feats are not shown on the panel (E1 lists
+  conditions, items and Down only).
+- **`useKey` is `usageKey`**: a function named `use…` trips the hooks lint
+  rule in a non-component.
+- **Tool budget:** the Fantastic Realms list grew from 11,118 to 11,443 tokens
+  (the system extra from +1,139 to +1,462 of the 1,500 allowed). No schema
+  text had to move into the core note, but there is 57 tokens of room left.

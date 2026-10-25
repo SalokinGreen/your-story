@@ -154,7 +154,8 @@ export interface OpposedFormulaParams {
 export interface RecordChallengeResultParams {
   // strong_hit / weak_hit / miss: tally challenges (+1 / 0 / -1). In a
   // first_to challenge strong_hit and weak_hit count as a success, miss as a failure.
-  outcome: "success" | "failure" | "strong_hit" | "weak_hit" | "miss";
+  // "hit" (Fantastic Realms' middle tier, scored +1 like a strong hit) is accepted only there.
+  outcome: "success" | "failure" | "strong_hit" | "weak_hit" | "hit" | "miss";
   description: string; // What this check represented, e.g. "Vault over the gap"
   // Hardness dimensions for a failure's narration - see
   // FormulaRollParams.target/forces_choice. Ignored on a success.
@@ -634,22 +635,59 @@ export interface ActionRollParams {
 }
 
 // Fantastic Realms tools (systems/fantastic-realms; offered only to its stories)
+export type ManageFeatsAction =
+  | "add"
+  | "rename"
+  | "remove"
+  | "burn"
+  | "break"
+  | "lose"
+  | "recover"
+  | "mend"
+  | "add_condition"
+  | "clear_condition"
+  | "add_scar"
+  | "scar_to_feat"
+  | "use"
+  | "add_party_feat"
+  | "remove_party_feat";
+
 export interface ManageFeatsParams {
-  hero: string;
-  action: "add" | "rename" | "remove";
-  feat: string;
+  /** Not needed for the party-feat actions. */
+  hero?: string;
+  action: ManageFeatsAction;
+  /** The feat (or, for `use`, the feat or named move). */
+  feat?: string;
   new_wording?: string;
+  /** add: absent means a skill. */
+  kind?: "skill" | "spell" | "item";
+  /** add, items only: at most two ItemQuality words. */
+  qualities?: string[];
+  /** add_condition, clear_condition, add_scar, scar_to_feat. */
+  condition?: string;
+  /** add_condition: what clears it besides a rest. */
+  cure?: string;
+  /** use: when the counter resets. */
+  per?: "scene" | "rest" | "adventure";
+  /** use: uses allowed before the reset (default 1). */
+  limit?: number;
 }
 
 export interface FeatRollParams {
   hero: string;
-  feats: string[]; // feats that apply; the pool is 1 + feats.length d6
+  feats: string[]; // feats that apply; the pool is 1 + feats.length d6 (+ help, - hindrances)
   dc: number; // 2-6
   burn?: string; // one of `feats`: one sure success, spent until a rest
   reason: string;
-  dice?: number[]; // manual dice mode: one face per die, 1 + feats.length
+  dice?: number[]; // manual dice mode: one face per die in the pool
   /** The foe the roll strikes. A hit then owes a Hearts change on that foe (an event contract). */
   target?: string;
+  /** Condition words (or scars) on the roller that get in the way: one die each, never below 1. */
+  hindered_by?: string[];
+  /** Another hero adds one die with one of their feats. */
+  help?: { hero: string; feat: string };
+  /** Two sure successes, no dice from either burned feat: a partner's feat and the roller's own. */
+  team_burn?: { hero: string; feat: string; own_feat: string };
 }
 
 export interface InitiativeRollParams {
@@ -1178,7 +1216,7 @@ const recordChallengeResultTool: ToolSchema = {
       properties: {
         outcome: {
           type: "string",
-          enum: ["success", "failure", "strong_hit", "weak_hit", "miss"],
+          enum: ["success", "failure", "strong_hit", "weak_hit", "hit", "miss"],
           description:
             "Which way this check went, per your `calculate` comparison or action_roll",
         },
@@ -2059,16 +2097,29 @@ const manageFeatsTool: ToolSchema = {
   type: "function",
   function: {
     name: "manage_feats",
-    description: `Add, rename or remove a hero's feat. A rename keeps the feat's burn.`,
+    description: `Keep a hero's feats, items, conditions and counted uses, and the party's feats. A rename keeps the burn.`,
     parameters: {
       type: "object",
       properties: {
-        hero: { type: "string" },
-        action: { type: "string", enum: ["add", "rename", "remove"] },
-        feat: { type: "string", description: "The feat's wording (add) or current wording" },
-        new_wording: { type: "string", description: "rename: the new wording" },
+        hero: { type: "string", description: "Not needed for the party-feat actions" },
+        action: {
+          type: "string",
+          enum: [
+            "add", "rename", "remove", "burn", "break", "lose", "recover", "mend",
+            "add_condition", "clear_condition", "add_scar", "scar_to_feat", "use",
+            "add_party_feat", "remove_party_feat",
+          ],
+        },
+        feat: { type: "string", description: "The feat's wording (add) or current wording; use: a feat or named move" },
+        new_wording: { type: "string", description: "rename, scar_to_feat: the new wording" },
+        kind: { type: "string", enum: ["skill", "spell", "item"], description: "add: default skill" },
+        qualities: { type: "array", items: { type: "string" }, description: "add, item: up to 2" },
+        condition: { type: "string", description: "The condition or scar word" },
+        cure: { type: "string", description: "add_condition: what clears it besides a rest" },
+        per: { type: "string", enum: ["scene", "rest", "adventure"], description: "use: when it resets" },
+        limit: { type: "integer", description: "use: allowed uses, default 1" },
       },
-      required: ["hero", "action", "feat"],
+      required: ["action"],
     },
   },
 };
@@ -2077,7 +2128,7 @@ const featRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "feat_roll",
-    description: `Roll 1 + one d6 per feat against a DC. Each die at or above the DC is a success: 0 miss, 1 weak hit, 2 hit, 3 strong hit, +1 magnitude per extra. A burned feat is one sure success and stays spent until a rest.`,
+    description: `Roll 1 + one d6 per feat (+1 helper, -1 per hindrance, min 1) against a DC. Each die at or above the DC is a success: 0 miss, 1 weak hit, 2 hit, 3 strong hit, +1 magnitude per extra. A burned feat is one sure success and stays spent until a rest.`,
     parameters: {
       type: "object",
       properties: {
@@ -2086,8 +2137,21 @@ const featRollTool: ToolSchema = {
         dc: { type: "number", description: "2-6" },
         burn: { type: "string", description: "One of feats, to burn it" },
         reason: { type: "string" },
-        dice: { type: "array", items: { type: "number" }, description: "Manual dice: the faces reported, 1 + feats" },
+        dice: { type: "array", items: { type: "number" }, description: "Manual dice: the faces reported, one per die in the pool" },
         target: { type: "string", description: "The foe struck, if any" },
+        hindered_by: { type: "array", items: { type: "string" }, description: "The roller's conditions in the way, a die each" },
+        help: {
+          type: "object",
+          properties: { hero: { type: "string" }, feat: { type: "string" } },
+          required: ["hero", "feat"],
+          description: "Another hero adds a die",
+        },
+        team_burn: {
+          type: "object",
+          properties: { hero: { type: "string" }, feat: { type: "string" }, own_feat: { type: "string" } },
+          required: ["hero", "feat", "own_feat"],
+          description: "Two sure successes, no dice from the two burned feats",
+        },
       },
       required: ["hero", "feats", "dc", "reason"],
     },
@@ -2145,7 +2209,7 @@ const takeRestTool: ToolSchema = {
   type: "function",
   function: {
     name: "take_rest",
-    description: `Heal all hearts and un-burn every feat for the heroes listed (default all). Returns the realm's rest condition.`,
+    description: `Heal all hearts, un-burn every feat and clear conditions that name no cure for the heroes listed (default all). Everyone is a party rest. Returns the realm's rest condition.`,
     parameters: {
       type: "object",
       properties: {

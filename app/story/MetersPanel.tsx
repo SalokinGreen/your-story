@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { currentThreshold, normalizeKey } from "@/app/misc/metersAndTracks";
+import { isDown } from "@/app/misc/systems/fantastic-realms/engine";
 import type {
   FantasticRealmsHero,
   Meter,
@@ -87,22 +88,93 @@ function MeterBar({ meter }: { meter: Meter }) {
   );
 }
 
-/** A hero's feats as chips; a burned one is struck through until a rest. */
-function FeatChips({ hero }: { hero: FantasticRealmsHero }) {
-  if (hero.feats.length === 0) return null;
+/**
+ * A hero's feats as chips. A burned feat is struck through until a rest; a
+ * broken item is struck through in the danger colour and a lost one is hidden.
+ * Conditions are danger chips, scars muted ones, and a hero who is down gets a
+ * badge (decisions 247, 250).
+ */
+function FeatChips({
+  hero,
+  down,
+}: {
+  hero: FantasticRealmsHero;
+  down: boolean;
+}) {
+  const feats = hero.feats.filter((f) => f.status !== "lost");
+  const conditions = (hero.conditions ?? []).filter((c) => !c.scar);
+  const scars = (hero.conditions ?? []).filter((c) => c.scar);
+  if (feats.length === 0 && conditions.length === 0 && scars.length === 0 && !down) {
+    return null;
+  }
   return (
-    <ul className="flex flex-wrap gap-1.5" aria-label="Feats">
-      {hero.feats.map((f) => (
-        <li
-          key={f.id}
-          className={`ys-chip ${f.burned ? "line-through opacity-60" : ""}`}
-          title={f.burned ? "Burned: spent until the next rest" : undefined}
+    <div className="space-y-1.5">
+      {down && (
+        <span
+          className="ys-chip border-ys-danger text-ys-danger font-semibold"
+          title="Down: out of the scene until a rest or a healing spell lifts them"
         >
-          {f.wording}
-          {f.burned && <span className="sr-only"> (burned)</span>}
-        </li>
-      ))}
-    </ul>
+          Down
+        </span>
+      )}
+      {feats.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Feats">
+          {feats.map((f) => {
+            const broken = f.status === "broken";
+            const qualities = (f.qualities ?? [])
+              .map((q) => q.charAt(0).toUpperCase() + q.slice(1))
+              .join(", ");
+            return (
+              <li
+                key={f.id}
+                className={`ys-chip ${
+                  broken
+                    ? "line-through text-ys-danger"
+                    : f.burned
+                      ? "line-through opacity-60"
+                      : ""
+                }`}
+                title={
+                  broken
+                    ? "Broken: cannot be used until it is mended"
+                    : f.burned
+                      ? "Burned: spent until the next rest"
+                      : undefined
+                }
+              >
+                {f.wording}
+                {qualities && <span className="text-ys-muted"> ({qualities})</span>}
+                {broken && <span className="sr-only"> (broken)</span>}
+                {!broken && f.burned && <span className="sr-only"> (burned)</span>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {(conditions.length > 0 || scars.length > 0) && (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Conditions">
+          {conditions.map((c) => (
+            <li
+              key={`c-${c.word}`}
+              className="ys-chip border-ys-danger text-ys-danger"
+              title={c.cure ? `Needs ${c.cure}` : "Clears at a rest"}
+            >
+              {c.word}
+            </li>
+          ))}
+          {scars.map((c) => (
+            <li
+              key={`s-${c.word}`}
+              className="ys-chip text-ys-muted"
+              title="A scar: it never clears on its own"
+            >
+              {c.word}
+              <span className="sr-only"> (scar)</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -198,7 +270,7 @@ export default function MetersPanel({
   const tracks = progressTracks ?? [];
   const challenge = activeChallenge?.active ? activeChallenge : undefined;
   const featHeroes = Object.entries(heroFeats ?? {}).filter(
-    ([, h]) => h.feats.length > 0,
+    ([, h]) => h.feats.length > 0 || (h.conditions ?? []).length > 0,
   );
   if (
     visibleMeters.length === 0 &&
@@ -269,7 +341,13 @@ export default function MetersPanel({
                 ))}
               {(() => {
                 const hero = heroFeats?.[normalizeKey(owner)];
-                return hero ? <FeatChips hero={hero} /> : null;
+                if (!hero) return null;
+                const hearts = (meters ?? []).find(
+                  (m) => m.owner === owner && m.name === "Hearts",
+                )?.value;
+                return (
+                  <FeatChips hero={hero} down={isDown(hearts, hero.conditions)} />
+                );
               })()}
             </div>
           ))}

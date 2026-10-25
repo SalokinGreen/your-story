@@ -84,4 +84,19 @@ export const FANTASTIC_REALMS_METER_SETS: MeterSet[] = [
       },
     ],
   },
+  {
+    name: "Fantastic Realms party",
+    description:
+      "The party's Supplies (owner = world). Made with create_set on the first journey; the party starts with 3.",
+    meters: [
+      {
+        name: "Supplies",
+        min: 0,
+        max: 6,
+        start: 3,
+        description:
+          "One Supply feeds the whole party for a day; a journey day costs 1. Buying, foraging or a host's hospitality refills it, up to 6. At 0 the party is Hungry: a condition on every hero that only a meal clears.",
+      },
+    ],
+  },
 ];

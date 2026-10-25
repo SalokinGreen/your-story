@@ -45,6 +45,13 @@ import {
 } from "@/app/misc/contextLimits";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { estimateTokens } from "@/app/misc/tokenCounter";
+import {
+  TEAM_BURNS_PER_REST,
+  describeConditions,
+  describeFeat,
+  describeScars,
+  isDown,
+} from "@/app/misc/systems/fantastic-realms/engine";
 import { formatCampaignBrief } from "@/app/misc/campaign/brief";
 import {
   estimateRenderedPartTokens,
@@ -536,12 +543,25 @@ export function formatHeroFeatsState(
       )?.owner ??
       key;
     const feats =
-      hero.feats.length > 0
-        ? hero.feats
-            .map((f) => (f.burned ? `${f.wording} (burned)` : f.wording))
-            .join(", ")
-        : "none yet";
-    lines.push(`${name} — feats: ${feats}`);
+      hero.feats.length > 0 ? hero.feats.map(describeFeat).join(", ") : "none yet";
+    let line = `${name} — feats: ${feats}`;
+    const conditions = describeConditions(hero.conditions);
+    if (conditions) line += `; conditions: ${conditions}`;
+    const scars = describeScars(hero.conditions);
+    if (scars) line += `; scars: ${scars}`;
+    const hearts = (storyData.meters ?? []).find(
+      (m) => normalizeKey(m.owner) === key && m.name === "Hearts",
+    )?.value;
+    if (isDown(hearts, hero.conditions)) line += `; DOWN`;
+    lines.push(line);
+  }
+  const partyFeats = fr.partyFeats ?? [];
+  const burnsUsed = fr.teamBurnsUsed ?? 0;
+  if (partyFeats.length > 0 || burnsUsed > 0) {
+    const left = Math.max(0, TEAM_BURNS_PER_REST - burnsUsed);
+    lines.push(
+      `Party: ${partyFeats.length > 0 ? `${partyFeats.map(describeFeat).join(", ")}; ` : ""}team burns left ${left} of ${TEAM_BURNS_PER_REST}`,
+    );
   }
   if (fr.realm) lines.push(`Realm: ${fr.realm}`);
   return lines.join("\n");
