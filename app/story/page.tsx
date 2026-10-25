@@ -72,10 +72,7 @@ import {
 import {
   applyBackgroundFlags,
   applyBackgroundLayersDelta,
-  applyBackgroundRewrite,
-  backgroundRewriteTarget,
   type BackgroundLayersDelta,
-  type BackgroundRewritePatch,
 } from "../misc/backgroundPatch";
 import { getObserverSettings } from "../misc/layerSettings";
 import {
@@ -83,6 +80,7 @@ import {
   isTurnLocked,
   shouldHoldNarrationForJudge,
 } from "./turnLock";
+import { liveRelayText } from "@/app/misc/liveRelayText";
 import { cancelImageJobsForTurn } from "../misc/imageJobs";
 import { pickImageProvider } from "../misc/imageProvider";
 import {
@@ -186,6 +184,7 @@ import { processLoreTriggers } from "../misc/lore";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn } from "../misc/generation";
+import type { TurnPhase } from "./StoryTurn";
 import { MAX_UNDO_STACK_SIZE } from "../misc/localStoryManager";
 import { GMNPCReactionResult } from "../misc/gmExecutor";
 import { NPCReactionContainer } from "./NPCReactionToast";
@@ -604,7 +603,14 @@ function StoryPageContent() {
     turnSaveRef.current = null;
     beginTurnKeepAlive(turnId);
     try {
-      const result = await generateStoryTurn(...args);
+      // The phase of a held turn (decision 221) reaches the work line from
+      // here, so all three call sites (new, retry, reword) get it.
+      const result = await generateStoryTurn(
+        args[0],
+        args[1],
+        args[2],
+        { ...args[3], onTurnPhase: setTurnPhase },
+      );
       lastTurnCostIdRef.current = result.meta?.costTurnId ?? null;
       let saved = false;
       try {
@@ -631,6 +637,7 @@ function StoryPageContent() {
       turnSaveRef.current = null;
       turnInFlightRef.current = false;
       setTurnInFlight(false);
+      setTurnPhase(null);
       // Late results that arrived mid-turn land now, on the saved story. A
       // tick later so the turn's own commit has reached storyDataRef.
       if (patchQueueRef.current.size() > 0) {
@@ -764,6 +771,10 @@ function StoryPageContent() {
   // chunks from a previous turn are discardable on the guest side.
   const relayTurnIdRef = useRef(0);
   const lastStreamedTextRef = useRef("");
+  // storyText as it stood when the current turn began streaming: a held turn
+  // (decision 221) leaves the previous turn's prose in storyText until release,
+  // and that must not be relayed to guests as new text (liveRelayText.ts).
+  const storyTextAtTurnStartRef = useRef("");
   // Tracks storyTextReady's previous value so the host streaming effect can
   // detect turn start (ready -> not-ready) and completion (not-ready -> ready).
   const prevStoryReadyRef = useRef(true);
@@ -1097,6 +1108,9 @@ function StoryPageContent() {
   // generation so a stale tier from the previous turn can't linger.
   const [liveReasoningTier, setLiveReasoningTier] =
     useState<ResolvedTier | null>(null);
+  // Where a turn held for the judges is (onTurnPhase, decision 221); null when
+  // no turn is held. Cleared when the turn settles (generateTrackedTurn).
+  const [turnPhase, setTurnPhase] = useState<TurnPhase | null>(null);
 
   // Host-only: relay the live narration to guests so they watch the story
   // being written in real time (and can TTS it), instead of only seeing the
@@ -1114,14 +1128,16 @@ function StoryPageContent() {
       // A new turn just started streaming - fresh relay id.
       relayTurnIdRef.current += 1;
       lastStreamedTextRef.current = "";
+      storyTextAtTurnStartRef.current = storyText;
     }
 
     const turnId = String(relayTurnIdRef.current);
     if (!storyTextReady) {
-      const text =
-        liveNarrationText && liveNarrationText.length > 0
-          ? liveNarrationText
-          : storyText;
+      const text = liveRelayText({
+        liveNarrationText,
+        storyText,
+        storyTextAtTurnStart: storyTextAtTurnStartRef.current,
+      });
       if (text && text !== lastStreamedTextRef.current) {
         lastStreamedTextRef.current = text;
         broadcastNetStoryStream({ turnId, text, stage: loadingStage, done: false });
@@ -1851,40 +1867,6 @@ function StoryPageContent() {
   function backgroundTargetStory(): StoryData | null {
     if (!mountedRef.current) return null;
     return turnLiveRef.current ?? storyDataRef.current;
-  }
-
-  function handleBackgroundObserverRewrite(patch: BackgroundRewritePatch): void {
-    if (!mountedRef.current || !onScreenStory(storyDbId)) {
-      // The page is gone, or showing another story: the stored story takes the
-      // patch, if it still fits.
-      patchCurrentStory((sd) => applyBackgroundRewrite(sd, patch));
-      return;
-    }
-    const current = turnLiveRef.current ?? storyDataRef.current;
-    const target = current ? backgroundRewriteTarget(current, patch) : null;
-    if (!target) {
-      logger.action("Observer rewrite dropped: its turn changed or is gone", {
-        partId: patch.partId,
-        type: patch.flag.type,
-      });
-      return;
-    }
-    patchCurrentStory((sd) => applyBackgroundRewrite(sd, patch));
-    // The screen's current narration and choices follow only the newest turn.
-    if (target === "newest") {
-      setStoryText(patch.narration);
-      if (patch.choices) setChoices({ choices: patch.choices });
-    }
-    logger.action("Observer rewrote narration in the background", {
-      type: patch.flag.type,
-      detail: patch.flag.detail,
-      partId: patch.partId,
-      totalFlags: patch.allFlags.length,
-    });
-    addNotification(
-      `Narration revised: ${patch.flag.detail} Use "Undo revision" on that turn to keep the original.`,
-      "warning",
-    );
   }
 
   function handleBackgroundObserverFlags(
@@ -2921,7 +2903,6 @@ function StoryPageContent() {
             );
           },
           onBackgroundObserverFlags: handleBackgroundObserverFlags,
-          onBackgroundObserverRewrite: handleBackgroundObserverRewrite,
           onBackgroundLayersUpdate: handleBackgroundLayersUpdate,
           onComplete: (result) => {
             if (result.meta.totalTokenCost) {
@@ -3468,7 +3449,6 @@ function StoryPageContent() {
             );
           },
           onBackgroundObserverFlags: handleBackgroundObserverFlags,
-          onBackgroundObserverRewrite: handleBackgroundObserverRewrite,
           onBackgroundLayersUpdate: handleBackgroundLayersUpdate,
           onComplete: (result) => {
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
@@ -4474,7 +4454,6 @@ function StoryPageContent() {
             );
           },
           onBackgroundObserverFlags: handleBackgroundObserverFlags,
-          onBackgroundObserverRewrite: handleBackgroundObserverRewrite,
           onBackgroundLayersUpdate: handleBackgroundLayersUpdate,
           onComplete: (result) => {
             // Check for chapter completion
@@ -5126,6 +5105,7 @@ function StoryPageContent() {
             liveGMEntries={liveGMEntries}
             liveNarrationText={liveNarrationText}
             liveReasoningTier={liveReasoningTier}
+            turnPhase={turnPhase}
             myPlayerId={netSession ? netSession.myLocalPlayerId : undefined}
             remoteActivity={netActivity}
             onLocalActivity={sendNetActivity}

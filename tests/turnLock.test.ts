@@ -10,7 +10,10 @@ import {
   shouldHoldNarrationForJudge,
 } from "@/app/story/turnLock";
 import { cloneDefaultObserverSettings } from "@/app/misc/observer";
-import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import {
+  LEGACY_OBSERVER_SETTINGS,
+  FLAG_ONLY_OBSERVER_SETTINGS,
+} from "./helpers/observerSettings";
 
 describe("isTurnLocked", () => {
   it("stays locked after streaming and the choices stage have both released their own flags", () => {
@@ -43,8 +46,12 @@ describe("effectiveLoadingStage", () => {
 });
 
 describe("shouldHoldNarrationForJudge", () => {
-  it("lets read-aloud start at once under the flag-only defaults", () => {
-    expect(shouldHoldNarrationForJudge(cloneDefaultObserverSettings())).toBe(false);
+  it("lets read-aloud start at once when every judge may only flag", () => {
+    expect(shouldHoldNarrationForJudge(FLAG_ONLY_OBSERVER_SETTINGS)).toBe(false);
+  });
+
+  it("holds read-aloud under the defaults, where the prose judges rewrite (decision 220)", () => {
+    expect(shouldHoldNarrationForJudge(cloneDefaultObserverSettings())).toBe(true);
   });
 
   it("holds read-aloud for a judge the player allowed to rewrite", () => {

@@ -1,7 +1,8 @@
 /**
  * Integration coverage for the observer's deferral gate and the background
  * rewrite it enables, as they actually run inside generateStoryTurn
- * (app/misc/generation.ts, search "resetPossible").
+ * (app/misc/generation.ts, search "resetPossible"). Since decision 221 the
+ * background wave only flags: it never rewrites.
  *
  * The mechanism: the observer used to block every single turn behind a full
  * round of judge calls, because the only gate was a config question
@@ -24,11 +25,9 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import type { ObserverSettings } from "@/app/misc/observer";
 import {
   applyBackgroundFlags,
-  applyBackgroundRewrite,
-  backgroundRewriteTarget,
-  type BackgroundRewritePatch,
 } from "@/app/misc/backgroundPatch";
 import type { ObserverFlag, StoryData } from "@/app/misc/structs";
 
@@ -95,6 +94,14 @@ const baseOptions: GenerationOptions = {
   observerSettings: LEGACY_OBSERVER_SETTINGS,
   // The id the page gives the turn's part: a late result is applied by id.
   scenePartId: PART_ID,
+};
+
+// Decision 237: agency is plausible on every turn with a player line while it
+// can rewrite, so it would make every turn here block. The deferral tests opt
+// it down to a flag, which leaves it to the background wave.
+const AGENCY_FLAGS_ONLY: ObserverSettings = {
+  ...LEGACY_OBSERVER_SETTINGS,
+  player_agency: { enabled: true, triggersReset: false, sensitivity: 5 },
 };
 
 interface ObserverCall {
@@ -221,7 +228,7 @@ describe("observer deferral - generateStoryTurn integration", () => {
     const result = await generateStoryTurn(
       createTestStory(),
       "I pick the lock",
-      baseOptions,
+      { ...baseOptions, observerSettings: AGENCY_FLAGS_ONLY },
       {},
     );
 
@@ -286,11 +293,12 @@ describe("the player's line reaches the Observer on a typed turn", () => {
   });
 });
 
-describe("background observer rewrite - generateStoryTurn integration", () => {
-  it("rewrites the narration after the turn completed and reports which part it landed on", async () => {
-    // player_agency is the check with no free pre-signal, so it is always
-    // judged in the background now. A major violation found back there still
-    // gets the targeted rewrite - it just arrives after onComplete.
+describe("the background observer never rewrites (decision 221) - generateStoryTurn integration", () => {
+  it("flags a violation found in the background, makes no rewrite call and leaves the text alone", async () => {
+    // With agency set to flag only (it does not wait, decision 237) it is
+    // judged in the background. The player already has the turn by then, and
+    // text they have read is not replaced behind them: the finding is an
+    // advisory flag.
     const { fetchMock, observerCalls } = createFetchMock(
       SHORT_NARRATION,
       async (call) => {
@@ -302,74 +310,27 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const storyData = createTestStory();
-    const rewrites: BackgroundRewritePatch[] = [];
+    const advisory: Array<{ flags: ObserverFlag[]; partId: string }> = [];
     let completedContent: string | undefined;
 
-    await generateStoryTurn(storyData, "I pick the lock", baseOptions, {
-      onStoryContent: scenePartPublisher(storyData),
-      onComplete: (result) => {
-        completedContent = result.content;
+    await generateStoryTurn(
+      storyData,
+      "I pick the lock",
+      { ...baseOptions, observerSettings: AGENCY_FLAGS_ONLY },
+      {
+        onStoryContent: scenePartPublisher(storyData),
+        onComplete: (result) => {
+          completedContent = result.content;
+        },
+        onBackgroundObserverFlags: (flags, partId) =>
+          advisory.push({ flags, partId }),
       },
-      onBackgroundObserverRewrite: (patch) => {
-        rewrites.push(patch);
-      },
-    });
-
-    // The player got the flagged draft first - that's the accepted cost of
-    // not making them wait for a check that had no reason to fire.
-    expect(completedContent).toBe(SHORT_NARRATION);
-    expect(rewrites).toHaveLength(0);
-
-    await flushBackground();
-
-    expect(observerCalls.filter(isRewrite)).toHaveLength(1);
-    expect(rewrites).toHaveLength(1);
-    expect(rewrites[0].flag.type).toBe("player_agency");
-    expect(rewrites[0].narration).toBe(REWRITTEN);
-    // It names the part by id; generateStoryTurn wrote nothing into the story.
-    expect(rewrites[0].partId).toBe(PART_ID);
-    expect(storyData.scene.parts[storyData.scene.parts.length - 1].content).toBe(
-      SHORT_NARRATION,
     );
 
-    // The page applies the patch to the CURRENT story: the corrected text is
-    // what's saved, with the discarded draft kept for the player's "Undo
-    // revision" and the flag recorded so the next turn's prompt still tells
-    // the GM a correction was needed.
-    expect(backgroundRewriteTarget(storyData, rewrites[0])).toBe("newest");
-    const patched = applyBackgroundRewrite(storyData, rewrites[0]);
-    const part = patched.scene.parts[patched.scene.parts.length - 1];
-    expect(part.content).toBe(REWRITTEN);
-    expect(part.observerRewriteOriginal?.content).toBe(SHORT_NARRATION);
-    expect(part.correctedObserverFlags?.[0]?.type).toBe("player_agency");
-    expect(part.observerFlags).toBeUndefined();
-  });
-
-  it("leaves the flag advisory when the background rewrite call fails", async () => {
-    // No full-turn reset is available back here - rolling storyData back and
-    // re-rolling the dice underneath a player who already read the turn would
-    // be worse than the flag - so a failed rewrite surfaces as a warning.
-    const { fetchMock } = createFetchMock(SHORT_NARRATION, async (call) => {
-      if (isRewrite(call)) throw new Error("rewrite unavailable");
-      if (isAgencyJudge(call)) return AGENCY_VIOLATION;
-      return ALL_CLEAR;
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    const storyData = createTestStory();
-    const rewrites: string[] = [];
-    const advisory: Array<{ flags: ObserverFlag[]; partId: string }> = [];
-
-    await generateStoryTurn(storyData, "I pick the lock", baseOptions, {
-      onStoryContent: scenePartPublisher(storyData),
-      onBackgroundObserverRewrite: (patch) => rewrites.push(patch.narration),
-      onBackgroundObserverFlags: (flags, partId) =>
-        advisory.push({ flags, partId }),
-    });
-
+    expect(completedContent).toBe(SHORT_NARRATION);
     await flushBackground();
 
-    expect(rewrites).toHaveLength(0);
+    expect(observerCalls.filter(isRewrite)).toHaveLength(0);
     expect(advisory).toHaveLength(1);
     expect(advisory[0].flags[0].type).toBe("player_agency");
     expect(advisory[0].partId).toBe(PART_ID);
@@ -382,6 +343,7 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
     const part = patched.scene.parts[patched.scene.parts.length - 1];
     expect(part.content).toBe(SHORT_NARRATION);
     expect(part.observerFlags?.[0]?.type).toBe("player_agency");
+    expect(part.observerRewriteOriginal).toBeUndefined();
   });
 
   it("surfaces a background tier_escalation_missed as advisory instead of rewriting it", async () => {
@@ -405,21 +367,22 @@ describe("background observer rewrite - generateStoryTurn integration", () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const storyData = createTestStory();
-    const backgroundRewrites: string[] = [];
     const advisory: Array<{ flags: ObserverFlag[]; partId: string }> = [];
 
-    await generateStoryTurn(storyData, "I pick the lock", baseOptions, {
-      onStoryContent: scenePartPublisher(storyData),
-      onBackgroundObserverRewrite: (patch) =>
-        backgroundRewrites.push(patch.narration),
-      onBackgroundObserverFlags: (flags, partId) =>
-        advisory.push({ flags, partId }),
-    });
+    await generateStoryTurn(
+      storyData,
+      "I pick the lock",
+      { ...baseOptions, observerSettings: AGENCY_FLAGS_ONLY },
+      {
+        onStoryContent: scenePartPublisher(storyData),
+        onBackgroundObserverFlags: (flags, partId) =>
+          advisory.push({ flags, partId }),
+      },
+    );
 
     await flushBackground();
 
     expect(observerCalls.filter(isRewrite)).toHaveLength(0);
-    expect(backgroundRewrites).toHaveLength(0);
     expect(advisory).toHaveLength(1);
     expect(advisory[0].flags[0].type).toBe("tier_escalation_missed");
 
