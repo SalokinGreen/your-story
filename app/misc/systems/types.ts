@@ -1,3 +1,4 @@
+import type { EventContract } from "../judges/types";
 import type { CreationStep } from "../setupSteps";
 import type {
   Adventure,
@@ -93,6 +94,9 @@ export interface BuiltinSystem {
   endOfSessionReminder?: string; // returned by end_session
   // Checks the engine runs when a turn ends on prose (turnEndChecks.ts).
   turnEndChecks?: SystemTurnEndCheck[];
+  // Promises the rules make that a tool result can prove (judges/rung1.ts,
+  // judge layer design 11.2). A broken one earns one re-ask of the GM.
+  eventContracts?: EventContract[];
   // The GM tools a story of this system is offered (resolveSystem). Unset
   // means Blood & Bone's four, the legacy tools-on set.
   tools?: string[];

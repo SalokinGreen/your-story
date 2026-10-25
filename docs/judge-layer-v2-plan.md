@@ -267,3 +267,56 @@ runs rise by more than 2 of 20 on two separate runs.
 ## Decisions made during implementation
 
 (Filled in as the slices land.)
+
+### 2026-10-25 — slice 1 (J1), rung 1 and the re-ask
+
+- **`reask` takes the failure too.** `EventContract.reask(turn, failure)`, not
+  `reask(turn)`: the message names the exact remaining `by`, which needs what
+  `expects` found. `ContractTurn` carries `trigger`, `results` and `storyAfter`.
+- **Foe-damage applies only to a foe that has a Hearts meter** (in the story
+  after the turn, or created this turn by `manage_meter`). A foe tracked nowhere
+  has nowhere to record the loss, so nothing is provable and nothing is asked.
+  The Fantastic Realms core note now tells the GM to pass `target` and keep a
+  foe's Hearts on a meter (one sentence in section 6; the core is still under
+  its 3,000-token cap). Several `feat_roll`s on one foe are summed; a `set`
+  counts as `before - requested`. Net change is compared, so a healing write in
+  the same turn can mask a missing one (accepted).
+- **A tools-only re-ask keeps the draft; only a line's re-ask replaces it.** The
+  plan says the re-ask's prose replaces the final round's. For a damage contract
+  the GM's reply is an acknowledgement ("Recorded."), and replacing the story
+  with it would destroy the turn. So `Rung1Hit.replacesProse` is true only for
+  lines; for a contract the round's calls run and its text is dropped. A
+  mixed re-ask (both kinds) replaces.
+- **Lines are "verified" and re-ask, secrets and dead people are not.** The
+  table says lines re-ask; the keyword is a literal whole-word match, so it is
+  marked verified. The message lets the GM answer with the same text when the
+  word does not cross the line. Secret phrases feed the secret-leak judge
+  (slice 2) and only log; the departed-person check is the existing name-match
+  heuristic and flags only. Lines are read from the story as the turn found it.
+- **Dice are refused, not hidden.** The tool list stays the one stable list (the
+  cache rule). During the re-ask any `DICE_TOOLS` call is not executed and gets
+  an `[ERROR]` result in its place, so the transcript stays well formed
+  (`mergeRefusedDiceCalls`, exported for the test). The refused result also
+  enters `gmResults`, as an error, which every reader already skips.
+- **The re-ask sees the final round's prose only.** Lines in an earlier round's
+  prose or in a separate narration call are not re-asked (the narration is not
+  written yet at that gate); the post-narration pass logs them.
+- **Pacing counters use turns, not scenes.** Nothing records when a clock last
+  moved, so "turns since a clock moved" reads the prior parts' stored tool
+  messages for a `[Clock` line (10 turns, `PACING_CLOCK_IDLE_TURNS`); the
+  spotlight counter is 4 turns by name in the prose (`PACING_SPOTLIGHT_TURNS`,
+  two or more couch or party players). The note is `ScenePart.pacingNote`,
+  joined to the story-progress check-in block of the next turn. The repeated
+  phrase hit reuses `findRepeatedPhrases` over the last 4 turns and this one.
+- **Snapshot, not a full clone.** `snapshotJudgeView` copies only the campaign
+  record, NPCs and meters at the start of the attempt (`JudgeStoryView`), not
+  the scene.
+- **Not done in this slice:** the sheet facts (`source.kind: "sheet"` exists in
+  the type; the world-consistency judge, slice 2, is its first reader), and the
+  removal of the speculative length rewrite and "first major flag wins"
+  (revised finding 12), which belong with the combined call (J2/J3) because they
+  change how the judges' output is used; no judge behaviour changed here.
+- **Where the held text matters.** With the default settings the turn is held
+  (decision 221), so a replaced draft is never shown. When every judge only
+  flags, text streams live and a draft that is later replaced has already been
+  on screen once.

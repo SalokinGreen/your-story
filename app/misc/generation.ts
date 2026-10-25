@@ -121,6 +121,8 @@ import {
 import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
 import { resolveSystem } from "@/app/misc/systems/resolve";
 import { pendingCheck, splitPlayerLines } from "@/app/misc/turnEndChecks";
+import { snapshotJudgeView } from "@/app/misc/judges/facts";
+import { buildReask, pacingNoteFor, runRung1 } from "@/app/misc/judges/rung1";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
 import {
@@ -217,6 +219,35 @@ const DICE_TOOLS = [
   "feat_roll",
   "initiative_roll",
 ];
+
+/**
+ * A re-ask round may not roll (judge layer rung 2): the calls that were left
+ * out of the run get an error result in their place, in the GM's call order,
+ * so every tool call still has its tool message.
+ */
+export function mergeRefusedDiceCalls(
+  all: ReadonlyArray<{ id: string; function: { name: string } }>,
+  ran: ReadonlyArray<{ id: string }>,
+  execution: GMExecutionResult,
+): GMExecutionResult {
+  const ranIds = new Set(ran.map((tc) => tc.id));
+  let next = 0;
+  const results: GMToolResult[] = all.map((tc) => {
+    if (ranIds.has(tc.id)) return execution.results[next++];
+    return {
+      toolName: tc.function.name,
+      toolCallId: tc.id,
+      success: false,
+      result: {
+        type: "state_change",
+        message: "refused: the dice were already thrown this turn",
+        command: tc.function.name,
+      },
+      contextForStory: `[ERROR] ${tc.function.name} was not run: this turn's dice are already thrown, and a re-ask never rolls again. Use the result you have.`,
+    };
+  });
+  return { ...execution, results };
+}
 
 /**
  * Strip affirmation prefill from AI response.
@@ -1013,7 +1044,12 @@ export async function generateStoryTurn(
   // note, if any, carries forward exactly once - it's about the last N
   // turns as of when it fired, not just the immediately preceding turn, so
   // there's no reset-and-replace lifecycle here the way observerNote has.
-  const storyProgressNote: string | undefined = lastAssistantPart?.storyProgressNote;
+  // The pacing counters' note (judges/rung1.ts, decision 235) rides the same
+  // block; it is absent on every story that has not tripped one.
+  const storyProgressNote: string | undefined =
+    [lastAssistantPart?.storyProgressNote, lastAssistantPart?.pacingNote]
+      .filter((note): note is string => Boolean(note))
+      .join("\n\n") || undefined;
   const repetitionNote: string | undefined = lastAssistantPart?.repetitionNote;
   const knowledgeNote: string | undefined = lastAssistantPart?.knowledgeNote;
   let resetAttempts = 0;
@@ -2423,6 +2459,8 @@ async function generateStoryTurnOnce(
     // until no more tool calls are made (natural completion)
     // ========================================
     let gmResults: GMToolResult[] = [];
+    // The story as this attempt found it, for the judge layer's rung-1 checks.
+    const storyBeforeJudgeView = snapshotJudgeView(storyData);
     let gmStoryContext = "";
     let gmFinalStoryContent = ""; // NEW: GM's final prose content (when no tool calls)
     // Decision 240: the prose a pause released (polished, verbatim) and the raw
@@ -2801,6 +2839,55 @@ async function generateStoryTurnOnce(
         // A system's turn-end checks (decision 183, turnEndChecks.ts): the ids
         // already sent back this turn. One reminder per check per turn.
         const turnEndChecksPrompted = new Set<string>();
+
+        // Rung 2 of the judge layer (judges/rung1.ts, design 11.1): one re-ask
+        // of the GM per turn, sent when a verified rung-1 hit can be fixed with
+        // the GM's own tools. `storyBeforeJudgeView` is the story as the turn
+        // found it, taken before any tool ran.
+        let reaskUsed = false;
+        let reask: {
+          armedRound: number;
+          replacesProse: boolean;
+          resolved: boolean;
+          /** Lengths of the text stores before the draft round wrote to them. */
+          before: { thinking: number; accumulated: number; context: number };
+          /** Lengths with the draft in them (a tools-only re-ask keeps the draft). */
+          after: { thinking: number; accumulated: number; context: number };
+          /** The draft's own text, set aside while a prose re-ask is answered. */
+          stash: { thinking: string[]; accumulated: string[]; context: string[] };
+          /** Where the draft sits in the conversation, or -1. */
+          historyIndex: number;
+        } | null = null;
+        // The re-ask round's outcome, settled on the first prose-only round
+        // after it (or at the loop's end). A prose re-ask (a line) replaces the
+        // draft when it answered with words and gives it back when it did not;
+        // a tools-only re-ask (a damage contract) keeps the draft and drops the
+        // acknowledgement the GM wrote around its tool calls.
+        const resolveReask = (visibleNow: string) => {
+          const r = reask;
+          if (!r || r.resolved) return;
+          r.resolved = true;
+          if (r.replacesProse) {
+            if (visibleNow) {
+              const draft = conversationHistory[r.historyIndex];
+              if (r.historyIndex >= 0 && draft?.role === "assistant") {
+                conversationHistory.splice(r.historyIndex, 1);
+              }
+            } else {
+              gmThinking.splice(r.before.thinking, 0, ...r.stash.thinking);
+              gmAccumulatedStory.splice(r.before.accumulated, 0, ...r.stash.accumulated);
+              allGMContextParts.splice(r.before.context, 0, ...r.stash.context);
+            }
+          } else {
+            gmThinking.length = Math.min(gmThinking.length, r.after.thinking);
+            gmAccumulatedStory.length = Math.min(gmAccumulatedStory.length, r.after.accumulated);
+            allGMContextParts.length = Math.min(allGMContextParts.length, r.after.context);
+          }
+          logger.action("Rung 2 re-ask settled", {
+            replacesProse: r.replacesProse,
+            answeredWithProse: visibleNow.length > 0,
+          });
+        };
 
         // ---- Session zero's setup gate (docs/session-zero-plan.md, slice 4) ----
         // Read ONCE, from the story as the turn found it. start_game flips
@@ -3531,8 +3618,19 @@ async function generateStoryTurnOnce(
               ? currentSetupHashes(storyData)
               : null;
 
-            const gmExecution = await executeGMTools(
-              gmResult.toolCalls,
+            // While a re-ask is being answered no dice tool runs: the dice are
+            // thrown, and a second roll for the same action would be a reroll.
+            // A refused call still gets a tool message, so the transcript stays
+            // well formed.
+            const reaskBlocking = reask !== null && !reask.resolved;
+            const callsToRun: typeof gmResult.toolCalls = reaskBlocking
+              ? gmResult.toolCalls.filter(
+                  (tc: { function: { name: string } }) =>
+                    !DICE_TOOLS.includes(tc.function.name),
+                )
+              : gmResult.toolCalls;
+            const rawExecution = await executeGMTools(
+              callsToRun,
               storyData,
               {
                 enabled: options.enableEmbeddings,
@@ -3554,6 +3652,15 @@ async function generateStoryTurnOnce(
                 turnLedger,
               },
             );
+            const gmExecution =
+              callsToRun.length === gmResult.toolCalls.length ||
+              rawExecution.aborted
+                ? rawExecution
+                : mergeRefusedDiceCalls(
+                    gmResult.toolCalls,
+                    callsToRun,
+                    rawExecution,
+                  );
             if (gmExecution.turnLedger) turnLedger = gmExecution.turnLedger;
 
             // Stopped during the batch (the signal fired, or Stop on the
@@ -3791,6 +3898,12 @@ async function generateStoryTurnOnce(
                   totalAccumulatedParts: gmAccumulatedStory.length,
                 },
               );
+            }
+
+            // A re-ask armed in an earlier round is answered by this prose-only
+            // round: settle it before any gate looks at the stores.
+            if (reask && !reask.resolved) {
+              resolveReask(extractVisibleText(content).trim());
             }
 
             // Session zero's setup gate (docs/session-zero-design.md 3.6).
@@ -4036,6 +4149,85 @@ async function generateStoryTurnOnce(
               }
             }
 
+            // Rung 2 of the judge layer (judges/rung1.ts, design 11.1): the
+            // deterministic rung-1 checks read this final round, and a verified
+            // hit the GM can fix with its own tools (a foe's damage never
+            // recorded, a line's word on screen) sends it back once, on the
+            // gates' own path: one appended user message, an explicit "auto".
+            // The re-ask round shares maxToolLoops, never runs a dice tool, and
+            // is off in session zero and for a repetitive round. The prose is
+            // not final here, so a line's re-ask is answered with new prose
+            // that replaces this round's (resolveReask above).
+            if (
+              !sessionZeroTurn &&
+              !isRepetitive &&
+              !reaskUsed &&
+              !options.precomputedGMResults &&
+              MAX_GM_ROUNDS - gmRound >= 2
+            ) {
+              let plan: ReturnType<typeof buildReask> = null;
+              try {
+                plan = buildReask(
+                  runRung1({
+                    storyBefore: storyBeforeJudgeView,
+                    storyAfter: storyData,
+                    results: gmResults,
+                    prose: extractVisibleText(content),
+                    system: resolveSystem(storyData).system,
+                  }),
+                );
+              } catch (rung1Error) {
+                logger.action("Rung 1 check failed - skipping the re-ask", {
+                  error:
+                    rung1Error instanceof Error
+                      ? rung1Error.message
+                      : String(rung1Error),
+                });
+              }
+              if (plan) {
+                reaskUsed = true;
+                const draftInHistory = conversationHistory.length > roundMarks.history;
+                const after = {
+                  thinking: gmThinking.length,
+                  accumulated: gmAccumulatedStory.length,
+                  context: allGMContextParts.length,
+                };
+                reask = {
+                  armedRound: gmRound,
+                  replacesProse: plan.replacesProse,
+                  resolved: false,
+                  before: {
+                    thinking: roundMarks.thinking,
+                    accumulated: roundMarks.accumulated,
+                    context: roundMarks.context,
+                  },
+                  after,
+                  stash: { thinking: [], accumulated: [], context: [] },
+                  historyIndex: draftInHistory ? roundMarks.history : -1,
+                };
+                if (plan.replacesProse) {
+                  // Set the draft aside; it comes back if the GM answers
+                  // with no words.
+                  reask.stash = {
+                    thinking: gmThinking.splice(roundMarks.thinking),
+                    accumulated: gmAccumulatedStory.splice(roundMarks.accumulated),
+                    context: allGMContextParts.splice(roundMarks.context),
+                  };
+                }
+                for (const hit of plan.hits) {
+                  logger.action(`Rung 1 hit (${hit.check}) - re-asking the GM once`, {
+                    contract: hit.contractId,
+                    evidence: hit.evidence,
+                    factIds: hit.factIds,
+                    round: gmRound,
+                  });
+                }
+                conversationHistory.push({ role: "user", content: plan.message });
+                forceToolChoiceNextRound = "auto";
+                continue gmRoundLoop;
+              }
+            }
+
             // Leniency audit (widened past M2's hard gate): M2 only forces a
             // retry when combat/challenge/high-stakes is active. This is a
             // purely advisory, non-blocking log of the same underlying drift
@@ -4065,6 +4257,11 @@ async function generateStoryTurnOnce(
             break;
           }
         }
+
+        // The loop ended before a prose-only round answered the re-ask (the
+        // round limit, or the re-ask round's tools ran last): settle it with
+        // no new words, so a set-aside draft is given back.
+        if (reask && !reask.resolved) resolveReask("");
 
         // Round limit reached in session zero, the last round still a tool
         // round: its text is a line written before the tools' results were
@@ -4753,6 +4950,44 @@ async function generateStoryTurnOnce(
       });
     }
 
+    // Rung 1 of the judge layer, on the finished prose (judges/rung1.ts): the
+    // deterministic checks, free, every turn. Every hit goes to the Debug Logs;
+    // the pacing hits also make a GM-only note for the next turn (decision
+    // 235). Nothing here changes the prose or fails the turn.
+    let rung1PacingNote: string | undefined;
+    try {
+      const couchPlayers = storyData.multiplayer?.couchPlayers ?? [];
+      const players =
+        couchPlayers.length > 1
+          ? couchPlayers.map((p) => ({ id: p.id, name: p.name }))
+          : (options.setupPlayers ?? []);
+      const rung1Hits = runRung1({
+        storyBefore: storyBeforeJudgeView,
+        storyAfter: storyData,
+        results: options.precomputedGMResults ? [] : gmResults,
+        prose: storyContent,
+        system: resolveSystem(storyData).system,
+        priorParts: storyData.scene?.parts ?? [],
+        players: players.length > 1 ? players : undefined,
+      });
+      for (const hit of rung1Hits) {
+        logger.action(`Rung 1 check: ${hit.check}`, {
+          verified: hit.verified,
+          evidence: hit.evidence,
+          factIds: hit.factIds,
+          contract: hit.contractId,
+        });
+      }
+      rung1PacingNote = pacingNoteFor(rung1Hits);
+    } catch (rung1Error) {
+      logger.action("Rung 1 checks failed - skipped", {
+        error:
+          rung1Error instanceof Error
+            ? rung1Error.message
+            : String(rung1Error),
+      });
+    }
+
     // Final tier reached this turn (after any mid-turn self-escalation or
     // fallback) - undefined on the retry/precomputed-conversation path,
     // where the tier router never runs (see reasoningTierRanThisTurn).
@@ -4788,6 +5023,7 @@ async function generateStoryTurnOnce(
       gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
       consistencyWarnings:
         consistencyWarnings.length > 0 ? consistencyWarnings : undefined,
+      ...(rung1PacingNote && { pacingNote: rung1PacingNote }),
     };
 
     const result: GenerationResult = {

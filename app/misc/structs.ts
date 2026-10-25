@@ -326,6 +326,11 @@ export interface ScenePart {
   // observerFlags feeds buildObserverWarningNote, to carry the note forward
   // into the next turn's prompt.
   storyProgressNote?: string;
+  // Judge layer v2 rung 1 (judges/rung1.ts): a GM-only note the pacing counters
+  // made after this turn (no clock moved in a while, a player not addressed,
+  // phrases coming back). Carried into the next turn's check-in block once;
+  // never shown to the player (decision 235).
+  pacingNote?: string;
   // Repeated-phrase callout from the same Layer 3 check-in (see
   // storyProgressObserver.ts's findRepeatedPhrases): GM-facing feedback on
   // word/phrase tics the deterministic counter caught recurring across
