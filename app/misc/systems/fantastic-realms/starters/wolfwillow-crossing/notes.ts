@@ -18,7 +18,7 @@ A short campaign in Larkenfell, the folk frontier. The heroes arrive at Wolfwill
 
 **Foes.** Read FR — Larkenfell for stat lines. Mooks (Redthistle Goblin, Hedge Bandit, Marsh Wolf) are the bulk of the early fights; a champion (Goblin Warchief, Barrow Wight, Briar Hag) is a session's climax; Hollin Greycrown and the Mire Troll are legends and need a plan. Each foe's XP is on its line; award it with award_xp. A finished quest is 500 to 2,000.
 
-**Setup.** For each hero, the moment their feats are known: manage_meter create_set "Fantastic Realms hero" (owner = their name), then manage_feats add for each of the four feats. A pre-made hero is no exception. If there is no Campaign Plan note, read the secret "Wolfwillow Crossing — The week and after" (the outline), write one (medium spine, seven beats), and call start_game after the setup card.
+**Setup.** For each hero, the moment their feats are known: manage_meter create_set "Fantastic Realms hero" (owner = their name), then manage_feats add for each of the four feats. A pre-made hero is no exception. The campaign ships built: an adventure-path record with the seven beats, the barrow king's front, the goblins' flight, two secrets with clues and four endings (campaign read; set_beat moves the current beat when one is done). Session zero reviews it with the player, and start_game follows the setup card. The secret "Wolfwillow Crossing — The week and after" keeps the XP guide and who knows what.
 
 **The Crossroads.** The wider world is in "FR — The Crossroads". The Waymeet is two days upriver. A hero who walks the Thin Mile into Aurelane or Gloamreach leaves this story for the next one; keep the road in sight as the last beat, not the first.
 

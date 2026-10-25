@@ -10,6 +10,7 @@
  * finer list inside its "interview".)
  */
 import type { StoryData } from "./structs";
+import { STYLE_SPECS } from "./campaign/styles";
 import { resolveSystem } from "./systems/resolve";
 
 export interface CreationStep {
@@ -100,6 +101,42 @@ const SELF_STEPS: CreationStep[] = [
   },
 ];
 
+/**
+ * Starters only (design section 8): a story whose record a built-in starter
+ * shipped (`origin: "starter"`) reviews the campaign instead of building it.
+ */
+const CAMPAIGN_REVIEW_STEP: CreationStep = {
+  id: "campaign_review",
+  label: "Review the campaign",
+  group: "world",
+  scope: "table",
+  hint: 'This adventure ships with a built campaign (read it with the campaign tool). Tell the player in a few lines only what their characters could know at the start: the pitch and tone, the places, the factions by name and any clock marked visible. Never read out or hint at secrets, dooms, portents, what a person hides, or what a front is really about. Ask what they would change, and apply it with the campaign tool (edit, add or remove); "nothing" is a real answer. Do not rebuild it.',
+};
+
+/** The world steps of a story whose campaign a starter shipped. */
+function starterWorldSteps(story: StoryData, steps: CreationStep[]): CreationStep[] {
+  const record = story.campaign;
+  if (record?.origin !== "starter") return steps;
+  const label = record.style ? STYLE_SPECS[record.style].label : "";
+  const tone = (record.pitch?.tone ?? []).join(", ");
+  return steps.map((st) => {
+    if (st.id === "campaign") return CAMPAIGN_REVIEW_STEP;
+    if (st.id === "style" && label) {
+      return {
+        ...st,
+        hint: `The adventure's style is already ${label}. Confirm it with the player in a line and offer to change it (campaign edit, part "style"); do not ask them to pick one from scratch.`,
+      };
+    }
+    if (st.id === "tone_safety") {
+      return {
+        ...st,
+        hint: `The adventure's tone words are ${tone || "in the record"}. Confirm or change them, then ask plainly for lines (never shown) and veils (off screen), with examples; "none" is a real answer. Record the lines and veils with the campaign tool, part "safety".`,
+      };
+    }
+    return st;
+  });
+}
+
 /** A story with no system but a mechanics note gets this one step. */
 const ABILITIES_STEP: CreationStep = {
   id: "abilities",
@@ -128,7 +165,7 @@ export function setupParticipants(
 export function getCreationSteps(story: StoryData, players?: Roster): CreationStep[] {
   const steps: CreationStep[] = [];
   if (setupParticipants(story, players).length > 1) steps.push(COHORT_STEP);
-  steps.push(...WORLD_STEPS);
+  steps.push(...starterWorldSteps(story, WORLD_STEPS));
   const system = resolveSystem(story).system;
   if (system) {
     steps.push(...(system.creationSteps ?? []));

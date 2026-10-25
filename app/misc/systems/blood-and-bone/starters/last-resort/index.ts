@@ -12,6 +12,7 @@ import { createMeter, createTrack } from "../../../../metersAndTracks";
 import type { BuiltinAdventure, BuiltinNote } from "../../../types";
 import { BLOOD_AND_BONE_SHEET_TEMPLATE } from "../../sheet";
 import { builtinToLore, ownWorldRulesNotes } from "../shared";
+import { lastResortCampaign } from "./campaign";
 import { LR_FAMILY_NOTE, LR_PRESETS } from "./family";
 import { LR_NOTES } from "./notes";
 import { LR_NPCS } from "./people";
@@ -95,6 +96,7 @@ export function buildLastResort(packNotes: BuiltinNote[]): BuiltinAdventure {
       presets: LR_PRESETS,
       systemState: { sessionCount: 0, dedupKeys: [], setting: "last-resort" },
       sessionZeroActive: true,
+      campaign: lastResortCampaign(),
       meters: [vacancy()],
       progressTracks: [
         createTrack("Family", "Keep the doors open", "vow", "epic"),
