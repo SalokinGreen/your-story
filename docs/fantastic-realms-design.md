@@ -1,9 +1,11 @@
 # Fantastic Realms — design
 
-**Status:** design, for the author's review. Not approved for building yet.
-Decisions 201–215 (`docs/decisions.md`). The implementation plan (files,
-signatures and slice order) is a second document, written after this one is
-approved (`workflow.md` Phase 3).
+**Status:** design, revised after Codex's review
+([`research/codex-fantastic-realms-review-2026-10-25.md`](research/codex-fantastic-realms-review-2026-10-25.md)),
+for the author's go. Not approved for building yet. Decisions 201–218
+(`docs/decisions.md`). The implementation plan (files, signatures and slice
+order) is a second document, written after this one is approved
+(`workflow.md` Phase 3).
 
 ## 1. What it is
 
@@ -14,96 +16,106 @@ and a handful of **feats**: words or short phrases such as *Brave*, *Quick*,
 feat that fits what the hero is doing adds a die.
 
 It is inspired by EZD6, Stonetop, Tiny RPG, Mythic Bastion Land and Legends
-of the Mist. It copies no text, tables or names from any of them (decision 3).
-The rules, the world and the starter are written for this project. Section 8
-covers why no credit line is owed.
+of the Mist, and its description says so (decision 215). It copies no text,
+tables or names from any of them (decision 3).
 
 Like Blood & Bone, it ships as built-in packs and a starter listed on the
-Library home, and runs on the engine's system hooks. Unlike Blood & Bone, it
-needs its own coded roll. That is the engine change in §5.
+Library home. Unlike Blood & Bone, it needs its own coded roll and a few
+generalisations of the system hooks (§5).
+
+**Words used below.** A die that equals or beats the DC is a **success**. The
+number of successes gives the **result**: miss, weak hit, hit, strong hit.
+"Hit" on its own always means the result, never a die.
 
 ## 2. The rules
 
 ### 2.1 The roll
 
-- **The pool.** The base die, plus one d6 for every feat that applies.
-  - The player says which feats they lean on, and the GM accepts or refuses
-    each one.
+- **The pool** is the base die, plus one d6 for every feat that applies.
+  - The player names the feats they lean on, and the GM accepts or refuses
+    each.
   - A knight fighting with *Quick*, *Sword* and *Armor* rolls 1 + 3 = **4d6**.
-  - The rules count each feat once per roll, however well it fits.
-- **The DC.** The GM sets it from the situation, 1 to 6:
+  - Each feat counts once per roll.
+- **The DC** is set by the GM from the situation, 1 to 6:
 
   | DC | Means |
   |---|---|
-  | 1 | Easy. No roll; it happens. |
+  | 1 | Easy. No roll; it happens, as a hit. |
   | 2 | Average: it can go wrong. |
   | 3 | Hard. |
   | 4 | Very hard. |
   | 5 | Heroic. |
   | 6 | Almost impossible. |
 
-- **Hits.** Each die that **equals or beats** the DC is a hit (decision 202).
+- **Successes.** Each die that **equals or beats** the DC is a success
+  (decision 202).
 - **Results:**
 
-  | Hits | Result |
+  | Successes | Result |
   |---|---|
-  | 0 | **Miss**: it fails, and the GM makes it cost (§2.3). |
+  | 0 | **Miss**: it fails, and it costs (§2.3). |
   | 1 | **Weak hit**: it works, with a cost or only partly. |
   | 2 | **Hit**: it works. |
   | 3 | **Strong hit**: it works well, with something extra. |
-  | 4+ | Strong, and **one magnitude greater per hit beyond 3**: four hits is strong +1, five is strong +2. |
+  | 4+ | **Strong, one magnitude greater per success beyond 3**: four is strong +1, five is strong +2. |
 
-  "A magnitude" is the GM's to narrate: more damage, more foes affected,
-  further, faster, a lasting edge. The result line says the number, so the
-  narration can scale with it.
+  "A magnitude" is the GM's to narrate: more damage (§2.6), more foes
+  affected, further, faster, a lasting edge.
 
-The arithmetic, for a feel of the curve (at least one hit / at least three
-hits):
+**The curve** (at least one success / at least three):
 
 | Pool | DC 2 | DC 3 | DC 4 | DC 6 |
 |---|---|---|---|---|
 | 2d6 | 97% / – | 89% / – | 75% / – | 31% / – |
 | 4d6 | 99.9% / 87% | 99% / 59% | 94% / 31% | 52% / 2% |
 
-Small pools rarely reach a strong hit. A hero leaning on many feats usually
-does at an average DC, and almost never against DC 6.
-
 ### 2.2 Burning a feat
 
 Burning is a grand display of one feat (decision 204):
-- The burned feat counts as **one sure hit**.
-- **Its die is still rolled**, so it can add a second hit.
-- The feat is then **burned**: it adds nothing to any roll until the next
+
+- **What it gives.** The burned feat counts as **one sure success**, and
+  **its die is still rolled**, so it can add a second.
+- **What it costs.** The feat then adds nothing to any roll until the next
   rest.
-- One burn per roll.
-- The engine records the burn and refuses a burned feat until a rest (§5).
+- **Who can burn.** Only a feat that applies to the roll and is not already
+  burned. A pool of the base die alone has nothing to burn.
+- **How often.** One burn per roll.
+- **When it counts.** The burn is recorded only when the roll completes. A
+  roll that is cancelled, or refused by the engine, burns nothing.
 
-### 2.3 Harm: hearts
+### 2.3 Harm to heroes: hearts
 
-Decisions 203 and 206 set harm:
-- A hero has **3 hearts**.
-- **A miss usually costs a heart.** A weak hit can, when the cost the GM
-  picks is harm.
+Decisions 203, 206 and 216:
+
+- A hero has **3 hearts** at the start.
+- **A miss costs 1 heart** by default, or 2 when the foe or danger has a harm
+  word that applies (*Deadly*, *Fire-Breath*). Harm words do not stack: a miss
+  never costs more than 2.
+- **A weak hit costs 1 heart** only when the GM picks harm as its cost.
+  Otherwise its cost is something else: a position lost, gear damaged, a foe
+  unhurt, time spent.
 - **At 0 hearts the hero is down.** They are out of the scene, and the GM
-  picks a cost: captured, scarred (a lasting status the GM writes on the
-  sheet), a feat lost, gear gone.
-- **Death** comes only when the realm's tone and the stated stakes say so.
-  The GM says so before the roll.
+  picks a cost: captured, scarred (written on the sheet), a feat lost, gear
+  gone.
+- **Death** comes only when the realm's tone and the stated stakes say so,
+  and the GM says so before the roll.
 - **A rest heals every heart.**
 
-### 2.4 Who rolls
+### 2.4 Who rolls, and how foes are written
 
 **Only players roll** (decision 205). Every other character, from a goblin to
-a dragon, is written as:
-- a **DC**;
-- a few **words** (*Fast*, *Armored*, *Pack*, *Fire-Breath*);
-- **hearts** (how many hits it takes to beat: 1 for a mook, 3 for a champion,
-  more for a legend);
-- the **XP** it gives (§2.7).
+a dragon, is a stat line:
 
-A foe's words set the DC and the cost of a miss. *Armored* raises the DC to
-hit it, and *Fire-Breath* makes a miss cost two hearts. The foe never rolls
-against the player.
+| Part | What it holds |
+|---|---|
+| **DC** | The number a hero rolls against to act on it. **Its permanent words are already counted in it** (an *Armored* knight is printed at DC 4, not DC 3 + 1). |
+| **Words** | Two to four: *Fast*, *Armored*, *Pack*, *Fire-Breath*. They tell the GM what it does, which costs a miss carries, and its initiative edge. |
+| **Hearts** | 1 for a mook, 3 for a champion, 5 or more for a legend. |
+| **XP** | What beating it gives (§2.7). |
+
+**Situational modifiers.** The GM may move the DC by 1 for the moment: a
+foe that is cornered, blinded or on high ground. The final DC stays within
+2–6.
 
 ### 2.5 Rests
 
@@ -113,58 +125,98 @@ There is one kind of rest, and **the realm sets its condition**:
 |---|---|
 | A bright heroic realm | A few hours. |
 | A folk frontier | A night by a fire with a full meal. |
-| A grim realm | Weeks, and somewhere safe. |
+| A grim realm | Weeks, somewhere safe. |
 
-A rest:
+**A rest covers every hero who takes part**, which by default is everyone
+present. For each of them it:
 - heals every heart;
-- un-burns every feat;
-- is the moment the GM offers anything milestone-shaped.
+- un-burns every feat.
 
-The engine's `take_rest` tool does the bookkeeping and reminds the GM of the
-realm's condition (§5). Whether the fiction allows a rest is the GM's call.
+The realm the story is in is recorded (§5.2). `take_rest` returns that realm's
+condition as a reminder; whether the fiction allows the rest is the GM's
+call.
 
-### 2.6 Combat and initiative
+### 2.6 Fights
 
-There are no combat rounds beyond the usual turn-taking. When it matters who
-goes first:
-- **A hero's initiative** is 1d6, plus 1 for every feat that helps them get
-  the edge.
-- **A foe's initiative** is its DC, plus 1 for each of its words that gives an
-  edge (*Fast*, *Ambusher*). It does not roll, per §2.4.
-- **Order:** heroes at or above a foe's number act before it, and the rest
-  after.
-- **The scene turns to a hero when they choose to act**, as in Blood & Bone.
-  Each action is a roll against the foe's DC.
-- **Damage:** a hit takes one heart from the foe, and a strong hit takes two
-  plus one per magnitude.
-- **The foe's actions are the costs of the heroes' misses and weak hits.**
+**Initiative** is rolled once, when a fight starts (decisions 201, 212):
+- each hero rolls 1d6 + 1 per feat that helps them get the edge;
+- each foe's number is its DC + 1 per edge word (*Fast*, *Ambusher*), with no
+  roll.
 
-Engine combat (`start_combat`) stays off, as in Blood & Bone. The foe's
-initiative number is decision 212.
+**The order** runs highest first. Ties go to the heroes.
+
+**A foe's turn** (decision 217). Foes never roll, so a foe acting means:
+1. The GM narrates its threat: a charge, a spell, an ambush, aimed at one or
+   more heroes.
+2. Each targeted hero who has not yet acted rolls to answer it, against the
+   foe's DC, with the feats that help.
+3. The result decides the harm:
+   - a **miss** takes the harm (§2.3);
+   - a **weak hit** takes it partly, or pays another cost;
+   - a **hit** or better avoids it;
+   - a **strong hit** can also turn it.
+
+Heroes who beat a foe's number act before its threat lands.
+
+**Damage to foes** (decision 216):
+
+| Result | Hearts lost |
+|---|---|
+| Weak hit | 1, and the hero pays a cost |
+| Hit | 1 |
+| Strong hit | 2 |
+| Each magnitude | +1 |
+| DC 1 (no roll) | Counts as a hit: 1 |
+
+**After the first round** play goes back to the usual turn-taking, with the
+spotlight moving. Engine combat (`start_combat`) stays off, as in Blood &
+Bone.
+
+**A worked example.**
+- Bryn (*Brave*, *Quick*, *Sword*, *Armor*, 3 hearts) meets a goblin
+  champion: DC 3, *Fast*, *Pack*, *Cruel*, 3 hearts, 600 XP.
+- **Initiative.**
+  - Bryn rolls 1d6 + 1 for *Quick* and gets 4.
+  - The goblin's number is DC 3 + 1 (*Fast*) = 4.
+  - The tie goes to Bryn, so Bryn acts first.
+- **Bryn attacks** with *Quick*, *Sword* and *Brave* (4d6 at DC 3) and burns
+  *Sword*.
+  - The dice show 5, 2, 3, 1. The burned *Sword* adds one sure success.
+  - That is 2 + 1 = **3 successes, a strong hit**: the goblin loses 2 hearts.
+- **The goblin's threat:** it snaps at Bryn's leg. Bryn answers with *Armor*
+  (2d6 at DC 3).
+  - The dice show 1, 2: **a miss**. Bryn loses 1 heart (*Cruel* is not a harm
+    word).
+- **Bryn attacks again**, now without *Sword*, which stays burned until a
+  rest. *Quick* and *Brave* make 3d6.
+  - The dice show 6, 2, 4: **2 successes, a hit**. The goblin loses its last
+    heart.
+- **The reward:** 600 XP to each hero present.
 
 ### 2.7 Experience and levels
 
-**Earning XP** (decision 208). Treasure, enemies and quests each carry an XP
-value:
-- **Foes:** the XP is written on each foe in the world notes: DC × 50 for a
-  mook, × 200 for a champion, × 1,000 for a legend (decision 213).
-- **Treasure:** a find's XP is written on it, roughly its worth in gold.
-- **Quests:** a finished quest gives 500 to 2,000.
+**Earning XP** (decisions 208, 213, 218):
 
-The GM awards XP when a foe is beaten, a treasure is gathered or a quest is
-done. At this scale level 2 comes after roughly one adventure; it can be tuned
-after playtesting.
+| Source | XP |
+|---|---|
+| A foe beaten | DC × 50 for a mook, × 200 for a champion, × 1,000 for a legend, written on each foe. |
+| A treasure gathered | Roughly its worth in gold, written on it. |
+| A quest finished | 500 to 2,000. |
 
-**Levelling.** Going from level N to N + 1 costs **(N + 1) × 1,000 XP**, and
-the counter resets. So level 2 costs 2,000 XP, then level 3 costs 3,000 more.
-- The engine does the arithmetic (`award_xp`, §5) and says when a level is
-  reached. Several levels at once are counted in order.
-- **A new level gives a new feat** (decision 209). The feat is earned in
-  play, and the GM offers it from what happened ("Dragon-Scarred",
-  "Friend of the Deep King"). The player may instead sharpen an existing feat
-  into a bigger phrase.
-- **Every third level** (3, 6, 9…) also gives **+1 maximum heart**
-  (decision 214). `award_xp` reports it and raises the Hearts meter's cap.
+- **Every hero present gets the full amount**, with no splitting (decision
+  218).
+- **Each award names its source.** An award is refused if that hero already
+  had the same source, so a foe or a treasure is never counted twice.
+
+**Levelling** (decisions 208, 209, 214):
+- Going from level N to N + 1 costs **(N + 1) × 1,000 XP**, and the counter
+  resets. Level 2 costs 2,000 XP, then level 3 costs 3,000 more. Several levels
+  at once are counted in order.
+- **Every level gives a new feat**, earned in play: the GM offers it from what
+  happened ("Dragon-Scarred", "Friend of the Deep King"). The player may also
+  sharpen the wording of an existing feat, but the new feat is still gained.
+- **Every third level** (3, 6, 9…) also gives **+1 maximum heart**, and that
+  heart is gained at once.
 
 ### 2.8 Starting heroes
 
@@ -175,7 +227,7 @@ A hero starts with (decision 207):
 - **3 hearts**;
 - **level 1** and **0 XP**.
 
-Full step-by-step setup asks, per player:
+**Full step-by-step setup** asks, per player:
 
 | Step | Asks for |
 |---|---|
@@ -183,8 +235,18 @@ Full step-by-step setup asks, per player:
 | `feats` | The four feats, with suggestions drawn from the concept and the realm. |
 | `realm_tie` | Why the hero is in the starting realm. |
 
-The engine's own steps (`name_look`, `history`, `drives`) follow, as for every
-system.
+Then come the shared `name_look`, `history` and `drives`. The `history` hint
+is reworded for this system (§5.3), because the shared hint asks about a
+supernatural transformation.
+
+**Every hero is set up in the engine** the moment their feats are known:
+- in full setup;
+- in quick setup;
+- for a pre-made hero;
+- for a player who joins later.
+
+The core note tells the GM to do this, as Blood & Bone's core does with its
+meters (§5.2).
 
 ## 3. The world: the realms
 
@@ -193,17 +255,17 @@ The world pack is **a crossroads of realms with different rules** (decision
 - **The Crossroads.** One overview note: what the realms are, how travel
   between them works, and each realm's rest rule in one line.
 - **Three realms**, each in its own note: its look, its tone, its rest
-  condition, a handful of people, places and troubles, and its foes with DC,
-  words, hearts and XP.
+  condition, a handful of people, places and troubles, and its foes as stat
+  lines (§2.4).
   - a bright heroic realm;
   - a folk frontier;
   - a grim realm.
 - **Tables** as `table` notes: names, foes, treasure (with XP), and "what's
-  on the road", following Blood & Bone's table conventions (the die in each
-  heading, and `checkTableShape` passing).
+  on the road". They follow Blood & Bone's table conventions: the die in each
+  heading, and `checkTableShape` passing.
 
 The realm names and contents are written in the content slices and reviewed
-then. This design fixes only the shape.
+then.
 
 ## 4. The starter
 
@@ -215,117 +277,168 @@ One starter (decision 210), opening on an **arrival**, never mid-crisis
 - the trouble comes later in the first session.
 
 It carries:
-- a Campaign Plan outline (secret, as in Blood & Bone's starters);
+- a secret Campaign Plan outline;
 - a "Running it" note with the realm's rest rule;
 - a few pre-made heroes as presets;
-- its realm's foes and treasure with XP.
+- its realm's foes and treasure.
 
 ## 5. The engine
 
-### 5.1 A system declares its tools
+### 5.1 Which system a story runs, and its tools
 
-Today every system story is offered Blood & Bone's four tools
-(`SYSTEM_TOOL_NAMES`: `manage_meter`, `manage_track`, `end_session`,
-`action_roll`). The change:
-- `BuiltinSystem` gains `tools: string[]`. Blood & Bone lists its four, and
-  Fantastic Realms its own.
-- `resolveSystem` returns the resolved system's list, and the GM's tool list
-  offers exactly that.
-- The list is a story-level fact (which system the story's notes belong to),
-  read the same on every turn, so the cache rule holds.
-- A story with no system offers none, as now.
-- A Fantastic Realms story's tool list stays under the 10,000-token budget
-  (`tests/toolBudget.test.ts` gets a Fantastic Realms case).
+**Today.**
+- `resolveSystem` picks the first built-in system that owns any note the story
+  holds.
+- Every system story is offered Blood & Bone's four tools (`SYSTEM_TOOL_NAMES`).
+- `systemState.usesSystemTools` can force them on or off.
+
+**The change:**
+- **The system is recorded.** `systemState.systemId` is set when a story first
+  resolves to a system: started from a starter, or holding a system's core
+  note. From then on it wins over note matching, so importing another
+  system's notes, or deleting some, never switches the system mid-campaign.
+  - An old save has no `systemId`; it gets one derived once, by today's rule.
+  - A story holding two systems' core notes keeps the recorded one. Without a
+    record, the first system in `BUILTIN_SYSTEMS` order wins, which is
+    Blood & Bone.
+- **A system declares its tools.** `BuiltinSystem` gains `tools: string[]`:
+  - Blood & Bone lists its four, unchanged;
+  - Fantastic Realms lists its own (§5.2).
+  - The GM is offered exactly the resolved system's list.
+- **The overrides keep working:**
+  - tools *off* gives none;
+  - tools *on* with no system (the Designer's legacy switch) keeps Blood &
+    Bone's four, so nothing that works today changes.
+- **The cache rule holds.** The list depends only on `systemState.systemId`
+  and the override, both story-level and read the same every turn.
+- **The budget holds.** `tests/toolBudget.test.ts` gets a Fantastic Realms
+  case under the 10,000-token budget.
 
 This is the "named coded roll" decision 183 named as the next hook.
 
-### 5.2 The Fantastic Realms tools
+### 5.2 The Fantastic Realms tools and state
 
-**`feat_roll({ hero, feats: string[], dc, burn?, reason })`** rolls the pool
-and decides the result. It refuses:
-- a DC outside 2–6 (DC 1 is no roll);
-- a feat listed twice;
-- a burned feat;
-- a `burn` that is not one of `feats`.
+**State.** It lives in `systemState`, is optional and backward-compatible
+(absent on old saves, filled on first use), and travels with the story blob,
+so save, load, sync and Undo carry it unchanged.
 
-It reports:
-- each die;
-- the hits;
-- the tier: miss, weak, hit, strong, or strong + N;
-- the burn, recorded on the hero.
+| Part | Holds | Shown to |
+|---|---|---|
+| **Heroes** | For each hero (keyed by the same owner names the meters use): a list of feats, each with a stable id, its wording and a burned flag; and the reward sources already credited. | The GM's live block every turn ("Bryn: Brave, Quick, Sword (burned), Armor"), and the player's panel. |
+| **Realm** | The realm the story is in. | `take_rest`. |
 
-The dice go through the same physical toss as `formula_roll`. Like
-`action_roll`, its result is typed, so the Observer's outcome judge reads its
-tier (`extractOutcomeVerdicts`).
+**Meters** (`manage_meter`, the "Fantastic Realms hero" set):
 
-The engine cannot see whether a feat fits the action: the player and the GM
-decide that. What the engine guarantees is the count, the comparison, the
-tier and the burn bookkeeping.
+| Meter | Range | Notes |
+|---|---|---|
+| Hearts | 0–max | Max starts at 3. |
+| Level | 1–20 | |
+| XP | 0 to the next level's cost | |
 
-**`initiative_roll({ hero, edge_feats: string[] })`** rolls 1d6 + one per edge
-feat and reports the number. *(Or fold it into `feat_roll` as a mode; the
-implementation plan picks.)*
+The meters show on the existing Meters panel. `award_xp` is the only writer of
+XP and Level, and it raises Hearts' `max` and `cap` together through a new
+`raiseMeterMax` in `metersAndTracks.ts`. Blood & Bone's meters are untouched.
 
-**`award_xp({ hero, amount, source })`** adds XP:
-- carries over the level cost, (level + 1) × 1,000, as many times as it is
-  met;
-- updates the hero's Level and XP;
-- answers "Level 3 reached: offer a new feat".
+**`manage_feats({ hero, action: add | rename | remove, feat, new_wording? })`**
+- Sets up and edits a hero's feats.
+- A rename keeps the feat's id, so a burned feat stays burned when it is
+  sharpened.
+- Feat wording is matched loosely (case and punctuation), so *Sword* and
+  *sword* are one feat.
 
-**`take_rest()`**:
-- heals every hero's hearts to their maximum;
-- clears the burned feats;
-- returns the realm's rest condition as a reminder;
-- does not decide whether the fiction allows the rest.
+**`feat_roll({ hero, feats, dc, burn?, reason })`**
+- **Validates.** Every feat must be one of that hero's feats, unburned, and
+  named once. `burn` must be one of `feats`. DC must be 2–6.
+- **Rolls.** It takes the same dice paths as `action_roll`: the physical toss,
+  manual dice with validated faces, AI dice.
+- **Reports** each die, the successes, and the result with its magnitude.
+- **Records the burn** only on a completed roll.
+- **A refusal is an engine error, not a miss.**
 
-**`manage_meter`** (existing) keeps the Hearts, XP and Level meters. The
-system's meter set is "Fantastic Realms hero": Hearts 0–3, Level from 1, and
-XP from 0. On every third level `award_xp` raises the Hearts cap by one
-(decision 214).
+**`initiative_roll({ heroes: [{ hero, edge_feats }] })`** rolls each hero's
+1d6 + edges at once and reports the numbers. Foes' numbers are the GM's to
+state (DC + edge words).
 
-**State:** burned feats live in `systemState` per hero, beside Blood & Bone's
-existing `dedupKeys`. They are not stored in the sheet note, so the GM cannot
-forget a burn.
+**`award_xp({ heroes?, amount, source })`**
+- Credits every hero listed, or every hero by default, in full.
+- Refuses a source a hero already had.
+- Carries over each level cost.
+- Reports, for example: "Bryn: level 3 reached. Offer a new feat. +1 maximum
+  heart."
 
-### 5.3 Everything else reuses Blood & Bone's hooks
+**`take_rest({ heroes?, realm? })`**
+- Heals and un-burns every hero listed, or all.
+- Updates the recorded realm when one is given.
+- Returns that realm's rest condition.
 
-The system plugs in through the same hooks:
+**The outcome judge.** The Observer's outcome check reads typed verdicts
+(`extractOutcomeVerdicts`). Its filters and labels (`observer.ts` around lines
+1397 and 1576) list `action_roll` by name. `feat_roll` is added in each place
+together:
+- a typed tier: miss, weak, hit or strong, with its magnitude;
+- a label;
+- an engine refusal kept out, as `action_roll`'s are.
+
+### 5.3 The hooks generalised
+
+**Loading missing notes.** `addMissingBuiltinNotes` hard-codes Blood & Bone's
+core id and Europe by Night's setting. `BuiltinSystem` gains:
+- **`coreNoteId`**: a story holding it is kept up to date.
+- **`defaultSetting`**: what an unset `systemState.setting` means, and the
+  scope of its cross-setting notes.
+
+Blood & Bone keeps exactly today's behaviour:
+- `builtin:blood-and-bone:core`;
+- Europe by Night and `cross-europe`;
+- deleted notes never re-added;
+- held notes never touched.
+
+**Setup steps.** Shared creation steps can take a per-system hint:
+`BuiltinSystem.stepHints`, e.g. `history` for Fantastic Realms. Blood & Bone
+keeps today's text.
+
+**Reused as they are:**
 - the packs and the starter;
 - `creationNoteId` and `creationSteps`;
-- the sheet template (concept, feats, burned, hearts, level, XP, gear);
-- `addMissingBuiltinNotes`;
+- the sheet template (concept, feats, hearts, level, XP, gear);
 - the Library listing.
 
-Each new tool lives in the usual six places (schema, whitelist, executor,
-Google list, label, Observer), and `tests/gmTools.sixPlaces.test.ts` holds
-them. The `engine-review` agent reviews the engine slice.
+**Every new tool** lives in the usual six places (schema, whitelist,
+executor, Google list, label, Observer). `tests/gmTools.sixPlaces.test.ts`
+holds them, and the engine slice gets the `engine-review` agent.
 
 ## 6. What the GM is told
 
-A pinned `dm_instructions` core note of at most about 3,000 tokens holds:
-- the roll, the DC table and the result tiers;
+A pinned core note of at most about 3,000 tokens holds:
+- successes and results;
+- the DC table;
 - burning;
-- hearts and "down";
-- who rolls;
+- hearts, harm and down;
+- how foes are written;
 - rests;
-- initiative;
+- fights, including a foe's turn and damage;
 - XP and levels;
+- the setup line: "set up every hero with `manage_meter create_set` and
+  `manage_feats add`";
 - how to read a feat generously but honestly.
 
-The rest is read on demand: the realms, the foes, the tables and the creation
-rules (the creation note is carried in session zero, as for Blood & Bone).
+The realms, foes, tables and creation rules are read on demand. The creation
+note is carried in session zero.
 
 ## 7. Slices (for the implementation plan)
 
 1. **The engine:**
-   - system-declared tools;
-   - `feat_roll`, `award_xp`, `take_rest` (and initiative);
-   - the meter set, the burned-feat state, outcome-judge typing;
-   - tests, including Blood & Bone unchanged.
-2. **The rules pack:** the core, creation, foes guidance, XP guidance, the
-   sheet template and the creation steps; the token budgets tested.
-3. **The world pack:** the Crossroads and the three realms, with their foes
-   and treasure tables.
+   - the recorded system and declared tools;
+   - the generalised note loading and step hints;
+   - `manage_feats`, `feat_roll`, `initiative_roll`, `award_xp`, `take_rest`;
+   - `raiseMeterMax` and the hero state;
+   - the outcome-judge typing;
+   - tests, including Blood & Bone unchanged and an old save resolving as
+     before.
+2. **The rules pack:** the core, creation, foes and XP guidance, the sheet
+   template and the creation steps; the token budgets tested.
+3. **The world pack:** the Crossroads and the three realms, with foes and
+   treasure tables.
 4. **The starter:**
    - the arrival opening;
    - the plan outline;
@@ -338,24 +451,42 @@ Slices 2–4 are prose the author reads in the PR.
 
 ## 8. Credit and copying
 
-The mechanics here are the author's own combination of ideas (dice pools from
-descriptive words, d6 hits against a target, burning a feat). Game mechanics
-are not covered by copyright, and no text is copied from the inspirations.
-Unlike Blood & Bone, Fantastic Realms is not built on an SRD, so it owes no
-credit line. As a courtesy, the system's description says "Inspired by EZD6,
-Stonetop, Tiny RPG, Mythic Bastion Land and Legends of the Mist"
-(decision 215).
+The mechanics are the author's own combination of ideas, and game mechanics
+are not covered by copyright; no text is copied. Fantastic Realms is not built
+on an SRD, so it owes no credit line. As a courtesy, the description says
+"Inspired by EZD6, Stonetop, Tiny RPG, Mythic Bastion Land and Legends of the
+Mist" (decision 215).
 
 ## 9. Settled in review
 
-The four points this design proposed are settled:
+**First pass** (decisions 212–215):
+- foe initiative;
+- the XP scale;
+- +1 maximum heart every third level;
+- the "inspired by" line.
 
-| # | Decision |
+**After Codex's review** (decisions 216–218):
+- damage by result;
+- a foe's turn as a threat the heroes answer;
+- XP to every hero in full.
+
+**Codex's other findings, fixed in this text:**
+
+| Finding | Fixed in |
 |---|---|
-| 212 | Foe initiative is the foe's DC plus its edge words. |
-| 213 | The XP scale stands. |
-| 214 | Every third level gives +1 maximum heart. |
-| 215 | The description carries the "inspired by" line. |
+| The recorded system | §5.1 |
+| The meter bounds | §5.2 |
+| The outcome-judge plumbing | §5.2 |
+| The hard-coded note loader | §5.3 |
+| Feat identity and visible burns | §5.2 |
+| The roll lifecycle and manual dice | §5.2 |
+| Per-hero setup | §2.8 |
+| The `history` hint | §5.3 |
+| DCs counting words twice | §2.4 |
+| Duplicate rewards and rest targets | §2.5, §2.7 |
+| Sharpening versus a new feat | §2.7 |
+| "Hit" meaning two things | Words used, §1 |
+| A worked example | §2.6 |
 
-Nothing is open. The next step is the author's "build it", then the
-implementation plan.
+Nothing is open. The next step is the author's go, then the implementation
+plan.
