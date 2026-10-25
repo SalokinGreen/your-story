@@ -635,3 +635,38 @@ Built on `claude/judges-j4`. Files: `judges/evalFormat.ts` (the versioned fixtur
   `engine-review` (no agent tool in this session). The runner is not engine code
   (`app/misc/` judges only; nothing in the app imports the eval files), but it
   reads `runCombinedJudges`, `runObserverSplit` and `judgeTurnFor` from the engine.
+
+### 2026-10-25 — slice 5 (J5), Settings and the turn details
+
+Built on `claude/judges-j5`. Files: `judges/measured.ts` (new), `observer.ts`
+(`JUDGE_DEFAULT_OVERRIDES`), `ArchitectureSettingsTab.tsx`, `StoryTurn.tsx`,
+`story.tsx`, `ContextViewer.tsx`, `generation.ts` (two log lines), `evals/results.json`
+(stub), `tests/judges.measured.test.ts`.
+
+- **Measured precision is bundled by a static import of `evals/results.json`.**
+  The static export and the native apps have no file system to read at run time,
+  and a dynamic optional import cannot be made to work in webpack. So a stub
+  (`{"v":1,"modes":[]}` plus a note) is committed, `--go` overwrites it, and
+  `measuredPrecision()` reads it defensively: a missing mode, a null or odd figure
+  yields nothing and the row shows nothing. The figure shown is precision at the
+  severity that rewrites (`major`), the combined form winning over the split form;
+  a figure under 0.7 adds "so it ships as Flag".
+- **`JUDGE_DEFAULT_OVERRIDES` is wired and empty.** No run exists, so no judge is
+  known to be under 0.7. `frozenCheckSettings` reads it for the three prose judges
+  (the only ones that default to Rewrite). A test fails when the bundled results say
+  a judge belongs in the table and it is not. When it is first filled, bump
+  `OBSERVER_SETTINGS_VERSION` only if stored configs should be reset; otherwise a
+  player's saved choice for that judge stays.
+- **The picker is not duplicated.** Rewrite confirmation stays under AI -> Advanced
+  settings (J3's card); the judges card on the Architecture tab names where it is.
+  The judges list stays on the Architecture tab, where J2/J3 put it; Off / Flag /
+  Rewrite and sensitivity were already there.
+- **The turn's details show the notice on the work line** (`TurnWorkLine`'s `notice`,
+  a small chip beside the Advanced tag): "Checked" or "Revised after a check", with
+  a generic tooltip. Not shown while the turn streams. A turn with no other work
+  still gets the line. Guests see it too (the notice is generic and `publicNotice`
+  survives their snapshot).
+- **Private findings** (`ObserverFlag.finding`) go into the two "Observer: ... flagged"
+  Debug Logs lines and under the flag in the Context Viewer's Adjudication flags
+  (host only: guests lose `observerFlags`).
+- **Not done:** a screenshot (see the session report); a real run of the runner.

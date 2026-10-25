@@ -1277,6 +1277,10 @@ export default function Story({
                     reasoningTier={
                       getGMDataForPart(exchange.gmMsg.partIndex).reasoningTier
                     }
+                    notice={
+                      storyData.scene.parts[exchange.gmMsg.partIndex]
+                        ?.publicNotice
+                    }
                     images={
                       storyData.scene.parts[exchange.gmMsg.partIndex]?.images
                     }
