@@ -1,7 +1,7 @@
 # Fantastic Realms, grown — design
 
 **Status:** design, for the author's review. Not approved for building.
-Decisions 243–253 (`docs/decisions.md`). The base system is
+Decisions 243–256 (`docs/decisions.md`); §14 records what changed after Codex's review. The base system is
 [`fantastic-realms-design.md`](fantastic-realms-design.md) (decisions
 201–219); everything here builds on it and changes none of its rules unless a
 section says so. The implementation plan comes after approval.
@@ -44,7 +44,7 @@ All text is original (decision 3).
 **What it can do.** A spell does what a skilled mundane action could not:
 - touch a mind;
 - call fire;
-- mend a wound;
+- mend a wound (it clears a condition; hearts still return only at a rest, decision 254);
 - see far.
 
 The DC follows the deed, not the spell. Calming a frightened horse is DC 2;
@@ -62,8 +62,7 @@ A weak hit on a spell works, at a cost the GM picks; a small miscast may be
 that cost.
 
 **Burning a spell feat** is the grand, flashy version: one sure success, as
-for any feat. After a burned spell, the next miss with that spell before the
-rest is a double miscast.
+for any feat. A burned spell is out until the rest, as any burned feat is.
 
 **Each realm's magic:**
 
@@ -102,12 +101,12 @@ another die.
 
 | Quality | Effect |
 |---|---|
-| Keen | A strong hit with it does +1 damage. |
+| Keen | A strong hit with it does +1 damage (the engine adds it; §14). |
 | Sturdy | A single miss cannot break it. |
 | Warded | It turns aside one condition a scene. |
 | Swift | It also counts as an edge feat for initiative. |
 | Bright | It reveals one hidden thing per scene. |
-| Cursed | It adds a die, but on a miss it takes its price as well as the GM's cost. |
+| Cursed | It adds its die like any item, and on a miss its price is the roll's cost (it spends the harm budget, §14). |
 
 *FR — Gear* lists twelve qualities.
 
@@ -274,10 +273,12 @@ at DC 3 unless the GM says otherwise.
 
 **The hearth** is an optional home base the party shares: a farmhouse, a
 tower, a ship.
-- **Improvements:** up to five, each a word that helps one kind of roll at the
-  hearth, or once per adventure away from it: *Library*, *Stables*, *Shrine*,
-  *Workshop*, *Watchtower*.
-- **Its record:** a note, with the improvements listed on it.
+- **Improvements:** up to five, such as *Library*, *Stables*, *Shrine*,
+  *Workshop* and *Watchtower*. Each is a **party feat** (decision 256): any hero
+  may name it in a roll it fits, freely at the hearth and once per adventure
+  away from it. The engine tracks them like other feats.
+- **Its record:** a note for the place and its people; the improvements live in
+  the engine as party feats.
 - **Who lives there:** townsfolk at the hearth are NPCs with a want.
 
 ## 9. Group play
@@ -290,7 +291,9 @@ tower, a ship.
 - A helper's feat cannot be burned for someone else's roll.
 
 **A team burn.** Twice per rest, per party, two heroes may each burn a feat on
-the same roll: two sure successes, and both feats burned.
+the same roll: the roll gets two sure successes, and neither burned feat adds
+its usual die (decision 255). It lands a hit; a strong hit still needs the
+dice. Both feats are burned.
 
 **Initiative for many.** `initiative_roll` already takes every hero. Foes'
 numbers are stated once per fight.
@@ -406,3 +409,138 @@ Slices 2–5 are prose the author reads in the PR.
   (§6; decision 252).
 - **A path feat outside one's calling needs the GM's nod** and a reason in the
   story (§5; decision 253).
+
+## 14. Revised after Codex's review (2026-10-25)
+
+Codex (gpt-6.1-sol) reviewed this design against the base system and its code.
+It found no copied text. Its 13 findings are resolved here. Where this section
+and an earlier one differ, this section wins.
+
+**Decided by the author:**
+- **Healing magic clears conditions, never hearts** (decision 254).
+  - A healing spell can clear a condition that names no cure, or one whose
+    named cure it is.
+  - It can lift a hero who is down, back to 1 heart.
+  - Hearts otherwise return only at a rest, as the core says.
+- **A team burn is two sure successes without the two feats' dice**
+  (decision 255).
+- **Hearth improvements are party feats** (decision 256).
+
+**Harm: one budget per roll** (findings 1 and 3).
+- **The budget.** Every roll has one consequence budget: one heart or one
+  condition, or two when a harm word applies. This is decision 216's cap,
+  counted per roll, not per hero.
+- **A miscast is the consequence** of a magic miss, never an extra one. A weak
+  hit's cost on a spell is at most one of the budget.
+- **Everything else spends the same budget:** a cursed item's price, an item
+  lost or broken, a helper's share. Helping splits the budget; it never
+  doubles it.
+- **Damage is the engine's.** `feat_roll` reports the damage a landed attack
+  does, Keen included, and the foe-damage contract (`contracts.ts`) reads that
+  number.
+- **Qualities are stored.** A quality with a mechanical effect is stored on the
+  item, not only in its wording.
+
+**Conditions, down and scars** (finding 4).
+- **Each condition word is stored once;** giving it again does nothing.
+- **Down is an engine state,** set at 0 hearts or a third condition.
+  - A hero who is down cannot roll, help or burn.
+  - They are back when a rest or a healing spell lifts them: at 1 heart, or
+    once a condition clears.
+- **Rest:** `take_rest` clears conditions that name no cure, and never a scar.
+- **Mend** (downtime) clears a condition that needs a cure, when the cure is at
+  hand. It does not touch scars.
+- **Turning a scar into a feat is** that level's new feat.
+
+**Items** (finding 10).
+- `manage_feats` gains `break`, `lose`, `recover` and `mend`.
+- An item keeps its id, qualities and burn state through loss and recovery.
+  Mending does not un-burn it.
+- One shared check decides whether a feat can be used. So `feat_roll`,
+  `initiative_roll`, helping and team burns all refuse a broken, lost or
+  burned item alike.
+
+**Magic** (finding 2).
+- The "double miscast" is gone (see §2).
+- A miscast that costs the spell uses `manage_feats burn` on it: the feat is
+  burned, without the roll's sure success.
+- Magic is detected from the spell feats named in the roll. A spell narrated
+  without its feat is a plain action, with no spell die.
+
+**Helping and team burns** (finding 5).
+- **Who can join a roll:** the roller, at most one helper, and at most one team
+  burn.
+  - The team-burn partner is a third hero or the helper, never the roller.
+  - Every contributor is a distinct hero who owns the named feat and is not
+    down.
+- **What each adds:**
+  - The helper adds one die.
+  - The team burn adds two sure successes and takes the place of the roller's
+    own burn on that roll.
+- **When it is written:** burns and the counter are written only when the roll
+  completes.
+- **The reset:** the two team burns reset at a **party rest**, a `take_rest`
+  that includes every hero present. A partial rest does not reset them.
+
+**Journeys** (finding 7).
+- **Scoring:** Fantastic Realms maps its tiers onto the tally: miss −1, weak
+  hit 0, hit and strong hit +1. The challenge tool accepts `hit` for this
+  system.
+- **Long journeys:** a journey longer than five days is several legs of up to
+  five rounds each.
+- **Arrival:**
+  - a total above 0 arrives well;
+  - a total of 0 arrives worn: one condition, the party's choice;
+  - a total below 0 arrives late, lost or hurt, at the GM's cost.
+
+**Supplies** (finding 8).
+- **Start and refill:** a party starts with 3 Supplies. Buying in a town,
+  foraging (a roll) or a host's hospitality refills them, up to 6.
+- **Spending:**
+  - one Supply feeds the whole party for a day;
+  - a journey day costs 1, once, whatever else happens;
+  - a miss's cost may take a second.
+- **Hungry:** at 0 the party is *Hungry*, one condition per hero, given once.
+  Only a meal clears it; a rest alone does not.
+
+**Uses that need counting** (finding 9).
+- Warded, Bright, calling moves and away-from-hearth improvements each get a
+  use counter in the hero or party state.
+- Each counter resets on its own event:
+  - a scene (`increment_scene`);
+  - a rest;
+  - an adventure (`end_session` for a new adventure).
+
+**Creation and downtime** (finding 11).
+- **Starting kit:** a calling's kit is its signature feat plus three more,
+  four feats, as for any hero.
+- **Freeform heroes** pick one personal move of the same size instead (a
+  once-per-rest flourish), so neither path is worth more.
+- **Downtime rolls use every tier:**
+  - a strong hit gives the activity's best result;
+  - a hit gives the result;
+  - a weak hit gives it at a cost (time, coin, a favour owed);
+  - a miss gives the listed miss, and costs no hearts.
+- **What must exist first:** a cure or the materials must exist in the fiction
+  before the roll.
+
+**Legend phases** (finding 12).
+- Damage is never capped at a phase mark. The legend's remaining hearts decide
+  its phase, crossed phases are skipped, and it falls at 0 with no free
+  threat.
+- Each phase states its own DC and threat.
+
+**Budgets and old stories** (finding 13).
+- **The core** gets a rewritten operational section, not just a few index
+  lines. Down, the harm budget, burns, helping and healing must agree in the
+  pinned text. It stays under 3,000 tokens, held by its test.
+- **Tool results carry the reminders the engine can state** (damage done, a
+  condition's die, a burn spent), so the core does not have to.
+- **The tool budget test** asserts Fantastic Realms' actual full tool list,
+  Manual Dice Mode included, against its own allowance. The test permits
+  11,500 tokens for a system story today.
+- **Existing stories keep their old core** unless migrated, because the note
+  loader never replaces a note a story holds. The plan adds a versioned update
+  for the built-in core and the grown notes, offered once, the same way
+  `builtinNotesOffered` adds new notes.
+

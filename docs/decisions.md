@@ -435,4 +435,7 @@ The author: "We need to grow the Endless Realms rules a lot more." (Fantastic Re
 | 251 | "How often may a party make a team burn (two heroes each burn a feat on one roll)?" | **"Twice per rest (Recommended)."** Twice per rest per party. Rejected: once per rest; no limit. |
 | 252 | "The design adds three new realms. Keep these, or name your own?" | **"Keep all three (Recommended)."** Thornmere, Emberhold and the Hollow Sky, as drafted. |
 | 253 | "Can a hero take a path feat from another calling?" | **"With the GM's nod (Recommended)."** Allowed when the story gives a reason and the GM agrees. Rejected: freely; own calling only. |
+| 254 | After Codex's review: "The base rules say hearts come back only by resting. Can healing magic restore hearts?" | **"Conditions only (Recommended)."** Healing magic clears conditions and can lift a hero who is down; hearts still return only at a rest. Rejected: one heart per hit; hearts freely. |
+| 255 | "A team burn (two sure successes) measured as very strong. How strong should it be?" | **"Both feats, one sure success each (Recommended)."** Two sure successes, but neither burned feat adds its usual die: a sure hit, while a strong hit still needs the dice. Rejected: as drafted; one sure success and two dice. |
+| 256 | "Should hearth improvements work in the dice, or only in the fiction?" | **"Party feats (Recommended)."** Each improvement is a shared feat any hero may name, freely at the hearth and once per adventure away from it, tracked by the engine. Rejected: fiction only. |
 
