@@ -466,3 +466,8 @@ Where this entry and the plan above disagree, this entry is what was built.
   caller's to launch). The GM prompt's "Fronts advance on their own" line was
   left alone, as briefed. Live brief size: a full brief grows the live block by
   771 tokens on the fixture (`tests/campaign.brief.test.ts`).
+
+### 2026-10-25, the tool budget (decision 242, this session)
+
+- The author chose to trim other tools rather than give `campaign` its own allowance. `manage_timer`'s description was cut (it also now says a timer is a clock once a campaign record exists) and its reserved, unread `auto_advance` parameter was removed from the schema (the executor still treats a missing value as false). `tests/toolBudget.test.ts` holds the whole default list, `campaign` included, under 10,000 (measured 9,977), and `CAMPAIGN_TOOL_EXTRA` is gone.
+

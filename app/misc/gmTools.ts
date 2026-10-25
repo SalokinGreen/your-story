@@ -1823,7 +1823,7 @@ const manageTimerTool: ToolSchema = {
   type: "function",
   function: {
     name: "manage_timer",
-    description: `Create, advance, pause/resume, cancel or trigger a countdown timer (rituals, deadlines, arriving reinforcements). Timers count down to 0, then trigger. Actions: create (name + ticks; advance it yourself with the advance action, as auto_advance does not tick yet), advance (timer, optional ticks, default 1), toggle_pause, cancel (without triggering), trigger (fire now). Several timers can run at once.`,
+    description: `A countdown (a ritual, a deadline, reinforcements). It fills only when you advance it. With a campaign record it is a clock. Actions: create (name, ticks), advance (timer, ticks, default 1), toggle_pause, cancel, trigger (fire now).`,
     parameters: {
       type: "object",
       properties: {
@@ -1850,11 +1850,6 @@ const manageTimerTool: ToolSchema = {
           type: "number",
           description:
             "create: starting ticks. advance: ticks to advance (default 1).",
-        },
-        auto_advance: {
-          type: "boolean",
-          description:
-            "Reserved: timers do not tick on their own yet. create only.",
         },
         visibility: {
           type: "string",

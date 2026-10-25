@@ -2,7 +2,7 @@
  * An old save has no campaign record, and must be played exactly as before
  * (design section 11): the GM's request, every message of it, is byte-identical
  * to what the build without the campaign format produced. The digests below
- * were taken from `claude/redesign-base` before the format landed, from this
+ * were taken from the branch just before the format landed (see BEFORE), from this
  * same story, so they are the "before"; only the tool list differs (it gains
  * the campaign tool, which the tool budget test holds).
  */
@@ -57,9 +57,11 @@ function promptDigests(story: StoryData): string[] {
   });
 }
 
-// Taken from claude/redesign-base (before the campaign format) on 2026-10-25.
+// Taken on 2026-10-25 from `claude/gm-prompts-g1` (e8413c77): the GM prompts'
+// slice 1 without the campaign format, so the only difference left is the
+// campaign format's own (a story with no record must add nothing).
 const BEFORE: string[] = [
-  "system:27057:9522135ac041b3ee",
+  "system:27125:79c6101a27fd1101",
   "user:9575:ec82a88c82afe716",
   "assistant:129:bbb8f4a3710e013a",
   "user:65:21f6cbf4db8f7103",
@@ -72,7 +74,7 @@ const BEFORE: string[] = [
   "assistant:171:3c8914881ba4c61a",
   "tool:158:62279d34a94c796d",
   "assistant:992:7ffd2be89ef124c3",
-  "user:17784:d8eb7b4e8d0f89ef",
+  "user:17729:dcc57aa42dda3289",
   "assistant:82:75356dc26d8e4df6",
 ];
 

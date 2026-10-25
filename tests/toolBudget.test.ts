@@ -16,12 +16,10 @@ vi.setConfig({ testTimeout: 120_000 }); // the fixture story is slow to build
 const DEFAULT_LIST_BUDGET = 10_000; // tokens (was 15,841 before PR T3)
 const MANUAL_DICE_EXTRA = 400; // ask_for_roll
 // The campaign tool (campaign format, slice C1) is always offered, so every
-// story pays for it. It is a bare schema (the data shapes come from `read` on
-// an empty part and from the repair a refused write names). Measured 135 on
-// 2026-10-25, which took the default list from 9,899 to 10,034; the rest of the
-// list is held to the old 10,000 below. Its own bound, so the budget is not
-// loosened for anything else.
-const CAMPAIGN_TOOL_EXTRA = 150;
+// story pays for it, inside the one default budget (decision 242: other tool
+// descriptions were trimmed to make room, rather than giving it a bound of its
+// own). It is a bare schema: the data shapes come from `read` on an empty part
+// and from the repair a refused write names.
 // The four system tools (manage_meter, manage_track, end_session, action_roll),
 // offered only to stories that use a system (decision 79). Their own bound, so
 // the default list's budget is not loosened for them.
@@ -71,8 +69,8 @@ describe("the GM's tool list", () => {
     console.log(
       `Default tool list: ${estimateTokens(JSON.stringify(tools))} tokens (campaign tool ${campaignTokens}, the rest ${restTokens})`,
     );
-    expect(restTokens).toBeLessThan(DEFAULT_LIST_BUDGET);
-    expect(campaignTokens).toBeLessThan(CAMPAIGN_TOOL_EXTRA);
+    expect(restTokens + campaignTokens).toBeLessThan(DEFAULT_LIST_BUDGET);
+    expect(estimateTokens(JSON.stringify(tools))).toBeLessThan(DEFAULT_LIST_BUDGET);
   });
 
   it("is the same list, campaign tool included, for a story that has a campaign record", () => {
@@ -110,7 +108,7 @@ describe("the GM's tool list", () => {
     expect(extra).toBeLessThan(SYSTEM_TOOLS_EXTRA);
     // a system story's whole list still fits the default budget plus its own bound
     expect(estimateTokens(JSON.stringify(sys))).toBeLessThan(
-      DEFAULT_LIST_BUDGET + SYSTEM_TOOLS_EXTRA + CAMPAIGN_TOOL_EXTRA,
+      DEFAULT_LIST_BUDGET + SYSTEM_TOOLS_EXTRA,
     );
   });
 
@@ -130,7 +128,7 @@ describe("the GM's tool list", () => {
       const extra = total - estimateTokens(JSON.stringify(base));
       console.log(`Fantastic Realms tools: +${extra} tokens, list ${total}`);
       expect(extra).toBeLessThan(SYSTEM_TOOLS_EXTRA);
-      expect(total).toBeLessThan(DEFAULT_LIST_BUDGET + SYSTEM_TOOLS_EXTRA + CAMPAIGN_TOOL_EXTRA);
+      expect(total).toBeLessThan(DEFAULT_LIST_BUDGET + SYSTEM_TOOLS_EXTRA);
     } finally {
       BUILTIN_SYSTEMS.splice(BUILTIN_SYSTEMS.indexOf(FR_STAND_IN), 1);
     }
