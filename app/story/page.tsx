@@ -174,6 +174,7 @@ function getModelsFromPreset() {
 
 import {
   DEFAULT_PRESET,
+  buildAdventureWelcome,
   hasPremadeCharacters,
   shouldUseIntroOverride,
 } from "../misc/presets";
@@ -1660,12 +1661,13 @@ function StoryPageContent() {
         }))
       : [{ text: "Start Story" }];
 
-    // Determine intro content - priority order:
-    // 1. Preset's unique intro (if exists)
-    // 2. Adventure's default intro
-    // NOTE: starting_choices intro_override is applied AFTER the user selects a choice,
-    // not at preset selection time. The intro_override replaces the AI's first response.
-    const introContent = preset.intro || updatedStoryData.intro;
+    // The authored opening - the preset's own if it has one, else the
+    // adventure's - waits for start_game, which hands it to the GM to play
+    // after its briefing (decision 197). The first screen is a welcome.
+    // (A starting choice's intro_override is separate: it is applied after the
+    // player picks that choice.)
+    updatedStoryData.intro = preset.intro || updatedStoryData.intro;
+    const introContent = buildAdventureWelcome(updatedStoryData, preset);
 
     //Addstartingscenepart
     updatedStoryData.scene.parts.push({
@@ -3741,11 +3743,11 @@ function StoryPageContent() {
     const flavorLines: string[] = [];
 
     // A starting choice with an authored opening, picked during session zero:
-    // the GM gets it as the opening to narrate once setup is done.
+    // it replaces the story's opening (the field's own rule: "if empty, uses
+    // main intro"), and start_game hands it to the GM once setup is done
+    // (decision 197), so the GM never gets two openings.
     if (choice.intro_override && !shouldUseIntroOverride(storyData, choice)) {
-      flavorLines.push(
-        `The adventure's opening for this choice, to narrate once setup is done: ${choice.intro_override}`,
-      );
+      storyData.intro = choice.intro_override;
     }
 
     let text = ">" + choice.text;

@@ -737,7 +737,11 @@ report's §11.3. The ones that shape play:
   family inheriting a haunted hotel (Vacancy for Heat), five relatives as
   presets. Each copies the Rules notes but the twelve E1 table families
   (`ownWorldRulesNotes`, `starters/shared.ts`), brings its own tables, and
-  rereads the core in its "— Running it" note. A story's
+  rereads the core in its "— Running it" note. All three starters open on an
+  arrival (decisions 198–199): The Hollow Hour at the café where Margot's
+  envelope waits, Grave Watcher on Founders' Day morning in town (the tower at
+  dusk, the green light at the end of the first night), The Last Resort with
+  the family pulling up at the Belhaven and the lawyer on the steps. A story's
   `systemState.setting` ("grave-watch", "last-resort"; unset means Europe by
   Night) comes from the starter's template and is kept by the Designer's
   draft; only a Europe by Night story is given the cross-Europe notes on
@@ -797,8 +801,14 @@ report's §11.3. The ones that shape play:
   Custom with no screen between. There is no character form; the GM builds
   the sheet in conversation (decision 129). A starting choice's
   `intro_override` waits for `start_game` (`shouldUseIntroOverride()`,
-  `presets.ts`); during session zero the choice goes to the GM with the
-  authored opening attached (decision 130).
+  `presets.ts`); picked during session zero, it replaces `StoryData.intro`
+  (decisions 130, 197). The adventure's own opening (the preset's `intro`,
+  else the story's) is not shown first either (decision 197): the first part
+  is a welcome (`buildAdventureWelcome`: the title, the premise, who the
+  player will be, the setup pointer), the opening is kept in
+  `StoryData.intro`, and `start_game` hands it to the GM
+  (`authoredOpeningForStart`, only for a story whose first part is the
+  welcome, so an older save that showed an opening first never gets a second).
 - `confirm_setup` — session zero only. Refuses while a required creation step
   is uncovered, then shows the player a card with the sheet(s) and the plan and
   waits for their OK or their changes (decisions 143, 148; "Session zero"
@@ -998,7 +1008,8 @@ the live state, and names what is missing. A stale approval is named as one.
 Outside session zero it refuses with "The game has already started." On success
 it clears `sessionZeroActive` and its result carries the campaign intro
 (decision 144): a short briefing in the story's voice, then the opening scene,
-ending on a clear first choice. It is the direct path; a card OK starts the game
+ending on a clear first choice. When the adventure has an authored opening
+it rides in that result, to be played after the briefing (decision 197). It is the direct path; a card OK starts the game
 the same way.
 
 **The setup gate** (`generation.ts`, `MAX_SETUP_PROMPTS` = 2). A session-zero
@@ -1476,8 +1487,9 @@ work in any of these layers — it tracks what was tried and reverted, and why.
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 211 files and 3,418 tests (2026-10-25, after feedback
-  and the session-zero hand-back; earlier 210 files and 3,410 after feedback;
+- `tests/` — Vitest, 211 files and 3,427 tests (2026-10-25, after the
+  starter welcomes; earlier 3,418 after feedback and the session-zero
+  hand-back, 210 files and 3,410 after feedback;
   the counts were run). Earlier: 203 files and 3,228 tests (after the judge
   layer), 195 files and 3,032 tests (after Blood &
   Bone E1), 193 files and 3,000 tests (2026-10-24, after session

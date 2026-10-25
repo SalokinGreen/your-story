@@ -22,7 +22,7 @@ const PREMISE =
   "Somebody in the family died and left you a hotel. It is in a small town in the hills, it is in debt, and it is full of the dead: guests who checked in and never left, staff who never clocked off, and something in the boiler room that the will asked you, in writing, not to feed. You have one season to make it pay, or the bank takes it, and the dead have opinions about that.";
 
 const INTRO =
-  "The lawyer leaves before you have finished reading the will, which is the first bad sign. The second is the hotel's bell, ringing by itself at the empty front desk. The third is the old man behind it, who was not there a moment ago and is see-through at the edges. \"Checking in?\" he says, and then, looking at your face: \"Oh. Oh, you're *family*. Well. Nobody tell the basement.\"";
+  "Cutler's Bend is the kind of town the road seems surprised to find: a bend in the river, a main street of brick, and up on the hill, behind a lawn gone to seed, the Belhaven. Six floors of 1924 brass and green marble, a sign with three bulbs out so that it reads BEL AVEN, and a CLOSED card in the revolving door that someone has crossed out and rewritten as OPEN.\n\nIt is the last Friday of August, and the car is full of everything you own that fit. On the front steps a lawyer in a summer suit checks his watch, a folder under his arm: Winifred Alder's will, and the keys to a hotel none of you has ever stayed in. \"You'll want to read it inside,\" he says, already edging toward his car. \"All of it. Especially the part about the basement.\"";
 
 function vacancy() {
   return createMeter(

@@ -6,6 +6,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PRESET,
+  authoredOpeningForStart,
+  buildAdventureWelcome,
   hasPremadeCharacters,
   shouldUseIntroOverride,
 } from "@/app/misc/presets";
@@ -46,5 +48,62 @@ describe("shouldUseIntroOverride", () => {
     expect(
       shouldUseIntroOverride({}, { text: "Begin", intro_override: "" }),
     ).toBe(false);
+  });
+});
+
+describe("buildAdventureWelcome (decision 197)", () => {
+  const story = { story_name: "Grave Watcher", premise: "A season beside a graveyard." };
+
+  it("names the adventure, gives the premise and points at setup", () => {
+    const text = buildAdventureWelcome(story, DEFAULT_PRESET);
+    expect(text).toContain("Welcome to **Grave Watcher**.");
+    expect(text).toContain("A season beside a graveyard.");
+    expect(text).toContain("make your character");
+    expect(text).toContain("quick, or step by step");
+  });
+
+  it("drops the date a new story's name carries", () => {
+    expect(
+      buildAdventureWelcome({ ...story, story_name: "Grave Watcher - 10/25/2026" }, DEFAULT_PRESET),
+    ).toContain("Welcome to **Grave Watcher**.");
+    expect(
+      buildAdventureWelcome({ ...story, story_name: "Grave Watcher - 25.10.2026" }, DEFAULT_PRESET),
+    ).toContain("Welcome to **Grave Watcher**.");
+    expect(
+      buildAdventureWelcome({ ...story, story_name: "Grave Watcher - 2026. 10. 25." }, DEFAULT_PRESET),
+    ).toContain("Welcome to **Grave Watcher**.");
+  });
+
+  it("names a pre-made character", () => {
+    expect(buildAdventureWelcome(story, real)).toContain("You'll be playing Mira.");
+  });
+
+  it("never carries an authored opening", () => {
+    const text = buildAdventureWelcome({ ...story, intro: "The radio wakes you." } as typeof story, DEFAULT_PRESET);
+    expect(text).not.toContain("radio");
+  });
+});
+
+describe("authoredOpeningForStart", () => {
+  const part = (content: string) => ({ content, user: false, role: "assistant", imageUrl: "" });
+  const welcome = part(buildAdventureWelcome({ story_name: "X", premise: "" }, DEFAULT_PRESET));
+
+  it("returns the intro for a story that began with the welcome", () => {
+    expect(
+      authoredOpeningForStart({ intro: " Pancakes. ", scene: { parts: [welcome] } } as never),
+    ).toBe("Pancakes.");
+  });
+
+  it("is null with no intro", () => {
+    expect(authoredOpeningForStart({ intro: "", scene: { parts: [welcome] } } as never)).toBeNull();
+  });
+
+  // Older saves showed an opening first: the adventure's, or a preset's own.
+  it("is null for a story that began with an opening, whichever one", () => {
+    for (const first of ["Pancakes.", "A preset's own opening."]) {
+      expect(
+        authoredOpeningForStart({ intro: "Pancakes.", scene: { parts: [part(first)] } } as never),
+      ).toBeNull();
+    }
   });
 });

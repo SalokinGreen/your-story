@@ -6,6 +6,7 @@
  */
 
 import { isHiddenFromPlayerNote } from "./noteVisibility";
+import { authoredOpeningForStart } from "./presets";
 import {
   StoryData,
   SceneChallenge,
@@ -3965,6 +3966,9 @@ function executeStartGame(
   if (params.premise) {
     storyData.premise = params.premise;
   }
+  // Read before session zero closes: the opening the adventure's author
+  // wrote, held back from the first screen (decision 197).
+  const opening = authoredOpeningForStart(storyData);
   storyData.sessionZeroActive = false;
   storyData.reasoningTierState = {
     currentTier: SCENE_BASELINE_TIER,
@@ -3983,7 +3987,12 @@ function executeStartGame(
     } as GMStartGameResult,
     contextForStory: `[Session zero complete - story named "${params.story_name}"${
       params.premise ? `. Premise: ${params.premise}` : ""
-    }. Now write the campaign intro: first a short briefing in the story's voice (who the player is, where, what's at stake, why they are here), then the opening scene, ending on a clear first choice.]`,
+    }. Now write the campaign intro: first a short briefing in the story's voice (who the player is, where, what's at stake, why they are here), then the opening scene, ending on a clear first choice.${
+      opening
+        ? ` The adventure's author wrote the opening scene; play it after the briefing, keeping its place, time and people, adapted to the character(s) you built:
+${opening}`
+        : ""
+    }]`,
   };
 }
 

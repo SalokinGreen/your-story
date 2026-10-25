@@ -21,6 +21,8 @@ Setup for each Watcher: manage_meter create_set "Blood & Bone character" (owner 
 
 The team. Players crew Tower Nine, their headquarters. A roster Watcher a player picks is reassigned to Nine; their old tower gets a relief voice on the radio. The roster Watchers nobody picked are NPCs in Towers One to Eight; with one or two players, fill the team to three or four counting them, and let those NPCs drop by Nine on off-nights. Play them from "The roster". A player who joins later takes over a sheet from it. Couch and party: each player picks a Watcher (ask_question, target_player_name) or builds their own.
 
+The first day. Open on Founders' Day morning in town (the opening scene): the pancake breakfast, the regulars, June's keys to Tower Nine, and Walt signing the Watchers up for something. Climb the tower at dusk for the first watch and the first check-in on the net. The first green light among the Catholic Rise graves ends that first night; it is not the first line.
+
 Read when needed: "The town calendar" every week; "Hollins Ferry" and "Town regulars" for any scene in town; "The Watch net" for any radio scene; "The Long Acre" before a section is entered; the tables when you need a face, a rumour or a call. Connections are the heart: let a Connection ask for something.`;
 
 const SEASON_PUBLIC = `# Grave Watcher — This season

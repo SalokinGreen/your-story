@@ -12,6 +12,7 @@ import { ARCHETYPE_INFO } from "./gmAdvice";
 import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
 import { deleteImagesForStory } from "./imageStore";
 import { seedBuiltinNotesOffered } from "./systems/builtinNotes";
+import { SETUP_STYLE_POINTER } from "./presets";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -285,9 +286,6 @@ function buildPlayerPreferencesNote(
   };
 }
 
-// The strip above the composer offers the two ways to set up (SetupStrip.tsx).
-const SETUP_STYLE_POINTER =
-  "Pick how you'd like to set up below - quick, or step by step - or just tell me what you're in the mood for.";
 
 function buildFreeformGreeting(
   hasCharacterSheet: boolean,

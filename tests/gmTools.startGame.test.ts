@@ -15,6 +15,7 @@ import { executeGMTools } from "@/app/misc/gmExecutor";
 import { buildGMStagePrompt } from "@/app/misc/ai_staged";
 import { StoryData, StoryLore } from "@/app/misc/structs";
 import { currentSetupHashes } from "@/app/misc/campaignPlan";
+import { buildAdventureWelcome, DEFAULT_PRESET } from "@/app/misc/presets";
 import {
   hardRuleFloor,
   SCENE_BASELINE_TIER,
@@ -308,6 +309,34 @@ describe("start_game requires the sheet and the player's OK", () => {
     expect(result.results[0].contextForStory).toContain("Now write the campaign intro");
     expect(result.results[0].contextForStory).toContain("short briefing");
     expect(result.results[0].contextForStory).toContain("first choice");
+  });
+
+  // Decision 198: the adventure's authored opening waits for start_game.
+  it("hands the GM the authored opening to play after the briefing", async () => {
+    const opening = "The season starts with pancakes.";
+    const welcome = buildAdventureWelcome({ story_name: "Intro Saga", premise: "" }, DEFAULT_PRESET);
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Intro Saga" })],
+      createMockStoryData({
+        intro: opening,
+        scene: { parts: [{ content: welcome, user: false, role: "assistant", imageUrl: "" }] },
+      } as Partial<StoryData>),
+    );
+    const text = result.results[0].contextForStory;
+    expect(text).toContain("author wrote the opening scene");
+    expect(text).toContain(opening);
+  });
+
+  it("does not hand over an opening to a story that began with one", async () => {
+    const opening = "The radio wakes you.";
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Intro Saga" })],
+      createMockStoryData({
+        intro: opening,
+        scene: { parts: [{ content: opening, user: false, role: "assistant", imageUrl: "" }] },
+      } as Partial<StoryData>),
+    );
+    expect(result.results[0].contextForStory).not.toContain(opening);
   });
 });
 
