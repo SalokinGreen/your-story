@@ -211,9 +211,12 @@ export function selectFrame(storyData: StoryData): Frame {
   const activeThreads = (storyData.threads || []).filter(
     (t) => t.status === "active"
   );
-  const activeTimers = (storyData.timers || []).filter(
-    (t) => t.status === "active"
-  );
+  // With a campaign record the clocks are the timers (the old list is stale).
+  const activeTimers = storyData.campaign
+    ? storyData.campaign.clocks.filter(
+        (c) => !c.paused && !c.cancelled && c.filled < c.segments
+      )
+    : (storyData.timers || []).filter((t) => t.status === "active");
 
   // The world is visibly in motion - a deadline running, or enough open
   // plotlines that the macro layer is doing something on its own.

@@ -378,7 +378,7 @@ interface SavedToolResult {
  * flag, because the timeline falls back to the raw tool-call name whenever
  * the result is missing (an aborted round, a save from a partial turn).
  */
-const HIDDEN_FROM_PLAYER_TOOLS = new Set(["gm_roll"]);
+const HIDDEN_FROM_PLAYER_TOOLS = new Set(["gm_roll", "campaign"]);
 
 function isHiddenFromPlayer(
   toolName: string,

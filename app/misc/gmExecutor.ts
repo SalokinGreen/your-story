@@ -255,6 +255,10 @@ export interface GMToolResult {
   // The GM sees their lines appended to contextForStory; the narration
   // context's public summary reads this field and drops hidden clocks.
   clockReports?: ClockReport[];
+  // Lines about HIDDEN clocks this result moved. Only the GM's tool message
+  // carries them (generation.ts appends them); contextForStory is what the
+  // player's timeline, the saved tool log and the narrator see.
+  gmOnlyContext?: string;
   result:
     | GMChallengeResult
     | GMCancelChallengeResult
@@ -1158,6 +1162,18 @@ export async function executeGMTools(
         typeof params === "object" && params !== null && !Array.isArray(params)
           ? (params as Record<string, unknown>)
           : {};
+      // Google gets `campaign.data` as a JSON string (Gemini rejects an
+      // object schema with no properties, see filterToolsForGoogle).
+      if (call.function.name === "campaign" && typeof argsRecord.data === "string") {
+        try {
+          const parsed: unknown = JSON.parse(argsRecord.data);
+          if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+            argsRecord.data = parsed;
+          }
+        } catch {
+          // left as a string: validation reports it
+        }
+      }
       normalizeLegacyToolArgs(call.function.name, argsRecord);
       const validationErrors = validateToolArgs(gmToolSchema, argsRecord);
       if (validationErrors.length > 0) {
@@ -1655,10 +1671,18 @@ export async function executeGMTools(
           result.clockReports = applied.reports;
           result.contextForStory = [
             result.contextForStory,
-            ...applied.reports.map((r) => r.line),
+            ...applied.reports.filter((r) => r.visible).map((r) => r.line),
           ]
             .filter(Boolean)
             .join("\n");
+          // Hidden clocks' lines are the GM's alone: contextForStory is what
+          // the player's timeline and saved tool log show.
+          const hiddenLines = applied.reports
+            .filter((r) => !r.visible)
+            .map((r) => r.line);
+          if (hiddenLines.length > 0) {
+            result.gmOnlyContext = hiddenLines.join("\n");
+          }
         }
       }
     }
@@ -5977,7 +6001,8 @@ function executeManageTimerOnClocks(
       );
     }
     case "cancel": {
-      if (clock.cancelled || isFull) {
+      // A full clock may be cancelled: that is how a filled clock is cleared.
+      if (clock.cancelled) {
         return fail(
           `Timer "${clock.name}" is already ${stateWord}`,
           `[Timer Error: Timer "${clock.name}" is already ${stateWord}]`

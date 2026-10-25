@@ -471,3 +471,14 @@ Where this entry and the plan above disagree, this entry is what was built.
 
 - The author chose to trim other tools rather than give `campaign` its own allowance. `manage_timer`'s description was cut (it also now says a timer is a clock once a campaign record exists) and its reserved, unread `auto_advance` parameter was removed from the schema (the executor still treats a missing value as false). `tests/toolBudget.test.ts` holds the whole default list, `campaign` included, under 10,000 (measured 9,977), and `CAMPAIGN_TOOL_EXTRA` is gone.
 
+
+### 2026-10-25, engine-review fixes (`claude/redesign-1`)
+
+- **Hidden clock lines are the GM's alone.** `applyTurnEvents` lines for a clock with `visible: false` go to a new `GMToolResult.gmOnlyContext`, appended only where the GM's tool message is built (`generation.ts`); `contextForStory` (the player's timeline, `part.gmToolCalls`, the narrator's context) keeps visible-clock lines only. `campaign` joined `HIDDEN_FROM_PLAYER_TOOLS` in `turnTimeline.ts`.
+- **Front wording** in the system prompt and the CAMPAIGN PLAN live section now teaches `campaign` (a `front` part plus a clock), identical for every story. This moves the system prompt and the live block's plan section for a story with no record too, so two of `campaign.oldSaves.test.ts`'s BEFORE digests were retaken (the other thirteen are untouched); the test comment says so. The brief's Clocks heading says which triggers the engine ticks and that `[manual]` ones move only on a tick.
+- **Stale `story.timers`** are not read once a record exists: `adjustTension` (`toolExecutor.ts`) and `selectFrame` (`primaMateria.ts`) read clocks only.
+- **Filled clocks** have no line of their own in the brief: one last line, "Filled (cancel one to clear it): a, b", which the budget drops first. The turn a clock fills is told by its tick result. A full clock can now be cancelled by `manage_timer cancel` and by a new `campaign` action `cancel` (one enum word; the list stays under budget, `toolBudget.test.ts`). `resume` undoes it.
+- **Gemini:** `filterToolsForGoogle` rewrites an object parameter with no properties (`campaign.data`) as a JSON string on a copy; `executeGMTools` parses a string `campaign.data` back before validation. The shared list is unchanged. A live Gemini check is in `pending_tests.md`.
+- **Unfireable triggers:** the validator refuses `rest` (needs `take_rest`) and `session` (needs `end_session`) when `resolveSystem(story).tools` lacks the tool, naming the triggers that can fire. `miss` and `scene` always can (`record_challenge_result`, `increment_scene`).
+- **`edit clock` refuses `filled`** (it bypassed `tickClock`), pointing at `tick`. The portent-key rekeying was skipped as asked.
+- **Compaction seed:** the timers reset to none, so migrated clocks that are full or cancelled are dropped too; a migrated clock still running is carried with the rest of the record.

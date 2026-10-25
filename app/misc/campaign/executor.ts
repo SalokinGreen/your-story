@@ -9,6 +9,7 @@
 import type { GMToolResult } from "../gmExecutor";
 import type { CampaignParams } from "../gmTools";
 import type { StoryData } from "../structs";
+import { resolveSystem } from "../systems/resolve";
 import { defaultClockVisibility, describeTick, tickClock } from "./clocks";
 import { migrateTimers } from "./migrate";
 import {
@@ -87,6 +88,19 @@ function result(
   };
 }
 
+/**
+ * Triggers an offered tool can fire (events.ts): scene (increment_scene), miss
+ * (record_challenge_result, and the system's rolls) and manual always; rest
+ * only from take_rest, session only from end_session, both system tools.
+ */
+function fireableTriggersFor(story: StoryData): string[] {
+  const tools = resolveSystem(story).tools as string[];
+  const out = ["manual", "scene", "miss"];
+  if (tools.includes("take_rest")) out.push("rest");
+  if (tools.includes("end_session")) out.push("session");
+  return out;
+}
+
 function ctxFor(story: StoryData, record: CampaignRecord, isNew: boolean): ValidationContext {
   return {
     isNew,
@@ -94,6 +108,7 @@ function ctxFor(story: StoryData, record: CampaignRecord, isNew: boolean): Valid
     npcs: (story.npcs ?? []).map((n) => ({ id: n.id, name: n.name })),
     threads: (story.threads ?? []).map((t) => ({ id: t.id, title: t.title })),
     beatsAllowed: record.style === "adventure_path",
+    fireableTriggers: fireableTriggersFor(story),
   };
 }
 
@@ -264,6 +279,10 @@ function executeWrite(story: StoryData, p: CampaignParams, toolCallId: string): 
     if (npcId && record.people.some((x) => x.npcId === npcId)) {
       return result(toolCallId, p, false, `person "${npcId}" already has an entry; use edit with id "${npcId}"`);
     }
+  }
+
+  if (isEdit && part === "clock" && p.data.filled !== undefined) {
+    return result(toolCallId, p, false, 'edit clock cannot set `filled`; use action "tick" with `by` (negative to take a segment back) and a `reason`');
   }
 
   const candidate = existing ? mergeForEdit(stripState(part, existing), p.data) : p.data;
@@ -521,6 +540,13 @@ function executeClockState(p: CampaignParams, record: CampaignRecord, toolCallId
     clock.paused = true;
     return result(toolCallId, p, true, `clock "${clock.name}" paused at ${clock.filled}/${clock.segments}`, { id: clock.id });
   }
+  if (p.action === "cancel") {
+    // Works on a full clock too: that is how a filled clock is cleared.
+    if (clock.cancelled) return result(toolCallId, p, false, `clock "${clock.name}" is already cancelled`, { id: clock.id });
+    clock.paused = true;
+    clock.cancelled = true;
+    return result(toolCallId, p, true, `clock "${clock.name}" cancelled at ${clock.filled}/${clock.segments}; resume it to use it again`, { id: clock.id });
+  }
   clock.paused = false;
   delete clock.cancelled;
   return result(toolCallId, p, true, `clock "${clock.name}" resumed at ${clock.filled}/${clock.segments}`, { id: clock.id });
@@ -646,6 +672,7 @@ export function executeCampaign(
     }
     case "pause":
     case "resume":
+    case "cancel":
       return executeClockState(p, record, toolCallId);
     case "reveal_secret":
     case "place_clue":

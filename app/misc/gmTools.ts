@@ -540,6 +540,7 @@ export type CampaignAction =
   | "reveal_secret"
   | "place_clue"
   | "find_clue"
+  | "cancel"
   | "advance_front"
   | "set_beat"
   | "open_side_beat"
@@ -1888,6 +1889,7 @@ const campaignTool: ToolSchema = {
             "tick",
             "pause",
             "resume",
+            "cancel",
             "reveal_secret",
             "place_clue",
             "find_clue",

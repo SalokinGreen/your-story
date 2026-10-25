@@ -60,8 +60,14 @@ function promptDigests(story: StoryData): string[] {
 // Taken on 2026-10-25 from `claude/gm-prompts-g1` (e8413c77): the GM prompts'
 // slice 1 without the campaign format, so the only difference left is the
 // campaign format's own (a story with no record must add nothing).
+// 2026-10-25 (engine-review fixes): two digests were retaken, the system prompt
+// and the live block's CAMPAIGN PLAN section, because the Front wording now
+// teaches `campaign` (a front part plus a clock) instead of create_thread +
+// manage_timer. That text is identical for every story, with or without a
+// record, so it is a prompt change shared by all stories, not a record leak;
+// the other thirteen digests are untouched.
 const BEFORE: string[] = [
-  "system:27125:79c6101a27fd1101",
+  "system:27181:6eb3f9c692730311",
   "user:9575:ec82a88c82afe716",
   "assistant:129:bbb8f4a3710e013a",
   "user:65:21f6cbf4db8f7103",
@@ -74,7 +80,7 @@ const BEFORE: string[] = [
   "assistant:171:3c8914881ba4c61a",
   "tool:158:62279d34a94c796d",
   "assistant:992:7ffd2be89ef124c3",
-  "user:17729:dcc57aa42dda3289",
+  "user:17856:d1ba86728d3f32bb",
   "assistant:82:75356dc26d8e4df6",
 ];
 

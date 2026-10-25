@@ -3685,7 +3685,9 @@ async function generateStoryTurnOnce(
 
                 if (!isActualError) {
                   // Valid result - show normally (includes failed dice checks!)
-                  toolContent = `[${result.toolName}] ${result.contextForStory}`;
+                  toolContent = `[${result.toolName}] ${result.contextForStory}${
+                    result.gmOnlyContext ? `\n${result.gmOnlyContext}` : ""
+                  }`;
                 } else {
                   // Actual error - make it prominent so AI can fix
                   const errorMsg = result.contextForStory || "Unknown error";

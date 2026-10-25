@@ -77,7 +77,7 @@ describe("the note-type table", () => {
       ],
     });
     expect(allText(withNpc)).toContain("NPC summaries; read the note for more");
-    expect(allText(withNpc)).toContain("tick a front's clock yourself with `manage_timer`");
+    expect(allText(withNpc)).toContain("tick a [manual] clock yourself with `campaign` tick");
     expect(allText(withNpc)).not.toContain("Fronts advance on their own");
   });
 });

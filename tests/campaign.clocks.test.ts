@@ -9,6 +9,7 @@ import {
   ticksForEvents,
 } from "@/app/misc/campaign/clocks";
 import { turnEventsFrom } from "@/app/misc/campaign/events";
+import { toolResultBlock } from "@/app/misc/turnTimeline";
 import { clock, drownedKingStory, front, record, run, story } from "./helpers/campaignFixtures";
 
 describe("defaultPortents", () => {
@@ -221,7 +222,11 @@ describe("clocks across a turn's rounds, through the executor", () => {
     const r1 = await failOnce(s);
     expect(r1.modifiedStoryData.campaign!.clocks[0].filled).toBe(1);
     expect(r1.results[1].clockReports).toHaveLength(1);
-    expect(r1.results[1].contextForStory).toContain('Clock (hidden) "The barrow wakes" 0/6 → 1/6');
+    // A hidden clock's line is the GM's alone: not in the player-visible context.
+    expect(r1.results[1].contextForStory).not.toContain("Clock (hidden)");
+    expect(r1.results[1].gmOnlyContext).toContain('Clock (hidden) "The barrow wakes" 0/6 → 1/6');
+    const block = toolResultBlock(r1.results[1]);
+    expect(block.contextForStory ?? "").not.toContain("barrow wakes");
     // round 2: something unrelated
     const r2 = await run(r1.modifiedStoryData, [{ name: "calculate", args: { expression: "1+1", reason: "x" } }], r1.turnLedger);
     // round 3: another miss in the same turn (the challenge is still active)

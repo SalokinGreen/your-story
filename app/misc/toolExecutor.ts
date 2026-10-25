@@ -1783,9 +1783,12 @@ export function executeTools(
           sceneType,
           combatActive: storyData.combatState?.active,
           timerNearZero:
-            (storyData.timers || []).some(
-              (t) => t.status === "active" && t.currentTicks <= 1
-            ) ||
+            // With a campaign record the clocks are the timers (migrated
+            // ones included); the old list is then stale and not read.
+            (!storyData.campaign &&
+              (storyData.timers || []).some(
+                (t) => t.status === "active" && t.currentTicks <= 1
+              )) ||
             (storyData.campaign?.clocks ?? []).some(
               (c) =>
                 !c.paused &&

@@ -10,6 +10,15 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Engine-review fixes on the campaign slice
+
+- **Play one turn on a Gemini model (Google AI Studio key) in a story that has a
+  campaign record** (add a clock with the `campaign` tool first, or open a
+  story with timers). Expected: the turn succeeds and the GM can call
+  `campaign` (a `data` argument arrives as a JSON string and is parsed).
+  Failure looks like a 400 from Google, "properties should be non-empty",
+  naming the `campaign` tool's `data` parameter.
+
 ## 2026-10-25 — Campaign format, slice C1 (decisions 222–225, 230–232, 241)
 
 Engine only; no screen shows it yet (the Lore panel is slice 6). All of it is

@@ -33,13 +33,8 @@ function clockLine(record: CampaignRecord, c: Clock): string {
   let line = `- ${c.name} ${c.filled}/${c.segments}`;
   if (flags.length) line += ` (${flags.join(", ")})`;
   line += ` [${trig}]`;
-  if (c.filled >= c.segments) {
-    const fate = c.onFill || frontForClock(record, c)?.doom;
-    line += fate ? ` FULL: ${fate}` : " FULL";
-  } else {
-    const next = nextPortent(record, c);
-    if (next) line += `; next: ${next}`;
-  }
+  const next = nextPortent(record, c);
+  if (next) line += `; next: ${next}`;
   return line;
 }
 
@@ -104,10 +99,13 @@ export function formatCampaignBrief(
 
   const groups: Group[] = [];
 
-  // 3. Clocks, nearest to full first.
-  const clocks = record.clocks
-    .filter((c) => !c.cancelled)
-    .slice()
+  // 3. Clocks, nearest to full first. A full clock has already said its fate
+  // in the tick result of the turn it filled, so it is not a line of its own:
+  // the filled ones go in one compact line at the very end (step 8), which is
+  // the first thing the budget drops.
+  const live = record.clocks.filter((c) => !c.cancelled);
+  const clocks = live
+    .filter((c) => c.filled < c.segments)
     .sort((a, b) => b.filled / b.segments - a.filled / a.segments);
   groups.push({ noun: "clocks", lines: clocks.map((c) => clockLine(record, c)) });
 
@@ -144,6 +142,13 @@ export function formatCampaignBrief(
   // 7. The people here.
   groups.push({ noun: "people", lines: peopleHere(story, record) });
 
+  // 8. Clocks already full, one line, last.
+  const filled = live.filter((c) => c.filled >= c.segments);
+  groups.push({
+    noun: "filled clocks",
+    lines: filled.length > 0 ? [`Filled (cancel one to clear it): ${filled.map((c) => c.name).join(", ")}`] : [],
+  });
+
   const used = (lines: string[]) => estimateTokens(lines.join("\n"));
   const out = [...head];
   const reserve = 24; // the "(+N ..., read with campaign)" line
@@ -152,7 +157,7 @@ export function formatCampaignBrief(
   for (const g of groups) {
     if (g.lines.length === 0) continue;
     let heading = "";
-    if (g.noun === "clocks") heading = "Clocks (the engine ticks them; nearest to full first):";
+    if (g.noun === "clocks") heading = "Clocks (nearest to full first; the engine ticks miss/scene/rest/session ones on those events, [manual] ones move only when you tick):";
     if (g.noun === "secrets") heading = "Secrets not yet revealed (read one for its truth):";
     if (g.noun === "stakes questions") heading = "Stakes questions:";
     if (g.noun === "people") heading = "People here:";

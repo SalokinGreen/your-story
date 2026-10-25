@@ -54,6 +54,11 @@ export interface ValidationContext {
   threads: { id: string; title: string }[];
   /** True when the record's style allows beats. */
   beatsAllowed: boolean;
+  /**
+   * The triggers some offered tool can fire in this story. Unset means every
+   * trigger is accepted (callers with no story to ask).
+   */
+  fireableTriggers?: readonly string[];
 }
 
 // What each part is once validated: no id (the executor makes it) and no
@@ -324,6 +329,11 @@ export function validatePart(
         for (const t of list) {
           if (!(CLOCK_TRIGGERS as readonly string[]).includes(t)) {
             return fail(`clock trigger "${t}" is not one of ${CLOCK_TRIGGERS.join(", ")}`);
+          }
+          if (ctx.fireableTriggers && !ctx.fireableTriggers.includes(t)) {
+            return fail(
+              `clock trigger "${t}" can never fire in this story: no tool it is offered fires it. Triggers that can: ${ctx.fireableTriggers.join(", ")}`,
+            );
           }
         }
         triggers = [...new Set(list)] as ClockTrigger[];
