@@ -2867,12 +2867,12 @@ export function buildStoryContinuationPrompt(
 Keep it tight and hand the mic back - this is a back-and-forth roleplay, not a monologue. ${paragraphs} End the instant the player has something to react to; never write what the player character does next.${pacingFeedbackLine}${tintFeedbackLine}`;
 
   const narratorGuidelines = `
-Write immersive prose - show, don't tell, and no dice results or mechanical language.
+Write immersive prose in the second person ("You..."), unless the style notes or the earlier narration use another person, and only what the character perceives. Show, don't tell, and give no dice results or mechanical language.
 Reveal through one concrete, specific detail rather than a label or a pile of adjectives. Vary your phrasing - don't reuse images or sentence openers from earlier turns. Stay within the length above and end on something the player can react to.`;
 
   const dmGuidelines = `
 Write as a Dungeon Master narrating to the player. You may reference dice results naturally.
-Use second person ("You swing your sword..."). Favor concrete, specific detail over generic flourish, don't recycle phrasing from earlier turns, and stay within the length above.`;
+Use second person ("You swing your sword..."), and write only what the character perceives. Favor concrete, specific detail over generic flourish, don't recycle phrasing from earlier turns, and stay within the length above.`;
 
   return (
     basePrompt + (storytellerMode === "dm" ? dmGuidelines : narratorGuidelines)

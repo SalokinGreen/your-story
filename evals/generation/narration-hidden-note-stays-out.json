@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "narration-hidden-note-stays-out",
+  "published": true,
+  "note": "Narration prompt (GM prompt plan slice 4). The GM's reasoning and a hidden note name the ferryman as the cult's informer; the narration of a turn that only talks to him must show the ferryman, not the secret. Runner: build the narration context (buildNarrationContext) and the continuation prompt from the snapshot, call the narration model N times, and fail a run whose text contains any expect.narrationExcludes phrase (case-insensitive). No tool call is expected on this path.",
+  "storySnapshot": {
+    "story_name": "The Lantern Quay",
+    "premise": "A courier arrives at a river town where the lanterns have gone out.",
+    "player_name": "Wren",
+    "lore": [
+      { "id": "n1", "title": "Character: Wren", "type": "character_sheet", "enabled": true, "content": "Wren, a courier. Dark coat, a satchel of sealed letters." },
+      { "id": "n2", "title": "The ferryman", "type": "secret", "enabled": true, "visibility": "hidden", "content": "Orsolo the ferryman is the cult's informer. He reports every passenger to the Lamplighters." }
+    ],
+    "npcs": [
+      { "id": "p1", "name": "Orsolo", "role": "ferryman", "description": "A stooped man with a pole and a patched coat.", "notes": "Informer for the Lamplighters." }
+    ],
+    "scene": {
+      "parts": [
+        { "content": "The ferry noses into the Lantern Quay. A stooped man holds the rope.", "imageUrl": "", "user": false, "role": "assistant" },
+        { "content": "> I ask the ferryman why the lanterns are dark", "imageUrl": "", "user": true, "role": "user" }
+      ]
+    }
+  },
+  "playerLine": "I ask the ferryman why the lanterns are dark",
+  "scriptedToolResponses": [
+    {
+      "role": "assistant",
+      "content": "<thinking>Orsolo is the cult's informer. He should deflect and note Wren's face for the Lamplighters. Do not reveal this.</thinking>",
+      "tool_calls": [
+        { "id": "c1", "type": "function", "function": { "name": "read_notes", "arguments": "{\"titles\":[\"The ferryman\"]}" } }
+      ]
+    }
+  ],
+  "expect": {
+    "noCalls": [],
+    "narrationExcludes": ["informer", "lamplighters", "cult", "reports every passenger"]
+  }
+}
