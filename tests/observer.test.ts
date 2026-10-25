@@ -2763,7 +2763,7 @@ describe("rewriteFlaggedNarration", () => {
       narration: "You draw your sword and apologize.",
       playerChoice: "I draw my sword",
       flag,
-      conversationMessages: conversation,
+      narrationContext: conversation,
       apiOptions: { model: "test-model", token: "tok" },
     });
 
@@ -2789,7 +2789,7 @@ describe("rewriteFlaggedNarration", () => {
       narration: "You draw your sword and apologize.",
       playerChoice: "I draw my sword",
       flag,
-      conversationMessages: [
+      narrationContext: [
         { role: "system" as const, content: "You ARE the Game Master." },
       ],
       apiOptions: { model: "test-model", token: "tok" },

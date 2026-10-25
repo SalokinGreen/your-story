@@ -89,6 +89,103 @@ export function redactForPlayer(text: string, toolName?: string): string {
   return out;
 }
 
+// ---- What the narrator may be told of a tool result ----------------------
+//
+// The narration call and every rewrite are given an allowlisted context
+// (campaign/narrationContext.ts, campaign design 14.1). A tool result gets in
+// only through publicSummary: the one-line, player-safe account of what the
+// tool did. It is an ALLOWLIST by tool name: a tool not listed here (a note
+// read, a memory search, the game-state dump, the campaign record, a hidden
+// roll, an edit of a note, a timer) contributes nothing, because its result
+// can hold the GM's secrets and the narrator has no use for it.
+
+/** Tools whose result text states an outcome the narration has to honour. */
+const NARRATOR_VISIBLE_TOOLS = new Set([
+  // dice and checks
+  "formula_roll",
+  "opposed_formula",
+  "calculate",
+  "action_roll",
+  "feat_roll",
+  "initiative_roll",
+  // oracles
+  "fate_question",
+  "roll_table",
+  "roll_portent",
+  "generate_name",
+  // system state the player can see
+  "manage_track",
+  "manage_meter",
+  "manage_feats",
+  "end_session",
+  "award_xp",
+  "take_rest",
+  // challenges
+  "start_challenge",
+  "record_challenge_result",
+  "cancel_challenge",
+  // combat
+  "start_combat",
+  "add_combatant",
+  "add_multiple_combatants",
+  "remove_combatant",
+  "update_combatant_stat",
+  "toggle_combatant_condition",
+  "advance_turn",
+  "end_combat",
+  "npc_roll",
+  "npc_reaction",
+  // the player's own answers
+  "ask_question",
+  "ask_for_roll",
+]);
+
+/** The longest public summary of one tool result, in characters. */
+const PUBLIC_SUMMARY_MAX_CHARS = 1200;
+
+/** The slice of a tool result publicSummary reads. */
+export interface PublicSummarySource {
+  toolName: string;
+  success?: boolean;
+  contextForStory?: string;
+  hiddenFromPlayer?: boolean;
+  /** Clock ticks the result caused (campaign/clocks.ts ClockReport). */
+  clockReports?: Array<{ visible: boolean; line: string }>;
+}
+
+/**
+ * The line the narrator (and a rewrite) may be given for one tool result, or
+ * null when it has none. Hidden clocks never appear: a visible clock's tick
+ * line is already part of `contextForStory`, a hidden one's lives only in
+ * `gmOnlyContext`, which this never reads. A result for a tool outside the
+ * allowlist yields only the visible clock lines it caused, if any. Errors
+ * yield null (their text echoes the GM's arguments). Anything between
+ * [[HIDDEN_LORE]] markers is replaced the way the player's own view replaces
+ * it (redactForPlayer).
+ */
+export function publicSummary(result: PublicSummarySource): string | null {
+  if (result.hiddenFromPlayer === true || HIDDEN_FROM_PLAYER_TOOLS.has(result.toolName)) {
+    return null;
+  }
+  const visibleClockLines = (result.clockReports ?? [])
+    .filter((r) => r.visible)
+    .map((r) => r.line);
+  const text = result.contextForStory ?? "";
+  if (/^\s*\[ERROR/.test(text) || /\*\*ERROR\*\*/.test(text)) return null;
+  if (!NARRATOR_VISIBLE_TOOLS.has(result.toolName)) {
+    return visibleClockLines.length > 0 ? visibleClockLines.join("\n") : null;
+  }
+  // The debug tail an error carries ("[Debug: params=...]") is the GM's
+  // arguments; no allowed tool's success text has one, but cut it regardless.
+  const cleaned = redactForPlayer(text, result.toolName)
+    .replace(/\n?\[Debug:[\s\S]*$/, "")
+    .trim();
+  if (!cleaned) return visibleClockLines.length > 0 ? visibleClockLines.join("\n") : null;
+  return cleaned.length > PUBLIC_SUMMARY_MAX_CHARS
+    ? `${cleaned.slice(0, PUBLIC_SUMMARY_MAX_CHARS)}…`
+    : cleaned;
+}
+
 let blockIdCounter = 0;
 function nextId(): string {
   blockIdCounter += 1;

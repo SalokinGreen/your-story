@@ -907,16 +907,15 @@ export interface RewriteNarrationParams {
    */
   narrationThoughts?: string;
   /**
-   * The exact conversation that produced this turn (GM system prompt + game
-   * state + scene history + this turn's tool calls and results, ending with
-   * the narration turn itself - see GenerationResult.gmPromptMessages). When
-   * present the rewrite CONTINUES
-   * that conversation instead of being prompted from scratch, which is the
-   * difference between "rewrite this paragraph" and "write a paragraph about
-   * something, good luck". Omitted only when a caller has no conversation to
-   * hand over, in which case the old standalone prompt is used.
+   * The allowlisted narration context the turn was written from
+   * (campaign/narrationContext.ts, GenerationResult.narrationContext): the
+   * player's line, the public summaries of the tool results, the tone, lines,
+   * veils and style notes, and the last turns' prose. It never holds the GM's
+   * reasoning, tool arguments or notes it read, so a rewrite cannot leak what
+   * they name. When present the rewrite continues it; omitted only when a
+   * caller has none, in which case the old standalone prompt is used.
    */
-  conversationMessages?: ChatMessage[];
+  narrationContext?: ChatMessage[];
   /**
    * Other reset-eligible checks whose verdicts aren't in yet, to be fixed
    * conditionally ("if it's also true of this narration") alongside the flag
@@ -978,8 +977,8 @@ const ALSO_FIX_CLAUSES: Partial<Record<ObserverFlagType, string>> = {
  * ground truth the rewrite must stay consistent with, not redone.
  *
  * It runs as a CONTINUATION of the turn's own conversation whenever the
- * caller hands one over (conversationMessages), exactly like the story
- * stage's buildStoryContinuationPrompt path. It used to be a standalone
+ * caller hands one over (narrationContext, built by the same function as the
+ * story stage's own request). It used to be a standalone
  * two-message prompt holding nothing but the player's action, the flagged
  * text, and the roll results - no premise, no scene history, no lore, no
  * character sheet - so a rewrite could only guess at everything the draft
@@ -1074,7 +1073,7 @@ ${rewriteRules}`;
   // Preferred path: continue the conversation that produced the turn, so the
   // rewrite still has the premise, the scene history, the notes, the character
   // sheet, and this turn's own tool results in front of it.
-  const conversation = params.conversationMessages || [];
+  const conversation = params.narrationContext || [];
   const messages: ChatMessage[] = conversation.length
     ? [...conversation, { role: "user" as const, content: flaggedBlock }]
     : (() => {

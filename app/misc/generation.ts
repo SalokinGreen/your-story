@@ -126,6 +126,7 @@ import { snapshotJudgeView } from "@/app/misc/judges/facts";
 import { buildReask, pacingNoteFor, runRung1 } from "@/app/misc/judges/rung1";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
+import { buildNarrationContext } from "@/app/misc/campaign/narrationContext";
 import {
   executeGMTools,
   GMToolResult,
@@ -695,23 +696,30 @@ export interface GenerationResult {
   gmStoryContext?: string;
   gmThinking?: string[]; // GM's "[GM]" reasoning text from each round
   gmConversation?: GMConversationMessage[]; // Full GM conversation for context preservation
-  // The complete message array that produced this turn - the GM system
-  // prompt, the game-state message (lore, notes, character sheet, scene
-  // history) and this turn's own assistant/tool round trips. Not persisted:
-  // it exists so a same-turn side call can CONTINUE this conversation rather
-  // than prompt from scratch (see observer.ts's rewriteFlaggedNarration,
-  // which produced context-free prose until it got this).
-  gmPromptMessages?: ChatMessage[];
+  // The allowlisted narration context (campaign/narrationContext.ts) this
+  // turn's narration was written from, or would have been: the player's line,
+  // the public summaries of the tool results, the tone, lines, veils and style
+  // notes, and the last turns' prose. Not persisted. A same-turn rewrite of the
+  // prose (observer.ts's rewriteFlaggedNarration) continues THIS, never the GM's
+  // conversation, which holds its reasoning, tool arguments and the notes it read.
+  narrationContext?: ChatMessage[];
   /**
    * The reasoning behind this turn's narration, gathered from wherever the
    * model happened to put it: the story stage's native reasoning stream, the
    * reasoning attached to the GM's terminal assistant message (when that round
    * wrote the prose itself), and any inline <thinking> segments. Not persisted
-   * - like gmPromptMessages it exists for same-turn side calls, specifically
-   * the observer's rewrite, which needs to know which parts of the draft were
-   * deliberate before it starts cutting.
+   * - like narrationContext it exists for same-turn side calls. It is handed
+   * to the Observer's judges only: it can quote the GM's secrets, so a rewrite
+   * of the prose never gets it.
    */
   narrationThoughts?: string;
+  /**
+   * The narrator's own reasoning, set only when a separate narration call wrote
+   * the prose. The narrator saw only the allowlisted context, so this is the
+   * one reasoning a rewrite may be shown (it tells the rewrite what in the
+   * draft was deliberate). Not persisted.
+   */
+  narrationOwnThoughts?: string;
   meta: {
     storyMeta?: GenerationMeta;
     toolsMeta?: GenerationMeta;
@@ -1334,7 +1342,14 @@ export async function generateStoryTurn(
           rewritten = await rewriteFlaggedNarration({
             narration: ctx.prose,
             playerChoice: playerLine,
-            gmStoryContext: ctx.gmStoryContext,
+            narrationContext: buildNarrationContext(
+              {
+                playerLine,
+                results: ctx.gmResults,
+                scenePartId,
+              },
+              storyData,
+            ),
             flag: pauseMajor,
             replyLength: options.replyLength,
             storytellerMode: options.storytellerMode,
@@ -1680,16 +1695,14 @@ export async function generateStoryTurn(
       const promise = rewriteFlaggedNarration({
         narration: judgedText,
         playerChoice: playerLine,
-        gmStoryContext: result.gmStoryContext,
         flag: speculativeFlag,
         replyLength: options.replyLength,
         storytellerMode: options.storytellerMode,
         characterContext: observerCharacterContext,
-        conversationMessages: result.gmPromptMessages,
-        // What the draft was going for, so the shortening pass cuts the
-        // scenery and keeps the plant. Free - it was already collected during
-        // the turn, so passing it adds no latency to the speculation.
-        narrationThoughts: result.narrationThoughts,
+        narrationContext: result.narrationContext,
+        // The narrator's own reasoning (never the GM's), so the shortening
+        // pass cuts the scenery and keeps the plant.
+        narrationThoughts: result.narrationOwnThoughts,
         // The other reviewers are still deciding while this runs, and the turn
         // only ever gets one rewrite - so their complaints ride along as
         // conditional instructions ("fix this too, if it's also true here").
@@ -1868,18 +1881,15 @@ export async function generateStoryTurn(
             rewrittenNarration = await rewriteFlaggedNarration({
               narration: judgedText,
               playerChoice: playerLine,
-              gmStoryContext: result.gmStoryContext,
               flag: majorFlag,
               replyLength: options.replyLength,
               storytellerMode: options.storytellerMode,
               characterContext: observerCharacterContext,
-              // Continue the turn's own conversation - the rewrite needs the
-              // premise, scene history, notes and roll results the draft was
-              // grounded in, or it writes prose for a story it can't see.
-              conversationMessages: result.gmPromptMessages,
-              // ...and what it was trying to do with them, so the fix keeps
-              // the deliberate parts of the draft intact.
-              narrationThoughts: result.narrationThoughts,
+              // The same allowlisted context the narration was written from:
+              // the player's line, the public roll summaries, the tone and
+              // style notes, the recent prose. Not the GM's reasoning or notes.
+              narrationContext: result.narrationContext,
+              narrationThoughts: result.narrationOwnThoughts,
               // The Observer's pin if the player set one, else the narration
               // voice (decision 52) - not sideCallApiOptions, or the rewrite
               // would silently skip that pin.
@@ -2490,19 +2500,17 @@ async function generateStoryTurnOnce(
   let choicesMeta: GenerationMeta | undefined;
   let storyReasoning = "";
   let storyReasoningDetails: ReasoningDetail[] = [];
-  // The story stage's own two messages (the continuation prompt, and the
-  // narration it produced), appended to gmPromptMessages so the observer's
-  // rewrite continues a conversation that actually contains the text it's
-  // being asked to rewrite. Only populated on the separate-narration-call
-  // path: when the GM's terminal round wrote the prose itself, that assistant
-  // message is already the last entry in gmConversationHistory and adding it
-  // again would show the rewrite the draft twice.
-  //
-  // Deliberately kept OUT of gmConversationForStorage/ScenePart.gmConversation
-  // below - that one is replayed as precomputedGMConversation on retries, and
-  // a narration turn sitting in it would prime the replayed GM stage to
-  // narrate again instead of adjudicating.
-  let narrationTurnMessages: ChatMessage[] = [];
+  // The allowlisted narration context (campaign/narrationContext.ts): the
+  // player's line, the public summaries of the turn's tool results, the tone,
+  // lines, veils and style notes, and the last turns' prose. The separate
+  // narration call is built from it, and so is every rewrite of the turn's
+  // prose (GenerationResult.narrationContext). It never holds the GM's
+  // reasoning, tool arguments or the notes it read. Built once, when the GM
+  // stage is done.
+  let narrationContext: ChatMessage[] | undefined;
+  // True once the separate narration call wrote the prose (its own reasoning
+  // is then safe to pass to a rewrite; the GM's never is).
+  let narrationWrittenSeparately = false;
 
   try {
     // ========================================
@@ -2552,8 +2560,7 @@ async function generateStoryTurnOnce(
 
     // Extract user choice - either from parameter or from last user scene
     // part. Needed by every branch below: the round loop uses it to run
-    // the GM stage, and the precomputed-conversation (retry) / no-choice
-    // branches use it to rebuild the GM base prompt without an API call.
+    // the GM stage, and the narration context carries it to the narrator.
     let gmUserChoice = playerLineOf(storyData, userChoice);
 
     // True once the reasoning-tier router actually resolves a tier this
@@ -2564,10 +2571,8 @@ async function generateStoryTurnOnce(
 
     // Use a precomputed GM conversation if provided (retry flow: reuse the
     // popped turn's saved gmConversation instead of re-running the GM
-    // stage's tool-calling loop). Rebuilding the base prompt here is cheap
-    // (no API call, just the system/state/tools message) - it lets Stage 1
-    // below treat this exactly like the normal "continue GM conversation"
-    // narration call.
+    // stage's tool-calling loop). Stage 1 below then writes the narration from
+    // the narration context, exactly as on a fresh turn.
     if (options.precomputedGMConversation) {
       gmConversationHistory = options.precomputedGMConversation;
       // Carry the reused attempt's actual tool results through to this
@@ -2576,22 +2581,6 @@ async function generateStoryTurnOnce(
       // and the Director Assistant, exactly like a turn that called no
       // tools at all.
       gmResults = options.precomputedGMResults || [];
-      const gmPrompt = buildGMStagePrompt({
-        storyData,
-        userChoice: gmUserChoice,
-        customMaxContext: options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
-        customMaxOutput: options.customMaxOutput,
-        modelName: narrationModel,
-        replyLength: options.replyLength,
-        pacingNote,
-        observerNote: options.observerNote,
-        storyProgressNote: options.storyProgressNote,
-        repetitionNote: options.repetitionNote,
-        knowledgeNote: options.knowledgeNote,
-        imageToolAvailable: !!options.imageToolContext?.enabled,
-        imagesPerScene: options.imageToolContext?.maxPerScene,
-      });
-      gmBaseMessages = gmPrompt.messages;
       logger.action("Using precomputed GM conversation (retry flow)", {
         historyEntries: gmConversationHistory.length,
       });
@@ -2628,27 +2617,10 @@ async function generateStoryTurnOnce(
 
       if (!gmUserChoice) {
         // No prior user choice to adjudicate (e.g. very first turn) - skip
-        // the tool-calling loop, but still build the base prompt so Stage 1
-        // has something to continue.
+        // the tool-calling loop; the narrator writes from the narration
+        // context (an opening scene has no player line).
         logger.action("GM stage skipped - no user choice found");
         gmStoryContext = "";
-        const gmPrompt = buildGMStagePrompt({
-          storyData,
-          userChoice: "",
-          customMaxContext:
-            options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
-          customMaxOutput: options.customMaxOutput,
-          modelName: narrationModel,
-          replyLength: options.replyLength,
-          pacingNote,
-          observerNote: options.observerNote,
-          storyProgressNote: options.storyProgressNote,
-          repetitionNote: options.repetitionNote,
-          knowledgeNote: options.knowledgeNote,
-          imageToolAvailable: !!options.imageToolContext?.enabled,
-          imagesPerScene: options.imageToolContext?.maxPerScene,
-        });
-        gmBaseMessages = gmPrompt.messages;
       } else {
         // Two-Pass Visibility (§2.3): resolve "check_per_turn" lore once per
         // turn, before the round loop starts - the digital equivalent of a
@@ -4519,17 +4491,21 @@ async function generateStoryTurnOnce(
         contentLength: storyContent.length,
       });
     } else {
-      // No GM content yet - continue the GM's own conversation with a short
-      // prompt asking it to write the narration now. gmBaseMessages is
-      // always populated by this point (the round loop, the
-      // precomputed-conversation/retry branch, or the no-user-choice
-      // branch above all build it), so this is the only remaining way
-      // Stage 1 produces a story - the old standalone buildStoryPrompt()
-      // call (used only for NovelAI, retries, and this fallback) has been
-      // retired in favor of always continuing the same conversation.
-      logger.action("Stage 1: Continuing GM conversation for story generation", {
-        baseMessages: gmBaseMessages.length,
-        historyEntries: gmConversationHistory.length,
+      // No GM content: the narrator writes the turn. It is NOT handed the GM's
+      // conversation (its reasoning, tool arguments and the notes it read can
+      // name a secret, status report 6.16); it gets the allowlisted narration
+      // context instead.
+      narrationContext = buildNarrationContext(
+        {
+          playerLine: gmUserChoice,
+          results: gmResults,
+          scenePartId: options.scenePartId,
+        },
+        storyData,
+      );
+      logger.action("Stage 1: Writing the narration from the narration context", {
+        contextMessages: narrationContext.length,
+        toolResults: gmResults.length,
         narrationModel,
       });
 
@@ -4548,10 +4524,9 @@ async function generateStoryTurnOnce(
         formatTintLine(storyData),
       );
 
-      // Build messages: GM base + conversation history + story prompt
+      // Build messages: the narration context + the story prompt
       const storyMessages: ChatMessage[] = [
-        ...gmBaseMessages,
-        ...gmConversationHistory,
+        ...narrationContext,
         {
           role: "user" as const,
           content: storyContinuationPrompt,
@@ -4802,16 +4777,15 @@ async function generateStoryTurnOnce(
         storyContent = deAiifyText(storyContent);
       }
 
-      // Record the story stage as part of the turn's conversation. Without
-      // this, gmPromptMessages ended at the last GM round - so the observer's
-      // rewrite continued a conversation that stopped immediately before the
-      // narration, and saw the flagged prose only as text quoted at it, with
-      // no reasoning behind it. Reasoning rides along on the assistant message
-      // for the providers that accept it (sanitizeMessages forwards it to
-      // OpenRouter/Google only); rewriteFlaggedNarration also pastes it into
-      // the prompt as text so it survives the providers that don't.
+      // The narrator's own round trip joins the context a rewrite continues,
+      // so the rewrite sees the draft as the narrator's last turn and, below,
+      // the narrator's own reasoning. That reasoning is safe to hand on: the
+      // narrator was only ever given the allowlisted context. (The GM's is not,
+      // and never reaches a rewrite.) Deliberately kept out of
+      // gmConversationForStorage, which is replayed on retries.
       if (storyContent.trim()) {
-        narrationTurnMessages = [
+        narrationContext = [
+          ...narrationContext,
           { role: "user", content: storyContinuationPrompt },
           {
             role: "assistant",
@@ -4823,6 +4797,7 @@ async function generateStoryTurnOnce(
           },
         ];
       }
+      narrationWrittenSeparately = true;
 
       callbacks.onStoryComplete?.(
         storyContent,
@@ -5039,6 +5014,15 @@ async function generateStoryTurnOnce(
         .join("\n\n")
         .trim() || undefined;
 
+    // The narrator's own reasoning, only when a separate narration call wrote
+    // the prose: the one reasoning a rewrite may be shown (see above).
+    const narrationOwnThoughts = narrationWrittenSeparately
+      ? [storyReasoning.trim(), extractThinkingText(rawStoryContent)]
+          .filter(Boolean)
+          .join("\n\n")
+          .trim() || undefined
+      : undefined;
+
     // Layer-5 consistency check (see consistencyCheck.ts): narration has
     // already streamed to the client by this point, so this is recorded
     // for display/debugging and eval-harness metrics, never a live gate.
@@ -5155,15 +5139,21 @@ async function generateStoryTurnOnce(
       gmResults: gmResults.length > 0 ? gmResults : undefined,
       gmStoryContext: gmStoryContext || undefined,
       gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
-      gmPromptMessages:
-        gmBaseMessages.length > 0
-          ? [
-              ...gmBaseMessages,
-              ...gmConversationHistory,
-              ...narrationTurnMessages,
-            ]
-          : undefined,
+      // The same allowlisted context the narration call used, or built now
+      // for a turn the GM wrote inline: a rewrite of this turn's prose starts
+      // from it, never from the GM's conversation.
+      narrationContext:
+        narrationContext ??
+        buildNarrationContext(
+          {
+            playerLine: gmUserChoice,
+            results: gmResults,
+            scenePartId: options.scenePartId,
+          },
+          storyData,
+        ),
       narrationThoughts,
+      narrationOwnThoughts,
       meta: {
         storyMeta,
         toolsMeta,

@@ -667,6 +667,23 @@ Found 2026-10-22; verified in the code.
   handed to the story stage (and decide whether `search_notes` should default
   to excluding hidden notes), with a test on the narrator's messages.
 
+> **Update 2026-10-25 (campaign slice 2): fixed for the separate narration call
+> and for rewrites.** The narration call no longer continues the GM's
+> conversation. `buildNarrationContext` (`app/misc/campaign/narrationContext.ts`)
+> builds it from an allowlist (the player's line, each tool result's
+> `publicSummary`, the tone, lines, veils and style notes, the last turns'
+> prose), runs the GM's prose and the earlier prose through
+> `extractVisibleText` and `stripHiddenLoreContent` (the stripper's first
+> caller), and never holds the GM's reasoning, tool arguments or a note it
+> read. `rewriteFlaggedNarration` and the pause rewrite get the same context.
+> `tests/campaign.narrationContext.test.ts` plants a canary in the GM's
+> reasoning, a tool argument, a read secret note and a campaign secret, and
+> asserts none is in either request. **Not covered:** when the GM's own final
+> round is the prose (the common path) the GM wrote it with the secrets in
+> view, and only the secret-leak judge (judge layer v2) checks that.
+> `search_notes` still returns hidden notes to the GM by default, which is the
+> GM's to see.
+
 ### 6.17 `calculate` strips letters and commas: `min(12,10)` evaluates as 1210
 
 **Severity: medium (a confident wrong answer).** Found 2026-10-22; verified in
@@ -768,6 +785,15 @@ planning the token-savings build; verified in the code.
   existing notes to `dm_instructions`. The token-savings plan
   ([`token-savings-implementation-plan.md`](token-savings-implementation-plan.md))
   leaves this alone.
+
+> **Update 2026-10-25 (campaign slice 2): partly fixed.** The enabled
+> `story_instructions` notes now go in full into the narration context, which
+> the separate narration call and every rewrite use (design 6, "Style notes
+> reach the narrator"). **Still open:** when the GM's own final round writes the
+> prose, which is the common path, the GM writes it and still sees only the
+> notes' titles, so the style guide does not steer that prose; and the
+> choices stage still excludes the type. The narration prompt redesign (plan
+> G4) is where that path would pick them up.
 
 ---
 
