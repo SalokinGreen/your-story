@@ -356,8 +356,8 @@ clocks, falling back to legacy timers.
 
 **The record.** It is `StoryData.campaign?: CampaignRecord`, carrying
 `version: 1`. Every part has a stable id (`clk_`, `fac_`, `frt_`, `sec_`,
-`clu_`, `loc_`, `end_` prefixes), made with the app's existing id helper,
-never at render time.
+`clu_`, `loc_`, `end_` prefixes), made with `crypto.randomUUID()` inside an executor or a migration
+(the app has no shared id helper), never at render time.
 
 **References.**
 - A person is referenced by NPC id, and a location's note by note id.
