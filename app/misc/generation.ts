@@ -93,6 +93,7 @@ import {
   isAbortError,
   REWRITABLE_FLAG_TYPES,
   ObserverSettings,
+  extractGmReasoning,
 } from "@/app/misc/observer";
 import { formatTintLine } from "@/app/misc/primaMateria";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
@@ -226,7 +227,7 @@ const DICE_TOOLS = [
  * so every tool call still has its tool message.
  */
 export function mergeRefusedDiceCalls(
-  all: ReadonlyArray<{ id: string; function: { name: string } }>,
+  all: ReadonlyArray<{ id: string; function: { name: string; arguments?: unknown } }>,
   ran: ReadonlyArray<{ id: string }>,
   execution: GMExecutionResult,
 ): GMExecutionResult {
@@ -234,19 +235,75 @@ export function mergeRefusedDiceCalls(
   let next = 0;
   const results: GMToolResult[] = all.map((tc) => {
     if (ranIds.has(tc.id)) return execution.results[next++];
-    return {
+    const why = reaskRefusal(tc);
+    const refused: GMToolResult = {
       toolName: tc.function.name,
       toolCallId: tc.id,
       success: false,
       result: {
         type: "state_change",
-        message: "refused: the dice were already thrown this turn",
+        message:
+          why === "pause"
+            ? "refused: a re-ask never pauses on the player"
+            : "refused: the dice were already thrown this turn",
         command: tc.function.name,
       },
-      contextForStory: `[ERROR] ${tc.function.name} was not run: this turn's dice are already thrown, and a re-ask never rolls again. Use the result you have.`,
+      contextForStory:
+        why === "pause"
+          ? `[ERROR] ${tc.function.name} was not run: this is a re-ask inside the turn, and it never stops to ask the player. Use what you have.`
+          : `[ERROR] ${tc.function.name} was not run: this turn's dice are already thrown, and a re-ask never rolls or draws again. Use the result you have.`,
     };
+    REASK_REFUSED.add(refused);
+    return refused;
   });
   return { ...execution, results };
+}
+
+/** True when the story's campaign record holds a line with a keyword to watch for. */
+export function storyHasLineKeywords(
+  story: Pick<StoryData, "campaign">,
+): boolean {
+  return (story.campaign?.safety?.lines ?? []).some(
+    (l) => (l.keywords ?? []).some((k) => k.trim() !== ""),
+  );
+}
+
+/** Results a re-ask refused: kept for the provider's tool message, hidden from the player. */
+const REASK_REFUSED = new WeakSet<GMToolResult>();
+export function isReaskRefused(result: GMToolResult): boolean {
+  return REASK_REFUSED.has(result);
+}
+
+/** Tools that draw or roll besides DICE_TOOLS: a re-ask never calls them. */
+const REASK_EXTRA_ROLL_TOOLS = ["fate_question", "roll_table", "roll_portent"];
+/** Tools that stop the turn for the player. */
+const REASK_PAUSE_TOOLS = ["ask_question", "ask_for_roll", "confirm_setup"];
+
+/**
+ * Why a re-ask round may not run this call, or null when it may: it rolls or
+ * draws (every dice tool, the oracles, a track's progress roll), or it would
+ * pause the turn on the player. The list is the re-ask's own; the GM's tool
+ * list itself stays the one stable list.
+ */
+export function reaskRefusal(tc: {
+  function: { name: string; arguments?: unknown };
+}): "roll" | "pause" | null {
+  const name = tc.function.name;
+  if (REASK_PAUSE_TOOLS.includes(name)) return "pause";
+  if (DICE_TOOLS.includes(name) || REASK_EXTRA_ROLL_TOOLS.includes(name)) {
+    return "roll";
+  }
+  if (name === "manage_track") {
+    try {
+      const raw = tc.function.arguments;
+      const args =
+        typeof raw === "string" ? JSON.parse(raw || "{}") : (raw ?? {});
+      if ((args as { action?: unknown }).action === "progress_roll") return "roll";
+    } catch {
+      // Unreadable arguments: the executor will refuse them itself.
+    }
+  }
+  return null;
 }
 
 /**
@@ -1063,8 +1120,13 @@ export async function generateStoryTurn(
   // judging is done; the text is then released once, rewritten or not. Not in
   // session zero, which has its own buffering (the setup gate), and not when
   // every judge can only flag, where text streams live as before.
+  // A campaign line with keywords holds the text too (rung 2, judges/rung1.ts):
+  // a re-ask may replace the prose, so a line's word must never stream first,
+  // whatever the judges are set to.
   const holdTurnText =
-    !storyData.sessionZeroActive && canObserverTriggerReset(observerSettings);
+    !storyData.sessionZeroActive &&
+    (canObserverTriggerReset(observerSettings) ||
+      storyHasLineKeywords(storyData));
   const held = holdTurnText ? createHeldTurnOutput(callbacks) : null;
   // Set only when a tier_escalation_missed flag forces a full-turn retry
   // (see below) - floors the retry's GM-stage starting tier so the forced
@@ -2855,8 +2917,8 @@ async function generateStoryTurnOnce(
           after: { thinking: number; accumulated: number; context: number };
           /** The draft's own text, set aside while a prose re-ask is answered. */
           stash: { thinking: string[]; accumulated: string[]; context: string[] };
-          /** Where the draft sits in the conversation, or -1. */
-          historyIndex: number;
+          /** The assistant messages that carried the draft (a prose re-ask). */
+          draftHistory: number[];
         } | null = null;
         // The re-ask round's outcome, settled on the first prose-only round
         // after it (or at the loop's end). A prose re-ask (a line) replaces the
@@ -2869,14 +2931,34 @@ async function generateStoryTurnOnce(
           r.resolved = true;
           if (r.replacesProse) {
             if (visibleNow) {
-              const draft = conversationHistory[r.historyIndex];
-              if (r.historyIndex >= 0 && draft?.role === "assistant") {
-                conversationHistory.splice(r.historyIndex, 1);
+              // The new words replace the draft span: the draft's rounds keep
+              // their reasoning and tool calls but no longer carry prose, so
+              // the saved conversation and later rounds read the new passage
+              // once.
+              for (const i of r.draftHistory) {
+                const m = conversationHistory[i];
+                if (m?.role !== "assistant") continue;
+                if (extractVisibleText(m.content || "") === "") continue;
+                const reasoning = extractGmReasoning(m.content);
+                m.content = reasoning
+                  ? `<thinking>\n${reasoning}\n</thinking>`
+                  : "";
               }
             } else {
-              gmThinking.splice(r.before.thinking, 0, ...r.stash.thinking);
-              gmAccumulatedStory.splice(r.before.accumulated, 0, ...r.stash.accumulated);
-              allGMContextParts.splice(r.before.context, 0, ...r.stash.context);
+              // No words came back: the draft stands, and so does nothing the
+              // re-ask rounds wrote around their calls.
+              gmThinking.length = Math.min(gmThinking.length, r.before.thinking);
+              gmAccumulatedStory.length = Math.min(
+                gmAccumulatedStory.length,
+                r.before.accumulated,
+              );
+              allGMContextParts.length = Math.min(
+                allGMContextParts.length,
+                r.before.context,
+              );
+              gmThinking.push(...r.stash.thinking);
+              gmAccumulatedStory.push(...r.stash.accumulated);
+              allGMContextParts.push(...r.stash.context);
             }
           } else {
             gmThinking.length = Math.min(gmThinking.length, r.after.thinking);
@@ -3518,7 +3600,10 @@ async function generateStoryTurnOnce(
             const newNormalized = normalizeForComparison(newThinking);
 
             // Check if this thinking is substantially similar to previous entries
-            const isDuplicate = gmThinking.some((prev) => {
+            // A prose re-ask is answered with a passage that may repeat what the
+            // draft said, on purpose: nothing the draft left behind may swallow it.
+            const answeringReask = reask !== null && !reask.resolved && reask.replacesProse;
+            const isDuplicate = !answeringReask && gmThinking.some((prev) => {
               const prevNormalized = normalizeForComparison(prev);
               // Exact normalized match
               if (prevNormalized === newNormalized) return true;
@@ -3540,7 +3625,7 @@ async function generateStoryTurnOnce(
               if (rawContent) {
                 // Check for duplicate content
                 const contentNormalized = normalizeForComparison(rawContent);
-                const isAlreadyAccumulated = gmAccumulatedStory.some(
+                const isAlreadyAccumulated = !answeringReask && gmAccumulatedStory.some(
                   (existing) => {
                     const existingNormalized = normalizeForComparison(existing);
                     // Check for exact match or high overlap
@@ -3625,8 +3710,8 @@ async function generateStoryTurnOnce(
             const reaskBlocking = reask !== null && !reask.resolved;
             const callsToRun: typeof gmResult.toolCalls = reaskBlocking
               ? gmResult.toolCalls.filter(
-                  (tc: { function: { name: string } }) =>
-                    !DICE_TOOLS.includes(tc.function.name),
+                  (tc: { function: { name: string; arguments?: unknown } }) =>
+                    reaskRefusal(tc) === null,
                 )
               : gmResult.toolCalls;
             const rawExecution = await executeGMTools(
@@ -3672,13 +3757,18 @@ async function generateStoryTurnOnce(
             }
 
             // Accumulate results across rounds
-            gmResults.push(...gmExecution.results);
+            // A call a re-ask refused is no result the player or the saved
+            // log should see; its error text reaches the provider below.
+            gmResults.push(
+              ...gmExecution.results.filter((r) => !isReaskRefused(r)),
+            );
             if (gmExecution.storyContext) {
               allGMContextParts.push(gmExecution.storyContext);
             }
 
             // Notify callback for each tool result (for real-time interleaved display)
             for (const result of gmExecution.results) {
+              if (isReaskRefused(result)) continue;
               callbacks.onGMToolResult?.(result);
             }
 
@@ -4161,10 +4251,17 @@ async function generateStoryTurnOnce(
             if (
               !sessionZeroTurn &&
               !isRepetitive &&
+              !rollGateDeclined &&
               !reaskUsed &&
               !options.precomputedGMResults &&
               MAX_GM_ROUNDS - gmRound >= 2
             ) {
+              // The prose the player has not seen: everything accumulated
+              // after what a pause already released.
+              const releasedCount = pauseReleasedEntry ? 1 : 0;
+              const unreleasedProse = extractVisibleText(
+                gmAccumulatedStory.slice(releasedCount).join("\n\n"),
+              );
               let plan: ReturnType<typeof buildReask> = null;
               try {
                 plan = buildReask(
@@ -4172,7 +4269,7 @@ async function generateStoryTurnOnce(
                     storyBefore: storyBeforeJudgeView,
                     storyAfter: storyData,
                     results: gmResults,
-                    prose: extractVisibleText(content),
+                    prose: unreleasedProse,
                     system: resolveSystem(storyData).system,
                   }),
                 );
@@ -4186,7 +4283,6 @@ async function generateStoryTurnOnce(
               }
               if (plan) {
                 reaskUsed = true;
-                const draftInHistory = conversationHistory.length > roundMarks.history;
                 const after = {
                   thinking: gmThinking.length,
                   accumulated: gmAccumulatedStory.length,
@@ -4197,20 +4293,26 @@ async function generateStoryTurnOnce(
                   replacesProse: plan.replacesProse,
                   resolved: false,
                   before: {
-                    thinking: roundMarks.thinking,
-                    accumulated: roundMarks.accumulated,
+                    thinking: pauseThinkingMark,
+                    accumulated: releasedCount,
                     context: roundMarks.context,
                   },
                   after,
                   stash: { thinking: [], accumulated: [], context: [] },
-                  historyIndex: draftInHistory ? roundMarks.history : -1,
+                  draftHistory: [],
                 };
                 if (plan.replacesProse) {
-                  // Set the draft aside; it comes back if the GM answers
-                  // with no words.
+                  // The whole unreleased span is the draft: set it aside (it
+                  // comes back if the GM answers with no words) and note which
+                  // assistant messages carried it.
+                  conversationHistory.forEach((m, i) => {
+                    if (m.role === "assistant" && i >= pauseHistoryMark) {
+                      reask?.draftHistory.push(i);
+                    }
+                  });
                   reask.stash = {
-                    thinking: gmThinking.splice(roundMarks.thinking),
-                    accumulated: gmAccumulatedStory.splice(roundMarks.accumulated),
+                    thinking: gmThinking.splice(pauseThinkingMark),
+                    accumulated: gmAccumulatedStory.splice(releasedCount),
                     context: allGMContextParts.splice(roundMarks.context),
                   };
                 }
@@ -4957,17 +5059,33 @@ async function generateStoryTurnOnce(
     let rung1PacingNote: string | undefined;
     try {
       const couchPlayers = storyData.multiplayer?.couchPlayers ?? [];
-      const players =
+      const seated =
         couchPlayers.length > 1
           ? couchPlayers.map((p) => ({ id: p.id, name: p.name }))
           : (options.setupPlayers ?? []);
+      // A player is also addressed by their character's name: a sheet they
+      // own, or one titled "Character: <name>".
+      const players = seated.map((p) => {
+        const aliases = new Set<string>();
+        for (const note of storyData.lore ?? []) {
+          if (note.type !== "character_sheet") continue;
+          if (note.ownerCouchPlayerId !== p.id) continue;
+          const m = /^\s*character:\s*(.+?)\s*$/i.exec(note.title || "");
+          if (m && m[1].toLowerCase() !== p.name.toLowerCase()) aliases.add(m[1]);
+        }
+        return { ...p, aliases: [...aliases] };
+      });
       const rung1Hits = runRung1({
         storyBefore: storyBeforeJudgeView,
         storyAfter: storyData,
         results: options.precomputedGMResults ? [] : gmResults,
         prose: storyContent,
         system: resolveSystem(storyData).system,
-        priorParts: storyData.scene?.parts ?? [],
+        // Without this turn's own part: when the text was not held the page
+        // has already pushed it, and it would count itself.
+        priorParts: (storyData.scene?.parts ?? []).filter(
+          (p) => !options.scenePartId || p.id !== options.scenePartId,
+        ),
         players: players.length > 1 ? players : undefined,
       });
       for (const hit of rung1Hits) {

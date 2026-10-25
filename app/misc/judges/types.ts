@@ -7,7 +7,7 @@ import type { StoryData } from "../structs";
 
 /** What a turn's checks read of a story: a StoryData satisfies it, a snapshot is cheaper. */
 export type JudgeStoryView = Pick<StoryData, "npcs" | "meters" | "campaign"> &
-  Partial<Pick<StoryData, "multiplayer">>;
+  Partial<Pick<StoryData, "multiplayer" | "systemState">>;
 
 /** The slice of a GMToolResult the checks read. */
 export interface JudgeToolResult {
@@ -62,6 +62,8 @@ export type ExpectResult =
       evidence: string;
       /** Two triggers that owe the same thing share a key, so one hit is made. */
       key?: string;
+      /** A real mismatch that asking the GM could only make worse: flag it, never re-ask. */
+      flagOnly?: boolean;
     };
 
 /** What a contract reads: the trigger, the turn's results and the story after it. */

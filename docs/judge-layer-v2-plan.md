@@ -298,9 +298,10 @@ runs rise by more than 2 of 20 on two separate runs.
   an `[ERROR]` result in its place, so the transcript stays well formed
   (`mergeRefusedDiceCalls`, exported for the test). The refused result also
   enters `gmResults`, as an error, which every reader already skips.
-- **The re-ask sees the final round's prose only.** Lines in an earlier round's
-  prose or in a separate narration call are not re-asked (the narration is not
-  written yet at that gate); the post-narration pass logs them.
+- **The re-ask sees the final round's prose only.** *Revised the same day by the
+  engine review (below): it now reads all unreleased prose.* A line in a separate
+  narration call is still not re-asked (the narration is not written yet at that
+  gate); the post-narration pass logs it.
 - **Pacing counters use turns, not scenes.** Nothing records when a clock last
   moved, so "turns since a clock moved" reads the prior parts' stored tool
   messages for a `[Clock` line (10 turns, `PACING_CLOCK_IDLE_TURNS`); the
@@ -319,4 +320,49 @@ runs rise by more than 2 of 20 on two separate runs.
 - **Where the held text matters.** With the default settings the turn is held
   (decision 221), so a replaced draft is never shown. When every judge only
   flags, text streams live and a draft that is later replaced has already been
-  on screen once.
+  on screen once. *Revised by the engine review (below): a campaign line with a
+  keyword now holds the text whatever the judges are set to.*
+
+### 2026-10-25 — engine review of J1 (ten findings, all fixed)
+
+1. **`pacingNote` is saved.** The page's three `onComplete` handlers copy it
+   from `result.scenePart` with the other named fields; before, only the
+   generation result carried it, so the next turn read nothing. Tested on the
+   read side (`tests/generation.reask.test.ts`, "the pacing note"); the page
+   copy has no unit test (the page is not testable headless) and is on the
+   pending-tests list.
+2. **A prose re-ask replaces exactly the unseen span.** The draft is everything
+   accumulated after `pauseReleasedEntry`: its accumulation entries, its
+   `gmThinking` entries (from `pauseThinkingMark`) and its final-round context
+   part are set aside; the message quotes the whole passage; the accumulation and
+   thinking de-duplication is off for the answering rounds, so a reply that
+   repeats an earlier round is kept. On an answer with words the draft's
+   assistant messages keep their reasoning and tool calls but lose their prose;
+   on no words every part of the draft comes back and nothing the re-ask rounds
+   wrote around their calls stays.
+3. **A line word in an earlier round is caught**, by the same span. (Reverses the
+   "final round only" decision above.)
+4. **Pacing notes fire once per run.** The clock note fires as the count of turns
+   without a move (this one included) reaches each multiple of 10; the spotlight
+   note the same, per player, at multiples of 4. Migrated records, clocks from
+   migrated timers and manual-only clocks are left out of the clock counter. The
+   current part (`options.scenePartId`) is dropped from `priorParts`. Repeated
+   phrases need three words, exclude phrases containing an NPC's or a player's
+   name word, and are said once per run (the previous turn's note is checked).
+   A player counts as addressed by their character's name too (an owned sheet
+   titled "Character: <name>").
+5. **Foe-damage:** a target that is a hero (`systemState.fantasticRealms.heroes`)
+   is no foe; more hearts recorded than owed is a flag (`ExpectResult.flagOnly`),
+   never a re-ask, because the fix would heal the foe.
+6. **The re-ask has its own refusal list** (`reaskRefusal`): every dice tool, the
+   oracles (`fate_question`, `roll_table`, `roll_portent`) and `manage_track`'s
+   `progress_roll`.
+7. **Rung 1 is skipped when the roll gate removed the round** (`rollGateDeclined`).
+8. **Pausing tools are refused in a re-ask** (`ask_question`, `ask_for_roll`,
+   `confirm_setup`), with the same refusal shape.
+9. **A campaign line with a keyword holds the live text** (`storyHasLineKeywords`
+   joins `canObserverTriggerReset` in `holdTurnText`), so a word the re-ask may
+   remove never streams, even with every judge on Flag.
+10. **Refused re-ask calls are hidden**: not pushed to `gmResults`, not sent to
+    `onGMToolResult`, but their `[ERROR]` tool messages still go to the provider.
+    (They are tracked in a `WeakSet`, `isReaskRefused`.)

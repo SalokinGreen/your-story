@@ -368,7 +368,7 @@ describe("pacing counters", () => {
 
   it("notes a clock that has not moved for the threshold, for the GM's next turn", () => {
     const hits = runRung1(
-      turn({ storyAfter: clockStory, prose: "A quiet street.", priorParts: quiet(PACING_CLOCK_IDLE_TURNS) }),
+      turn({ storyAfter: clockStory, prose: "A quiet street.", priorParts: quiet(PACING_CLOCK_IDLE_TURNS - 1) }),
     );
     const hit = hits.find((h) => h.check === "pacing_clock");
     expect(hit).toBeDefined();
@@ -393,7 +393,7 @@ describe("pacing counters", () => {
         turn({
           storyAfter: clockStory,
           prose: "x",
-          priorParts: quiet(PACING_CLOCK_IDLE_TURNS + 2),
+          priorParts: quiet(PACING_CLOCK_IDLE_TURNS - 1),
           results: [now as JudgeToolResult],
         }),
       ).some((h) => h.check === "pacing_clock"),
@@ -412,7 +412,7 @@ describe("pacing counters", () => {
       },
     });
     expect(
-      runRung1(turn({ storyAfter: stopped, prose: "x", priorParts: quiet(20) })).some(
+      runRung1(turn({ storyAfter: stopped, prose: "x", priorParts: quiet(PACING_CLOCK_IDLE_TURNS - 1) })).some(
         (h) => h.check === "pacing_clock",
       ),
     ).toBe(false);
@@ -423,7 +423,7 @@ describe("pacing counters", () => {
       { id: "p1", name: "Ayla" },
       { id: "p2", name: "Bram" },
     ];
-    const parts: PriorPartView[] = Array.from({ length: PACING_SPOTLIGHT_TURNS }, () => ({
+    const parts: PriorPartView[] = Array.from({ length: PACING_SPOTLIGHT_TURNS - 1 }, () => ({
       content: "Ayla watches the door.",
     }));
     const hits = runRung1(turn({ prose: "Ayla ducks.", priorParts: parts, players }));
@@ -518,5 +518,147 @@ describe("facts", () => {
     const snap = snapshotJudgeView(story);
     story.meters![0].value = 0;
     expect(snap.meters![0].value).toBe(3);
+  });
+});
+
+describe("engine-review fixes", () => {
+  const quiet = (n: number): PriorPartView[] =>
+    Array.from({ length: n }, () => ({ content: "Nothing much happens.", gmConversation: [] }));
+  const baseClock = {
+    id: "clk_1",
+    name: "The Vigil closes in",
+    segments: 6,
+    filled: 2,
+    triggers: ["miss" as const],
+    visible: true,
+    paused: false,
+    crossed: [] as number[],
+  };
+  const withClocks = (clocks: Record<string, unknown>[], origin?: "migrated") =>
+    view({
+      campaign: {
+        ...emptyCampaign(),
+        ...(origin ? { origin } : {}),
+        clocks: clocks as never,
+      },
+    });
+  const hasClockHit = (story: JudgeStoryView, n: number) =>
+    runRung1(turn({ storyAfter: story, prose: "x", priorParts: quiet(n) })).some(
+      (h) => h.check === "pacing_clock",
+    );
+
+  it("fires the clock note on crossing the threshold, then waits a full threshold again", () => {
+    const story = withClocks([baseClock]);
+    expect(hasClockHit(story, PACING_CLOCK_IDLE_TURNS - 1)).toBe(true);
+    expect(hasClockHit(story, PACING_CLOCK_IDLE_TURNS)).toBe(false);
+    expect(hasClockHit(story, PACING_CLOCK_IDLE_TURNS + 3)).toBe(false);
+    expect(hasClockHit(story, 2 * PACING_CLOCK_IDLE_TURNS - 1)).toBe(true);
+  });
+
+  it("leaves migrated and manual-only clocks out of the clock-idle counter", () => {
+    const n = PACING_CLOCK_IDLE_TURNS - 1;
+    expect(hasClockHit(withClocks([baseClock], "migrated"), n)).toBe(false);
+    expect(hasClockHit(withClocks([{ ...baseClock, migratedFromTimerId: "t1" }]), n)).toBe(false);
+    expect(hasClockHit(withClocks([{ ...baseClock, triggers: ["manual"] }]), n)).toBe(false);
+  });
+
+  it("fires the spotlight note once per run, and counts a character's name as addressing", () => {
+    const players = [
+      { id: "p1", name: "Nik", aliases: ["Ayla"] },
+      { id: "p2", name: "Sam", aliases: ["Bram"] },
+    ];
+    const named = (n: number, who: string): PriorPartView[] =>
+      Array.from({ length: n }, () => ({ content: `${who} keeps watch.` }));
+    const fires = (parts: PriorPartView[], prose: string) =>
+      runRung1(turn({ prose, priorParts: parts, players })).filter(
+        (h) => h.check === "pacing_spotlight",
+      );
+    expect(fires(named(PACING_SPOTLIGHT_TURNS - 1, "Ayla"), "Ayla waits.")).toHaveLength(1);
+    expect(fires(named(PACING_SPOTLIGHT_TURNS, "Ayla"), "Ayla waits.")).toHaveLength(0);
+    expect(
+      fires(named(PACING_SPOTLIGHT_TURNS - 1, "Ayla and Bram"), "Ayla and Bram wait."),
+    ).toHaveLength(0);
+  });
+
+  it("ignores two-word phrases and phrases built on an NPC's name", () => {
+    const npc: NPC = {
+      id: "n1",
+      name: "Old Marta",
+      description: "",
+      role: "",
+      status: "alive",
+      relationship: "",
+      attitude: "neutral",
+      createdAt: 0,
+    };
+    const parts = (text: string): PriorPartView[] =>
+      Array.from({ length: 4 }, () => ({ content: text }));
+    const tavern = runRung1(
+      turn({ prose: "The tavern again.", priorParts: parts("The tavern is loud.") }),
+    );
+    expect(tavern.some((h) => h.check === "repeated_phrase")).toBe(false);
+    const named = runRung1(
+      turn({
+        storyAfter: view({ npcs: [npc] }),
+        prose: "Old Marta nods.",
+        priorParts: parts("Old Marta nods."),
+      }),
+    );
+    expect(named.some((h) => h.check === "repeated_phrase")).toBe(false);
+  });
+
+  it("says a repeated phrase once per run", () => {
+    const text = "The amber eyes of the cat follow you across the gloom.";
+    const parts: PriorPartView[] = Array.from({ length: 4 }, () => ({ content: text }));
+    const prose = "Again the amber eyes of the cat follow you.";
+    expect(
+      runRung1(turn({ prose, priorParts: parts })).some((h) => h.check === "repeated_phrase"),
+    ).toBe(true);
+    const after: PriorPartView[] = [
+      ...parts,
+      { content: text, pacingNote: 'These phrases keep coming back: "amber eyes". Find fresh wording.' },
+    ];
+    expect(
+      runRung1(turn({ prose, priorParts: after })).some((h) => h.check === "repeated_phrase"),
+    ).toBe(false);
+  });
+
+  it("flags more damage than owed and never asks the GM to undo it; heroes are no foes", () => {
+    const goblin = view({ meters: [hearts("Goblin", 3)] });
+    const over = runRung1(
+      turn({
+        storyAfter: goblin,
+        system: FR,
+        results: [featRoll("c1", "hit", "Goblin"), meterAdjust("c2", "Goblin", -2, 3)],
+      }),
+    );
+    expect(over).toHaveLength(1);
+    expect(over[0]).toMatchObject({ check: "event_contract", verified: false });
+    expect(over[0].reask).toBeUndefined();
+    expect(buildReask(over)).toBeNull();
+    const hero = view({
+      meters: [hearts("Ayla", 3)],
+      systemState: {
+        sessionCount: 0,
+        dedupKeys: [],
+        fantasticRealms: { heroes: { ayla: { name: "Ayla", feats: [], rewards: [] } } },
+      },
+    });
+    expect(
+      runRung1(turn({ storyAfter: hero, system: FR, results: [featRoll("c1", "hit", "Ayla")] })),
+    ).toEqual([]);
+  });
+
+  it("quotes the whole unreleased passage in a line's re-ask", () => {
+    const story = view({
+      campaign: {
+        ...emptyCampaign(),
+        safety: { lines: [{ id: "saf_1", text: "No torture", keywords: ["torture"] }], veils: [] },
+      },
+    });
+    const prose = "The gate opens.\n\nThe torture begins.";
+    const hit = runRung1(turn({ storyAfter: story, prose })).find((h) => h.check === "line");
+    expect(hit?.reask).toContain("The gate opens.");
+    expect(hit?.reask).toContain("The torture begins.");
   });
 });

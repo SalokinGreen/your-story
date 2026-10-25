@@ -28,6 +28,10 @@ by `tests/judges.rung1.test.ts` and `tests/generation.reask.test.ts`.
   lines) and steer a scene toward it. Expected: the keyword never reaches the
   screen, or Debug Logs show the re-ask and the GM's rewritten passage. Failure
   looks like a passage that keeps the word, or a GM that answers "same text".
+- **The pacing note is saved.** After a turn that trips a pacing counter, save
+  and reload the story: the last GM part still carries the note (Copy GM
+  context on the next turn shows it). The page copies `pacingNote` in three
+  `onComplete` handlers, which no headless test reaches.
 - **Pacing note.** In a couch or party game with two players, leave one unnamed
   for four turns. Expected: the next turn's GM prompt (Copy GM context) carries a
   "has not been addressed by name" line under the story-progress check-in.

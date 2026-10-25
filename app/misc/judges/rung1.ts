@@ -29,11 +29,14 @@ export const PACING_CLOCK_IDLE_TURNS = 10;
 export const PACING_SPOTLIGHT_TURNS = 4;
 /** How many earlier turns the repeated-phrase check reads, beside this one. */
 const REPEAT_WINDOW = 4;
+/** How the repeated-phrase note begins, so the next turn can tell it already said it. */
+const REPEAT_NOTE_MARK = "These phrases keep coming back:";
 
 /** The slice of an earlier part the pacing checks read. */
 export interface PriorPartView {
   user?: boolean;
   content?: string;
+  pacingNote?: string;
   gmConversation?: ReadonlyArray<{ role: string; content?: unknown }>;
 }
 
@@ -50,7 +53,7 @@ export interface Rung1Turn {
   /** The story's parts before this turn, for the pacing checks. */
   priorParts?: readonly PriorPartView[];
   /** Couch or party players, when there are two or more. */
-  players?: readonly { id: string; name: string }[];
+  players?: readonly { id: string; name: string; aliases?: readonly string[] }[];
 }
 
 function factIdsFor(facts: readonly Fact[], kind: Fact["source"]["kind"], ref: string): string[] {
@@ -108,10 +111,10 @@ function eventContractHits(turn: Rung1Turn, facts: Fact[]): Rung1Hit[] {
       hits.push({
         check: "event_contract",
         contractId: contract.id,
-        verified: true,
+        verified: !verdict.flagOnly,
         evidence: verdict.evidence,
         factIds: factIdsFor(facts, "tool", trigger.toolCallId),
-        reask: contract.reask(ct, verdict),
+        ...(verdict.flagOnly ? {} : { reask: contract.reask(ct, verdict) }),
       });
     }
   }
@@ -144,7 +147,7 @@ function lineHits(turn: Rung1Turn, facts: Fact[]): Rung1Hit[] {
         evidence: `"${m[0]}" appears in the prose: ${span}`,
         factIds: factIdsFor(facts, "record", line.id),
         replacesProse: true,
-        reask: `This table set a line: "${line.text}". Your prose uses the word "${m[0]}" (${span}). If that puts the line on screen, write the passage again without it, keeping everything else that happened, and reply with the whole passage. If it does not cross the line, reply with the same text.`,
+        reask: `This table set a line: "${line.text}". The prose you have written this turn, which the player has not seen, uses the word "${m[0]}" (${span}). The whole passage reads:\n\n"""\n${turn.prose.trim()}\n"""\n\nIf that puts the line on screen, write the whole passage again without it, keeping everything else that happened, and reply with the whole passage. If it does not cross the line, reply with the same text.`,
       });
       break; // one hit per line
     }
@@ -189,16 +192,26 @@ function turnsSinceClockMoved(parts: readonly PriorPartView[]): number {
 }
 
 function pacingClockHit(turn: Rung1Turn, facts: Fact[]): Rung1Hit[] {
+  // A record a timer migration made, and clocks only the GM ticks by hand, are
+  // not pressure the engine moves on its own: they would nag forever.
+  if (turn.storyAfter.campaign?.origin === "migrated") return [];
   const clocks = (turn.storyAfter.campaign?.clocks ?? []).filter(
-    (c) => !c.cancelled && !c.paused && c.filled < c.segments,
+    (c) =>
+      !c.cancelled &&
+      !c.paused &&
+      c.filled < c.segments &&
+      !c.migratedFromTimerId &&
+      c.triggers.some((t) => t !== "manual"),
   );
   if (clocks.length === 0 || !turn.priorParts) return [];
   const movedNow = turn.results.some(
     (r) => ((r as { clockReports?: unknown[] }).clockReports ?? []).length > 0,
   );
   if (movedNow) return [];
-  const idle = turnsSinceClockMoved(turn.priorParts);
-  if (idle < PACING_CLOCK_IDLE_TURNS) return [];
+  // Turns without a move, this one included. The note fires as the count
+  // crosses each multiple of the threshold, not on every turn past it.
+  const idle = turnsSinceClockMoved(turn.priorParts) + 1;
+  if (idle % PACING_CLOCK_IDLE_TURNS !== 0) return [];
   return [
     {
       check: "pacing_clock",
@@ -214,13 +227,20 @@ function spotlightHit(turn: Rung1Turn): Rung1Hit[] {
   const players = turn.players ?? [];
   if (players.length < 2 || !turn.priorParts) return [];
   const assistants = turn.priorParts.filter(isAssistant);
-  if (assistants.length < PACING_SPOTLIGHT_TURNS) return [];
-  const window = assistants.slice(-(PACING_SPOTLIGHT_TURNS - 1));
-  const neglected = players.filter(
-    (p) =>
-      !wholeWord(turn.prose, p.name) &&
-      !window.some((part) => wholeWord(part.content ?? "", p.name)),
-  );
+  // A player is addressed by their own name or by their character's.
+  const named = (text: string, p: { name: string; aliases?: readonly string[] }) =>
+    [p.name, ...(p.aliases ?? [])].some((n) => wholeWord(text, n) !== null);
+  // Turns in a row without being named, this one included; the note fires as
+  // the run crosses each multiple of the threshold, not on every turn past it.
+  const neglected = players.filter((p) => {
+    if (named(turn.prose, p)) return false;
+    let gap = 1;
+    for (let i = assistants.length - 1; i >= 0; i--) {
+      if (named(assistants[i].content ?? "", p)) break;
+      gap++;
+    }
+    return gap % PACING_SPOTLIGHT_TURNS === 0;
+  });
   if (neglected.length === 0) return [];
   const names = neglected.map((p) => p.name).join(", ");
   return [
@@ -236,14 +256,30 @@ function spotlightHit(turn: Rung1Turn): Rung1Hit[] {
 
 function repeatedPhraseHit(turn: Rung1Turn): Rung1Hit[] {
   if (!turn.prose.trim() || !turn.priorParts) return [];
-  const recent = turn.priorParts
-    .filter(isAssistant)
-    .slice(-REPEAT_WINDOW)
-    .map((p) => p.content ?? "");
+  const assistants = turn.priorParts.filter(isAssistant);
+  // One reminder per run: the previous turn's note already said it.
+  if (assistants[assistants.length - 1]?.pacingNote?.includes(REPEAT_NOTE_MARK)) {
+    return [];
+  }
+  const recent = assistants.slice(-REPEAT_WINDOW).map((p) => p.content ?? "");
   if (recent.length < 2) return [];
   const flat = turn.prose.toLowerCase().replace(/[^a-z'-]+/g, " ");
-  const repeated = findRepeatedPhrases([...recent, turn.prose]).filter((c) =>
-    ` ${flat} `.includes(` ${c.phrase} `),
+  // Names recur on purpose: a phrase built on a character's name, and any
+  // phrase under three words ("the tavern"), is not a tic.
+  const names = new Set<string>();
+  for (const n of turn.storyAfter.npcs ?? []) {
+    for (const w of (n.name ?? "").toLowerCase().split(/[^a-z'-]+/)) if (w) names.add(w);
+  }
+  for (const p of turn.players ?? []) {
+    for (const full of [p.name, ...(p.aliases ?? [])]) {
+      for (const w of full.toLowerCase().split(/[^a-z'-]+/)) if (w) names.add(w);
+    }
+  }
+  const repeated = findRepeatedPhrases([...recent, turn.prose]).filter(
+    (c) =>
+      c.phrase.split(" ").length >= 3 &&
+      !c.phrase.split(" ").some((w) => names.has(w)) &&
+      ` ${flat} `.includes(` ${c.phrase} `),
   );
   if (repeated.length === 0) return [];
   const phrases = repeated.slice(0, 3).map((c) => `"${c.phrase}"`);
@@ -253,7 +289,7 @@ function repeatedPhraseHit(turn: Rung1Turn): Rung1Hit[] {
       verified: false,
       evidence: `Repeated across recent turns: ${phrases.join(", ")}`,
       factIds: [],
-      note: `These phrases keep coming back: ${phrases.join(", ")}. Find fresh wording.`,
+      note: `${REPEAT_NOTE_MARK} ${phrases.join(", ")}. Find fresh wording.`,
     },
   ];
 }

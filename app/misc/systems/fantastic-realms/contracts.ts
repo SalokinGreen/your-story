@@ -112,11 +112,17 @@ export const FOE_DAMAGE_CONTRACT: EventContract = {
     if (!target) return { ok: true };
     // A foe with no Hearts meter has nowhere to record the loss: not provable.
     if (!foeHasHearts(turn, target)) return { ok: true };
+    // A hero (or an ally written as one) is not a foe: their Hearts are theirs.
+    const heroes = turn.storyAfter.systemState?.fantasticRealms?.heroes ?? {};
+    if (normalizeKey(target) in heroes) return { ok: true };
     const owed = damageOwed(turn.results, target);
     const applied = heartsRequestedLoss(turn.results, target);
     if (applied === owed) return { ok: true };
     return {
       ok: false,
+      // More lost than the rules gave: the fix would be to heal the foe, which
+      // is not ours to ask for. Flag it.
+      flagOnly: applied > owed,
       key: normalizeKey(target),
       evidence: `${target}: the rolls this turn owe ${owed} ${owed === 1 ? "heart" : "hearts"}, and the Hearts meter was asked to lose ${applied}`,
     };
