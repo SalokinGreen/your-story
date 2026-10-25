@@ -121,13 +121,6 @@ No session could run a live model, so these are owed:
   passes `hindered_by` for a condition, calls `manage_feats add_condition` and
   `use`, and starts a journey as a tally challenge. Failure looks like plain
   `feat_roll`s with no condition words, or a miscast that also costs a heart.
-- **An older Fantastic Realms story picks up the new rules.** Open a story saved
-  before this release (one that holds the old `FR — Core rules` and never
-  edited it). Expected: the Debug Logs show "Updated 2 built-in notes to the
-  current rules: FR — Core rules, FR — Character creation" and "Added 9 built-in
-  notes", and the core in the Lore page is the new text after the next save.
-  A story whose core the player edited shows the "player's own edit" line
-  and keeps its text.
 
 ## 2026-10-25 — Fantastic Realms E1 (the engine)
 
