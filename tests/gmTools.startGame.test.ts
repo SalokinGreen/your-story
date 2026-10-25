@@ -11,6 +11,7 @@
  * zero's job, and a campaign started without one never gets one.
  */
 import { describe, it, expect } from "vitest";
+import { QUICK_COVERED } from "./helpers/setupCovered";
 import { executeGMTools } from "@/app/misc/gmExecutor";
 import { buildGMStagePrompt } from "@/app/misc/ai_staged";
 import { StoryData, StoryLore } from "@/app/misc/structs";
@@ -54,6 +55,7 @@ function withApproval(story: StoryData): StoryData {
     ...story,
     setup: {
       mode: "quick",
+      covered: QUICK_COVERED,
       conceptDone: true,
       approval: currentSetupHashes(story),
     },
@@ -179,7 +181,7 @@ describe("start_game requires a campaign plan", () => {
     );
 
     expect(result.results[0].success).toBe(false);
-    expect(result.results[0].contextForStory).toContain("no campaign plan");
+    expect(result.results[0].contextForStory).toContain("the campaign is not ready");
     expect(result.results[0].contextForStory).toContain("Campaign Plan");
     // Nothing was mutated - the story stays unnamed and in session zero.
     expect(result.modifiedStoryData.story_name).toBe("New Story");
@@ -226,7 +228,7 @@ describe("start_game requires a campaign plan", () => {
     );
 
     expect(result.results[0].success).toBe(false);
-    expect(result.results[0].contextForStory).toContain("no campaign plan");
+    expect(result.results[0].contextForStory).toContain("the campaign is not ready");
   });
 
   it("ignores a disabled spine note", async () => {
@@ -297,7 +299,7 @@ describe("start_game requires the sheet and the player's OK", () => {
     );
     const text = result.results[0].contextForStory;
     expect(text).toContain("no character sheet");
-    expect(text).toContain("no campaign plan");
+    expect(text).toContain("the campaign is not ready");
   });
 
   it("carries the campaign intro instructions on success", async () => {

@@ -10,6 +10,7 @@ import {
   SETUP_DISMISSED,
   changesAnswer,
 } from "../misc/setupConfirmAnswer";
+import type { PublicCampaignView } from "../misc/campaign/publicView";
 import { useBackHandler } from "../misc/useBackHandler";
 import { DynamicIcon } from "./DynamicIcon";
 
@@ -33,6 +34,69 @@ function NoteSection({ title, content }: { title: string; content: string }) {
       <pre className="px-3 pb-3 pt-1 text-xs text-ys-muted whitespace-pre-wrap break-words font-sans max-h-64 overflow-y-auto">
         {content.trim() || "(empty)"}
       </pre>
+    </details>
+  );
+}
+
+/** A labelled run of short items; renders nothing when there are none. */
+function ListRow({ label, items }: { label: string; items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-ys-muted">
+        {label}
+      </dt>
+      <dd className="text-sm text-ys-text">{items.join("; ")}</dd>
+    </div>
+  );
+}
+
+/**
+ * The campaign record as the player may see it (publicCampaignView): the
+ * style, the pitch, the lines and veils, and the names of what the world holds.
+ * Never a secret, a doom or what a person hides; those are not in the view.
+ */
+function CampaignSection({ view }: { view: PublicCampaignView }) {
+  return (
+    <details className="ys-card group" open>
+      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold text-ys-text flex items-center gap-2">
+        <DynamicIcon
+          name="ChevronRight"
+          className="w-4 h-4 text-ys-muted transition-transform group-open:rotate-90"
+        />
+        {view.styleLabel ? `Campaign: ${view.styleLabel}` : "Campaign"}
+      </summary>
+      <dl className="px-3 pb-3 pt-1 space-y-2">
+        {view.premise && (
+          <p className="text-sm text-ys-text whitespace-pre-wrap">{view.premise}</p>
+        )}
+        <ListRow label="Tone" items={view.tone} />
+        <ListRow
+          label="Lines (never appear)"
+          items={view.lines.length > 0 ? view.lines : view.safetyAsked ? ["none"] : []}
+        />
+        <ListRow
+          label="Veils (off screen)"
+          items={view.veils.length > 0 ? view.veils : view.safetyAsked ? ["none"] : []}
+        />
+        <ListRow label="Factions" items={view.factions} />
+        <ListRow
+          label="Threats"
+          items={view.fronts.map((f) =>
+            f.stakes.length > 0 ? `${f.name} (${f.stakes.join(" / ")})` : f.name,
+          )}
+        />
+        <ListRow
+          label="Places"
+          items={view.locations.map((l) =>
+            l.features.length > 0 ? `${l.name} (${l.features.join(", ")})` : l.name,
+          )}
+        />
+        <ListRow
+          label="Clocks"
+          items={view.clocks.map((c) => `${c.name} ${c.filled}/${c.segments}`)}
+        />
+      </dl>
     </details>
   );
 }
@@ -124,10 +188,15 @@ export default function SetupConfirmModal({
                 content={sheet.content}
               />
             ))}
-            <NoteSection
-              title={request.plan.title}
-              content={request.plan.content}
-            />
+            {request.plan.campaign && (
+              <CampaignSection view={request.plan.campaign} />
+            )}
+            {request.plan.note && (
+              <NoteSection
+                title={request.plan.note.title}
+                content={request.plan.note.content}
+              />
+            )}
           </div>
 
           {changing && (

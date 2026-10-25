@@ -829,6 +829,10 @@ export interface SetupState {
   approval?: {
     sheetHash: string;
     planHash: string;
+    // The campaign record (hashCampaignRecord): present only when the story
+    // had a real record at approval. Absent on stories approved with a plan
+    // note alone, and on saves from before the record.
+    campaignHash?: string;
   };
   referenceTitles?: string[]; // notes read during setup, newest first
   questionsAsked?: number; // setup questions answered this session zero

@@ -26,7 +26,7 @@ export interface CreationStep {
 export const SOLO_PLAYER_ID = "solo";
 
 /** In quick mode only these steps are required. */
-export const QUICK_REQUIRED_STEPS = ["setting", "tone"];
+export const QUICK_REQUIRED_STEPS = ["setting", "tone", "tone_safety"];
 
 type Roster = ReadonlyArray<{ id: string; name: string }>;
 
@@ -52,6 +52,20 @@ const WORLD_STEPS: CreationStep[] = [
     group: "world",
     scope: "table",
     hint: "The mood they want (horror, intrigue, action, romance, tragedy...). Multi-select; their own words welcome.",
+  },
+  {
+    id: "style",
+    label: "Style",
+    group: "world",
+    scope: "table",
+    hint: 'The shape of the campaign, which decides what you build: sandbox, adventure path, mystery, horror, episodic, slice of life or solo/oracle. Offer the ones that fit the setting with a line each on how they play, then record the pick with the campaign tool (part "style").',
+  },
+  {
+    id: "tone_safety",
+    label: "Tone, lines and veils",
+    group: "world",
+    scope: "table",
+    hint: 'Tone words (2-4), then lines (never shown in the story) and veils (may happen, but off screen). Ask plainly, with examples; "none" is a real answer. Record with the campaign tool: part "pitch" (tone), part "safety" (lines and veils, empty lists for none).',
   },
   {
     id: "campaign",

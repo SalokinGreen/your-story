@@ -80,6 +80,9 @@ import {
 } from "./campaign/clocks";
 import { turnEventsFrom } from "./campaign/events";
 import type { Clock } from "./campaign/types";
+import { styleWarningLine } from "./campaign/styles";
+import { campaignWarnings } from "./campaign/validate";
+import { publicCampaignView, type PublicCampaignView } from "./campaign/publicView";
 import {
   StartChallengeParams,
   CancelChallengeParams,
@@ -940,7 +943,13 @@ export interface SetupConfirmationRequest {
   characterSummary: string;
   campaignHook: string;
   sheets: { title: string; content: string }[];
-  plan: { title: string; content: string };
+  // The campaign the card shows: a plan note (older stories, or a GM that
+  // wrote one), the record's public projection (campaign/publicView.ts, never
+  // a secret), or both. At least one is always set.
+  plan: {
+    note?: { title: string; content: string };
+    campaign?: PublicCampaignView;
+  };
 }
 
 export type SetupConfirmationAnswer =
@@ -2772,7 +2781,7 @@ function recordCreationSteps(
   const tail = next
     ? `Next: ${stepRef(next)}.`
     : story.setup?.mode === "full"
-      ? "Every step is covered: write the sheet and the plan."
+      ? "Every step is covered: write the sheet and build the campaign."
       : "Every required step is covered.";
   const extra = notes.length ? ` Not recorded: ${notes.join(" ")}` : "";
   return `[Setup: Recorded: ${recordedList.join(", ")}.${extra} ${tail}]`;
@@ -4140,7 +4149,17 @@ function executeStartGame(
   // and the player approved exactly those (getSetupProgress, campaignPlan.ts).
   // Judged on the working copy, which holds this batch's earlier edits.
   const progress = getSetupProgress(storyData, setupPlayers);
-  if (!progress.character || !progress.campaign || !progress.approved) {
+  // The tone and safety step is the one creation step start_game names
+  // itself: lines and veils may be "none", but they must have been asked.
+  const safetyUnasked = progress.creation.missing.some(
+    (m) => m.step.id === "tone_safety"
+  );
+  if (
+    !progress.character ||
+    !progress.campaign ||
+    !progress.approved ||
+    safetyUnasked
+  ) {
     const missing: string[] = [];
     if (!progress.character) {
       missing.push(
@@ -4150,14 +4169,17 @@ function executeStartGame(
       );
     }
     if (!progress.campaign) {
+      missing.push(campaignMissingText(storyData));
+    }
+    if (safetyUnasked) {
       missing.push(
-        `no campaign plan. Session zero isn't over until the spine exists. Create it first: \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (later beats stay one-line placeholders) - see the CAMPAIGN PLAN section. If this story has existing lore/mechanics/dm_instructions notes, \`read_notes\`/\`search_notes\` them first; create_note enforces that`
+        `the tone, lines and veils have not been asked yet (ask_question, setup_step "tone_safety"; "none" is a valid answer)`
       );
     }
     if (progress.character && progress.campaign && !progress.approved) {
       missing.push(
         storyData.setup?.approval
-          ? "the sheet or the plan changed after the player's OK, so the OK no longer counts. Call confirm_setup again"
+          ? "the sheet or the campaign changed after the player's OK, so the OK no longer counts. Call confirm_setup again"
           : "the player has not approved the setup yet. Call confirm_setup and wait for their OK"
       );
     }
@@ -4188,6 +4210,17 @@ function executeStartGame(
     lastSceneKey: computeSceneKey(storyData),
   };
 
+  // The style's other expected parts are prep warnings, never a refusal
+  // (design section 8). The line names parts only; the authoring checks that
+  // quote a secret's title are the GM's alone (gmOnlyContext).
+  const record = storyData.campaign;
+  const styleWarning =
+    record && record.origin !== "migrated" ? styleWarningLine(record) : "";
+  const authoringWarnings =
+    record && record.origin !== "migrated"
+      ? campaignWarnings(record).filter((w) => !w.startsWith("No style set"))
+      : [];
+
   return {
     toolName: "start_game",
     toolCallId,
@@ -4204,8 +4237,24 @@ function executeStartGame(
         ? ` The adventure's author wrote the opening scene; play it after the briefing, keeping its place, time and people, adapted to the character(s) you built:
 ${opening}`
         : ""
-    }]`,
+    }${styleWarning ? ` ${styleWarning}` : ""}]`,
+    ...(authoringWarnings.length > 0
+      ? { gmOnlyContext: `[Campaign prep: ${authoringWarnings.join(" ")}]` }
+      : {}),
   };
+}
+
+/**
+ * What start_game and confirm_setup say when the campaign is not ready: the
+ * campaign tool builds it, and a plan note still counts for older stories.
+ */
+function campaignMissingText(story: StoryData): string {
+  const record = story.campaign;
+  const real = record && record.origin !== "migrated" ? record : undefined;
+  const why = !real?.style
+    ? `no style yet (campaign add, part "style")`
+    : `nothing beyond the pitch yet`;
+  return `the campaign is not ready: ${why}. Build it with the campaign tool: part "style", part "pitch" (premise and tone words), part "safety" (the lines and veils, empty lists for none), then at least one more part: a front with its clock, a faction, a location, a person, or a secret with its clues. The style's other expected parts only warn. (An older story's "Campaign Plan" gm_plan note also counts.)`;
 }
 
 /**
@@ -4268,7 +4317,22 @@ async function executeConfirmSetup(
         : "the character sheet"
     );
   }
-  if (!progress.campaign) missing.push("the Campaign Plan (a gm_plan note)");
+  if (!progress.campaign) {
+    // A sheet is written with create_note, the campaign with its own tool.
+    const how = campaignMissingText(storyData);
+    if (missing.length > 0) {
+      return make(
+        false,
+        "refused",
+        `[ERROR: Can't show the setup card yet - missing ${missing.join(" and ")} (write it with create_note), and ${how} Then call confirm_setup.]`
+      );
+    }
+    return make(
+      false,
+      "refused",
+      `[ERROR: Can't show the setup card yet - ${how} Then call confirm_setup.]`
+    );
+  }
   if (missing.length > 0) {
     return make(
       false,
@@ -4286,16 +4350,28 @@ async function executeConfirmSetup(
   }
 
   const { sheets, plan } = getSetupNotes(storyData);
-  if (!plan) {
+  // The card shows the plan note when there is one, and the record's public
+  // projection when there is a real record (never a secret). Readiness
+  // guarantees at least one.
+  const record =
+    storyData.campaign && storyData.campaign.origin !== "migrated"
+      ? storyData.campaign
+      : undefined;
+  if (!plan && !record) {
     // Unreachable after the progress check; keeps the types honest.
-    return make(false, "refused", "[ERROR: the Campaign Plan is missing.]");
+    return make(false, "refused", "[ERROR: the campaign is missing.]");
   }
 
   const answer = await interaction.requestSetupConfirmation({
     characterSummary: params.character_summary,
     campaignHook: params.campaign_hook,
     sheets: sheets.map((n) => ({ title: n.title, content: n.content ?? "" })),
-    plan: { title: plan.title, content: plan.content ?? "" },
+    plan: {
+      ...(plan
+        ? { note: { title: plan.title, content: plan.content ?? "" } }
+        : {}),
+      ...(record ? { campaign: publicCampaignView(record) } : {}),
+    },
   });
 
   if ("stopped" in answer) {
@@ -4338,13 +4414,16 @@ async function executeConfirmSetup(
     setupPlayers
   );
   if (started.success) {
-    return make(
+    const approved = make(
       true,
       "approved",
       `[Approved: the player pressed Start the story, and the game has started. ${started.contextForStory}]`,
       undefined,
       true
     );
+    // The GM-only prep warnings (they may quote a secret's title).
+    if (started.gmOnlyContext) approved.gmOnlyContext = started.gmOnlyContext;
+    return approved;
   }
   // Believed unreachable: the approval just above made the hashes current, and
   // the checks start_game runs (sheet, plan, approval, session zero still on)

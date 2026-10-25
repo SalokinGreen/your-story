@@ -74,6 +74,8 @@ describe("getCreationSteps", () => {
     expect(ids(story({ mode: "full" }))).toEqual([
       "setting",
       "tone",
+      "style",
+      "tone_safety",
       "campaign",
       "name_look",
       "history",
@@ -85,6 +87,8 @@ describe("getCreationSteps", () => {
     expect(ids(story({ mode: "full" }, [bbLore()]))).toEqual([
       "setting",
       "tone",
+      "style",
+      "tone_safety",
       "campaign",
       "kind",
       "archetype",
@@ -141,24 +145,25 @@ describe("getCreationSteps", () => {
 });
 
 describe("what is required, and the totals", () => {
-  it("full mode requires every step, quick mode setting and tone, no mode none", () => {
+  it("full mode requires every step, quick mode setting, tone and tone_safety, no mode none", () => {
     const bb = [bbLore()];
-    expect(getRequiredSteps(story({ mode: "full" }, bb))).toHaveLength(15);
+    expect(getRequiredSteps(story({ mode: "full" }, bb))).toHaveLength(17);
     expect(getRequiredSteps(story({ mode: "quick" }, bb)).map((s) => s.id)).toEqual([
       "setting",
       "tone",
+      "tone_safety",
     ]);
     expect(getRequiredSteps(story({}, bb))).toHaveLength(0);
     expect(getRequiredSteps(story(undefined, bb))).toHaveLength(0);
   });
 
-  it("counts a solo Blood & Bone build as 15 and a couch of two as 28", () => {
-    expect(creationTotal(story({ mode: "full" }, [bbLore()]))).toBe(15);
+  it("counts a solo Blood & Bone build as 17 and a couch of two as 30", () => {
+    expect(creationTotal(story({ mode: "full" }, [bbLore()]))).toBe(17);
     const couch = story({ mode: "full" }, [bbLore()], {
       multiplayer: { enabled: true, couchPlayers: COUCH },
     } as Partial<StoryData>);
-    expect(creationTotal(couch)).toBe(28); // 1 cohort + 3 world + 12 x 2
-    expect(creationTotal(story({ mode: "quick" }, [bbLore()]))).toBe(2);
+    expect(creationTotal(couch)).toBe(30); // 1 cohort + 5 world + 12 x 2
+    expect(creationTotal(story({ mode: "quick" }, [bbLore()]))).toBe(3);
     expect(creationTotal(story({}))).toBe(0);
   });
 });
@@ -167,7 +172,7 @@ describe("getSetupProgress: the interview", () => {
   it("is next while required steps are missing, ahead of the character", () => {
     const p = getSetupProgress(story({ mode: "full" }));
     expect(p.next).toBe("interview");
-    expect(p.creation.total).toBe(6);
+    expect(p.creation.total).toBe(8);
     expect(p.creation.covered).toBe(0);
     expect(p.creation.missing[0].step.id).toBe("setting");
   });
@@ -190,15 +195,15 @@ describe("getSetupProgress: the interview", () => {
     expect(missing).not.toContain("name_look:Ann");
     expect(missing).not.toContain("setting:-");
     expect(p.creation.covered).toBe(2);
-    expect(p.creation.total).toBe(1 + 3 + 3 * 2);
+    expect(p.creation.total).toBe(1 + 5 + 3 * 2);
   });
 
   it("moves on to the character when every required step is covered", () => {
     const base = story({ mode: "quick" });
-    const s = story({ mode: "quick", covered: { table: ["setting", "tone"], players: {} } });
+    const s = story({ mode: "quick", covered: { table: ["setting", "tone", "tone_safety"], players: {} } });
     expect(getSetupProgress(base).next).toBe("interview");
     expect(getSetupProgress(s).next).toBe("character");
-    expect(getSetupProgress(s).creation).toMatchObject({ covered: 2, total: 2, missing: [] });
+    expect(getSetupProgress(s).creation).toMatchObject({ covered: 3, total: 3, missing: [] });
   });
 
   it("keys solo coverage under 'solo' and ignores ids the story does not have", () => {
@@ -206,14 +211,14 @@ describe("getSetupProgress: the interview", () => {
       mode: "quick",
       covered: { table: ["setting", "tone", "ghost"], players: { solo: ["nonsense"] } },
     });
-    expect(getCreationProgress(s)).toMatchObject({ covered: 2, total: 2 });
+    expect(getCreationProgress(s)).toMatchObject({ covered: 2, total: 3 });
     expect(SOLO_PLAYER_ID).toBe("solo");
   });
 });
 
 describe("the gate's words name the next step and player", () => {
   it("the re-prompt names the step, its tag, its hint, and keeps the card shut", () => {
-    const s = story({ mode: "full", covered: { table: ["setting", "tone", "campaign"], players: {} } }, [bbLore()]);
+    const s = story({ mode: "full", covered: { table: ["setting", "tone", "style", "tone_safety", "campaign"], players: {} } }, [bbLore()]);
     const p = getSetupProgress(s);
     expect(p.next).toBe("interview");
     const msg = setupGateMessage(p.next, p.creation);
@@ -224,7 +229,7 @@ describe("the gate's words name the next step and player", () => {
   });
 
   it("the engine line names the step and the player", () => {
-    const s = story({ mode: "full", covered: { table: ["setting", "tone", "campaign"], players: { solo: ["kind", "archetype", "stats", "vow"] } } }, [bbLore()]);
+    const s = story({ mode: "full", covered: { table: ["setting", "tone", "style", "tone_safety", "campaign"], players: { solo: ["kind", "archetype", "stats", "vow"] } } }, [bbLore()]);
     const p = getSetupProgress(s);
     expect(setupEngineLine(p.next, p.creation)).toBe(
       "Next up: Connections (Nik). Anything you want to tell me first? Or just say go on.",
@@ -262,16 +267,18 @@ describe("pre-made characters", () => {
 
   it("a pre-made player is not asked the player steps; table and world steps still apply", () => {
     const solo = story({ mode: "full", premadeFor: [SOLO_PLAYER_ID] }, [bbLore()]);
-    expect(creationTotal(solo)).toBe(3);
+    expect(creationTotal(solo)).toBe(5);
     expect(getCreationProgress(solo).missing.map((m) => m.step.id)).toEqual([
       "setting",
       "tone",
+      "style",
+      "tone_safety",
       "campaign",
     ]);
     const couch = story({ mode: "full", premadeFor: ["a"] }, [bbLore()], couchOverrides);
-    expect(creationTotal(couch)).toBe(16); // 1 cohort + 3 world + 12 x Bo
+    expect(creationTotal(couch)).toBe(18); // 1 cohort + 5 world + 12 x Bo
     expect(getCreationProgress(couch).missing.every((m) => m.playerId !== "a")).toBe(true);
-    expect(creationTotal(story({ mode: "quick", premadeFor: ["solo"] }))).toBe(2);
+    expect(creationTotal(story({ mode: "quick", premadeFor: ["solo"] }))).toBe(3);
   });
 });
 
