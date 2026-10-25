@@ -21,7 +21,7 @@ import { SIDE_AGENT_DEFAULT_MODEL_KEY } from "@/app/misc/layerSettings";
 import { createMockGMFetch, sseStreamResponse } from "./helpers/mockGMFetch";
 import type { StoryData } from "@/app/misc/structs";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
-import { isJudgeCall, judgeReply, requestedJudges } from "./helpers/combinedJudges";
+import { isJudgeCall, judgeReply, requestedJudges, rewriteReply } from "./helpers/combinedJudges";
 
 const NARRATION = "The lock clicks open. The corridor beyond is dark.";
 /** Well past the "medium" band's ceiling, so the Observer's length check trips. */
@@ -162,7 +162,9 @@ async function runTurn({
       const scripted = respond(call);
       const content = isJudgeCall(call.body)
         ? judgeReply(call.body, scripted === LENGTH_MAJOR ? { length: "major" } : {})
-        : scripted;
+        : isRewrite(call) && scripted === REWRITTEN
+          ? rewriteReply(call.body, scripted)
+          : scripted;
       return { ok: true, json: async () => ({ content }) } as unknown as Response;
     }
     if (isChoices(call)) {
@@ -337,10 +339,19 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
       expect(rewrites[0].body.reasoningEffort).toBe("high");
 
       // The judges stay on the side-agent default at none.
-      const judges = calls.filter((c) => c.url === "/api/generate" && isLengthJudge(c));
+      const judges = calls.filter(
+        (c) =>
+          c.url === "/api/generate" &&
+          isLengthJudge(c) &&
+          c.body.model === SIDE_AGENT_DEFAULT_MODEL_KEY,
+      );
       expect(judges.length).toBeGreaterThan(0);
       expect(effortsOf(judges)).toEqual(["none"]);
-      expect(judges[0].body.model).toBe(SIDE_AGENT_DEFAULT_MODEL_KEY);
+      // The second family confirms before the rewrite, at none too.
+      const confirmations = calls.filter(
+        (c) => c.url === "/api/generate" && isLengthJudge(c) && c.body.model === "GLM 5.3",
+      );
+      expect(effortsOf(confirmations)).toEqual(["none"]);
 
       // The turn's own choices and the ones re-derived after the rewrite are
       // both the narrator's call.

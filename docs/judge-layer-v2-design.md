@@ -4,7 +4,7 @@
 on `claude/judges-j1` (facts, rung 1 and the rung 2 re-ask; see the plan's
 "Decisions made during implementation"); **slice J2 built** on
 `claude/judges-j2` (the combined rung-3 call, its prompts and the three new
-judges). Rungs 4 and 5 (confirmation, the rewrite with facts), the labelled set and Settings are not
+judges). Rungs 4 and 5 (confirmation, the rewrite with facts) are built (J3, `claude/judges-j3`); the labelled set and Settings are not
 built. Earlier status: design, revised after Codex's review
 ([`research/codex-campaign-judges-review-2026-10-25.md`](research/codex-campaign-judges-review-2026-10-25.md);
 its findings are answered in §11), for the author's go. Not approved for building.

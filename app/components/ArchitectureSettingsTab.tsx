@@ -24,6 +24,9 @@ import {
   ModelEffortOverride,
   SIDE_AGENT_DEFAULT_MODEL_KEY,
   SIDE_AGENT_DEFAULT_EFFORT,
+  REWRITE_CONFIRM_DEFAULT_MODEL_KEY,
+  getRewriteConfirmModelOverride,
+  setRewriteConfirmModelOverride,
   getObserverModelOverride,
   setObserverModelOverride,
   getMemoryKeeperModelOverride,
@@ -90,7 +93,7 @@ const LAYERS: LayerInfo[] = [
     title: "Adjudication",
     badge: "Layer 5",
     summary:
-      "The Observer reviews each completed turn against rules the GM was already given, in one shared AI call. Every check is on by default: the three that judge the prose rewrite a flagged turn before you see it (the agency check runs on every turn that has your line, so it can), and the others only flag, after the turn appears. When the GM stops to ask you something, the text written so far is checked and shown first. It never re-rolls a turn. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
+      "The Observer reviews each completed turn against rules the GM was already given, in one shared AI call. Every check is on by default: the three that judge the prose rewrite a flagged turn before you see it, once a second judge from another model family agrees (the agency check runs on every turn that has your line, so it can), and the others only flag, after the turn appears. A turn it revised says so, and Undo revision puts the original back. When the GM stops to ask you something, the text written so far is checked and shown first. It never re-rolls a turn. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
     files: "app/misc/observer.ts, app/misc/consistencyCheck.ts",
     aiDriven: true,
   },
@@ -145,21 +148,21 @@ const OBSERVER_FLAG_INFO: Record<
   world_consistency: {
     label: "World Consistency",
     description:
-      "The narration contradicts a fact the story holds: a dead person who speaks, a person away from the place the campaign record gives. Flag only for now.",
+      "The narration contradicts a fact the story holds: a dead person who speaks, a person away from the place the campaign record gives. Flags by default; Rewrite automatically needs a second judge from another model family to agree first.",
     cost: "Part of the shared judge call, only on a turn that names a person or place from the record.",
     llmBacked: true,
   },
   secret_leak: {
     label: "Secret Leak",
     description:
-      "The narrator states part of a secret the story has not revealed yet. The flag never quotes the secret. Flag only for now.",
+      "The narrator states part of a secret the story has not revealed yet. The flag never quotes the secret, and a rewrite is never told it. Flags by default; Rewrite automatically needs a second judge from another model family to agree first.",
     cost: "Part of the shared judge call, only in a campaign with an unrevealed secret.",
     llmBacked: true,
   },
   lines_and_veils: {
     label: "Lines and Veils",
     description:
-      "The narration shows something your table set as a line (kept out of the game) or a veil (kept off screen). Flag only for now.",
+      "The narration shows something your table set as a line (kept out of the game) or a veil (kept off screen). Flags by default; Rewrite automatically needs a second judge from another model family to agree first.",
     cost: "Part of the shared judge call, only in a campaign that sets lines or veils.",
     llmBacked: true,
   },
@@ -227,6 +230,7 @@ function StageOverrideCard({
   onChange,
   customModels,
   offNote,
+  startModel,
 }: {
   icon: string;
   title: string;
@@ -235,10 +239,12 @@ function StageOverrideCard({
   onChange: (override: ModelEffortOverride | null) => void;
   customModels: CustomModel[];
   offNote?: string;
+  /** What turning the pin on starts from, when it is not the side-agent default. */
+  startModel?: AnyModelKey;
 }) {
   const pinned = override !== null;
   const effective: ModelEffortOverride = override ?? {
-    modelKey: DEFAULT_OVERRIDE_MODEL,
+    modelKey: startModel ?? DEFAULT_OVERRIDE_MODEL,
     reasoningEffort: SIDE_AGENT_DEFAULT_EFFORT,
   };
 
@@ -318,12 +324,19 @@ export function SideAgentPickers({
   ] = useState<ModelEffortOverride | null>(() =>
     getStoryProgressObserverModelOverride(),
   );
+  const [rewriteConfirmOverride, setRewriteConfirmOverrideState] = useState<
+    ModelEffortOverride | null
+  >(() => getRewriteConfirmModelOverride());
   const [storyProgressCheckInterval, setStoryProgressCheckIntervalState] =
     useState<number>(() => getStoryProgressCheckInterval());
 
   const handleObserverModelChange = (override: ModelEffortOverride | null) => {
     setObserverModelOverride(override);
     setObserverModelOverrideState(override);
+  };
+  const handleRewriteConfirmChange = (override: ModelEffortOverride | null) => {
+    setRewriteConfirmModelOverride(override);
+    setRewriteConfirmOverrideState(override);
   };
   const handleMemoryKeeperModelChange = (
     override: ModelEffortOverride | null,
@@ -427,6 +440,18 @@ export function SideAgentPickers({
         onChange={handleObserverModelChange}
         customModels={customModels}
         offNote={`Off - checks run on ${SIDE_AGENT_DEFAULT_MODEL_KEY}, effort ${SIDE_AGENT_DEFAULT_EFFORT}; rewrites use the Default model and its effort.`}
+      />
+
+      {/* The second judge before a rewrite */}
+      <StageOverrideCard
+        icon="ShieldCheck"
+        title="Rewrite confirmation"
+        description="Before the Observer rewrites a turn, a second judge from another model family has to agree the problem is real. Pick it here. A model of the same family as the Observer's is refused, and with no key for it the turn is flagged instead of rewritten."
+        override={rewriteConfirmOverride}
+        onChange={handleRewriteConfirmChange}
+        customModels={customModels}
+        startModel={REWRITE_CONFIRM_DEFAULT_MODEL_KEY}
+        offNote={`Off - ${REWRITE_CONFIRM_DEFAULT_MODEL_KEY} confirms (needs your OpenRouter key), effort ${SIDE_AGENT_DEFAULT_EFFORT}.`}
       />
     </div>
   );

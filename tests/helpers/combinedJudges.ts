@@ -64,3 +64,26 @@ export function judgeReply(
   }
   return JSON.stringify(out);
 }
+
+/** Whether a call is the Observer's rewrite (its last message carries the flagged block). */
+export function isRewriteCall(body: JudgeCallBody | undefined): boolean {
+  const last = body?.messages?.[body.messages.length - 1];
+  return last?.content?.includes("flagged by an automated reviewer") ?? false;
+}
+
+/** The narration a rewrite call was asked to rewrite. */
+export function rewriteOriginalOf(body: JudgeCallBody): string {
+  const last = body.messages[body.messages.length - 1]?.content ?? "";
+  const m = /What you wrote \(FLAGGED - do not repeat it as-is\):\n"""\n([\s\S]*?)\n"""/.exec(last);
+  return m ? m[1] : "";
+}
+
+/**
+ * A rewrite reply in the shape the rewrite is asked for: a fix plan quoting the
+ * last words of the original, the separator line, then the prose.
+ */
+export function rewriteReply(body: JudgeCallBody, prose: string): string {
+  const span = rewriteOriginalOf(body).split(/\s+/).slice(-4).join(" ");
+  const plan = [{ span, problem: "the flagged problem", replacement: "" }];
+  return `${JSON.stringify(plan)}\n===PROSE===\n${prose}`;
+}

@@ -319,6 +319,10 @@ export interface ScenePart {
   // player actually wanted. Set alongside correctedObserverFlags whenever a
   // rewrite lands, cleared when the player restores the original.
   observerRewriteOriginal?: ObserverRewriteOriginal;
+  // What the turn's details tell the player about the judges (judge layer v2,
+  // the public half of the findings): that the turn was checked and something
+  // stayed flagged, or revised after a check. Never a kind, a quote or a fact.
+  publicNotice?: "checked" | "revised";
   // Layer 3 periodic story-progress check-in (see storyProgressObserver.ts):
   // a GM-facing note on how the overall story is pacing (dragging, rushed,
   // or on track), produced every N turns rather than every turn. Never shown
@@ -388,8 +392,22 @@ export type ObserverSeverity = "minor" | "major";
 export interface ObserverFlag {
   type: ObserverFlagType;
   severity: ObserverSeverity;
-  detail: string; // Human-readable explanation, for logging/notification display
+  detail: string; // A fixed sentence per judge. Never the judge's own words: they may quote a secret.
   correctivePrompt: string; // Instruction injected into the GM's retry prompt when this flag triggers a reset
+  /**
+   * The private finding behind a combined-call flag (judges/combined.ts): the
+   * quote, the fact ids and the judge's one-sentence fix. Read by the Debug
+   * Logs, the confirming judge and the rewrite, and stripped from what online
+   * guests are sent (judges/publicView.ts). A secret-leak or lines-and-veils
+   * finding keeps no `fix`: it could name the very thing it removes.
+   */
+  finding?: ObserverFinding;
+}
+
+export interface ObserverFinding {
+  evidence: string;
+  factIds: string[];
+  fix: string;
 }
 
 // A rewritten turn's discarded first draft (see observer.ts's

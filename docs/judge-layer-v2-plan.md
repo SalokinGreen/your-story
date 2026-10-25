@@ -492,3 +492,50 @@ shared `AGENCY_CHAIN`, the prompt builders), `app/misc/judges/combined.ts`
    `runObserverSplit`'s comment now says the eval runner is slice J4 and not yet
    written.
 7. **`generate_name`** counts as randomness in `executedRandomness`.
+
+### 2026-10-25 — slice 3 (J3), confirmation and the rewrite with facts
+
+Built on `claude/judges-j3`. Files: `judges/confirm.ts` (model, agreement, rewriter
+facts, the gate), `judges/correction.ts` (`confirmAndRewrite`, the one path for the
+end-of-turn pass and the pass before a pause), `judges/rewritePlan.ts` (findings
+block, `parseFixPlan`, `planFollowed`, `recheckRewrite`), `judges/publicView.ts`
+(`withoutPrivateFindings`, `kindOnlyFlag`), plus `observer.ts`, `generation.ts`,
+`layerSettings.ts`, `ai_prices.ts` (`confirmModelFamily`), Settings, page and story.
+
+- **Every rewrite is confirmed, the prose judges included.** Length, agency and
+  outcome used to rewrite on one judge's word (decision 220); they now need the
+  second family too, as the plan's rung 4 says. A player with no OpenRouter key
+  (the default confirmer is GLM 5.3), or whose Observer already runs on a GLM, gets
+  flags instead of rewrites until they pick another confirming model.
+- **The confirming call is the same single-judge rubric** (`callJudges` with one
+  judge, blind to the first verdict). Agreement is major plus a shared run of three
+  words of quote (`evidenceOverlaps`). Disagreement and unknown both keep the flag.
+- **The new judges default to Flag, not Rewrite.** They have no measured precision
+  (slice 4); `FLAG_ONLY_FLAG_TYPES` no longer lists them and they are in
+  `REWRITABLE_FLAG_TYPES`, so Settings offers Rewrite. `plausibleResetFlagTypes`
+  takes `facts` so a turn waits for them only when their precondition holds.
+- **No fallback confirmer.** The player's pick or GLM 5.3; a pick the catalog
+  dropped reads as the default. Same family as the first judge, no key, or a
+  subscription model that cannot run: no confirmation, logged with the reason.
+- **Rewriter facts are cited facts only**, from `REWRITER_TOPICS` (outcome: results;
+  world: people, places, results; lines and veils: line and veil text). Never a
+  secret, a clock, the sheet (already in the narration context), a hidden tool's
+  result (`hiddenToolRefs`, via `publicSummary`) or a person the prose does not
+  name. A secret-leak rewrite gets the quoted statement and a rule, nothing more.
+  Findings of a leak or a line keep no `fix`.
+- **`alsoFixIfPresent`, `ALSO_FIX_CLAUSES` and `alsoFixTypes` are gone**; one rewrite
+  addresses the confirmed findings. Three tests of the clauses were removed.
+- **The fix plan is strict.** No separator, no plan, an empty plan, a span not in the
+  original, or a replaced span of four or more words still in the prose: the original
+  is released with its flags. The re-check fails closed if it cannot run.
+- **`ObserverFlag.finding`** (quote, fact ids, fix) is stored on `observerFlags`
+  (private; the Debug Logs, the confirmer, the rewrite). `ScenePart.publicNotice`
+  is set ("revised" when a rewrite landed, "checked" when a flag stayed, also by the
+  background wave). The turn's details do not display it yet: that is slice 5.
+- **Guests** lose `observerFlags`, `correctedObserverFlags` and the whole
+  `observerRewriteOriginal` (its draft is the text the judges objected to), so an
+  online guest has no Undo revision. Toasts and the Undo tooltip are generic.
+- **Tests that scripted a rewrite** now pass an OpenRouter key and answer in the
+  fix-plan shape (`rewriteReply` in `tests/helpers/combinedJudges.ts`).
+- **Not done:** the `engine-review` agent run (no agent tool in this session), and
+  the turn-details display of the notice (slice 5).

@@ -3,7 +3,7 @@
  * plan slice 1). Rung 0 is the facts, rung 1 the deterministic checks, rung 2
  * the re-ask. Nothing here calls a model.
  */
-import type { StoryData } from "../structs";
+import type { ObserverFlag, StoryData } from "../structs";
 
 /** What a turn's checks read of a story: a StoryData satisfies it, a snapshot is cheaper. */
 export type JudgeStoryView = Pick<StoryData, "npcs" | "meters" | "campaign"> &
@@ -130,4 +130,19 @@ export interface EventContract {
   expects: (turn: ContractTurn) => ExpectResult;
   /** The message that names the exact fix. Called only after `expects` failed. */
   reask: (turn: ContractTurn, failure: Extract<ExpectResult, { ok: false }>) => string;
+}
+
+/**
+ * A finding both judges agreed on, with the facts the rewrite is handed
+ * (judges/confirm.ts `rewriterFactsFor`). The facts here are the safe subset:
+ * never a secret's truth, a hidden clock or a hidden roll.
+ */
+export interface ConfirmedFinding {
+  flag: ObserverFlag;
+  judge: JudgeId;
+  /** The quote from the narration both judges pointed at. */
+  evidence: string;
+  /** The judge's fix sentence; empty for a finding that keeps none. */
+  fix: string;
+  facts: Fact[];
 }

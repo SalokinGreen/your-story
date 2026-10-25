@@ -22,7 +22,7 @@ import {
   LEGACY_OBSERVER_SETTINGS,
   FLAG_ONLY_OBSERVER_SETTINGS,
 } from "./helpers/observerSettings";
-import { isJudgeCall, judgeReply, requestedJudges } from "./helpers/combinedJudges";
+import { isJudgeCall, judgeReply, requestedJudges, rewriteReply } from "./helpers/combinedJudges";
 import type { ObserverSettings } from "@/app/misc/observer";
 import type { ObserverFlag, StoryData } from "@/app/misc/structs";
 import type { ResolvedTier } from "@/app/misc/reasoningTiers";
@@ -119,7 +119,9 @@ function installFetch(
             ...(scripted === LENGTH_UNJUSTIFIED && { length: "major" as const }),
             ...(scripted === TIER_NEEDED && { tier_gap: "major" as const }),
           })
-        : scripted;
+        : isRewrite(call) && scripted === REWRITTEN
+          ? rewriteReply(call.body, scripted)
+          : scripted;
       return { ok: true, json: async () => ({ content }) } as unknown as Response;
     }
     if (isChoices(call)) return sseStreamResponse({ content: CHOICES });

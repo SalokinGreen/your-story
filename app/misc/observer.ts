@@ -35,10 +35,22 @@
  * checkToolUsageGaps, checkTierEscalation) and runObserverSplit are the
  * version-1 per-judge form, kept for the eval runner's comparison and never
  * reached from Settings. Three judges joined (world_consistency, secret_leak,
- * lines_and_veils); they flag only until the confirming judge lands. The
- * scene-increment question is a free phrase check now, not a judge. When several
- * flags are major generateStoryTurn acts on the highest-priority one
- * (judges/combined.ts pickMajorFlag), and there is no speculative rewrite.
+ * lines_and_veils); they flag by default and may rewrite when the player sets
+ * Rewrite. The scene-increment question is a free phrase check now, not a judge.
+ *
+ * JUDGE LAYER V2, SLICE 3 (confirmation and the rewrite with facts): a major
+ * flag of a rewritable type no longer rewrites on one judge's word. The two
+ * highest-priority majors (judges/combined.ts majorFlagsInOrder) are each
+ * confirmed by a judge of another model family (judges/confirm.ts: the
+ * player's pick, GLM 5.3 by default; no key, or the first judge's own family,
+ * means no rewrite), and ONE rewrite fixes every confirmed finding
+ * (judges/correction.ts). The rewrite is handed the findings and only the facts
+ * they cite that are safe (never a secret's truth, a clock or a hidden roll),
+ * answers with a fix plan, a separator and the prose, and is re-checked: the
+ * plan's spans are in the original, a replaced span is gone from the prose, and
+ * rung 1 (judges/rewritePlan.ts recheckRewrite) finds no line or secret phrase
+ * in it. Any failure keeps the turn with its flags. A flag carries its private
+ * finding (ObserverFlag.finding); what the player sees is ScenePart.publicNotice.
  *
  * Three things scope every check below:
  * - Deferral (plausibleResetFlagTypes): whether the player WAITS on any of
@@ -129,11 +141,21 @@ import { callSideModel, ProviderKeys } from "./sideModelCall";
 import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
 import { appendToLastUser } from "./campaign/narrationContext";
 import {
+  JUDGE_FLAG_TYPE,
   runCombinedJudges,
   combinedResultToFlags,
   sceneIncrementFlag,
+  selectJudges,
+  type JudgeTurn,
 } from "./judges/combined";
-import type { Fact } from "./judges/types";
+import type { ConfirmedFinding, Fact } from "./judges/types";
+import {
+  FIX_PLAN_INSTRUCTION,
+  buildFindingsBlock,
+  parseFixPlan,
+  planFollowed,
+  type FixPlanEntry,
+} from "./judges/rewritePlan";
 
 // ============================================================
 // PER-FLAG-TYPE CONFIGURATION
@@ -237,8 +259,9 @@ export const DEFAULT_OBSERVER_SETTINGS: Readonly<CompleteObserverSettings> =
     missing_oracle_or_table: frozenCheckSettings(true, 5),
     missing_scene_increment: frozenCheckSettings(true, 5),
     tier_escalation_missed: frozenCheckSettings(true, 5),
-    // The combined call's newer judges. They flag only until the confirming
-    // judge and the rewrite with facts land (plan slice 3), and each runs only
+    // The combined call's newer judges. They flag by default: they have no
+    // measured precision yet (plan slice 4), so a rewrite is the player's
+    // choice (Settings), made after a second family confirms. Each runs only
     // when its precondition holds (a secret, a line, a named person).
     world_consistency: frozenCheckSettings(true, 5),
     secret_leak: frozenCheckSettings(true, 5),
@@ -290,11 +313,6 @@ export const OBSERVER_UNREGISTERED_TOOLS: ReadonlySet<string> = new Set(["campai
 export const FLAG_ONLY_FLAG_TYPES: ReadonlySet<ObserverFlagType> = new Set([
   "missing_oracle_or_table",
   "missing_scene_increment",
-  // Flag-only in this slice: a rewrite for these needs a confirming judge from
-  // another model family and the facts handed to the rewriter (slice 3).
-  "world_consistency",
-  "secret_leak",
-  "lines_and_veils",
 ]);
 
 /**
@@ -307,6 +325,12 @@ export const REWRITABLE_FLAG_TYPES: ReadonlySet<ObserverFlagType> = new Set([
   "response_length",
   "player_agency",
   "outcome_narration_mismatch",
+  // Judge layer v2, slice 3: these three rewrite too, but only after a judge
+  // of another model family confirms the finding (judges/confirm.ts) and with
+  // the facts handed to the rewriter. They default to Flag (see the defaults).
+  "world_consistency",
+  "secret_leak",
+  "lines_and_veils",
 ]);
 
 /** What Settings shows per judge: off, a flag in the turn's details, or an automatic rewrite. */
@@ -407,6 +431,12 @@ export function plausibleResetFlagTypes(params: {
   highStakes?: boolean;
   /** The player's line this turn; player_agency is plausible when it is non-empty (decision 237). */
   playerChoice?: string;
+  /**
+   * The turn's facts (judges/facts.ts). The judges of the record (world
+   * consistency, secret leak, lines and veils) are plausible when their own
+   * precondition holds on these, which is free: a fact of their kind exists.
+   */
+  facts?: Fact[];
   settings?: ObserverSettings;
 }): ObserverFlagType[] {
   const { narration, rollResults = [], tierUsed } = params;
@@ -417,6 +447,34 @@ export function plausibleResetFlagTypes(params: {
     const s = settingsFor(params.settings, type);
     return s.enabled && s.triggersReset;
   };
+
+  // The judges of the record, when the player lets them rewrite: they run (and
+  // so make the turn wait) only when selectJudges says their precondition holds.
+  if (
+    params.facts &&
+    (["world_consistency", "secret_leak", "lines_and_veils"] as const).some(canReset)
+  ) {
+    const selected = selectJudges({
+      narration,
+      playerChoice: params.playerChoice ?? "",
+      replyLength: params.replyLength,
+      toolNames: params.toolNames ?? [],
+      rollResults,
+      facts: params.facts,
+      settings: params.settings,
+    });
+    for (const id of selected) {
+      const type = JUDGE_FLAG_TYPE[id];
+      if (
+        (type === "world_consistency" ||
+          type === "secret_leak" ||
+          type === "lines_and_veils") &&
+        canReset(type)
+      ) {
+        types.push(type);
+      }
+    }
+  }
 
   // Free and exact: this is the same word count checkResponseLength runs, and
   // if it doesn't trip there is no length flag for the judge to justify.
@@ -983,20 +1041,18 @@ export interface RewriteNarrationParams {
    */
   narrationContext?: ChatMessage[];
   /**
-   * Other reset-eligible checks whose verdicts aren't in yet, to be fixed
-   * conditionally ("if it's also true of this narration") alongside the flag
-   * that actually triggered the rewrite. See ALSO_FIX_CLAUSES - only the
-   * text-based checks have a clause, since a rewrite can't fix a missing tool
-   * call or too low a reasoning tier.
-   *
-   * This exists for the speculative rewrite (generation.ts): it starts before
-   * the observer has finished, so it knows what the OTHER checks are looking
-   * for but not yet whether any of them fired. Rather than waste the one
-   * rewrite the turn gets on the length problem alone and leave a second
-   * violation standing, it asks for both in the same pass. Purely additive -
-   * an empty/omitted list produces exactly the prompt it always did.
+   * The findings two judges of different families agreed on (judges/confirm.ts),
+   * most serious first, each with the facts the rewrite may be handed. One
+   * rewrite fixes them all. When given, the reply is a fix plan, a separator
+   * and then the prose (judges/rewritePlan.ts), and `flag` is the first
+   * finding's. Without it the rewrite is the single-flag, prose-only form.
    */
-  alsoFixIfPresent?: ObserverFlagType[];
+  findings?: ConfirmedFinding[];
+  /**
+   * Re-checks the rewritten prose before it is accepted (rung 1 on the new
+   * text, generation.ts). Returns a reason to reject it, or null.
+   */
+  recheck?: (rewritten: string) => string | null;
   /** Swap the AI vocabulary tics in the result, like the story stage does (default on). */
   deAiifyWords?: boolean;
   /**
@@ -1009,26 +1065,6 @@ export interface RewriteNarrationParams {
   endsAtPause?: boolean;
   apiOptions: ObserverApiOptions;
 }
-
-/**
- * The "while you're in there" clause for each check that a prose rewrite could
- * plausibly fix. Deliberately conditional and self-limiting: the rewrite is
- * being told what the other reviewers look for, not that they found anything,
- * so every clause has to be safe to hand to a narration that has no such
- * problem. Confidently "fixing" a violation that isn't there is worse than
- * leaving a real one for the next turn's warning note.
- *
- * The three types with no entry are excluded on purpose:
- * missing_oracle_or_table and missing_scene_increment are complaints about
- * tool calls that didn't happen, and tier_escalation_missed is a complaint
- * about the reasoning tier the turn ran at - no amount of rewriting the prose
- * addresses any of them.
- */
-const ALSO_FIX_CLAUSES: Partial<Record<ObserverFlagType, string>> = {
-  player_agency: `if the narration gives the player character new meaningful dialogue, makes a significant choice for them or decides what they feel, cut that back and leave that choice to the player; narrating them carrying out what they declared, in second person, stays`,
-  response_length: `if the narration runs longer than the moment needs, cut scenery, repeated beats and anything the player did not ask for; keep every event and every result`,
-  outcome_narration_mismatch: `if the narration contradicts what a roll or check mechanically resolved to this turn, correct the narration to match the result - the result is ground truth and never changes to suit the prose`,
-};
 
 /**
  * Layer 5 hardening's answer to "just regenerate and hope for something
@@ -1076,7 +1112,10 @@ export async function rewriteFlaggedNarration(
   const lengthLine =
     alreadyRead || params.endsAtPause
       ? `This is only part of the turn, so do not write a whole turn's length: stay about as long as the text you were given${
-          flag.type === "response_length" ? ", or shorter, as the flag asks" : ""
+          flag.type === "response_length" ||
+          params.findings?.some((f) => f.flag.type === "response_length")
+            ? ", or shorter, as the flag asks"
+            : ""
         }.`
       : paragraphs;
   const pauseLine = params.endsAtPause
@@ -1088,33 +1127,25 @@ export async function rewriteFlaggedNarration(
       ? `Write as a Dungeon Master narrating to the player. You may reference dice results naturally. Use second person ("You swing your sword...").`
       : `Write immersive prose - show, don't tell. No dice results or mechanical language.`;
 
-  // A rewrite gets one shot per turn (MAX_OBSERVER_RESETS), so when the caller
-  // knows other reviewers are still deciding, their complaints ride along as
-  // conditional instructions - "fix this too, IF it's also true" - instead of
-  // being lost. Nothing here asserts a second problem exists; a clean
-  // narration should come back with only the flagged issue changed.
-  const alsoFixClauses = (params.alsoFixIfPresent || [])
-    .filter((type) => type !== flag.type)
-    .map((type) => ALSO_FIX_CLAUSES[type])
-    .filter((clause): clause is string => Boolean(clause));
-
-  const alsoFixBlock = alsoFixClauses.length
-    ? `\n- The same reviewers also check for the problems below. They have NOT necessarily been found here - check the narration yourself, and only change something if it genuinely applies. Do not invent a problem to fix:\n${alsoFixClauses
-        .map((clause) => `  - ${clause}`)
-        .join("\n")}`
-    : "";
+  // The findings two judges agreed on, when the caller has them: one rewrite
+  // fixes them all, and the reply is a fix plan, a separator, then the prose.
+  const findings = params.findings ?? [];
+  const withPlan = findings.length > 0;
 
   // The rules every rewrite has to obey, whether it runs as a continuation of
   // the turn's own conversation or from the standalone fallback prompt. The
   // "same moment" clause is load-bearing: a rewrite that quietly advances the
   // story, invents a new scene, or introduces people who weren't there is a
   // worse outcome than the flag it was fixing.
-  const rewriteRules = `Rewrite that narration to fix exactly that problem, and nothing else.
+  const outputRule = withPlan
+    ? `Output the fix plan, then the separator line, then the corrected narration prose - no meta-commentary, no notes to yourself, no tool calls.`
+    : `Output ONLY the corrected narration prose - no meta-commentary, no explanation of what you changed, no notes to yourself, no tool calls.`;
+  const rewriteRules = `Rewrite that narration to fix exactly ${withPlan ? "those problems" : "that problem"}, and nothing else.
 - Same moment, same scene, same events, same outcome. Do NOT advance the story, start a new scene, skip time, or introduce people, places, or events that weren't already in it.
 - Any dice rolls, checks, and state changes this turn already resolved are ground truth - the rewrite must stay consistent with them. They are NOT re-rolled.
-- Keep everything that was already correct (the tone, the details, the beat it lands on). Fix only what was flagged.${alsoFixBlock}
+- Keep everything that was already correct (the tone, the details, the beat it lands on). Fix only what was flagged.
 - ${lengthLine} ${voiceGuidance}${pauseLine}
-- Output ONLY the corrected narration prose - no meta-commentary, no explanation of what you changed, no notes to yourself, no tool calls.`;
+- ${outputRule}`;
 
   const readBlock = alreadyRead
     ? `The player has already read this opening of the turn, and it stays exactly as it is:
@@ -1133,7 +1164,11 @@ What you wrote (FLAGGED - do not repeat it as-is):
 ${narration.trim()}
 """${formatNarrationThoughtsBlock(params.narrationThoughts)}
 
-What was wrong: ${flag.detail}
+${
+    withPlan
+      ? `${buildFindingsBlock(findings)}\n\n${FIX_PLAN_INSTRUCTION}`
+      : `What was wrong: ${flag.detail}`
+  }
 
 ${rewriteRules}`;
 
@@ -1173,7 +1208,8 @@ ${rewriteRules}`;
       model: apiOptions.model,
       messages,
       keys: apiOptions,
-      maxTokens: Math.max(400, Math.ceil(band.high * 3)),
+      // The fix plan comes before the prose and costs tokens of its own.
+      maxTokens: Math.max(400, Math.ceil(band.high * 3)) + (withPlan ? 700 : 0),
       temperature: 0.7,
       reasoningEffort: apiOptions.reasoningEffort,
       abortSignal: apiOptions.abortSignal,
@@ -1181,8 +1217,25 @@ ${rewriteRules}`;
     });
     if (!result.ok) return null;
 
+    // With findings the reply is a fix plan, a separator, then the prose; code
+    // checks the plan against the original before the prose is trusted.
+    let replyData = result.data;
+    let plan: FixPlanEntry[] = [];
+    if (withPlan) {
+      const parsed = parseFixPlan(result.data.content || "", narration);
+      if (!parsed.ok) {
+        logger.action("Observer rewrite rejected, keeping the original", {
+          reason: parsed.reason,
+          type: flag.type,
+        });
+        return null;
+      }
+      plan = parsed.plan;
+      replyData = { ...result.data, content: parsed.prose };
+    }
+
     // A successful HTTP answer is not yet a rewritten narration (finding 5).
-    const checked = validateRewriteResponse(result.data, narration);
+    const checked = validateRewriteResponse(replyData, narration);
     if (!checked.ok) {
       logger.action("Observer rewrite rejected, keeping the original", {
         reason: checked.reason,
@@ -1190,9 +1243,28 @@ ${rewriteRules}`;
       });
       return null;
     }
-    return params.deAiifyWords === false
-      ? checked.text
-      : deAiifyText(checked.text);
+    if (withPlan) {
+      const followed = planFollowed(plan, checked.text);
+      if (!followed.ok) {
+        logger.action("Observer rewrite rejected, keeping the original", {
+          reason: followed.reason,
+          type: flag.type,
+        });
+        return null;
+      }
+    }
+    const text =
+      params.deAiifyWords === false ? checked.text : deAiifyText(checked.text);
+    // The deterministic checks run on the words the player would read.
+    const recheckFailure = params.recheck?.(text) ?? null;
+    if (recheckFailure) {
+      logger.action("Observer rewrite rejected, keeping the original", {
+        reason: recheckFailure,
+        type: flag.type,
+      });
+      return null;
+    }
+    return text;
   } catch (error) {
     // A cancelled turn is the caller's decision, not a judge failure (finding 8).
     if (isAbortError(error)) throw error;
@@ -2115,6 +2187,23 @@ export interface ObserverParams {
  * eval runner's comparison (slice J4 will add scripts/eval-judges.mjs; it does not exist yet) and never
  * reachable from Settings.
  */
+/** What the combined call (and the confirming judge after it) reads of a turn. */
+export function judgeTurnFor(params: ObserverParams): JudgeTurn {
+  return {
+    narration: params.narration,
+    playerChoice: params.playerChoice,
+    replyLength: params.replyLength,
+    toolNames: params.toolNames ?? [],
+    rollResults: params.rollResults ?? [],
+    tierUsed: params.tierUsed,
+    characterContext: params.characterContext,
+    narrationThoughts: params.narrationThoughts,
+    facts: params.facts ?? [],
+    phraseHits: params.phraseHits,
+    settings: params.settings,
+  };
+}
+
 export async function runObserver(params: ObserverParams): Promise<ObserverFlag[]> {
   if (
     observerSuspensionReason({
@@ -2126,22 +2215,7 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
     return [];
   }
 
-  const result = await runCombinedJudges(
-    {
-      narration: params.narration,
-      playerChoice: params.playerChoice,
-      replyLength: params.replyLength,
-      toolNames: params.toolNames ?? [],
-      rollResults: params.rollResults ?? [],
-      tierUsed: params.tierUsed,
-      characterContext: params.characterContext,
-      narrationThoughts: params.narrationThoughts,
-      facts: params.facts ?? [],
-      phraseHits: params.phraseHits,
-      settings: params.settings,
-    },
-    params.apiOptions,
-  );
+  const result = await runCombinedJudges(judgeTurnFor(params), params.apiOptions);
   const flags = combinedResultToFlags(result, {
     narration: params.narration,
     replyLength: params.replyLength,

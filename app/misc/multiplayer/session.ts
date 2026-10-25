@@ -15,6 +15,7 @@
 import { getLocalPlayerId } from "@/app/misc/localPlayerId";
 import type { PlayerArchetype, StoryData } from "@/app/misc/structs";
 import { withLegacyGuestShim } from "@/app/misc/storyDataDefaults";
+import { withoutPrivateFindings } from "@/app/misc/judges/publicView";
 import type { MultiplayerTransport } from "./transport";
 import { createTransport, generateRoomCode } from "./transports";
 import type {
@@ -444,7 +445,7 @@ export class NetSession {
       type: "state_snapshot",
       // A guest on a build from before the legacy removal needs the empty
       // arrays back (see withLegacyGuestShim); the host's own story is untouched.
-      storyData: withLegacyGuestShim(storyData),
+      storyData: withLegacyGuestShim(withoutPrivateFindings(storyData)),
       seq: this.nextSeq++,
     });
   }

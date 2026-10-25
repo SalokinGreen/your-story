@@ -25,7 +25,7 @@ import {
   type ScriptedGMRound,
 } from "./helpers/mockGMFetch";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
-import { isJudgeCall, judgeReply } from "./helpers/combinedJudges";
+import { isJudgeCall, judgeReply, rewriteReply } from "./helpers/combinedJudges";
 import { expectAlternatingRoles } from "./helpers/roles";
 import type { StoryData } from "@/app/misc/structs";
 
@@ -431,7 +431,7 @@ async function runTurn(narration: string, lengthJudgeJustified: boolean, gmRound
       let content = judge(true);
       if (last.includes("flagged by an automated reviewer")) {
         rewriteCalls.push(req);
-        content = REWRITTEN;
+        content = rewriteReply(req.body, REWRITTEN);
       } else if (isJudgeCall(req.body)) {
         // The judges are one call answering a keyed verdict per judge.
         content = judgeReply(req.body, lengthJudgeJustified ? {} : { length: "major" });
@@ -454,6 +454,8 @@ async function runTurn(narration: string, lengthJudgeJustified: boolean, gmRound
     skipChoices: true,
     replyLength: "medium",
     observerSettings: LEGACY_OBSERVER_SETTINGS,
+    // A rewrite needs a second family's judge (GLM 5.3, through OpenRouter).
+    openRouterKey: "test-key",
   };
   const result = await generateStoryTurn(story(), "I pick the lock", options, {});
   for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));

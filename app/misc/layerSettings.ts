@@ -156,6 +156,36 @@ export const setStoryProgressObserverModelOverride = (
   override: ModelEffortOverride | null,
 ): void => setOverride(STORY_PROGRESS_OBSERVER_MODEL_KEY, override);
 
+// The confirming judge (judge layer v2, decision 234): before a rewrite, a second
+// model from another family must agree the finding is major (design 11.5). The
+// player's pick, with GLM 5.3 through OpenRouter as the default. Judge-layer
+// code (judges/confirm.ts) refuses a pick of the first judge's own family.
+const REWRITE_CONFIRM_MODEL_KEY = "rewriteConfirmModelOverride";
+
+export const REWRITE_CONFIRM_DEFAULT_MODEL_KEY: AIModelKey = "GLM 5.3";
+
+export const getRewriteConfirmModelOverride = (): ModelEffortOverride | null =>
+  getOverride(REWRITE_CONFIRM_MODEL_KEY);
+export const setRewriteConfirmModelOverride = (
+  override: ModelEffortOverride | null,
+): void => setOverride(REWRITE_CONFIRM_MODEL_KEY, override);
+
+/** The confirming judge's model and effort: the player's pick, else GLM 5.3 at the side-agent effort. */
+export function getRewriteConfirmModel(): {
+  model: string;
+  reasoningEffort: ReasoningEffort;
+  picked: boolean;
+} {
+  const override = getRewriteConfirmModelOverride();
+  return override
+    ? { model: override.modelKey, reasoningEffort: override.reasoningEffort, picked: true }
+    : {
+        model: REWRITE_CONFIRM_DEFAULT_MODEL_KEY,
+        reasoningEffort: SIDE_AGENT_DEFAULT_EFFORT,
+        picked: false,
+      };
+}
+
 /**
  * Decisions 16 and 29 for the side agents: the layers whose Claude
  * subscription override cannot run here and now, for Settings' notice. They

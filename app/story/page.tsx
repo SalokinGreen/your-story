@@ -372,7 +372,7 @@ function handleObserverRewrite(
   });
 
   addNotification(
-    `Narration revised: ${triggeringFlag.detail} Use "Undo revision" to keep the original.`,
+    `Revised after a check. Use "Undo revision" to put the original back.`,
     "warning",
   );
 }
@@ -1885,7 +1885,7 @@ function StoryPageContent() {
     // Only tell the player about a turn that still exists on their screen.
     if (!target || applyBackgroundFlags(target, partId, flags) === target) return;
     addNotification(
-      `GM response flagged: ${flags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+      `This response was flagged after a check - use Edit to fix the text, or Retry to regenerate.`,
       "warning",
     );
   }
@@ -2938,6 +2938,14 @@ function StoryPageContent() {
               };
             }
 
+            // What the turn's details say about the judges: checked or revised.
+            if (lastIdx >= 0 && result.scenePart?.publicNotice) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                publicNotice: result.scenePart.publicNotice,
+              };
+            }
+
             // Copy the story stage's own native reasoning too - it streams
             // live via onStoryReasoning, but without this it never reaches
             // the persisted part, so it vanishes once the live timeline
@@ -2992,7 +3000,7 @@ function StoryPageContent() {
                 observerFlags: result.scenePart.observerFlags,
               };
               addNotification(
-                `GM response flagged: ${result.scenePart.observerFlags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+                `This response was flagged after a check - use Edit to fix the text, or Retry to regenerate.`,
                 "warning",
               );
             }
@@ -3489,6 +3497,14 @@ function StoryPageContent() {
               storyData.scene.parts[lastIdx] = {
                 ...storyData.scene.parts[lastIdx],
                 pacingNote: result.scenePart.pacingNote,
+              };
+            }
+
+            // What the turn's details say about the judges: checked or revised.
+            if (lastIdx >= 0 && result.scenePart?.publicNotice) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                publicNotice: result.scenePart.publicNotice,
               };
             }
 
@@ -4509,6 +4525,14 @@ function StoryPageContent() {
               };
             }
 
+            // What the turn's details say about the judges: checked or revised.
+            if (lastIdx >= 0 && result.scenePart?.publicNotice) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                publicNotice: result.scenePart.publicNotice,
+              };
+            }
+
             // Copy the story stage's own native reasoning too - it streams
             // live via onStoryReasoning, but without this it never reaches
             // the persisted part, so it vanishes once the live timeline
@@ -4563,7 +4587,7 @@ function StoryPageContent() {
                 observerFlags: result.scenePart.observerFlags,
               };
               addNotification(
-                `GM response flagged: ${result.scenePart.observerFlags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+                `This response was flagged after a check - use Edit to fix the text, or Retry to regenerate.`,
                 "warning",
               );
             }

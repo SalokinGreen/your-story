@@ -1354,10 +1354,12 @@ ends with no roll).
 review in `docs/research/codex-judge-layer-review-2026-10-24.md`).
 `DEFAULT_OBSERVER_SETTINGS` (frozen; every reader gets a copy, `settingsFor`,
 `cloneDefaultObserverSettings`) has **every judge on** (decision 220): the three
-prose judges (`REWRITABLE_FLAG_TYPES`: length, agency, outcome) rewrite a
-flagged turn automatically (`triggersReset`), the others flag (and the three
-judges of the record added by judge layer v2, world consistency, secret leak
-and lines and veils, flag only for now). A stored
+prose judges (length, agency, outcome) rewrite a flagged turn automatically
+(`triggersReset`), the others flag (and the three judges of the record added by
+judge layer v2, world consistency, secret leak and lines and veils, default to
+flag and offer "Rewrite automatically" too: all six are `REWRITABLE_FLAG_TYPES`).
+Since slice J3 **no rewrite happens on one judge's word**: a judge of another
+model family must confirm it first (see J3 below). A stored
 config without `observerSettingsVersion: 3` (`OBSERVER_SETTINGS_VERSION`) is
 replaced by the defaults once, with a Debug Logs line (`getObserverSettings`,
 `layerSettings.ts`); a player's later choices are kept, and the flag-only table
@@ -1435,8 +1437,8 @@ and the context viewer. "Undo revision" is attached to each revised turn
 work in any of these layers — it tracks what was tried and reverted, and why.
 
 **Judge layer v2, slice J1: rung 1 and the re-ask** (`docs/judge-layer-v2-design.md`
-§11, plan slice 1; the combined judge call, confirmation and the rewrite with
-facts are J2/J3 and not built). `app/misc/judges/` holds the facts
+§11, plan slice 1; the combined call is J2 and confirmation with the rewrite
+with facts is J3, below). `app/misc/judges/` holds the facts
 (`collectTurnFacts`, ids `f1…fn` with source and time), the pure rung-1 checks
 (`runRung1`: event contracts, dead or departed people, campaign lines, secret
 key phrases, and the pacing counters) and `buildReask`. A system declares event
@@ -1456,7 +1458,7 @@ run once more for the Debug Logs; the pacing hits make a GM-only
 check-in (decision 235).
 
 **Judge layer v2, slice J2: the combined judge call** (`docs/judge-layer-v2-plan.md`
-slice 2; confirmation and the rewrite with facts are J3 and not built).
+slice 2; confirmation and the rewrite with facts are J3, below).
 `runObserver` no longer makes one call per judge: every judge whose
 precondition holds (`selectJudges`: length past the ceiling, agency with a
 player line, outcome with a typed ruling, world consistency when the prose names
@@ -1483,11 +1485,55 @@ call is unknown. The scene-increment question is a free phrase check
 gone, several major flags are acted on in `FLAG_PRIORITY` order (lines and veils,
 secret leak, outcome, world, agency, length; `pickMajorFlag`), and the full-turn
 tier retry is refused when the turn already threw dice (`executedRandomness`).
-The three new judges are flag-only (`FLAG_ONLY_FLAG_TYPES`) until slice 3; an
+The three new judges default to Flag (J3 made them rewritable on request); an
 older stored config that does not name them reads their defaults
 (`ObserverSettings` lets the newer types be absent), so no settings-version
 bump. A secret-leak flag is generic and never quotes the secret; the quote
 stays in the Debug Logs.
+
+**Judge layer v2, slice J3: confirmation and the rewrite with facts**
+(`docs/judge-layer-v2-plan.md` slice 3, design §11.5, decision 228 and 234).
+**A rewrite needs two families.** Of a pass's major flags the player let
+rewrite (`REWRITABLE_FLAG_TYPES`, now also world consistency, secret leak and
+lines and veils), the two of highest `FLAG_PRIORITY` (`MAX_CONFIRMATIONS`) are
+each re-judged by the confirming model (`judges/confirm.ts`: the same single
+judge's rubric through `callJudges`, run together). It **agrees** on a major
+verdict whose quote overlaps the first judge's (`evidenceOverlaps`: a shared
+run of three words). The model is the player's pick
+(`getRewriteConfirmModel`, `rewriteConfirmModelOverride`, a synced key, picker
+"Rewrite confirmation" under Settings → AI → Advanced), **GLM 5.3** by default.
+No key for it, or a model of the first judge's family
+(`confirmModelFamily`, read from the catalog), or a subscription model that
+cannot run here: no confirmation call and no rewrite, the finding stays a flag,
+and the Debug Logs say why. A confirmation that fails or cannot be read is
+"unknown", never a rewrite; a Stop passes through. `judges/correction.ts`
+(`confirmAndRewrite`) is the one path for the end-of-turn pass and the pass
+before a pause: confirm, then **one** rewrite (`rewriteFlaggedNarration` with
+`findings`, on the narration voice and the narration context) addressing every
+confirmed finding. `alsoFixIfPresent` and the speculative "fix this too"
+clauses are gone. **The rewrite is handed facts, never secrets**
+(`rewriterFactsFor`): only the facts the finding cites, of kinds the judge's
+rewrite may use (outcome: results; world: people, places, results; lines and
+veils: the line and veil text), never a secret's truth, a clock, the sheet, a
+hidden roll (`hiddenToolRefs`, the tools `publicSummary` hides) or a person the
+prose does not name. A secret-leak rewrite is told only the quoted statement to
+take out. It replies with a **fix plan** (a JSON array of
+`{span, problem, replacement}`), the line `===PROSE===`, then the prose
+(`judges/rewritePlan.ts`): `parseFixPlan` rejects a span that is not in the
+original, `planFollowed` a replaced span of four words or more that is still
+in the prose, `validateRewriteResponse` the usual cut-off, refusal or
+unchanged text, and `recheckRewrite` runs rung 1 on the new text (a line's
+keyword or an unrevealed secret's key phrase, or a dead person acting that the
+draft did not have, fails it). Any failure releases the original with its
+flags, exactly once. **Public and private:** a flag made by the combined call
+carries `ObserverFlag.finding` (quote, fact ids, the judge's `fix`; none for a
+leak or a line); a rewrite original keeps its flag's kind only
+(`kindOnlyFlag`); `ScenePart.publicNotice` ("checked" or "revised") is all the
+player is told; the toasts and the Undo tooltip are generic ("Revised after a
+check", "Undo revision"); and `withoutPrivateFindings` strips
+`observerFlags`, `correctedObserverFlags` and the replaced draft from what the
+host sends online guests (`broadcastSnapshot`; `buildPlayerView` never had
+them). The turn's details do not show the notice yet (slice 5).
 
 ## BYOK, no accounts, local storage, native shells
 

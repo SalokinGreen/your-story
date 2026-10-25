@@ -29,6 +29,7 @@ import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
 import {
   isJudgeCall,
   judgeReply,
+  rewriteReply,
   requestedJudges,
   type JudgeSpec,
 } from "./helpers/combinedJudges";
@@ -92,6 +93,8 @@ const baseOptions: GenerationOptions = {
   skipChoices: true,
   replyLength: "medium",
   observerSettings: LEGACY_OBSERVER_SETTINGS,
+  // A rewrite needs a second judge from another family (GLM 5.3, through OpenRouter).
+  openRouterKey: "test-key",
 };
 
 interface ObserverCall {
@@ -174,7 +177,7 @@ describe("the length rewrite - generateStoryTurn integration", () => {
       async (call) => {
         if (isRewrite(call)) {
           rewriteAskedBeforeJudges = !judgeAnswered;
-          return REWRITTEN;
+          return rewriteReply(call.body, REWRITTEN);
         }
         if (isLengthJudge(call)) {
           // Slow, so a rewrite started alongside it would show.
@@ -208,7 +211,7 @@ describe("the length rewrite - generateStoryTurn integration", () => {
     const { fetchMock, observerCalls } = createFetchMock(
       LONG_NARRATION,
       async (call) => {
-        if (isRewrite(call)) return REWRITTEN;
+        if (isRewrite(call)) return rewriteReply(call.body, REWRITTEN);
         if (isLengthJudge(call)) return judges(call, {});
         return OTHER_SIDE_CALL;
       },
@@ -264,7 +267,7 @@ describe("the length rewrite - generateStoryTurn integration", () => {
         },
       ],
       async (call) => {
-        if (isRewrite(call)) return REWRITTEN;
+        if (isRewrite(call)) return rewriteReply(call.body, REWRITTEN);
         if (isLengthJudge(call)) return judges(call, { length: "major" });
         return OTHER_SIDE_CALL;
       },
@@ -290,17 +293,14 @@ describe("the length rewrite - generateStoryTurn integration", () => {
   });
 
   it("acts on the higher-priority major flag: agency before length, one rewrite", async () => {
-    // Both judges say major. The design's order puts the player's agency ahead
-    // of length, so the one rewrite the turn gets is for agency.
+    // Both judges say major, and a second family confirms each. The design's
+    // order puts the player's agency ahead of length; the one rewrite the turn
+    // gets is for both, agency first.
     const { fetchMock, observerCalls } = createFetchMock(
       LONG_NARRATION,
       async (call) => {
-        if (isRewrite(call)) {
-          return call.body.messages.some((m) => m.content?.includes("taken a decision away"))
-            ? "You hesitate at the lock."
-            : REWRITTEN;
-        }
-        if (isLengthJudge(call)) {
+        if (isRewrite(call)) return rewriteReply(call.body, "You hesitate at the lock.");
+        if (isJudgeCall(call.body)) {
           return judges(call, {
             length: "major",
             agency: { severity: "major", fix: "Spoke for the player." },
@@ -319,15 +319,30 @@ describe("the length rewrite - generateStoryTurn integration", () => {
     );
 
     expect(observerCalls.filter(isRewrite)).toHaveLength(1);
-    // The one rewrite also carries the other major's fix, so it cuts the length too.
+    // Each major was confirmed by its own call to the other family's model.
+    const confirmations = observerCalls.filter(
+      (c) => isJudgeCall(c.body) && (c.body as { model?: string }).model === "GLM 5.3",
+    );
+    expect(confirmations.map((c) => requestedJudges(c.body)).sort()).toEqual([
+      ["agency"],
+      ["length"],
+    ]);
+    // The one rewrite is handed both confirmed findings, most serious first.
     const prompt = observerCalls
       .filter(isRewrite)[0]
       .body.messages.map((m) => m.content)
       .join("\n");
-    expect(prompt).toContain("runs longer than the moment needs");
-    expect(prompt).not.toContain("makes a significant choice for them"); // the chosen flag is not its own clause
+    expect(prompt).toContain("Problems found, most serious first");
+    expect(prompt).toContain("Cut scenery, repeated beats");
+    expect(prompt).toContain("Give the player character no new dialogue");
+    expect(prompt.indexOf("Give the player character")).toBeLessThan(
+      prompt.indexOf("Cut scenery, repeated beats"),
+    );
     expect(result.content).toBe("You hesitate at the lock.");
-    expect(result.scenePart.correctedObserverFlags?.[0]?.type).toBe("player_agency");
+    expect(result.scenePart.correctedObserverFlags?.map((f) => f.type)).toEqual([
+      "player_agency",
+      "response_length",
+    ]);
   });
 });
 
@@ -429,7 +444,7 @@ describe("the narration turn in the rewrite's conversation", () => {
       gmRounds,
       storyRound,
       async (call) => {
-        if (isRewrite(call)) return REWRITTEN;
+        if (isRewrite(call)) return rewriteReply(call.body, REWRITTEN);
         if (isLengthJudge(call)) return judges(call, { length: "major" });
         return OTHER_SIDE_CALL;
       },
@@ -476,7 +491,7 @@ describe("the narration turn in the rewrite's conversation", () => {
       gmRounds,
       storyRound,
       async (call) => {
-        if (isRewrite(call)) return REWRITTEN;
+        if (isRewrite(call)) return rewriteReply(call.body, REWRITTEN);
         if (isLengthJudge(call)) return judges(call, { length: "major" });
         return OTHER_SIDE_CALL;
       },

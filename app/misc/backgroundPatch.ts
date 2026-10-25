@@ -68,7 +68,14 @@ export function applyBackgroundFlags(
     scene: {
       ...story.scene,
       parts: story.scene.parts.map((p, i) =>
-        i === index ? { ...p, observerFlags: flags } : p,
+        i === index
+          ? {
+              ...p,
+              observerFlags: flags,
+              // The turn's details say it was checked (a revised turn stays revised).
+              publicNotice: p.publicNotice === "revised" ? "revised" : "checked",
+            }
+          : p,
       ),
     },
   };
