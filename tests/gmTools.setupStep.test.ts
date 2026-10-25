@@ -92,7 +92,7 @@ async function run(s: StoryData, calls: ReturnType<typeof call>[], h: GMInteract
 
 describe("recording a step", () => {
   it("records a solo player step under 'solo' and names the next one", async () => {
-    const s = story({ mode: "full", covered: { table: ["setting", "tone", "campaign"], players: {} } }, [BB]);
+    const s = story({ mode: "full", covered: { table: ["setting", "tone", "style", "tone_safety", "campaign"], players: {} } }, [BB]);
     const out = await run(s, [ask(q({ setup_step: "kind" }))], answering(answered()));
     expect(out.modifiedStoryData.setup?.covered?.players).toEqual({ solo: ["kind"] });
     expect(out.results[0].contextForStory).toContain("Recorded: kind (Nik). Next: archetype (Nik).");
@@ -111,14 +111,14 @@ describe("recording a step", () => {
   });
 
   it("says when every required step is covered", async () => {
-    const quick = story({ mode: "quick", covered: { table: ["setting"], players: {} } });
-    const out = await run(quick, [ask(q({ setup_step: "tone" }))], answering(answered()));
+    const quick = story({ mode: "quick", covered: { table: ["setting", "tone"], players: {} } });
+    const out = await run(quick, [ask(q({ setup_step: "tone_safety" }))], answering(answered()));
     expect(out.results[0].contextForStory).toContain("Every required step is covered.");
     expect(getSetupProgress(out.modifiedStoryData).next).toBe("character");
 
-    const full = story({ mode: "full", covered: { table: ["setting", "tone", "campaign"], players: { solo: ["name_look", "history"] } } });
+    const full = story({ mode: "full", covered: { table: ["setting", "tone", "style", "tone_safety", "campaign"], players: { solo: ["name_look", "history"] } } });
     const done = await run(full, [ask(q({ setup_step: "drives" }))], answering(answered()));
-    expect(done.results[0].contextForStory).toContain("Every step is covered: write the sheet and the plan.");
+    expect(done.results[0].contextForStory).toContain("Every step is covered: write the sheet and build the campaign.");
   });
 
   it("ignores an unknown tag and says so, listing the story's steps", async () => {
@@ -127,7 +127,7 @@ describe("recording a step", () => {
     // "kind" is Blood & Bone's; this story has no system.
     expect(out.modifiedStoryData.setup?.covered).toBeUndefined();
     expect(out.results[0].contextForStory).toContain('unknown setup_step "kind" ignored');
-    expect(out.results[0].contextForStory).toContain("setting, tone, campaign");
+    expect(out.results[0].contextForStory).toContain("setting, tone, style, tone_safety, campaign");
     expect(out.results[0].success).toBe(true); // the answer itself still counts
   });
 
@@ -318,7 +318,7 @@ describe("confirm_setup waits for the steps", () => {
         return { approved: true };
       },
     };
-    const s = story({ mode: "full", covered: { table: ["setting", "tone", "campaign"], players: { solo: ["name_look"] } } }, [SHEET, PLAN]);
+    const s = story({ mode: "full", covered: { table: ["setting", "tone", "style", "tone_safety", "campaign"], players: { solo: ["name_look"] } } }, [SHEET, PLAN]);
     const out = await run(s, [call("confirm_setup", CONFIRM)], h);
     const r = out.results[0];
     expect(r.success).toBe(false);
@@ -329,7 +329,7 @@ describe("confirm_setup waits for the steps", () => {
   });
 
   it("names the table and each player separately", async () => {
-    const s = couchStory({ mode: "full", covered: { table: ["setting", "tone", "campaign"], players: { a: ["name_look", "history", "drives"] } } }, [SHEET, PLAN]);
+    const s = couchStory({ mode: "full", covered: { table: ["setting", "tone", "style", "tone_safety", "campaign"], players: { a: ["name_look", "history", "drives"] } } }, [SHEET, PLAN]);
     const out = await run(s, [call("confirm_setup", CONFIRM)], approving);
     expect(out.results[0].contextForStory).toContain("the table about cohort");
     expect(out.results[0].contextForStory).toContain("Bo about name_look, history, drives");
@@ -341,7 +341,7 @@ describe("confirm_setup waits for the steps", () => {
       {
         mode: "full",
         covered: {
-          table: ["setting", "tone", "campaign"],
+          table: ["setting", "tone", "style", "tone_safety", "campaign"],
           players: { solo: ["name_look", "history", "drives"] },
         },
       },
@@ -367,14 +367,14 @@ describe("confirm_setup waits for the steps", () => {
   });
 
   it("falls back to a title when the GM gave none", async () => {
-    const s = story({ mode: "quick", covered: { table: ["setting", "tone"], players: {} } }, [SHEET, PLAN]);
+    const s = story({ mode: "quick", covered: { table: ["setting", "tone", "tone_safety"], players: {} } }, [SHEET, PLAN]);
     const out = await run(s, [call("confirm_setup", CONFIRM)], approving);
     expect(out.modifiedStoryData.sessionZeroActive).toBe(false);
     expect(out.modifiedStoryData.story_name).toBe("Untitled Story");
   });
 
   it("dismissed and changes do not start the game", async () => {
-    const s = story({ mode: "quick", covered: { table: ["setting", "tone"], players: {} } }, [SHEET, PLAN]);
+    const s = story({ mode: "quick", covered: { table: ["setting", "tone", "tone_safety"], players: {} } }, [SHEET, PLAN]);
     for (const answer of [{ dismissed: true as const }, { approved: false as const, note: "Edit" }]) {
       const out = await run(
         s,

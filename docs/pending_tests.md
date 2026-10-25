@@ -41,6 +41,33 @@ The labelled set (J4) is what will measure these properly.
   the judge and then for the rewrite (the speculative rewrite is gone). Note the
   wait; it should be one judge call plus one rewrite.
 
+## 2026-10-25 — Campaign slice 3: session zero builds the campaign
+
+Needs a live model and the author's go (or a screenshot session for the card);
+the engine side is covered by `tests/campaign.sessionZero.test.ts` and
+`tests/generation.campaignSetup.test.ts`.
+
+- **The setup card with a campaign record.** Start a new adventure, choose
+  Step by step, and answer through to the card. Expected: "Campaign: Mystery"
+  (or the style chosen) with the premise, tone, lines and veils (or "none"),
+  the names of factions and threats, places and any visible clock, and no
+  secret, doom or hidden clock anywhere on it. Check the card at phone width.
+- **Does a real GM build the record?** Quick setup with a live model: it should
+  ask setting, tone and lines and veils, pick a style, then call `campaign`
+  (style, pitch, safety, a faction or front with a clock) before
+  `confirm_setup`. Failure looks like the GM writing a `gm_plan` note instead
+  (still accepted, but it skips the record), or `start_game` refusing with
+  "the campaign is not ready" repeatedly.
+- **Lines and veils in session zero.** The deterministic keyword check for a
+  line's `keywords` logs only in session zero (its re-ask is off there, because
+  the setup talk names the lines); play a turn after starting with a line like
+  "harm to children" and confirm the Debug Logs show "Rung 1 check: line" if
+  the prose uses a keyword.
+- **System prompt wording.** The system prompt's CAMPAIGN PLAN section still
+  tells the GM to create a "Campaign Plan" `gm_plan` note in session zero (the
+  live block now says to use the `campaign` tool). Watch for the GM following
+  the older wording.
+
 ## 2026-10-25 — Campaign slice 2: the narration context
 
 Needs a live model and the author's go; the allowlist itself is covered by

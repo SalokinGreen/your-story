@@ -110,13 +110,13 @@ describe("setupStripState", () => {
     const probe = setupStripState(story({ setup: { mode: "full" } }));
     if (probe.kind !== "checklist") throw new Error("checklist expected");
     // Cover everything by listing each step for the table and the solo player.
-    const ids = ["setting", "tone", "campaign", "name_look", "history", "drives"];
+    const ids = ["setting", "tone", "style", "tone_safety", "campaign", "name_look", "history", "drives"];
     const full = setupStripState(
       story({ setup: { mode: "full", covered: { table: ids, players: { solo: ids } } } }),
     );
     if (full.kind !== "checklist") throw new Error("checklist expected");
     const item = full.steps.find((x) => x.id === "setup")!;
-    expect(item.label).toBe("Setup 6/6");
+    expect(item.label).toBe("Setup 8/8");
     expect(item.done).toBe(true);
   });
 
