@@ -373,6 +373,15 @@ Ranked by severity (sections below are numbered in the order they were found):
   delete `end_gm_thinking` end to end (see [§10](#10-dead-code)). Check undo/retry
   snapshotting covers the timer mutation.
 
+> **Update 2026-10-25 (campaign format C1, `claude/campaign-c1`): fixed for
+> clocks.** A countdown timer becomes a manual campaign clock on load
+> (`migrateTimers`), `manage_timer` is translated onto clocks, and clocks that
+> list the triggers `miss`, `scene`, `rest` or `session` are ticked by the
+> engine as the triggering tool executes (`applyTurnEvents`, once per trigger
+> per clock per turn, across the GM's rounds). Nothing is deleted: a story's
+> `timers` stay beside its clocks. A story with no campaign record behaves as
+> before, so the legacy `auto_advance` flag is still inert there.
+
 ### 6.2 `StoryThread.linkedTimerId` / `threshold` are never written
 
 **Severity: medium (feature never actually connected).** From the branch
@@ -386,6 +395,12 @@ audit; re-verify before fixing.
   clock" — in practice the link only exists by naming convention.
 - **Fix sketch:** add an optional `thread_id` to `manage_timer` create (or a
   `timer_id` to `create_thread`/`update_thread`) and write both sides.
+
+> **Update 2026-10-25 (campaign format C1): fixed for fronts.** A clock carries
+> `link: {kind: "front"|"faction"|"thread", id}` and a front carries `clockId`;
+> the `campaign` tool keeps the two sides in step, and the director's
+> `tick_a_clock` move targets a campaign clock (`targetClockId`) before a legacy
+> timer. `StoryThread.linkedTimerId` is still never written by a tool.
 
 ### 6.3 `goals.tsx` mutates StoryData during render + random keys
 
@@ -621,6 +636,13 @@ Found 2026-10-22; verified in the code.
   rules notes (a system's core goes in a pinned note); then correct the NOTE
   TYPES table, the comments, the `LoreType` comment and the Designer's
   `alwaysOn`/`keys` descriptions to match.
+
+> **Update 2026-10-25 (GM prompts, slice 1):** the prompt no longer claims rules
+> notes are pinned. The NOTE TYPES table drops its "always loaded" marks and one
+> line names the pinned types from `PINNED_NOTE_TYPES` (`ai_staged.ts`), the
+> constant the prompt builder pins by, saying `mechanics` is listed by title and
+> read with `read_notes`. The `alwaysOn`/`keys` descriptions in the Designer's
+> tools are still to correct.
 
 ### 6.16 Hidden note text reaches the narrator: the stripper is never called
 

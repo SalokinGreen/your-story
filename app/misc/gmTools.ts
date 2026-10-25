@@ -526,6 +526,35 @@ export type ManageTimerAction =
   | "cancel"
   | "trigger";
 
+// ============================================
+// CAMPAIGN TOOL (docs/campaign-format-design.md section 7)
+// ============================================
+
+export type CampaignAction =
+  | "read"
+  | "add"
+  | "edit"
+  | "tick"
+  | "pause"
+  | "resume"
+  | "reveal_secret"
+  | "place_clue"
+  | "find_clue"
+  | "cancel"
+  | "advance_front"
+  | "set_beat"
+  | "open_side_beat"
+  | "close_side_beat";
+
+export interface CampaignParams {
+  action: CampaignAction;
+  part?: string; // style, pitch, safety, faction, front, clock, person, secret, location, beat, end_state
+  id?: string; // the part's id (a clock, front or secret may also be named)
+  data?: Record<string, unknown>; // the part, validated per part
+  by?: number; // tick / advance_front: segments, signed (default 1)
+  reason?: string; // tick / advance_front: why
+}
+
 export interface ManageTimerParams {
   action: ManageTimerAction;
   timer?: string; // Timer name or ID - required for advance/toggle_pause/cancel/trigger
@@ -713,6 +742,7 @@ export type GMToolParams =
   | { name: "get_game_state"; params: GetGameStateParams }
   // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
   | { name: "manage_timer"; params: ManageTimerParams }
+  | { name: "campaign"; params: CampaignParams }
   // System tools (meters, tracks, sessions, action rolls)
   | { name: "manage_meter"; params: ManageMeterParams }
   | { name: "manage_track"; params: ManageTrackParams }
@@ -1794,7 +1824,7 @@ const manageTimerTool: ToolSchema = {
   type: "function",
   function: {
     name: "manage_timer",
-    description: `Create, advance, pause/resume, cancel or trigger a countdown timer (rituals, deadlines, arriving reinforcements). Timers count down to 0, then trigger. Actions: create (name + ticks; advance it yourself with the advance action, as auto_advance does not tick yet), advance (timer, optional ticks, default 1), toggle_pause, cancel (without triggering), trigger (fire now). Several timers can run at once.`,
+    description: `A countdown (a ritual, a deadline, reinforcements). It fills only when you advance it. With a campaign record it is a clock. Actions: create (name, ticks), advance (timer, ticks, default 1), toggle_pause, cancel, trigger (fire now).`,
     parameters: {
       type: "object",
       properties: {
@@ -1822,11 +1852,6 @@ const manageTimerTool: ToolSchema = {
           description:
             "create: starting ticks. advance: ticks to advance (default 1).",
         },
-        auto_advance: {
-          type: "boolean",
-          description:
-            "Reserved: timers do not tick on their own yet. create only.",
-        },
         visibility: {
           type: "string",
           enum: ["visible", "hidden"],
@@ -1837,6 +1862,48 @@ const manageTimerTool: ToolSchema = {
           type: "string",
           description: "Why the timer was cancelled/triggered early. cancel/trigger only.",
         },
+      },
+      required: ["action"],
+    },
+  },
+};
+
+// ============================================
+// CAMPAIGN TOOL SCHEMA
+// ============================================
+
+const campaignTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "campaign",
+    description: `Read and keep the campaign record. The engine ticks clocks itself; a hand tick needs a reason. read an empty part for its data shape.`,
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: [
+            "read",
+            "add",
+            "edit",
+            "tick",
+            "pause",
+            "resume",
+            "cancel",
+            "reveal_secret",
+            "place_clue",
+            "find_clue",
+            "advance_front",
+            "set_beat",
+            "open_side_beat",
+            "close_side_beat",
+          ],
+        },
+        part: { type: "string" },
+        id: { type: "string" },
+        data: { type: "object" },
+        by: { type: "number" },
+        reason: { type: "string" },
       },
       required: ["action"],
     },
@@ -2292,6 +2359,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   getGameStateTool,
   // Countdown timer tool (create/advance/toggle_pause/cancel/trigger via `action`)
   manageTimerTool,
+  // The campaign record: clocks, fronts, secrets, clues, beats (always offered, so the list is stable)
+  campaignTool,
   // System tools: offered only to stories that use a system (decision 79, see buildGMStagePrompt)
   manageMeterTool,
   manageTrackTool,

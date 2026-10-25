@@ -122,6 +122,7 @@ import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
 import { resolveSystem } from "@/app/misc/systems/resolve";
 import { pendingCheck, splitPlayerLines } from "@/app/misc/turnEndChecks";
 import { deAiifyText } from "@/app/misc/deAiify";
+import { newTurnLedger } from "@/app/misc/campaign/clocks";
 import {
   executeGMTools,
   GMToolResult,
@@ -185,11 +186,14 @@ import {
   getSetupProgress,
   currentSetupHashes,
   setupGateMessage,
+  classifySetupRejection,
   setupEngineLine,
   SETUP_CARD_HANDED_BACK_LINE,
   MAX_SETUP_PROMPTS,
 } from "@/app/misc/campaignPlan";
 import { getCustomModelIfUUID, CustomModel } from "@/app/misc/user_settings";
+import { rollGateMessage } from "@/app/misc/gateMessages";
+import { setupParticipants } from "@/app/misc/setupSteps";
 
 // ============================================================
 // TYPES
@@ -2779,6 +2783,7 @@ async function generateStoryTurnOnce(
         // Local conversation history (will be copied to outer scope at end)
         let conversationHistory: ChatMessage[] = [];
         let isComplete = false;
+        let rollGatePromptedRound = -1; // the round after which the M2 prompt was sent
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
         // Phase 2 campaign-plan gate (mirror of the M2 roll gate below): its
@@ -2967,6 +2972,11 @@ async function generateStoryTurnOnce(
         // diff in the tool result.
         let gmBaseTools: unknown[] = [];
         let needsGMPromptRebuild = true;
+
+        // The turn's clock event ledger (campaign clocks tick once per
+        // trigger per turn, across rounds). Kept here, handed to every batch
+        // and replaced by the one it returns.
+        let turnLedger = newTurnLedger();
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
@@ -3541,8 +3551,10 @@ async function generateStoryTurnOnce(
                 imageJobs: options.imageToolContext,
                 abortSignal: options.abortSignal,
                 setupPlayers: options.setupPlayers,
+                turnLedger,
               },
             );
+            if (gmExecution.turnLedger) turnLedger = gmExecution.turnLedger;
 
             // Stopped during the batch (the signal fired, or Stop on the
             // setup card): the executor committed nothing, and neither do we.
@@ -3673,7 +3685,9 @@ async function generateStoryTurnOnce(
 
                 if (!isActualError) {
                   // Valid result - show normally (includes failed dice checks!)
-                  toolContent = `[${result.toolName}] ${result.contextForStory}`;
+                  toolContent = `[${result.toolName}] ${result.contextForStory}${
+                    result.gmOnlyContext ? `\n${result.gmOnlyContext}` : ""
+                  }`;
                 } else {
                   // Actual error - make it prominent so AI can fix
                   const errorMsg = result.contextForStory || "Unknown error";
@@ -3738,6 +3752,26 @@ async function generateStoryTurnOnce(
             // Check for repetition (AI stuck in a loop)
             const isRepetitive = detectRepetition(content);
 
+            // The M2 gate asked on `auto` and this round, the one right after
+            // the prompt, called no tool at all: the GM declined. That ends
+            // the gate for the turn, and the round's words (a second telling
+            // of the moment) are taken back out so the story is the gated
+            // round's prose once. A prompted round that called other tools
+            // is not a decline, so the second prompt stays available to it.
+            const rollGateDeclined = rollGatePromptedRound === gmRound - 1;
+            if (rollGateDeclined) {
+              rollGatePromptedRound = -1;
+              noToolCallPrompts = MAX_NO_TOOL_PROMPTS;
+              gmThinking.length = roundMarks.thinking;
+              gmAccumulatedStory.length = roundMarks.accumulated;
+              allGMContextParts.length = roundMarks.context;
+              conversationHistory.length = roundMarks.history;
+              logger.action(
+                "M2 gate: the GM declined the roll - ending the gate for this turn",
+                { round: gmRound },
+              );
+            }
+
             if (isRepetitive) {
               logger.action(
                 "GM stage detected repetitive content - forcing end",
@@ -3745,7 +3779,7 @@ async function generateStoryTurnOnce(
               allGMContextParts.push(
                 `[GAME MASTER: AI got stuck in repetition loop.]`,
               );
-            } else if (content.trim()) {
+            } else if (content.trim() && !rollGateDeclined) {
               // Add raw content to context parts (with thinking) for backward compat
               // (Prose extraction already happened earlier - don't duplicate)
               allGMContextParts.push(content);
@@ -3775,7 +3809,8 @@ async function generateStoryTurnOnce(
                 setupApprovedThisTurn && setupNow.next === "start_game";
               // A reply with nothing to show is not an end while setup is
               // unfinished, whatever progress the turn made earlier.
-              const roundIsEmpty = !extractVisibleText(content).trim();
+              const roundVisibleText = extractVisibleText(content).trim();
+              const roundIsEmpty = !roundVisibleText;
 
               // The player closed or sent back the card and the GM then said
               // nothing: the turn ends on the engine's own question, and the
@@ -3817,7 +3852,21 @@ async function generateStoryTurnOnce(
                   );
                   conversationHistory.push({
                     role: "user",
-                    content: setupGateMessage(setupNow.next, setupNow.creation),
+                    content: setupGateMessage(
+                      setupNow.next,
+                      setupNow.creation,
+                      {
+                        cause: classifySetupRejection({
+                          visibleText: roundVisibleText,
+                          toolNames: [],
+                          next: setupNow.next,
+                        }),
+                        rejected: roundVisibleText,
+                        multiPlayer:
+                          setupParticipants(storyData, options.setupPlayers)
+                            .length > 1,
+                      },
+                    ),
                   });
                   // The gates' usual forcing, unless the next round's model
                   // answers a forced tool call with a 400 (then the message
@@ -3871,10 +3920,19 @@ async function generateStoryTurnOnce(
               );
               conversationHistory.push({
                 role: "user",
-                content:
-                  "This scene requires a roll before the turn can end - combat or a challenge is active, or you declared high/deadly stakes earlier this scene. Resolve the pending action with formula_roll, opposed_formula, fate_question, or npc_roll, then continue.",
+                content: rollGateMessage(
+                  gmBaseTools
+                    .map(
+                      (t) =>
+                        (t as { function?: { name?: string } }).function?.name,
+                    )
+                    .filter((n): n is string => typeof n === "string"),
+                ),
               });
-              forceToolChoiceNextRound = "required";
+              // "auto", not "required": the message lets the GM decline when
+              // nothing in the declared action is uncertain.
+              forceToolChoiceNextRound = "auto";
+              rollGatePromptedRound = gmRound;
               continue gmRoundLoop;
             }
 

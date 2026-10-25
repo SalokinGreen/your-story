@@ -29,7 +29,7 @@ import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import type { StoryData } from "@/app/misc/structs";
 
-const REPROMPT_TEXT = "This scene requires a roll before the turn can end";
+const REPROMPT_TEXT = "This scene is contested";
 
 function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
   return {
@@ -91,14 +91,15 @@ describe("M2 roll-invariant gate - generateStoryTurn integration", () => {
       },
     });
 
-    // Three prose-only rounds, each with zero tool calls:
+    // Two prose-only rounds, each with zero tool calls:
     //   round 1: gate fires (noToolCallPrompts 0 -> 1), re-prompt pushed, loop continues.
-    //   round 2: still no roll ever made -> gate fires again (1 -> 2), re-prompt pushed again.
-    //   round 3: MAX_NO_TOOL_PROMPTS (2) reached -> gate no longer fires, fails open, turn completes.
+    //   round 2: the prompted round called no tool at all, so the GM declined:
+    //            the gate ends for the turn (no third round) and the round's
+    //            words are not added to the turn's text.
     const { fetchMock, gmStageCalls } = createMockGMFetch([
       { content: "The goblin lunges forward, blade flashing." },
-      { content: "It presses the attack, forcing you back toward the wall." },
-      { content: "The moment stretches - the fight hangs in the balance." },
+      { content: "The goblin lunges forward, blade flashing, and you ride it out." },
+      { content: "A third round the gate must never ask for." },
     ]);
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -112,7 +113,7 @@ describe("M2 roll-invariant gate - generateStoryTurn integration", () => {
     expect(result.success).toBe(true);
 
     const calls = gmStageCalls();
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(2);
 
     // Round 2's request is the direct evidence the gate fired after round 1.
     const round2Messages = calls[1].body.messages as { role: string; content: string }[];
@@ -122,13 +123,6 @@ describe("M2 roll-invariant gate - generateStoryTurn integration", () => {
       ),
     ).toBe(true);
 
-    // Round 3 carries both re-prompts (round 1's and round 2's).
-    const round3Messages = calls[2].body.messages as { role: string; content: string }[];
-    const round3RepromptCount = round3Messages.filter(
-      (m) => m.role === "user" && m.content?.includes(REPROMPT_TEXT),
-    ).length;
-    expect(round3RepromptCount).toBe(2);
-
     // Round 1's own request predates any gate firing - it must NOT already contain the re-prompt.
     const round1Messages = calls[0].body.messages as { role: string; content: string }[];
     expect(
@@ -137,11 +131,43 @@ describe("M2 roll-invariant gate - generateStoryTurn integration", () => {
       ),
     ).toBe(false);
 
-    // toolChoice: "required" is set on exactly the rounds immediately after
-    // a gate firing (2 and 3), not on round 1 (the gate hasn't fired yet).
+    // toolChoice: "auto" is set on the round right after the gate fired.
     expect(calls[0].body.toolChoice).toBeUndefined();
-    expect(calls[1].body.toolChoice).toBe("required");
-    expect(calls[2].body.toolChoice).toBe("required");
+    expect(calls[1].body.toolChoice).toBe("auto");
+
+    // The gated round's prose appears once; the decline round's is not kept.
+    expect(result.content.split("blade flashing").length - 1).toBe(1);
+    expect(result.content).not.toContain("you ride it out");
+  });
+
+  it("re-prompts a second time only when the prompted round called non-roll tools", async () => {
+    const storyData = createTestStory({
+      combatState: {
+        active: true,
+        combatants: [],
+        turnOrder: [],
+        currentTurnIndex: 0,
+        round: 1,
+      },
+    });
+    const { fetchMock, gmStageCalls } = createMockGMFetch([
+      { content: "The goblin lunges forward." },
+      { content: "", toolCalls: [{ name: "read_notes", arguments: { titles: ["Nothing"] } }] },
+      { content: "The goblin presses on." },
+      { content: "Never reached." },
+    ]);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await generateStoryTurn(storyData, "I fight", baseOptions, {});
+    expect(result.success).toBe(true);
+    const calls = gmStageCalls();
+    // Round 3 (after the prompted round's tool call) is prompted again; round 4
+    // is that prompt's answer, a decline.
+    expect(calls).toHaveLength(4);
+    const count = (calls[3].body.messages as { role: string; content: string }[]).filter(
+      (m) => m.role === "user" && m.content?.includes(REPROMPT_TEXT),
+    ).length;
+    expect(count).toBe(2);
   });
 
   it("does not fire when the gate is already satisfied by a roll tool call earlier this turn", async () => {

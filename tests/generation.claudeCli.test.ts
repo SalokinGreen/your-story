@@ -157,7 +157,7 @@ describe("a turn on the Claude subscription", () => {
     expect(httpCalls.filter((c) => c.body.tools)).toHaveLength(0);
   });
 
-  it("forces the next round's schema when the roll gate fires", async () => {
+  it("leaves the next round's schema open when the roll gate fires (auto)", async () => {
     let round = 0;
     fakeCli.respond = () => {
       round++;
@@ -181,8 +181,8 @@ describe("a turn on the Claude subscription", () => {
     const runs = structuredRuns();
     expect(runs.length).toBeGreaterThanOrEqual(3);
     expect(schemaOf(runs[0]).properties.tool_calls.minItems).toBeUndefined();
-    expect(schemaOf(runs[1]).properties.tool_calls.minItems).toBe(1);
-    expect(runs[1].prompt).toContain("This scene requires a roll before the turn can end");
+    expect(schemaOf(runs[1]).properties.tool_calls.minItems).toBeUndefined();
+    expect(runs[1].prompt).toContain("This scene is contested");
     expect(schemaOf(runs[2]).properties.tool_calls.minItems).toBeUndefined();
   });
 

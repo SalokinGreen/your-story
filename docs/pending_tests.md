@@ -10,6 +10,34 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Engine-review fixes on the campaign slice
+
+- **Play one turn on a Gemini model (Google AI Studio key) in a story that has a
+  campaign record** (add a clock with the `campaign` tool first, or open a
+  story with timers). Expected: the turn succeeds and the GM can call
+  `campaign` (a `data` argument arrives as a JSON string and is parsed).
+  Failure looks like a 400 from Google, "properties should be non-empty",
+  naming the `campaign` tool's `data` parameter.
+
+## 2026-10-25 — Campaign format, slice C1 (decisions 222–225, 230–232, 241)
+
+Engine only; no screen shows it yet (the Lore panel is slice 6). All of it is
+unit-tested; none of it has met a real model (the author's key):
+
+- **Open a story that has a countdown timer** (a saved one, or make one with
+  `manage_timer create`). Expected: Debug Logs show "Migrated countdown timers
+  to campaign clocks" on load only for a story that already had timers; the
+  next turn's live block shows a "CAMPAIGN" brief listing the timer as a clock
+  (`name 2/6 [manual]`) and no "ACTIVE TIMERS" section. A story with no timers
+  shows neither.
+- **Play a turn with a model on a story that has a record** (ask the GM to
+  `campaign add` a style, a front and a clock with `triggers: ["scene"]`).
+  Expected: the GM's `campaign` calls succeed, or are refused with a line that
+  names the repair ("faction needs `goal`"), and a later `increment_scene`
+  produces a "[Clock … → …]" line in the tool result. Failure looks like the GM
+  never calling `campaign` (its schema is bare on purpose: it learns a shape
+  from `read` on an empty part), or a clock that does not move on a scene.
+
 ## 2026-10-25 — Fantastic Realms (decisions 201–219)
 
 Seen in the browser preview: the Library lists the system, its two packs and

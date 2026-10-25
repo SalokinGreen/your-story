@@ -331,6 +331,17 @@ export async function buildCondensedStorySeed(
   seed.goals = (seed.goals || []).filter((g) => g.active && !g.fulfilled);
   seed.activeChallenge = undefined;
   seed.timers = [];
+  // The timers are dropped, so the clocks migrated from them go too when they
+  // are spent (full or cancelled); a migrated clock still running is live
+  // campaign state and is carried, like the record's other parts.
+  if (seed.campaign) {
+    seed.campaign = {
+      ...seed.campaign,
+      clocks: seed.campaign.clocks.filter(
+        (c) => !(c.migratedFromTimerId && (c.cancelled || c.filled >= c.segments)),
+      ),
+    };
+  }
   // Meters and tracks carry over; scene count restarts, so scene-scoped keys
   // would collide with the new count, so the dedup keys are cleared.
   if (seed.systemState) {

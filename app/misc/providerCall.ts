@@ -208,6 +208,8 @@ export const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "formula_roll",
   "opposed_formula",
   "fate_question",
+  // The roll gate's message names it (gateMessages.ts), so Gemini must have it.
+  "gm_roll",
   // Required alongside the dice tools, not optional: they report numbers and
   // `calculate` is the only thing that turns those into a pass/fail verdict.
   "calculate",
@@ -240,6 +242,8 @@ export const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "record_challenge_result",
   "cancel_challenge",
   "increment_scene",
+  // The campaign record (clocks, fronts, secrets, clues)
+  "campaign",
   // System tools (only present for stories that use a system, decision 79).
   "manage_meter",
   "manage_track",
@@ -247,10 +251,47 @@ export const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "action_roll",
 ]);
 
-function filterToolsForGoogle(tools: any[]): any[] {
-  return tools.filter(
-    (t) => t?.function?.name && GOOGLE_ESSENTIAL_TOOLS.has(t.function.name),
-  );
+/**
+ * Gemini rejects an object-typed parameter that declares no properties
+ * ("properties should be non-empty"). Such a parameter is offered as a string
+ * holding the JSON object instead (the campaign executor parses it back,
+ * gmExecutor.ts). The shared tool list is not touched: this builds a copy.
+ */
+export function googleSafeToolSchema(tool: any): any {
+  const props = tool?.function?.parameters?.properties;
+  if (!props || typeof props !== "object") return tool;
+  let changed = false;
+  const nextProps: Record<string, unknown> = {};
+  for (const [key, schema] of Object.entries(props as Record<string, any>)) {
+    const emptyObject =
+      schema?.type === "object" &&
+      (!schema.properties || Object.keys(schema.properties).length === 0);
+    if (emptyObject) {
+      changed = true;
+      nextProps[key] = {
+        type: "string",
+        description: schema.description
+          ? `${schema.description} (a JSON object, as a string)`
+          : "A JSON object, as a string",
+      };
+    } else {
+      nextProps[key] = schema;
+    }
+  }
+  if (!changed) return tool;
+  return {
+    ...tool,
+    function: {
+      ...tool.function,
+      parameters: { ...tool.function.parameters, properties: nextProps },
+    },
+  };
+}
+
+export function filterToolsForGoogle(tools: any[]): any[] {
+  return tools
+    .filter((t) => t?.function?.name && GOOGLE_ESSENTIAL_TOOLS.has(t.function.name))
+    .map(googleSafeToolSchema);
 }
 
 /**

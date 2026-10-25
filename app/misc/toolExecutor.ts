@@ -1782,9 +1782,20 @@ export function executeTools(
         storyData.agmtState.tension = adjustTension(oldTension, {
           sceneType,
           combatActive: storyData.combatState?.active,
-          timerNearZero: (storyData.timers || []).some(
-            (t) => t.status === "active" && t.currentTicks <= 1
-          ),
+          timerNearZero:
+            // With a campaign record the clocks are the timers (migrated
+            // ones included); the old list is then stale and not read.
+            (!storyData.campaign &&
+              (storyData.timers || []).some(
+                (t) => t.status === "active" && t.currentTicks <= 1
+              )) ||
+            (storyData.campaign?.clocks ?? []).some(
+              (c) =>
+                !c.paused &&
+                !c.cancelled &&
+                c.filled < c.segments &&
+                c.segments - c.filled <= 1
+            ),
         });
 
         // Director move selection: a deterministic policy, not the model's
