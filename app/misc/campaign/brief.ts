@@ -93,7 +93,7 @@ export function formatCampaignBrief(
 
   // 2. Style and tone.
   const styleBits: string[] = [];
-  if (record.style) styleBits.push(record.style.replace("_", " "));
+  if (record.style) styleBits.push(record.style.replace(/_/g, " "));
   if (record.pitch && record.pitch.tone.length > 0) styleBits.push(record.pitch.tone.join(", "));
   if (styleBits.length > 0) head.push(`Style: ${styleBits.join(" - ")}`);
 
