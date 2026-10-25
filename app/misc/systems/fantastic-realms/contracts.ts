@@ -19,6 +19,8 @@ interface FeatRollShape {
   outcome?: FeatTier;
   magnitude?: number;
   target?: string;
+  /** The damage the engine worked out, Keen included (E1). Absent on a result from before it. */
+  damage?: number;
 }
 
 interface MeterResultShape {
@@ -43,6 +45,8 @@ function targetOf(result: unknown): string | null {
 
 function damageOf(result: unknown): number {
   const r = result as FeatRollShape;
+  // The engine's own number, qualities included (Keen adds a heart on a strong hit).
+  if (typeof r.damage === "number") return r.damage;
   if (!r.outcome) return 0;
   return foeDamage({ tier: r.outcome, magnitude: r.magnitude ?? 0 });
 }
