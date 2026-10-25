@@ -604,6 +604,34 @@ export interface SystemState {
   // story before E5, and The Hollow Hour). Only a Europe by Night story is
   // given the cross-Europe notes on load (builtinNotes.ts, design E5 §5).
   setting?: string;
+  // The built-in system the story runs, recorded when it first resolves to
+  // one (recordSystemId). Wins over note matching afterwards, so importing or
+  // deleting a note never switches the system mid-campaign.
+  systemId?: string;
+  // Fantastic Realms hero state (systems/fantastic-realms/engine.ts).
+  fantasticRealms?: FantasticRealmsState;
+}
+
+/** One feat of a Fantastic Realms hero: a stable id, its wording, whether it is burned. */
+export interface HeroFeat {
+  id: string;
+  wording: string;
+  burned: boolean;
+}
+
+export interface FantasticRealmsHero {
+  /** The hero's name as the GM spelled it first (the state is keyed by the normalised name). */
+  name?: string;
+  feats: HeroFeat[];
+  /** Award sources already credited to this hero (award_xp refuses repeats). */
+  rewards: string[];
+}
+
+export interface FantasticRealmsState {
+  /** Keyed by the normalised owner name the hero's meters use. */
+  heroes: Record<string, FantasticRealmsHero>;
+  /** The realm id the story is in (take_rest). */
+  realm?: string;
 }
 
 // ============================================

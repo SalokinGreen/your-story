@@ -124,6 +124,13 @@ export function getCreationSteps(story: StoryData, players?: Roster): CreationSt
     steps.push(ABILITIES_STEP);
   }
   steps.push(...SELF_STEPS);
+  const hints = system?.stepHints;
+  if (hints) {
+    return steps.map((st) => {
+      const hint = hints[st.id];
+      return hint !== undefined ? { ...st, hint } : st;
+    });
+  }
   return steps;
 }
 

@@ -12,6 +12,7 @@ import { ARCHETYPE_INFO } from "./gmAdvice";
 import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
 import { deleteImagesForStory } from "./imageStore";
 import { seedBuiltinNotesOffered } from "./systems/builtinNotes";
+import { recordSystemId } from "./systems/resolve";
 import { SETUP_STYLE_POINTER } from "./presets";
 
 const DB_NAME = "YourStoryDB";
@@ -215,6 +216,7 @@ export async function startAdventureLocally(
     ],
   } as unknown as StoryData);
   // What the author left out of a built-in system's notes stays out.
+  recordSystemId(newStoryData);
   seedBuiltinNotesOffered(newStoryData);
 
   await saveLocalStory(localId, newStoryData);
@@ -421,6 +423,7 @@ export async function startFreeformStoryLocally(
     goals: [],
     npcs: [],
   } as unknown as StoryData;
+  recordSystemId(newStoryData);
   seedBuiltinNotesOffered(newStoryData);
 
   await saveLocalStory(localId, newStoryData);

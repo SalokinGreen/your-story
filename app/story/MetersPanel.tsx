@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
-import { currentThreshold } from "@/app/misc/metersAndTracks";
+import { currentThreshold, normalizeKey } from "@/app/misc/metersAndTracks";
 import type {
+  FantasticRealmsHero,
   Meter,
   ProgressTrack,
   SceneChallenge,
@@ -11,6 +12,8 @@ import type {
 
 interface MetersPanelProps {
   meters?: Meter[];
+  /** Fantastic Realms heroes' feats, keyed by normalised name. */
+  heroFeats?: Record<string, FantasticRealmsHero>;
   progressTracks?: ProgressTrack[];
   activeChallenge?: SceneChallenge;
 }
@@ -81,6 +84,25 @@ function MeterBar({ meter }: { meter: Meter }) {
         </p>
       )}
     </div>
+  );
+}
+
+/** A hero's feats as chips; a burned one is struck through until a rest. */
+function FeatChips({ hero }: { hero: FantasticRealmsHero }) {
+  if (hero.feats.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="Feats">
+      {hero.feats.map((f) => (
+        <li
+          key={f.id}
+          className={`ys-chip ${f.burned ? "line-through opacity-60" : ""}`}
+          title={f.burned ? "Burned: spent until the next rest" : undefined}
+        >
+          {f.wording}
+          {f.burned && <span className="sr-only"> (burned)</span>}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -166,6 +188,7 @@ function ChallengeLine({ challenge }: { challenge: SceneChallenge }) {
  */
 export default function MetersPanel({
   meters,
+  heroFeats,
   progressTracks,
   activeChallenge,
 }: MetersPanelProps) {
@@ -174,7 +197,15 @@ export default function MetersPanel({
   const visibleMeters = (meters ?? []).filter((m) => !m.hidden);
   const tracks = progressTracks ?? [];
   const challenge = activeChallenge?.active ? activeChallenge : undefined;
-  if (visibleMeters.length === 0 && tracks.length === 0 && !challenge) {
+  const featHeroes = Object.entries(heroFeats ?? {}).filter(
+    ([, h]) => h.feats.length > 0,
+  );
+  if (
+    visibleMeters.length === 0 &&
+    tracks.length === 0 &&
+    !challenge &&
+    featHeroes.length === 0
+  ) {
     return null;
   }
 
@@ -185,6 +216,10 @@ export default function MetersPanel({
     ...tracks.map((t) => t.owner),
   ]) {
     if (!owners.includes(o)) owners.push(o);
+  }
+  // A hero with feats but no meters yet still gets a column, under their key.
+  for (const [key] of featHeroes) {
+    if (!owners.some((o) => normalizeKey(o) === key)) owners.push(key);
   }
 
   return (
@@ -232,6 +267,10 @@ export default function MetersPanel({
                 .map((t) => (
                   <TrackBoxes key={t.id} track={t} />
                 ))}
+              {(() => {
+                const hero = heroFeats?.[normalizeKey(owner)];
+                return hero ? <FeatChips hero={hero} /> : null;
+              })()}
             </div>
           ))}
         </div>

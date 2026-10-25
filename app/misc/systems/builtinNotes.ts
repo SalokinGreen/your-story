@@ -24,21 +24,41 @@
  */
 import type { StoryData, StoryLore } from "../structs";
 import { BUILTIN_SYSTEMS } from "./index";
-import { resolveSystem } from "./resolve";
-import { EUROPE_BY_NIGHT_SETTING, type BuiltinNote, type BuiltinSystem } from "./types";
+import { recordSystemId, resolveSystem } from "./resolve";
+import {
+  EUROPE_BY_NIGHT_SETTING,
+  LEGACY_CORE_NOTE_ID,
+  LEGACY_CROSS_SETTING_SCOPE,
+  type BuiltinNote,
+  type BuiltinSystem,
+} from "./types";
 
 /** The core note's id: a story holding it runs the system (design 3.2). */
-export const BLOOD_AND_BONE_CORE_ID = "builtin:blood-and-bone:core";
+export const BLOOD_AND_BONE_CORE_ID = LEGACY_CORE_NOTE_ID;
 
 const PINNED_TYPES = new Set(["dm_instructions", "character_sheet", "gm_plan"]);
 
 /** The scope of the setting notes every story of the setting uses. */
-export const CROSS_SETTING_SCOPE = "cross-europe";
+export const CROSS_SETTING_SCOPE = LEGACY_CROSS_SETTING_SCOPE;
 
-/** Whether a story's built-in notes are kept up to date: it holds the core and the tools are not off. */
-function keepsBuiltinNotes(story: Pick<StoryData, "lore" | "systemState">): boolean {
+/** The system's core note id (Blood & Bone's when it declares none). */
+function coreIdOf(system: BuiltinSystem): string {
+  return system.coreNoteId ?? LEGACY_CORE_NOTE_ID;
+}
+
+/**
+ * Whether a story's built-in notes are kept up to date: its system holds its
+ * core note and the tools are not off.
+ */
+function keepsBuiltinNotes(
+  story: Pick<StoryData, "lore" | "systemState">,
+  systems: BuiltinSystem[],
+): boolean {
   if (story.systemState?.usesSystemTools === false) return false;
-  return (story.lore ?? []).some((l) => l.libraryNoteId === BLOOD_AND_BONE_CORE_ID);
+  const { system } = resolveSystem(story, systems);
+  if (!system) return false;
+  const core = coreIdOf(system);
+  return (story.lore ?? []).some((l) => l.libraryNoteId === core);
 }
 
 function heldIds(story: Pick<StoryData, "lore">): Set<string> {
@@ -49,9 +69,9 @@ function heldIds(story: Pick<StoryData, "lore">): Set<string> {
 
 export { EUROPE_BY_NIGHT_SETTING };
 
-/** Whether a story's setting is Europe by Night: unset is (every story before E5). */
-function inCrossSetting(setting: string | undefined): boolean {
-  return setting === undefined || setting === EUROPE_BY_NIGHT_SETTING;
+/** Whether a story's setting is the system's default: unset is (every story before E5). */
+function inCrossSetting(setting: string | undefined, defaultSetting: string): boolean {
+  return setting === undefined || setting === defaultSetting;
 }
 
 /**
@@ -63,15 +83,17 @@ export function pushedBuiltinNotes(
   system: BuiltinSystem,
   setting?: string,
 ): BuiltinNote[] {
-  const cross = inCrossSetting(setting);
-  const storySetting = setting ?? EUROPE_BY_NIGHT_SETTING;
+  const defaultSetting = system.defaultSetting ?? EUROPE_BY_NIGHT_SETTING;
+  const crossScope = system.crossSettingScope ?? LEGACY_CROSS_SETTING_SCOPE;
+  const cross = inCrossSetting(setting, defaultSetting);
+  const storySetting = setting ?? defaultSetting;
   const out: BuiltinNote[] = [];
   for (const pack of system.packs) {
     const isRules = pack.id.endsWith(":rules");
     for (const n of pack.notes) {
       if (PINNED_TYPES.has(n.type)) continue;
       if (n.setting !== undefined && n.setting !== storySetting) continue;
-      if (isRules || (cross && n.scope === CROSS_SETTING_SCOPE)) out.push(n);
+      if (isRules || (cross && n.scope === crossScope)) out.push(n);
     }
   }
   return out;
@@ -120,7 +142,10 @@ export function addMissingBuiltinNotes(
   story: StoryData,
   systems: BuiltinSystem[] = BUILTIN_SYSTEMS,
 ): number {
-  if (!keepsBuiltinNotes(story)) return 0;
+  if (!keepsBuiltinNotes(story, systems)) return 0;
+  // Only a story that holds a system's core is recorded as running it: one
+  // that merely imported a note is left byte for byte as it was.
+  recordSystemId(story, systems);
   const { system } = resolveSystem(story, systems);
   if (!system) return 0;
   const missing = missingBuiltinNotes(story, system);
@@ -158,7 +183,7 @@ export function seedBuiltinNotesOffered(
   story: StoryData,
   systems: BuiltinSystem[] = BUILTIN_SYSTEMS,
 ): void {
-  if (!keepsBuiltinNotes(story)) return;
+  if (!keepsBuiltinNotes(story, systems)) return;
   const { system } = resolveSystem(story, systems);
   if (!system) return;
   const offered = new Set(story.systemState?.builtinNotesOffered ?? []);

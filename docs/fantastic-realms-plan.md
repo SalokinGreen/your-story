@@ -285,4 +285,16 @@ original, with no names or text from the inspirations (decision 3).
 
 ## Decisions made during implementation
 
-(Filled in as the slices land.)
+### 2026-10-25, slices 1 and 2 (implementer)
+
+- **`tools`, `coreNoteId`, `defaultSetting`, `crossSettingScope` are optional on `BuiltinSystem`**, not required. The existing test fakes (`TEST_SYSTEM`, `testSystem`) declare none, and the plan said no existing test is edited. An unset field means Blood & Bone's value (`LEGACY_SYSTEM_TOOLS`, `LEGACY_CORE_NOTE_ID`, `LEGACY_CROSS_SETTING_SCOPE` in `types.ts`). Blood & Bone declares all four explicitly.
+- **`SYSTEM_TOOL_NAMES` stays Blood & Bone's four**, not the union. Two existing tests (`systems.resolve`, `aiStaged.metersSection`) use it as exactly that list. The union over a registry is the new `allSystemToolNames(systems)`.
+- **`recordSystemId` runs in `addMissingBuiltinNotes` only after the story is known to hold its system's core.** An existing test requires a story that merely imported a setting note to be left byte for byte unchanged. Starter-made stories are recorded at start (`localStoryManager.ts`), so the campaign-switch guard covers them.
+- **`tests/gmTools.sixPlaces.test.ts` edited:** `take_rest` is removed from `REMOVED_TOOLS` (it is Fantastic Realms' tool now), and the whitelist also collects what a story recorded as `fantastic-realms` is offered, through a stand-in system pushed into `BUILTIN_SYSTEMS` for the setup only (skipped once slice 6 registers the real one). Without it the new labels and Google names fail "inside what the GM can be offered" until registration.
+- **`FantasticRealmsHero` gained an optional `name`** (the hero as the GM first spelled them). The state is keyed by the normalised name, and the live block and the executors' reports need the display spelling before the hero's meters exist.
+- **The XP meter's max moves with the level.** The plan's table gives XP 0-2000, which is level 2's cost only. `award_xp` sets XP's max and cap to `levelCost(level)` (`setMeterMax` with `raiseCap`) before it writes the value, so level 3 shows `/3000`. The hero set is still XP 0-2000 start 0 at level 1.
+- **Executors refuse outside the system.** The five tools return an engine error when the story's resolved `tools` does not list them, so a stray call in a Blood & Bone story changes nothing.
+- **Extra "roll" places beyond the plan's list:** `feat_roll` and `initiative_roll` are also in `ROLL_OR_ORACLE_TOOL_NAMES` (`reasoningTiers.ts`, so the M2 gate counts them) and in `ROLL_TOOLS` (`turnWork.ts`).
+- **`formatHeroFeatsState`** is joined onto the meters section of the live block rather than getting its own `LiveBlockInput` field.
+- **`MetersPanel`** takes a `heroFeats` prop, passed by `lore.tsx`.
+

@@ -1342,6 +1342,7 @@ export async function checkPlayerAgencyViolation(
 // So the judge is given only real adjudications, each with the outcome tier the
 // engine decided:
 // - action_roll and a manage_track progress_roll: strong hit / weak hit / miss;
+// - feat_roll (Fantastic Realms): strong hit (with its magnitude) / hit / weak hit / miss;
 // - record_challenge_result: the outcome the GM recorded (the engine accepted it);
 // - calculate: only when its expression held a comparison (`>=`, `<`, ...) and
 //   evaluated, as success (TRUE) or failure (FALSE) - never a plain sum, never
@@ -1352,6 +1353,7 @@ export async function checkPlayerAgencyViolation(
 
 export type OutcomeTier =
   | "strong_hit"
+  | "hit"
   | "weak_hit"
   | "miss"
   | "success"
@@ -1359,6 +1361,7 @@ export type OutcomeTier =
 
 export const OUTCOME_TIER_LABELS: Record<OutcomeTier, string> = {
   strong_hit: "STRONG HIT (full success)",
+  hit: "HIT (it works)",
   weak_hit: "WEAK HIT (partial success: the goal is reached at a cost, with a complication, or only partway)",
   miss: "MISS (failure)",
   success: "SUCCESS (the comparison was TRUE)",
@@ -1387,6 +1390,7 @@ export interface ToolResultForOutcome {
 
 const OUTCOME_TIERS: ReadonlySet<string> = new Set([
   "strong_hit",
+  "hit",
   "weak_hit",
   "miss",
   "success",
@@ -1398,6 +1402,7 @@ const OUTCOME_CHECK_TOOL_NAMES = new Set([
   "calculate",
   "record_challenge_result",
   "action_roll",
+  "feat_roll",
   "progress_roll",
 ]);
 
@@ -1422,6 +1427,12 @@ export function extractOutcomeVerdicts(
     let tier: OutcomeTier | null = null;
     let toolName = r.toolName;
     if (r.toolName === "action_roll" && res.type === "action_roll") {
+      if (res.outcome && OUTCOME_TIERS.has(res.outcome)) {
+        tier = res.outcome as OutcomeTier;
+      }
+    } else if (r.toolName === "feat_roll" && res.type === "feat_roll") {
+      // Fantastic Realms: miss, weak hit, hit or strong hit; the magnitude
+      // ("STRONG HIT +2") is in the executor's text the judge is shown.
       if (res.outcome && OUTCOME_TIERS.has(res.outcome)) {
         tier = res.outcome as OutcomeTier;
       }

@@ -29,6 +29,17 @@ export interface BuiltinNote {
 /** `SystemState.setting` for Europe by Night, the setting an unset field means. */
 export const EUROPE_BY_NIGHT_SETTING = "europe-by-night";
 
+/** Blood & Bone's four tools: its own list, and the legacy tools-on set (resolve.ts). */
+export const LEGACY_SYSTEM_TOOLS: readonly string[] = [
+  "manage_meter",
+  "manage_track",
+  "end_session",
+  "action_roll",
+];
+/** Defaults for a system that declares no core note or cross-setting scope: Blood & Bone's. */
+export const LEGACY_CORE_NOTE_ID = "builtin:blood-and-bone:core";
+export const LEGACY_CROSS_SETTING_SCOPE = "cross-europe";
+
 export interface BuiltinPack {
   id: string; // "blood-and-bone:rules"
   systemId: string; // "blood-and-bone"
@@ -82,4 +93,20 @@ export interface BuiltinSystem {
   endOfSessionReminder?: string; // returned by end_session
   // Checks the engine runs when a turn ends on prose (turnEndChecks.ts).
   turnEndChecks?: SystemTurnEndCheck[];
+  // The GM tools a story of this system is offered (resolveSystem). Unset
+  // means Blood & Bone's four, the legacy tools-on set.
+  tools?: string[];
+  // Holding this built-in note keeps the system's notes up to date
+  // (builtinNotes.ts). Unset means Blood & Bone's core.
+  coreNoteId?: string;
+  // What an unset systemState.setting means. Unset means Europe by Night.
+  defaultSetting?: string;
+  // The scope of the notes every story of the default setting is given on
+  // load. Unset means "cross-europe".
+  crossSettingScope?: string;
+  // Per-system hints for the shared creation steps ("history"), applied over
+  // the shared hint by getCreationSteps.
+  stepHints?: Partial<Record<string, string>>;
+  // Realm id to the condition of a rest there (take_rest).
+  rests?: Record<string, string>;
 }
