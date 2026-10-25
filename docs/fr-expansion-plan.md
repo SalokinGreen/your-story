@@ -464,3 +464,41 @@ Judgment calls the plan left to the builder. None changes the plan's scope.
   tables) as arriving with the realms in a later release (E3).
 - **Travel** says rounds = the days, 2 to 5 (a one-day trip is one roll).
   **Downtime's** away-from-hearth `use` names the `hero`.
+
+### 2026-10-25 — E3 (the original three realms grown)
+
+Judgment calls the plan left to the builder. None changes the plan's scope.
+
+- **Two notes per realm, not one.** Each realm note (look, people, places,
+  troubles, Magic here, Local callings, twelve foes) is 1,600 to 1,700 tokens,
+  under the 2,500 cap; the miscast d12, treasure d20 and road d20 live in a
+  separate tables note per realm, `builtin:fantastic-realms:realm-<id>-tables`
+  (type `table`, 1,060 to 1,120 tokens). The three new ids are in the
+  Crossroads pack, so the loader offers them to existing stories. The realm
+  note ids are unchanged.
+- **Tactics are a second line** (`*Tactics:* ...`) under each foe, as the
+  Bestiary shows, so the stat line stays the one the old parser reads. 12 foes
+  per realm: four new each (Beacon-Moth Swarm, Glass Sentinel, Court Poisoner,
+  Halcyon Wyvern; Bramble Imp, Thornback Boar, Hedge-Folk Tithe-Taker, Scarecrow
+  of the Last Furrow; Grave-Robber Crew, Gibbet Crow Flock, Fog Stalker, Hollow
+  Bishop). The XP follows the scale; `Pale Magistrate` keeps its DC 5 / 3 hearts
+  / 1000.
+- **The local callings follow the Callings format** (signature, kit of five,
+  path of eight, a move) with moves that need no new engine: *Under Truce* and
+  *Light the Lamp* and the rest are played in fiction, as the twelve are.
+- **Treasure rows carry XP and, for items, the item feat and its quality**; the
+  last two rows of each realm's d20 are wonders. A one-use marvel that lifts a
+  hero who is down is "back to 1 heart", per decision 254.
+- **`checkTableShape` accepts a d12** (`tests/helpers/tableShape.ts`), since the
+  miscast tables are d12 and the shared foes table is now three d12s (it grew
+  from d6 to cover the new foes, and the shared treasure gained a d12 "Items
+  with a quality" table and four more great finds, d6 to d10).
+- **Edits to E2's notes:** Magic, Callings and Travel no longer say the realm
+  content "arrives in a later release"; they point at the realm notes. Each
+  changed note, and the shared foes and treasure tables, has its new hash
+  appended to `BUILTIN_NOTE_HISTORY` (previous hashes kept); the three new
+  tables notes start a history of one.
+- **Tests:** `tests/systems.fantasticRealms.realms.test.ts` (new); the
+  realm-foe test in `systems.fantasticRealms.test.ts` now expects exactly 12
+  and seven table notes; the "hedges" test in the rules test now checks the
+  pointers.

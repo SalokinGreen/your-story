@@ -74,6 +74,8 @@ It runs 20 times per case on Default (GLM 5.3) and Advanced (Claude Sonnet 5.5) 
 shipped. A target case must fall against the baseline; no other case may rise by
 more than 2 of 20 on two separate runs.
 
+Generation fixtures live in `evals/generation/` (the first, from slice 3: full-mode setup asks one player step per call). Their `expect` is tool names; a case that needs argument checks adds an `expectArguments` key for the runner to read.
+
 ## Drafting a turn from your own play
 
 ```

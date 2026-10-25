@@ -228,12 +228,31 @@ export type CompleteObserverSettings = Record<ObserverFlagType, ObserverCheckSet
  */
 export const OBSERVER_SETTINGS_VERSION = 3;
 
+/**
+ * Judges that ship as Flag whatever their row below says (plan slice 5,
+ * decision 233's rule): the ones whose measured precision at the severity that
+ * rewrites was under 0.7 in the last labelled run. Updated by hand from the
+ * runner's report (`scripts/eval-judges.mjs` prints "ships flag-only"); empty
+ * until the author's first run, and `tests/judges.measured.test.ts` fails when
+ * the bundled `evals/results.json` says a judge belongs here and it is not.
+ * A player can still choose Rewrite in Settings.
+ */
+export const JUDGE_DEFAULT_OVERRIDES: Readonly<
+  Partial<Record<ObserverFlagType, Readonly<{ triggersReset: false }>>>
+> = Object.freeze({});
+
 function frozenCheckSettings(
   enabled: boolean,
   sensitivity: number,
   rewrite = false,
+  type?: ObserverFlagType,
 ): Readonly<ObserverCheckSettings> {
-  return Object.freeze({ enabled, triggersReset: rewrite, sensitivity });
+  const override = type ? JUDGE_DEFAULT_OVERRIDES[type] : undefined;
+  return Object.freeze({
+    enabled,
+    triggersReset: override ? override.triggersReset : rewrite,
+    sensitivity,
+  });
 }
 
 /**
@@ -253,9 +272,9 @@ function frozenCheckSettings(
  */
 export const DEFAULT_OBSERVER_SETTINGS: Readonly<CompleteObserverSettings> =
   Object.freeze({
-    response_length: frozenCheckSettings(true, 5, true),
-    player_agency: frozenCheckSettings(true, 3, true),
-    outcome_narration_mismatch: frozenCheckSettings(true, 2, true),
+    response_length: frozenCheckSettings(true, 5, true, "response_length"),
+    player_agency: frozenCheckSettings(true, 3, true, "player_agency"),
+    outcome_narration_mismatch: frozenCheckSettings(true, 2, true, "outcome_narration_mismatch"),
     missing_oracle_or_table: frozenCheckSettings(true, 5),
     missing_scene_increment: frozenCheckSettings(true, 5),
     tier_escalation_missed: frozenCheckSettings(true, 5),

@@ -32,6 +32,49 @@ this merges. Every run costs the author's money and waits for their go.
   message is in the report); a case failing 20 of 20 on both prompts (the case is
   mis-specified: read its top failure).
 
+## 2026-10-25 — GM prompt plan, slice 3 (session zero's block)
+
+- **The behavioural case has no runner yet.** G2's generation runner was not on
+  master when slice 3 landed, so
+  `evals/generation/setup-full-one-player-step-per-call.json` is written in J4's
+  generation format (`kind: "generation"`) and only checked to parse
+  (`tests/gmPrompt.slice3.test.ts`). When the runner lands, run it 20 times on
+  GLM 5.3 (Default) and Claude Sonnet 5.5 (Advanced) with the author's go: every
+  run should call `ask_question` once with items under a single `setup_step`
+  (one of name_look, history, drives), an `intro` on it, and no `create_note`,
+  `confirm_setup` or `start_game`. The runner must read the fixture's
+  `expectArguments` key (the format has no field for argument checks yet). The
+  case rises beyond noise when its failing runs rise by more than 2 of 20 on two
+  runs. Failure looks like two player-step tags in one call (the engine records
+  neither and says "Ask one setup step at a time") or an `ask_question` refused
+  for a missing intro.
+- **A real full-mode setup in the app** (author's keys): start a Blood & Bone
+  adventure with "Step by step". Every question should show its intro above the
+  options, and the creative ones (setting, tone, vow, connections, gear, name and
+  look, history, drives) should show the custom-answer box even if the model did
+  not ask for it. A model that omits an intro gets an error result and asks
+  again; a loop of refusals would show as the turn ending on the engine line.
+
+## 2026-10-25 — GM prompt plan G4: the narration prompt
+
+Covered for free: the prompt's contents, alternating roles, the stable block's
+byte-identity and the fixture's parse, in `tests/gmPrompt.narration.test.ts`. No
+model was called.
+
+- **The hidden-note case against a real narration model.** The fixture is
+  `evals/generation/narration-hidden-note-stays-out.json` (a hidden note and the
+  GM's reasoning name the ferryman as the cult's informer). With G2's runner:
+  build the narration context and continuation prompt from the snapshot, call
+  the narration model (GLM 5.3, Default) 20 times, and count runs whose text
+  contains a phrase in `expect.narrationExcludes`. Expected: 0 of 20, or no more
+  than 2 above a run on the previous prompt. Failure looks like the ferryman
+  "reporting" the player, "watching for the cult" or any hint of an informer. The
+  runner must read `expect.narrationExcludes`, a key G4 added to the generation
+  fixture beyond `calls`/`noCalls`. Waits for the author's go (it spends their key).
+- **Person on a real turn.** Play two turns in Narrator mode on a story with no
+  style note about person. Expected: second person ("You...") throughout, and a
+  story whose style note says "third person, past tense" is narrated that way.
+
 ## 2026-10-25 — Judge layer J4: the labelled set and its runner
 
 The format, the scoring, the runner (against a mocked provider), the exporter and

@@ -224,6 +224,42 @@ revised section, with the "beyond noise" rule there.
   updated to the new anchors ("This scene is contested", "Next step:"), and the
   M2 tests now expect `toolChoice` `auto` (and an unforced CLI schema).
 
+### 2026-10-25, slice 3
+
+- **Block order** (`buildSessionZeroBlock`): header and checklist (with "What to
+  do next is the last line of this block"), the step list, then the reference
+  (the system's creation rules note, the setup reference, the sheet template,
+  and C3's campaign guide, which carries C5's starter-review wording), then the
+  RULE line, the mode lines and the asking rules (`creationRules(mode)`), the
+  quick-mode nudge, and last the one next-step pair: `setupNextStep` plus
+  `creationNextStep` (the step to ask, or the all-covered line, unchanged text).
+  `creationRules` no longer takes `progress` or `shipped`; the next-step half
+  moved to the new `creationNextStep`. The "below" pointers in the next-step
+  and mode texts now say "above".
+- **The batching rule** is one bullet, "Batching, by scope". The mode lines no
+  longer restate it. The model is no longer told to set `allow_custom`.
+- **`CreationStep.kind`** is optional (Codex's revision, default `"choice"`,
+  read through `stepKind`) but set on every step in the repository. Creative:
+  cohort, setting, tone, style, tone_safety, campaign, campaign_review,
+  name_look, history, drives; every Fantastic Realms step; Blood & Bone's vow,
+  connections and gear. Choice: abilities and Blood & Bone's kind, archetype,
+  stats, burden, power and path.
+- **`prepareSetupQuestions`** (exported from `gmExecutor.ts`, run by
+  `executeAskQuestion` in session zero, both modes) sets `allow_custom: true` on
+  an item tagged with a creative step; in full mode it refuses the call, before
+  the player is asked, when the **first item under a known tag** has no `intro`.
+  Untagged items and unknown tags are never touched or refused (an untagged
+  clarifying question counts for nothing anyway), and only the first item per tag
+  needs an intro, since `history` asks three questions under one tag. A refusal
+  is `success: false`, so the setup gate treats it as no progress.
+- **Existing tests** updated deliberately: `gmTools.setupStep` and
+  `generation.setupDetail` now send an `intro` (full mode requires it);
+  `sessionZeroBlock*` match the new batching and allow_custom wording.
+- **The behavioural case** is `evals/generation/setup-full-one-player-step-per-call.json`
+  (generation format, `published: false` until the author reads it); G2's runner
+  was not on master, so it is only parsed by a test. It adds an `expectArguments`
+  key the format does not define; the runner must read it.
+
 ### 2026-10-25 - engine-review fixes to slice 1
 
 - **A decline ends the M2 gate.** A prompted round (`rollGatePromptedRound`)
@@ -300,3 +336,29 @@ Built on `claude/gm-prompts-g2`. Files: `app/misc/gmPromptChains.ts` (new),
   not by the agency judge.
 - **Owed before merge: the baseline-then-compare measurement.** No model was
   called. Commands are in `docs/pending_tests.md`.
+
+### 2026-10-25, slice 4
+
+- **There is no person setting.** The only control is `storytellerMode` (`dm`
+  says second person already). The person rule therefore lives in the fixed
+  `NARRATOR_SYSTEM_PROMPT` (second person by default; a style note naming another
+  person, or the tense and person of "Earlier in the story", wins) and the
+  continuation prompt repeats it for Narrator mode; DM mode gained only the
+  perception clause. Narrator mode used to name no person at all.
+- **Perception and the hidden-text case are in the system message**, which is
+  constant, so the stable block and the cache stay byte-identical
+  (`tests/gmPrompt.narration.test.ts`). The GM request is untouched.
+- **The behavioural case** is `evals/generation/narration-hidden-note-stays-out.json`,
+  not `evals/turns/public/`, because that folder is the judge set (30 to 50
+  judge turns, a test counts them). A generation fixture's `expect` only had
+  `calls` and `noCalls`; the case adds `expect.narrationExcludes` (phrases the
+  narration must not contain) with `noCalls: []`. The format type in
+  `evalFormat.ts` was not edited (G2 owns the runner); the runner must read the
+  new key. The live run is owed (`docs/pending_tests.md`).
+- **Player notes (coordinator's fix).** `story.player_notes` (Settings default
+  notes, copied into each story) now joins the narration context's stable block
+  under "The player's own style notes (these override your defaults for person,
+  tense and style)", through `stripHiddenLoreContent`; the system message says
+  they override the default person. `author_notes` (the Designer's private GM
+  notes) are deliberately not carried. Rewrites get both, as they continue the
+  same context.

@@ -1,0 +1,37 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "setup-full-one-player-step-per-call",
+  "published": false,
+  "note": "Step-by-step session zero, every table step covered, a solo player with nothing on the sheet. The GM must ask the next player step alone: one ask_question call, every item under one setup_step tag, an intro on it, and no sheet, card or start yet. Slice 3 of docs/gm-prompt-plan.md. Authored by hand, not from play. The runner is G2's (generation fixtures); `expectArguments` is read by that runner and ignored by the judge scorer.",
+  "storySnapshot": {
+    "story_name": "New Story",
+    "premise": "A lantern-lit river town where the ferry stopped running.",
+    "player_name": "Nik",
+    "sessionZeroActive": true,
+    "scene": { "parts": [] },
+    "lore": [],
+    "memory": [],
+    "npcs": [],
+    "setup": {
+      "mode": "full",
+      "conceptDone": true,
+      "questionsAsked": 5,
+      "covered": {
+        "table": ["setting", "tone", "style", "tone_safety", "campaign"],
+        "players": {}
+      }
+    }
+  },
+  "playerLine": "Step by step, please. The world is settled; let's make my character.",
+  "expect": {
+    "calls": ["ask_question"],
+    "noCalls": ["create_note", "confirm_setup", "start_game"]
+  },
+  "expectArguments": {
+    "tool": "ask_question",
+    "maxDistinctSetupStepsPerCall": 1,
+    "everyFirstItemPerTagHas": ["intro"],
+    "setupStepIn": ["name_look", "history", "drives"]
+  }
+}

@@ -1379,37 +1379,38 @@ function creationStepList(story: StoryData): string {
   return `SETUP STEPS (✓ asked and answered, → ask next, · still to come):\n${rows.join("\n")}`;
 }
 
-/** The rules for asking the steps, and the one to ask now. */
-function creationRules(
-  progress: SetupProgress,
-  mode: "quick" | "full",
-  shipped = false,
-): string {
-  const next = progress.creation.missing[0];
+/** The rules for asking the steps (the step to ask now is the block's last line). */
+function creationRules(mode: "quick" | "full"): string {
   const lines: string[] = [];
   lines.push(
     `TAGGING: put \`setup_step\` (the step's id, from the list) on every \`ask_question\` item that covers a step. The engine counts a step only when it is tagged and answered; an untagged question counts for nothing.${mode === "quick" ? " In quick setup the steps are setting, tone and tone_safety (lines and veils, plainly; none counts): ask all three, tagged." : ""}`,
   );
   if (mode === "full") {
     lines.push(
-      "- Table and world steps (setting, tone, style, tone_safety, campaign or campaign_review, cohort) may be batched in one `ask_question`, each under its own tag. A character step (name and look, history, drives, abilities) is asked one at a time: never two different character tags in one call, and never mixed with another. Several questions under the same tag are fine (all must be answered).",
-      "- Always give `intro`: one or two sentences on what is being chosen and why it matters. Give 2-4 options whose descriptions say what each does in play, mechanics and flavour.",
-      "- Creative steps (the table, world, name and look, history, drives): offer 2-4 suggestions and set allow_custom true. Tone is a multi_select.",
+      "- Batching, by scope: a table step may share one `ask_question` with other table steps, each under its own tag; a player step is asked alone, one tag in the call; several questions under one tag are fine (all must be answered).",
+      "- Always give `intro` on a tagged question (the engine refuses one without): one or two sentences on what is being chosen and why it matters. Give 2-4 options whose descriptions say what each does in play, mechanics and flavour. On a creative step (the player's own words) the engine always allows a custom answer. Tone is a multi_select.",
       "- With several players, a player step carries target_player_name (the player it is for) on every item; table steps are untargeted. Table steps first, then each player in turn.",
     );
   }
-  if (next) {
-    lines.push(
-      `NEXT STEP TO ASK: ${next.step.id}${next.player ? ` (${next.player})` : ""}. ${next.step.hint}`,
-    );
-  } else if (mode === "full") {
-    lines.push(
-      shipped
-        ? "Every step is covered: write the sheet, then confirm_setup. The campaign is already built; change only what the player asked to."
-        : "Every step is covered: write the sheet and build the campaign from the answers, then confirm_setup.",
-    );
-  }
   return lines.join("\n");
+}
+
+/** The creation step to ask now, or the all-covered line; "" in quick mode with none left. */
+function creationNextStep(
+  progress: SetupProgress,
+  mode: "quick" | "full",
+  shipped: boolean,
+): string {
+  const next = progress.creation.missing[0];
+  if (next) {
+    return `NEXT STEP TO ASK: ${next.step.id}${next.player ? ` (${next.player})` : ""}. ${next.step.hint}`;
+  }
+  if (mode === "full") {
+    return shipped
+      ? "Every step is covered: write the sheet, then confirm_setup. The campaign is already built; change only what the player asked to."
+      : "Every step is covered: write the sheet and build the campaign from the answers, then confirm_setup.";
+  }
+  return "";
 }
 
 function setupNextStep(
@@ -1419,8 +1420,8 @@ function setupNextStep(
   switch (progress.next) {
     case "interview":
       return mode === "full"
-        ? `NEXT: the setup steps, one at a time (list and rules below). Do not write the sheet or the plan, and do not call confirm_setup, until every step is covered.`
-        : `NEXT: ask the setup questions below, tagged, with \`ask_question\` (2-4 short questions in all; choices the player can tap, a custom answer allowed). Then move on to the character.`;
+        ? `NEXT: the setup steps, one at a time (list and rules above). Do not write the sheet or the plan, and do not call confirm_setup, until every step is covered.`
+        : `NEXT: ask the setup questions, tagged, with \`ask_question\` (2-4 short questions in all; choices the player can tap, a custom answer allowed). Then move on to the character.`;
     case "concept":
       return mode === "full"
         ? `NEXT: the concept. Ask the player the first creation step with \`ask_question\` (2-4 options plus a custom answer; allow several answers where that fits (multi_select)). One question per step.`
@@ -1435,7 +1436,7 @@ function setupNextStep(
         : `NEXT: the character. Propose a complete one from the answers so far and write it from the template with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one per player.${who}`;
     }
     case "campaign":
-      return `NEXT: the campaign. \`read_notes\` the existing lore, mechanics and setting notes, then build the campaign with the \`campaign\` tool (the CAMPAIGN section below says which parts this style expects). The player sees the public parts on the setup card (the pitch, the lines and veils, the names of the factions and fronts, locations, visible clocks); secrets, dooms and what people hide stay hidden from the card. If you write a \`gm_plan\` note instead, the player sees that note in full on the card: truths, secrets and endings go in the record (\`campaign\`) or a \`secret\` note, never in a plan note.`;
+      return `NEXT: the campaign. \`read_notes\` the existing lore, mechanics and setting notes, then build the campaign with the \`campaign\` tool (the CAMPAIGN section above says which parts this style expects). The player sees the public parts on the setup card (the pitch, the lines and veils, the names of the factions and fronts, locations, visible clocks); secrets, dooms and what people hide stay hidden from the card. If you write a \`gm_plan\` note instead, the player sees that note in full on the card: truths, secrets and endings go in the record (\`campaign\`) or a \`secret\` note, never in a plan note.`;
     case "confirm":
       return `NEXT: ask the player's OK. Call \`confirm_setup({ character_summary, campaign_hook, story_name, premise })\` with a short summary of the character (name, kind, the hook of their background), one or two sentences on the campaign (what the characters know, no secrets or endings), a short title for the story and a one-to-three sentence premise. The player sees a card with Start the story / Change something. When they press Start the game starts by itself: write the campaign intro in that same turn. If they ask for changes, edit the sheet or the campaign, then call \`confirm_setup\` again.`;
     case "start_game":
@@ -1449,7 +1450,7 @@ function setupModeLines(mode: "quick" | "full", shipped = false): string {
   const campaignWord = shipped ? "review the shipped campaign" : "build the campaign";
   if (mode === "full") {
     return `MODE: step by step.
-- Ask the setup steps (listed below) in order before writing anything: character steps one per \`ask_question\` call, table and world steps may share a call.
+- Ask the setup steps (listed above) in order before writing anything, batched as the asking rules below say.
 - Each question offers 2-4 options and a custom answer; never fill in a choice the player did not make.
 - Write the sheet only after every step is covered, then ${campaignWord} ${shipped ? "with the player" : "from what you learned"}.
 - Keep each reply short: the question, no story.`;
@@ -1457,7 +1458,7 @@ function setupModeLines(mode: "quick" | "full", shipped = false): string {
   return `MODE: quick setup.
 - Ask only 2-4 short questions with \`ask_question\`, then PROPOSE: make the choices the player left open yourself.
 - Write the sheet and ${campaignWord} without asking about every field. The player can change anything on the setup card.
-- Use the creation rules (below, when present) as grounding for what is legal, not as a script to walk through.
+- Use the creation rules (above, when present) as grounding for what is legal, not as a script to walk through.
 - Keep each reply short: the question or the proposal, no story.`;
 }
 
@@ -1589,21 +1590,15 @@ export function buildSessionZeroBlock(story: StoryData): string {
   const mode = story.setup?.mode ?? "quick";
   const resolved = resolveSystem(story);
   const lore = story.lore ?? [];
+  const shipped = story.campaign?.origin === "starter";
 
-  let out = `\n## 🎭 SESSION ZERO - SETTING UP THE STORY\n${setupChecklist(progress)}\n\n${setupNextStep(progress, mode)}\n\n`;
-  out += `RULE: until \`start_game\` succeeds you never narrate the story. Every turn you either ask the player (\`ask_question\`), do a setup step (write the sheet or ${story.campaign?.origin === "starter" ? "review the campaign" : "build the campaign"}) or call \`confirm_setup\`. A short out-of-character line is fine. Do not describe scenes, play out events or roll for the story yet.\n\n`;
-  out += setupModeLines(mode, story.campaign?.origin === "starter") + "\n";
-
+  // Order (gm-prompt-plan slice 3): where setup stands, then the reference
+  // material (the system's creation rules, the notes read, the sheet template,
+  // the campaign guide), then how to ask (the rule, the mode, the asking
+  // rules), and the one next-step line LAST, where attention is highest.
+  let out = `\n## 🎭 SESSION ZERO - SETTING UP THE STORY\n${setupChecklist(progress)}\n(What to do next is the last line of this block.)\n`;
   const stepList = creationStepList(story);
   if (stepList) out += `\n${stepList}\n`;
-  out += `\n${creationRules(progress, mode, story.campaign?.origin === "starter")}\n`;
-  out += `\n${campaignSetupGuide(story)}\n`;
-
-  const template =
-    story.characterSheetTemplate?.template || resolved.system?.sheetTemplate;
-  if (template) {
-    out += `\n## CHARACTER SHEET TEMPLATE\nBuild each player's sheet in this shape: fill in every field with the player in conversation. The \`| default\` values are examples, not choices made for the player. Write the finished sheet with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one note per player.\n\`\`\`\n${template}\n\`\`\`\n`;
-  }
 
   const creationId = resolved.system?.creationNoteId;
   if (creationId) {
@@ -1618,12 +1613,27 @@ export function buildSessionZeroBlock(story: StoryData): string {
   const reference = buildSetupReference(story, creationId);
   if (reference) out += "\n" + reference;
 
+  const template =
+    story.characterSheetTemplate?.template || resolved.system?.sheetTemplate;
+  if (template) {
+    out += `\n## CHARACTER SHEET TEMPLATE\nBuild each player's sheet in this shape: fill in every field with the player in conversation. The \`| default\` values are examples, not choices made for the player. Write the finished sheet with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one note per player.\n\`\`\`\n${template}\n\`\`\`\n`;
+  }
+
+  out += `\n${campaignSetupGuide(story)}\n`;
+
+  out += `\nRULE: until \`start_game\` succeeds you never narrate the story. Every turn you either ask the player (\`ask_question\`), do a setup step (write the sheet or ${shipped ? "review the campaign" : "build the campaign"}) or call \`confirm_setup\`. A short out-of-character line is fine. Do not describe scenes, play out events or roll for the story yet.\n\n`;
+  out += setupModeLines(mode, shipped) + "\n";
+  out += `\n${creationRules(mode)}\n`;
+
   const asked = story.setup?.questionsAsked ?? 0;
-  // Step by step has its own end: every step covered (creationRules). The
+  // Step by step has its own end: every step covered (creationNextStep). The
   // nudge to propose is for quick setup only.
   if (mode !== "full" && asked >= SETUP_QUESTION_NUDGE_AT) {
     out += `\nYou have asked ${asked} setup questions. Enough: stop asking, make the remaining choices yourself and propose the character and the campaign now.\n`;
   }
+
+  const stepLine = creationNextStep(progress, mode, shipped);
+  out += `\n${setupNextStep(progress, mode)}${stepLine ? `\n${stepLine}` : ""}\n`;
   return out;
 }
 
@@ -2856,12 +2866,12 @@ export function buildStoryContinuationPrompt(
 Keep it tight and hand the mic back - this is a back-and-forth roleplay, not a monologue. ${paragraphs} End the instant the player has something to react to; never write what the player character does next.${pacingFeedbackLine}${tintFeedbackLine}`;
 
   const narratorGuidelines = `
-Write immersive prose - show, don't tell, and no dice results or mechanical language.
+Write immersive prose in the second person ("You..."), unless the style notes or the earlier narration use another person, and only what the character perceives. Show, don't tell, and give no dice results or mechanical language.
 Reveal through one concrete, specific detail rather than a label or a pile of adjectives. Vary your phrasing - don't reuse images or sentence openers from earlier turns. Stay within the length above and end on something the player can react to.`;
 
   const dmGuidelines = `
 Write as a Dungeon Master narrating to the player. You may reference dice results naturally.
-Use second person ("You swing your sword..."). Favor concrete, specific detail over generic flourish, don't recycle phrasing from earlier turns, and stay within the length above.`;
+Use second person ("You swing your sword..."), and write only what the character perceives. Favor concrete, specific detail over generic flourish, don't recycle phrasing from earlier turns, and stay within the length above.`;
 
   return (
     basePrompt + (storytellerMode === "dm" ? dmGuidelines : narratorGuidelines)

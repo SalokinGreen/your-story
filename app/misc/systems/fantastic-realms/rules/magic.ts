@@ -23,7 +23,7 @@ Read this before the first spell in a story, and again when a miscast is due.
 It does what a skilled mundane hand could not: touch a mind, call fire, close a wound, see far, speak with what cannot answer. The DC follows the deed, not the spell. Calming a frightened horse is DC 2. Turning a dragon's will is DC 6. Two heroes casting the same spell face different DCs for different deeds.
 
 ## The cost is the miss
-A magic miss is a **miscast**, and the miscast is the roll's whole consequence: never a heart on top of it. It spends the one harm budget (FR — Core rules). Choose a kind below (each realm will carry its own d12 miscast table, added with the realms in a later release; until then choose a kind):
+A magic miss is a **miscast**, and the miscast is the roll's whole consequence: never a heart on top of it. It spends the one harm budget (FR — Core rules). Choose a kind below, or roll the d12 miscast table in the realm's tables note (FR — Aurelane tables, FR — Larkenfell tables, FR — Gloamreach tables):
 - **Backfire.** One heart, or one condition, to the caster.
 - **Goes wide.** It hits the wrong target, or the right one in the wrong way.
 - **Draws attention.** Something notices, and it is not friendly.
@@ -53,7 +53,7 @@ A healing spell clears a condition that names no cure, or one whose named cure i
 - **Aurelane.** Bright, courtly, sanctioned. Done in public with a flourish. Miscasts lean to attention and glory gone wrong.
 - **Larkenfell.** Folk-magic and bargains: hedge-charms, knots, words said over bread. Miscasts lean to the hedge-folk taking their price.
 - **Gloamreach.** Rare and costly. Few cast, and everyone remembers what it cost. Miscasts lean to marks and hollowness.
-The realm notes will carry a "Magic here" section and a d12 miscast table; they are added with the realms in a later release. Until then, use the lean above.
+Each realm note has a "Magic here" section, and its tables note a d12 miscast table. Outside the three realms, use the lean above.
 
 ## Learning magic
 A spell is gained like any feat: at creation, when the concept supports it, or at a level, from what happened ("Ghost-Touched" after a night in a barrow). A teacher, a bargain or a scar turned into a feat all work.

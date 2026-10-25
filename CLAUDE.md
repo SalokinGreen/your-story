@@ -446,7 +446,7 @@ always runs **before** the story stage:
    a rewrite sees, and only on this path). Claude's cache marks apply to
    tool-carrying requests only, so this tool-less call keeps just the
    `session_id` (`:narration`) and the stable block's byte-identity. The narrator
-   no longer sees lore, memory or the summary (a quality risk plan G4 revisits). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
+   no longer sees lore, memory or the summary (a quality risk the plan leaves open). Its fixed system message (`NARRATOR_SYSTEM_PROMPT`, GM prompt plan G4) names the grammatical person (second, unless a style note or the earlier narration uses another), says to write only what the character perceives, and gives the excluded case with an invented example (hidden text is never narrated, not even by hint); the continuation prompt repeats person and perception. The stable block also carries the player's own style notes (`player_notes`, which override the default person, tense and style; never `author_notes`). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
    default GLM 5.3 through OpenRouter, decision 50), not the GM's tier model.
 3. **The choices stage** — a separate call on the narration model
    (`generateChoicesWithRetry` → `parseChoices`), only when
@@ -891,6 +891,15 @@ report's §11.3. The ones that shape play:
   with a Debug Logs line, and a note with one recorded version (Blood & Bone's)
   never changes. **Changing a built-in note's text means appending its new hash**
   (`tests/systems.noteUpdate.test.ts` fails when the last entry is not current).
+  **The original realms grown (slice E3, `world/realms/`, one file per realm,
+  ids unchanged):** each of Aurelane, Larkenfell and Gloamreach is a realm note
+  (a "Magic here" section, two local callings in the Callings format, and twelve
+  foes, each stat line followed by a `*Tactics:*` line) and a new tables note,
+  `builtin:fantastic-realms:realm-<id>-tables` (type `table`: a d12 miscast
+  table, a d20 treasure table and a d20 "On the road" table); the shared
+  treasure and foes tables grew (`checkTableShape` now accepts a d12). Magic,
+  Callings and Travel point at them. The three new notes ride in the Crossroads
+  pack, so the loader offers them to existing stories.
   **Its campaign** is an
   `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
   Week, the barrow king's front (a hidden clock on `rest`) and the goblins'
@@ -1075,6 +1084,14 @@ tag), `burden` ("none" counts; its hint says to state the starting Stress),
 mode chosen (an old save, a bare story), none. `creationTotal()` counts the
 table steps once and each player step once per player who needs it. A player
 with a pre-made sheet (`premadeFor`) is skipped for the player steps.
+- **Kinds and the fields code sets** (gm-prompt-plan slice 3): every step
+  has `kind` (`"choice"` or `"creative"`, optional, default choice, read through
+  `stepKind`; creative is the player's own words: the shared world and self
+  steps, every Fantastic Realms step, Blood & Bone's vow, connections and gear).
+  `prepareSetupQuestions` (`gmExecutor.ts`, from `executeAskQuestion`) sets
+  `allow_custom: true` on an item tagged with a creative step, and in full mode
+  refuses the call (`success: false`, nothing asked) when the first item under a
+  known tag has no `intro`.
 - **Recording** (`recordCreationSteps`, `gmExecutor.ts`, run by
   `executeAskQuestion` in session zero). A tag counts only if it is a step of
   this story (an unknown tag is ignored and the result lists the valid ones),
@@ -1126,19 +1143,24 @@ not done (`interview`, `concept`, `character`, `campaign`, `confirm`,
 (`ai_staged.ts`) is the only setup text, in the **live block** (the cache
 rule). It replaces `freshStorySetupBlock`, `sessionZeroStartGameReminder`,
 `setupOverdueBlock` and `buildSheetTemplateBlock`, which still fire outside
-session zero. It holds, in order: the checklist, the next step with its tools,
-the rule that the GM does not narrate until `start_game` succeeds, the mode's
-lines, the creation rules, the CAMPAIGN guide (`campaignSetupGuide`: the seven
+session zero. It holds, in order (reference first, the next step last; slice 3
+of `docs/gm-prompt-plan.md`): the checklist, the step list, the system's
+creation rules note, the setup reference, the sheet template, the CAMPAIGN guide
+(`campaignSetupGuide`: the seven
 styles until one is chosen, then the style's expected parts with what is built
 and what is not, the clock triggers that suit it, the `campaign` tool's parts
-and the lines-and-veils hint), the sheet template, the setup reference, and after
-6 setup questions (`SETUP_QUESTION_NUDGE_AT`) a nudge to propose. The checklist
+and the lines-and-veils hint), the rule that the GM does not narrate until
+`start_game` succeeds, the mode's lines, the asking rules (tagging, the one
+batching chain by scope, intro; `creationRules`), after
+6 setup questions (`SETUP_QUESTION_NUDGE_AT`) a nudge to propose, and last the
+one next-step pair (`setupNextStep` and `creationNextStep`). The checklist
 gains a "Setup steps (n/m asked and answered)" row when the mode requires steps,
 and the block lists each required step per player with ✓ (covered), → (next) or
 · (still to come). The creation rules say to tag every covering item with
-`setup_step`. In full mode they add: table and world steps may share a call,
-character steps go one per call, always an `intro`, options that say what they
-do in play, 2–4 suggestions and `allow_custom` on creative steps, and
+`setup_step`. In full mode they add one batching chain by scope (a table step
+may share a call with other table steps, a player step is asked alone), an
+`intro` the engine requires, options that say what they
+do in play, 2–4 suggestions (the engine sets `allow_custom` on creative steps), and
 `target_player_name` on every player-step item. In full mode the nudge is
 replaced by "every step is covered: write the sheet and build the campaign" (quick mode
 keeps the nudge at 6).
@@ -1297,7 +1319,7 @@ checkboxes and a Done button in `AskQuestionModal.tsx`. The answer item carries
 `selectedLabels`. The executor (`gmExecutor.ts`) and the party host
 (`partyHost.ts`) keep only offered labels, once each, in option order, and the
 GM's line reads `→ "A", "C"`. Any custom text the player typed is kept
-alongside the picks (the modal offers the box only when `allow_custom` is set). `selectedLabels` is honoured only on a multi-select
+alongside the picks (the box shows unless the question sets `allow_custom: false`; in session zero a creative step's items are always given it, `prepareSetupQuestions`). `selectedLabels` is honoured only on a multi-select
 question. The phone protocol caps picks at 4 (`PARTY_MAX_PICKS`). Couch
 `target_player_name` routing is unchanged.
 
@@ -1551,6 +1573,15 @@ keeps the draft and drops the acknowledgement. After narration the same checks
 run once more for the Debug Logs; the pacing hits make a GM-only
 `ScenePart.pacingNote`, carried into the next live block under the story-progress
 check-in (decision 235).
+
+**Judge layer v2, slice J5: Settings and the turn details** (plan slice 5).
+`judges/measured.ts` bundles `evals/results.json` (a committed stub until the
+author's first `eval-judges.mjs --go`) and gives Settings each judge's measured
+precision at the rewriting severity (`MEASURED_JUDGES`; nothing shown when absent);
+`JUDGE_DEFAULT_OVERRIDES` (`observer.ts`, empty) holds the judges that ship as Flag
+below 0.7, updated by hand from the report. The turn's work line shows
+`publicNotice` as "Checked" or "Revised after a check" (`TurnWorkLine`); the private
+`finding` is in the Debug Logs and the Context Viewer only.
 
 **Judge layer v2, slice J2: the combined judge call** (`docs/judge-layer-v2-plan.md`
 slice 2; confirmation and the rewrite with facts are J3, below).

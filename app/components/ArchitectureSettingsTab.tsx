@@ -11,6 +11,8 @@ import {
   ReasoningEffort,
 } from "@/app/misc/reasoningTiers";
 import { ObserverFlagType } from "@/app/misc/structs";
+import { MEASURED_JUDGES } from "@/app/misc/judges/measured";
+import { FLAG_ONLY_PRECISION } from "@/app/misc/judges/evalScore";
 import {
   DEFAULT_OBSERVER_SETTINGS,
   REWRITABLE_FLAG_TYPES,
@@ -594,6 +596,9 @@ export default function ArchitectureSettingsTab() {
             heads-up to the GM next turn; the text you read never changes). The
             three that judge the prose can also Rewrite automatically; you can
             undo a revision on its turn. Nothing here ever re-rolls a turn.
+            A rewrite also needs a second judge from another model family to
+            agree; pick it under AI &rarr; Advanced settings &rarr; Rewrite
+            confirmation.
           </p>
           <p className="text-xs text-ys-muted">
             While a judge can rewrite, a turn&rsquo;s text appears only after it
@@ -658,6 +663,18 @@ export default function ArchitectureSettingsTab() {
                     {info.description}
                   </p>
                   <p className="text-[10px] text-ys-muted">{info.cost}</p>
+                  {MEASURED_JUDGES[type] && (
+                    <p className="text-[10px] text-ys-muted">
+                      Measured on the labelled turns: when it says a turn is
+                      wrong it is right{" "}
+                      {Math.round(MEASURED_JUDGES[type]!.precision * 100)}% of
+                      the time
+                      {MEASURED_JUDGES[type]!.precision < FLAG_ONLY_PRECISION
+                        ? ", so it ships as Flag"
+                        : ""}
+                      .
+                    </p>
+                  )}
                   {settings.enabled && (
                     <>
                       {REWRITABLE_FLAG_TYPES.has(type) &&

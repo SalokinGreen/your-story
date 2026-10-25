@@ -6,12 +6,18 @@
  */
 import type { CreationStep } from "../../setupSteps";
 
-const step = (id: string, label: string, hint: string): CreationStep => ({
+const step = (
+  id: string,
+  label: string,
+  hint: string,
+  kind: "choice" | "creative" = "choice",
+): CreationStep => ({
   id,
   label,
   group: "character",
   scope: "player",
   hint,
+  kind,
 });
 
 export const BLOOD_AND_BONE_CREATION_STEPS: CreationStep[] = [
@@ -34,11 +40,13 @@ export const BLOOD_AND_BONE_CREATION_STEPS: CreationStep[] = [
     "vow",
     "Vow",
     "Their driving goal and its rank (Troublesome, Dangerous, Formidable, Extreme).",
+    "creative",
   ),
   step(
     "connections",
     "Connections",
     "Two connections, both under this tag: who or what each is, its rank (one Steady and one Weak, or two Weak) and why it still matters.",
+    "creative",
   ),
   step(
     "burden",
@@ -55,5 +63,6 @@ export const BLOOD_AND_BONE_CREATION_STEPS: CreationStep[] = [
     "gear",
     "Gear and resources",
     "Two or three pieces of gear or resources that fit the Kind and the Path.",
+    "creative",
   ),
 ];
