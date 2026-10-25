@@ -6,8 +6,13 @@ three", decision 241). Decisions 238–239. Audit:
 
 ## Before slice 1
 
-Slice 1 has no prerequisites beyond master. Slices 2–5 need the judge v2
-labelled-set runner (judge v2 slice 4) for their behavioural cases.
+The order is the graph in [`campaign-format-plan.md`](campaign-format-plan.md),
+"The order across the three plans":
+- slice 1 needs Fantastic Realms (#252) only for its Fantastic Realms gate
+  test;
+- slices 2 and 5 need J4's runner;
+- slice 3 follows campaign slice 3;
+- slice 4 follows campaign slice 2.
 
 Every slice keeps the cache rule: per-turn text only in the live block. It
 holds `tests/tokenBudget.test.ts` and `tests/toolBudget.test.ts`.
@@ -41,7 +46,11 @@ All deterministic text; scripted tests only.
 - the round's tool choice changes from `"required"` to `"auto"`.
 
 **`campaignPlan.ts`, `setupGateMessage`.** The signature becomes
-`(next, creation, cause: SetupGateCause, rejected?: string, multiPlayer: boolean)`.
+`(next, creation, opts: { cause?: SetupGateCause; rejected?: string; multiPlayer?: boolean } = {})`.
+The defaults keep today's text. The callers updated:
+- `generation.ts` around 3351;
+- `tests/setupSteps.test.ts` around 219 and 238;
+- `tests/generation.setupGate.test.ts`.
 - `SetupGateCause` is `"prose_question" | "prose_note" | "nothing"`, derived
   by `classifySetupRejection(round)`:
   - a question mark in the visible prose with no `ask_question` gives
@@ -129,6 +138,42 @@ the GM's reasoning yields narration without it.
   - the phrase table stays as the fallback when the judge call fails;
   - it ships only after its behavioural case shows no rise in missed or false
     dawns.
+
+## Revised after Codex's review
+
+Codex reviewed the three plans ([`research/codex-plans-review-2026-10-25.md`](research/codex-plans-review-2026-10-25.md)). Its findings for this plan
+change the slices above as follows. Where this section and a slice disagree,
+this section wins.
+
+**The roll tool's name renders in the live block** (finding 9). The system
+prompt's chain says "your system's roll tool (named in the live block)". The
+live block names it from the resolved system. The system prompt stays
+system-independent, and the cache holds.
+
+**`CreationStep.kind`'s construction sites** (finding 17). Slice 3 sets `kind`
+on:
+- the shared steps in `setupSteps.ts` (`setting`, `tone`, `campaign`,
+  `name_look`, `history`, `drives`, `cohort`, `abilities`);
+- Blood & Bone's steps (`blood-and-bone/creationSteps.ts`);
+- Fantastic Realms' steps (`fantastic-realms/sheet.ts`);
+- the test fixtures that build steps.
+
+`kind` is optional with the default `"choice"`, so a step without it keeps
+today's behaviour.
+
+**The dawn reading runs before the final round, not after narration**
+(finding 8). Slice 5's judge trigger is evaluated where the turn-end checks
+run today (`generation.ts:3453`), on the GM's final prose, before narration.
+- **Precedence.** It feeds `pendingCheck` as the phrase table does: the
+  previous-turn suppression stays, and so do the three rounds reserved for the
+  Reckoning (`:3488`).
+- **The call.** It is one small Haiku call, counted in the judge plan's
+  ceilings.
+- **The fallback.** The phrase table is used when that call fails or times
+  out.
+
+**The behavioural cases' format** is the generation fixture in the judge plan's
+revised section, with the "beyond noise" rule there.
 
 ## Checks every slice
 

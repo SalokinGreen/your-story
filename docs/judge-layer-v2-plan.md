@@ -5,13 +5,10 @@
 
 ## Before slice 1
 
-This plan builds on top of:
-- **The held output** (220–221, 237, 240), on master;
-- **Fantastic Realms** (#252), on master;
-- **Campaign slice 1**: the record supplies lines, veils, secrets and people.
-
-Slices 1 and 2 run before campaign slice 3 can use the safety check. Take
-the baseline on master after those merges.
+The order and the prerequisites are the graph in
+[`campaign-format-plan.md`](campaign-format-plan.md), "The order across the
+three plans". J3 needs campaign slice 2's narration context; G2 and G5 need
+J4's runner. Take the baseline on master after the prerequisites merge.
 
 ## Slice 1 — rung 1 checks and the rung 2 re-ask
 
@@ -174,6 +171,89 @@ turns, at no cost.
 private findings.
 
 **The check:** a browser screenshot, and an APK after merge.
+
+## Revised after Codex's review
+
+Codex reviewed the three plans ([`research/codex-plans-review-2026-10-25.md`](research/codex-plans-review-2026-10-25.md)). Its findings for this plan
+change the slices above as follows. Where this section and a slice disagree,
+this section wins.
+
+**The damage contract's shapes** (finding 6). `feat_roll` gains an optional
+`target` in its params, its schema and its typed result (`GMFeatRollResult.target`).
+- **The adapter.** `foeDamage({tier: result.outcome, magnitude: result.magnitude})`.
+- **What it expects:** a `manage_meter` change on the target's Hearts this
+  turn whose **requested** change equals the damage.
+- **Clamping:** a meter that clamps at 0 is not a violation.
+
+**Every correction goes through one path** (finding 12). On the held-output
+code:
+- **The speculative length rewrite** (`generation.ts:1278`) is removed. The
+  length judge joins the combined call.
+- **"The first major flag wins"** (`:1411`) is replaced by the design's
+  priority order and the two-confirmation limit.
+- **The optional mechanical retry** (`:1638`) stays, reachable only by the
+  stored setting it has today, and is refused when it would re-run executed
+  dice.
+
+**The schemas** (finding 13):
+- **Judge ids:** `JudgeId` is a union of the eight judges.
+- **Verdicts:** `JudgeVerdict = { severity: "none"|"minor"|"major"|"unknown"; evidence: string; factIds: string[]; fix: string }`.
+- **Validation:**
+  - `evidence` must be a substring of the narration;
+  - each `factId` must exist in the turn's facts;
+  - a verdict that fails either is "unknown".
+- **Confirmation** refuses a confirming model of the same family as the first
+  judge (Anthropic), naming the family. `confirmModelFamily(modelKey)` reads
+  `ai_prices.ts`.
+- **The comparison switch.** `observerSettings.combined` is not a field.
+  Instead, the old per-judge calls stay reachable only from the eval runner
+  (`scripts/eval-judges.mjs --mode split`), never from Settings.
+- **Settings migration.** The confirming picker's key joins
+  `syncableSettingsKeys.ts`.
+- **Default to flag.** A judge whose measured precision is below 0.7 ships as
+  "flag" by default, through a `JUDGE_DEFAULT_OVERRIDES` table updated by hand
+  from the runner's report.
+
+**Every player-facing exit is generic** (finding 14):
+- the rewrite toast (`page.tsx:2998`) says "Revised after a check";
+- the Undo tooltip (`story.tsx:1113`) says "Undo revision";
+- the original's stored `flag` keeps only its kind;
+- guest snapshots (`multiplayer/session.ts:441`) strip `observerFlags` and the
+  original's flag.
+
+The campaign data leak to guests (§6.12) stays a named gap.
+
+**The eval format** (finding 18) is versioned, in two kinds:
+- **A judge fixture:** `{ v: 1, kind: "judge", storyBefore, storyAfter, toolResults, playerLine, narration, settings, labels }`.
+  The before and after states let event contracts run.
+- **A generation fixture**, for the GM prompt cases:
+  `{ v: 1, kind: "generation", storySnapshot, playerLine, settings, scriptedToolResponses?, expect: { calls?: string[], noCalls?: string[] } }`.
+
+The exporter writes either kind.
+
+**What "beyond noise" means.** A case rises beyond noise when its failing
+runs rise by more than 2 of 20 on two separate runs.
+
+**The cost and latency budget** (finding 20):
+- **Fact selection.** Each judge declares the fact kinds it reads, and
+  `selectFactsFor(judgeId, facts)` hands it only those. A split call therefore
+  carries less, not the same facts twice.
+- **Ceilings per turn:**
+  - one blocking call;
+  - one background call;
+  - two confirmations;
+  - one rewrite;
+  - one dawn reading (G5).
+- **What the runner and the cost ledger record,** per turn kind (clean,
+  split, confirmed, rewritten, timed out, no key):
+  - total and discarded cost;
+  - tokens and cache hits;
+  - p50 and p95 time until release.
+
+**Tests that catch the failures** (finding 19):
+- a prohibited-dice re-ask test, where the re-ask round never calls a dice tool
+  twice for one action;
+- a secret canary in the rewrite request and the guest snapshot.
 
 ## Checks every slice
 

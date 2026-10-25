@@ -12,8 +12,7 @@ This plan builds on top of three things, which must be on master first:
   `BuiltinSystem.tools` and `systemState.systemId`.
 - **The held output**, decisions 220–221, 237 and 240 (`claude/judges-on-build`
   and its fixes branch): the hold the narration context plugs into.
-- **The three plans' shared order:** campaign slice 1, then judge v2 slices
-  1–3, then the GM prompts slices 2–5. GM prompts slice 1 can go any time.
+- **The order across the three plans** is the graph below.
 
 Baseline: take it on master after those merges, with the full Vitest suite
 and tsc.
@@ -21,6 +20,35 @@ and tsc.
 **Ids.** Every new part's id is made with `crypto.randomUUID()` inside an
 executor or a migration, never during render, with a prefix (`clk_`, `fac_`,
 `frt_`, `sec_`, `clu_`, `loc_`, `end_`). Tests stub `crypto.randomUUID`.
+
+## The order across the three plans
+
+This is the one dependency graph, kept here; the other two plans point at it.
+An arrow means "must be on master first".
+
+```
+Fantastic Realms (#252) ──┐
+Held output (220/221/237/240) ┤
+                          ├─► G1 (truth fixes, gate messages; its FR test needs #252)
+                          ├─► C1 (record, clocks, tool) ─► C2 (narration context) ─┬─► J3 (confirm + rewrite)
+                          │                                                         ├─► G4 (narration prompt)
+                          │                                                         └─► C3 (session zero) ─► G3 (session-zero block)
+                          ├─► J1 (rung 1, re-ask) ─► J2 (combined call) ─► J3 ─► J4 (labelled set) ─┬─► G2 (roll + agency chains)
+                          │                                                                           └─► G5 (length, tiers, dawn)
+                          └─► C4 (Designer) ─► C5 (starters) ─► C6 (player view)
+J5 (Settings) after J3.   C1 replaces G1's temporary front wording in the same change.
+```
+
+**Ownership of shared functions.** One slice at a time owns a function, and
+the next slice that touches it rebases onto it and runs the full suite after
+the merge:
+- `generateStoryTurn` / `generateStoryTurnOnce`: C1 → J1 → C2 → J2 → J3 → G5.
+- `buildSessionZeroBlock`, `setupGateMessage`, `executeConfirmSetup`: G1 → C3 → G3.
+- The narration path and `rewriteFlaggedNarration`: C2 → J3 → G4.
+
+**The cache rule across slices.** Every name that varies by story (the
+resolved system's roll tool, the brief) renders in the live block. The system
+prompt stays system-independent.
 
 ## Slice 1 — the record, clocks, the brief and the tool
 
@@ -230,6 +258,125 @@ Grave Watcher and Last Resort are under `blood-and-bone/`; Wolfwillow is under
 - **Online guests:** the existing §6.12 leak (guests receive the whole
   `StoryData`) is unchanged and stays named as a gap.
 - **The check:** a browser screenshot at phone width, and an APK after merge.
+
+## Revised after Codex's review
+
+Codex reviewed the three plans ([`research/codex-plans-review-2026-10-25.md`](research/codex-plans-review-2026-10-25.md)). Its findings for this plan
+change the slices above as follows. Where this section and a slice disagree,
+this section wins.
+
+**Clock events come from typed results, not `success`** (finding 1). A graded
+miss returns `success: false`.
+- `turnEventsFrom(result)` reads the result's type and outcome:
+  - `action_roll` with outcome `miss`;
+  - `feat_roll` with outcome `miss`;
+  - `manage_track` with `action: "progress_roll"` and outcome `miss`;
+  - `record_challenge_result` with a failure;
+  - `increment_scene` executed;
+  - `take_rest` executed;
+  - `end_session` executed.
+- A result whose `contextForStory` starts with `[ERROR` is no event.
+
+**`manage_timer`'s real actions** are `create`, `advance`, `toggle_pause`,
+`cancel` and `trigger` (finding 2). On a story with a record:
+
+| Action | Becomes |
+|---|---|
+| `create` | A manual clock, at any capacity |
+| `advance` | A tick |
+| `toggle_pause` | Toggles `paused` |
+| `cancel` | Paused, with `cancelled: true` |
+| `trigger` | Fills the clock at once and reports its fill |
+
+Lookup is by clock id or name, as timers are found today. The results keep the
+existing result types, so the timeline and the labels are unchanged.
+
+**A turn event ledger** (finding 10). `GenerationTurnState.events: TurnEvent[]`
+lives in `generation.ts` for the turn, and is passed into every
+`executeGMTools` call. Each event carries `{kind, toolCallId, order}`, and a
+clock carries `createdOrder`. Ticks apply at tool boundaries inside the batch,
+in call order, so a `pause` before a `miss` in one batch is honoured. The
+consumed `(clockId, trigger)` keys live on the ledger, and the turn's
+one-tick-per-trigger rule reads them across rounds.
+
+**The shapes the slice left open** (finding 11):
+- **Beats.** A `Beat` is `{ id, title, summary, status: "pending"|"current"|"done"|"suspended" }`.
+  - `set_beat` marks the current beat done and the given one current.
+  - `open_side_beat` sets `suspendedId` to the current beat and makes the side
+    beat current.
+  - `close_side_beat` restores `suspendedId`.
+- **Portents.** `tickClock(clock, by, reason, record)` takes the record and
+  looks up the linked front's portents. A clock with no front has none.
+- **Director moves.** `DirectorMove.targetTimerId` gains a sibling,
+  `targetClockId`.
+- **Visibility.** A clock's `visible` defaults from the style (decision 231)
+  through `defaultClockVisibility(style)`.
+- **Dangling references** render "(missing)" and are kept.
+- **Migration.** It maps every timer status: `active` and `paused` to
+  `paused: false` and `true`; `triggered` to full; `cancelled` to
+  `cancelled: true`.
+
+**Legacy precedence** (finding 15). A record created only by the timer
+migration carries `origin: "migrated"`. On such a record:
+- **Beat tools** keep the legacy plan-note behaviour until the record gains a
+  style.
+- **Readiness** follows the old plan note.
+
+A test runs load → save → sync shape → reload on a story with timers and an
+existing spine.
+
+**The GM conversation is assembled in `generation.ts`, not in
+`buildStoryContinuationPrompt`** (finding 4).
+- **The prompt builder.** `buildStoryContinuationPrompt` stays the narration
+  instruction text.
+- **Slice 2 replaces the message assembly** around `generation.ts:3712` with
+  `buildNarrationContext` and returns that context on `GenerationResult` as
+  `narrationContext`.
+- **Rewrites.** Every rewrite caller (`rewriteFlaggedNarration`'s callers in
+  `generation.ts`) passes `result.narrationContext` instead of
+  `gmStoryContext` and `narrationThoughts`.
+
+**`confirm_setup` without a plan note** (finding 3). Slice 3 also changes:
+- `executeConfirmSetup`'s plan refusal (`gmExecutor.ts:4077`), to accept a
+  record;
+- its `plan` payload (`:4082`), to `{ note?, campaign?: PublicCampaignView }`;
+- the confirmation request type and the interaction handler;
+- `SetupConfirmModal.tsx`.
+
+A test approves a setup that has a record and no plan note, through to
+`executeStartGame`.
+
+**The six places** (finding 16), for `campaign`:
+1. the schema in the `GM_TOOL_SCHEMAS` array, with a `CampaignParams` member of
+   the params union and a `GMCampaignResult` member of the result union;
+2. the whitelist;
+3. the executor;
+4. `GOOGLE_ESSENTIAL_TOOLS`;
+5. the label;
+6. **the Observer:** it is not a dice tool and produces no verdict; the
+   six-places test records that explicitly.
+
+`historyStubs.ts`: a new `stubPolicy(toolName, args)` keeps `campaign` results
+whole except `action: "read"`, checked before the unconditional keep-whole
+return.
+
+**The Designer's dispatch** (finding 17). Slice 4 also adds `write_campaign`
+to `executeDesignerTool` (`designer_executor.ts:197`), and deep-clones
+`draft.campaign` on the working copy. A rejected write leaves the draft
+byte-identical, tested.
+
+**Tests that would actually catch the failures** (finding 19):
+- an explicit six-places assertion for `campaign`;
+- a campaign-bearing fixture in the token- and tool-budget tests;
+- a multi-round clock test (a miss in round 1 and a miss in round 3 tick
+  once);
+- a secret canary: one unique string in a secret, the reasoning and a tool
+  argument, asserted absent from the narration request, the rewrite request
+  and the guest snapshot.
+
+**Context cost** (finding 20). The token-budget test measures a story with a
+full brief and whole thread descriptions, and the live block's growth is
+reported in the PR.
 
 ## Checks every slice
 
