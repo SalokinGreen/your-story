@@ -142,7 +142,7 @@ describe("a setup turn shows only its latest words", () => {
     // The empty round hit the gate even though the turn had made progress,
     // and the gate named the next step, not the card.
     expect(hasUser(calls[3], GATE_TEXT)).toBe(true);
-    expect(hasUser(calls[3], 'setup_step "campaign"')).toBe(true);
+    expect(hasUser(calls[3], 'setup_step "style"')).toBe(true);
     expect(hasUser(calls[3], "Do not call confirm_setup yet")).toBe(true);
     expect(calls[3].body.toolChoice).toBe("required");
     expect(result.content).toBe("Which kind of campaign do you want?");
@@ -194,7 +194,7 @@ describe("a setup turn shows only its latest words", () => {
 });
 
 describe("approval starts the game", () => {
-  const ready = () => story({ setup: { mode: "quick", covered: { table: ["setting", "tone"], players: {} } }, lore: [SHEET, PLAN] });
+  const ready = () => story({ setup: { mode: "quick", covered: { table: ["setting", "tone", "tone_safety"], players: {} } }, lore: [SHEET, PLAN] });
 
   it("the intro streams in the same turn, and the pre-start chatter is dropped", async () => {
     const s = ready();
@@ -275,15 +275,16 @@ describe("approval starts the game", () => {
     const { fetchMock } = createMockGMFetch([
       { content: "Where is it set? (stale)", toolCalls: [askStep("setting")] },
       { content: "And the tone? (stale)", toolCalls: [askStep("tone")] },
+      { content: "Any lines? (stale)", toolCalls: [askStep("tone_safety")] },
     ]);
     global.fetch = fetchMock as unknown as typeof fetch;
     const { cb, rec } = callbacksWith();
 
-    const result = await generateStoryTurn(s, "hi", { ...baseOptions, maxToolLoops: 2 }, cb);
+    const result = await generateStoryTurn(s, "hi", { ...baseOptions, maxToolLoops: 3 }, cb);
 
     expect(s.sessionZeroActive).toBe(true);
     expect(result.content).not.toContain("stale");
-    expect(result.content).toBe(setupEngineLine("character", { covered: 2, total: 2, missing: [] }));
+    expect(result.content).toBe(setupEngineLine("character", { covered: 3, total: 3, missing: [] }));
     expect(rec.storyComplete.join("")).not.toContain("stale");
   });
 
@@ -305,7 +306,7 @@ describe("approval starts the game", () => {
 
   it("an approval whose sheet is missing is refused, not started", async () => {
     const s = story({
-      setup: { mode: "quick", covered: { table: ["setting", "tone"], players: {} } },
+      setup: { mode: "quick", covered: { table: ["setting", "tone", "tone_safety"], players: {} } },
       lore: [PLAN],
     });
     const { fetchMock, gmStageCalls } = createMockGMFetch([
@@ -328,7 +329,7 @@ describe("approval starts the game", () => {
 });
 
 describe("a closed or sent-back card", () => {
-  const ready = () => story({ setup: { mode: "quick", covered: { table: ["setting", "tone"], players: {} } }, lore: [SHEET, PLAN] });
+  const ready = () => story({ setup: { mode: "quick", covered: { table: ["setting", "tone", "tone_safety"], players: {} } }, lore: [SHEET, PLAN] });
 
   it("dismissed, then an empty round: the turn ends on the engine's question, no card forced", async () => {
     const s = ready();

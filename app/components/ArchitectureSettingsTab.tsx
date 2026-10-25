@@ -90,7 +90,7 @@ const LAYERS: LayerInfo[] = [
     title: "Adjudication",
     badge: "Layer 5",
     summary:
-      "The Observer reviews each completed turn against rules the GM was already given. Every check is on by default: the three that judge the prose rewrite a flagged turn before you see it (the agency check runs on every turn that has your line, so it can), and the other three only flag, after the turn appears. When the GM stops to ask you something, the text written so far is checked and shown first. It never re-rolls a turn. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
+      "The Observer reviews each completed turn against rules the GM was already given, in one shared AI call. Every check is on by default: the three that judge the prose rewrite a flagged turn before you see it (the agency check runs on every turn that has your line, so it can), and the others only flag, after the turn appears. When the GM stops to ask you something, the text written so far is checked and shown first. It never re-rolls a turn. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
     files: "app/misc/observer.ts, app/misc/consistencyCheck.ts",
     aiDriven: true,
   },
@@ -104,42 +104,63 @@ const OBSERVER_FLAG_INFO: Record<
     label: "Response Length",
     description:
       "A single turn ran far past the Reply Length setting's usual ceiling (word count, free). When it does, a second AI call judges whether the length was earned (a session-zero opening, a big reveal) before flagging it.",
-    cost: "One AI call, only on a turn that passes the ceiling.",
+    cost: "Part of the shared judge call, only on a turn that passes the ceiling.",
     llmBacked: false,
   },
   player_agency: {
     label: "Player Agency",
     description:
       "The GM took a decision away from the player: new meaningful dialogue, a significant choice, or a decided feeling. Narrating your character carrying out what you said is fine. It sees only the current action, not earlier consent, so it can misjudge.",
-    cost: "One AI call on every turn.",
+    cost: "Part of the shared judge call, on every turn that has your line.",
     llmBacked: true,
   },
   outcome_narration_mismatch: {
     label: "Outcome/Narration Mismatch",
     description:
       "The narration contradicts the outcome the engine decided for a roll or check this turn (a strong hit, a weak hit, a miss, a true or false comparison). Each result is judged on its own.",
-    cost: "One AI call, only on a turn with a roll or check result.",
+    cost: "Part of the shared judge call, only on a turn with a roll or check result.",
     llmBacked: true,
   },
   missing_oracle_or_table: {
     label: "Missing Oracle/Table",
     description:
       "An uncertain outcome or random flavor was decided narratively instead of via fate_question/roll_table. Flag only: words cannot fix a tool that did not run.",
-    cost: "One AI call on every turn, shared with Missing Scene Increment.",
+    cost: "Part of the shared judge call, on a turn with no oracle or table roll.",
     llmBacked: true,
   },
   missing_scene_increment: {
     label: "Missing Scene Increment",
     description:
-      "The narration moved to a clearly new scene without calling increment_scene. Flag only: words cannot fix a tool that did not run.",
-    cost: "One AI call on every turn, shared with Missing Oracle/Table.",
-    llmBacked: true,
+      "The narration skips ahead (\"the next morning\", \"hours later\") without calling increment_scene. A phrase check, so it can be wrong. Flag only: words cannot fix a tool that did not run.",
+    cost: "Free: a phrase check, no AI call.",
+    llmBacked: false,
   },
   tier_escalation_missed: {
     label: "Tier Escalation Missed",
     description:
       "This turn's own complexity or stakes called for a higher reasoning tier than it ran at. Flag only: a rewrite adds no reasoning.",
-    cost: "One AI call on every turn below the top tier.",
+    cost: "Part of the shared judge call on every turn below the top tier.",
+    llmBacked: true,
+  },
+  world_consistency: {
+    label: "World Consistency",
+    description:
+      "The narration contradicts a fact the story holds: a dead person who speaks, a person away from the place the campaign record gives. Flag only for now.",
+    cost: "Part of the shared judge call, only on a turn that names a person or place from the record.",
+    llmBacked: true,
+  },
+  secret_leak: {
+    label: "Secret Leak",
+    description:
+      "The narrator states part of a secret the story has not revealed yet. The flag never quotes the secret. Flag only for now.",
+    cost: "Part of the shared judge call, only in a campaign with an unrevealed secret.",
+    llmBacked: true,
+  },
+  lines_and_veils: {
+    label: "Lines and Veils",
+    description:
+      "The narration shows something your table set as a line (kept out of the game) or a veil (kept off screen). Flag only for now.",
+    cost: "Part of the shared judge call, only in a campaign that sets lines or veils.",
     llmBacked: true,
   },
 };
@@ -157,6 +178,9 @@ const OBSERVER_FLAG_ORDER: ObserverFlagType[] = [
   "missing_scene_increment",
   "tier_escalation_missed",
   "response_length",
+  "world_consistency",
+  "secret_leak",
+  "lines_and_veils",
 ];
 
 function sensitivityLabel(sensitivity: number): string {

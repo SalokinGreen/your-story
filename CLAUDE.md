@@ -924,8 +924,8 @@ report's §11.3. The ones that shape play:
   `formatCampaignBrief` (about 800 tokens, in priority order) in the live
   block. A story with no record is byte-identical to before
   (`tests/campaign.oldSaves.test.ts`). The Designer writes the record too
-  (slice 4, below). The narration context, session zero, the starters and the
-  player view are later slices.
+  (slice 4, below), and the GM builds it in session zero (slice 3, "Session
+  zero" below). The starters and the player view are later slices.
 - `manage_timer` — countdown timers. **On a story with no campaign record,
   `auto_advance` timers never tick (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
   behind `end_gm_thinking`) and was deleted on 2026-10-23 (decision 128).
@@ -995,14 +995,16 @@ already populated when the style was chosen).
 **The creation steps** (decision 148, `app/misc/setupSteps.ts`, `CreationStep`:
 `id`, `label`, `group`, `scope` `table` or `player`, `hint`). `getCreationSteps(story,
 players?)` returns, in order: `cohort` (only with two or more players), the
-world steps `setting`, `tone` and `campaign`; the system's `creationSteps`
+world steps `setting`, `tone`, `style`, `tone_safety` and `campaign` (campaign
+slice 3: `style` is the campaign style, `tone_safety` the tone words plus lines
+and veils, "none" counting; the older `campaign` tag keeps its name); the system's `creationSteps`
 (`BuiltinSystem.creationSteps`); or, for a story with no system but an enabled
 `mechanics` note, one `abilities` step; then `name_look`, `history` and
 `drives`. Blood & Bone's nine system steps (`blood-and-bone/creationSteps.ts`)
 are `kind`, `archetype`, `stats`, `vow`, `connections` (both connections, one
 tag), `burden` ("none" counts; its hint says to state the starting Stress),
 `power`, `path` and `gear`. Stress is a rule the GM states, not a step.
-**Required:** full mode, every step; quick mode, `setting` and `tone` only; no
+**Required:** full mode, every step; quick mode, `setting`, `tone` and `tone_safety` only; no
 mode chosen (an old save, a bare story), none. `creationTotal()` counts the
 table steps once and each player step once per player who needs it. A player
 with a pre-made sheet (`premadeFor`) is skipped for the player steps.
@@ -1019,8 +1021,8 @@ with a pre-made sheet (`premadeFor`) is skipped for the player steps.
   progress between rounds (the live block is built once per turn).
 - **What the engine can know:** that a step was asked and answered under its
   tag, not that the question was good. The hint for each step is in the prompt.
-- **Sheet and plan steps** are not tagged: the sheet or plan being written
-  satisfies `character` and `campaign`, not `interview`.
+- **Sheet and campaign steps** are not tagged: the sheet or campaign being
+  written satisfies `character` and `campaign`, not `interview`.
 
 **The steps** are derived by `getSetupProgress(story, players?)`
 (`campaignPlan.ts`), which returns the five flags, `next`, the first step
@@ -1036,11 +1038,21 @@ not done (`interview`, `concept`, `character`, `campaign`, `confirm`,
   `character_sheet`. Solo play needs one. Couch co-op and party need one per
   player, matched by `ownerCouchPlayerId` or a "Character: <name>" title
   (`missingSheetFor` names the rest).
-- **Campaign:** an enabled `gm_plan` note. A stale `planState` alone does not
-  count.
-- **Approved:** `approval` is set and its hashes match the current sheet(s)
-  and plan (`currentSetupHashes`, `hashNotes`: a stable FNV-1a string hash,
-  no crypto API). Any later edit cancels the approval.
+- **Campaign** (`campaignRecordReady`, `campaignPlan.ts`, campaign slice 3): a
+  campaign record with a `style` and at least one part beyond the pitch
+  (`hasPartBeyondPitch`, `campaign/styles.ts`: a faction, front, clock,
+  person, secret, location, beat or end state; safety does not count), **or**
+  an enabled `gm_plan` note, for older stories. A record the timer migration
+  made (`origin: "migrated"`) never counts, so readiness follows the plan note
+  until the record gains a style. A stale `planState` alone does not count.
+  The style's other expected parts (`STYLE_SPECS`) only warn.
+- **Approved:** `approval` is set and its hashes match the current sheet(s),
+  plan note and campaign record (`currentSetupHashes`, `hashNotes`: a stable
+  FNV-1a string hash, no crypto API). `campaignHash` (`hashCampaignRecord`) is
+  the third hash, present whenever the story has a campaign record (any origin); it covers the
+  whole record, secrets and dooms included, minus play state (a clock's fill
+  and crossed portents, found clues, revealed secrets, `paused`). Any later
+  edit cancels the approval.
 - **Started:** `sessionZeroActive` is false.
 
 **The block.** While `sessionZeroActive`, `buildSessionZeroBlock(story)`
@@ -1049,7 +1061,10 @@ rule). It replaces `freshStorySetupBlock`, `sessionZeroStartGameReminder`,
 `setupOverdueBlock` and `buildSheetTemplateBlock`, which still fire outside
 session zero. It holds, in order: the checklist, the next step with its tools,
 the rule that the GM does not narrate until `start_game` succeeds, the mode's
-lines, the sheet template, the creation rules, the setup reference, and after
+lines, the creation rules, the CAMPAIGN guide (`campaignSetupGuide`: the seven
+styles until one is chosen, then the style's expected parts with what is built
+and what is not, the clock triggers that suit it, the `campaign` tool's parts
+and the lines-and-veils hint), the sheet template, the setup reference, and after
 6 setup questions (`SETUP_QUESTION_NUDGE_AT`) a nudge to propose. The checklist
 gains a "Setup steps (n/m asked and answered)" row when the mode requires steps,
 and the block lists each required step per player with ✓ (covered), → (next) or
@@ -1058,7 +1073,7 @@ and the block lists each required step per player with ✓ (covered), → (next)
 character steps go one per call, always an `intro`, options that say what they
 do in play, 2–4 suggestions and `allow_custom` on creative steps, and
 `target_player_name` on every player-step item. In full mode the nudge is
-replaced by "every step is covered: write the sheet and the plan" (quick mode
+replaced by "every step is covered: write the sheet and build the campaign" (quick mode
 keeps the nudge at 6).
 - **Template precedence:** the story's own `characterSheetTemplate` if it has
   one, else the resolved system's `sheetTemplate`. An explicit template always
@@ -1077,11 +1092,18 @@ keeps the nudge at 6).
 
 **`confirm_setup({ character_summary, campaign_hook, story_name?, premise? })`**
 refuses while a required creation step is uncovered (`Not yet: you haven't
-asked Nik about connections, …`), and refuses without the sheet(s) or the plan,
-naming which. Otherwise it pauses the turn like `ask_question`. The card (`app/components/SetupConfirmModal.tsx`, opened from
-`requestSetupConfirmation` in `page.tsx`) shows the sheet(s) and the plan
+asked Nik about connections, …`), and refuses without the sheet(s) or the
+campaign (a ready record, or a plan note), naming which and pointing at the
+`campaign` tool. Otherwise it pauses the turn like `ask_question`. The card (`app/components/SetupConfirmModal.tsx`, opened from
+`requestSetupConfirmation` in `page.tsx`) shows the sheet(s) and the campaign
 **from the executor's working copy**, passed with the request, not from page
-state. Its four outcomes:
+state. The request's `plan` is `{ note?, campaign? }`: the plan note (older
+stories) and/or `publicCampaignView(record)` (`campaign/publicView.ts`), the one
+projection any player view uses (slice 6 reuses it): style, pitch, tone, lines
+and veils as text, faction and front names, a front's stakes questions,
+locations with features, visible clocks, found clues. It never holds a secret,
+a doom, portents, dangers, a person's want, secret or voice, a hidden clock,
+beats or end states. Its four outcomes:
 - **Start the story** (`approved`): the executor stores `setup.approval` with
   the hashes of exactly what the card showed, then runs `executeStartGame` on
   the same working copy (`story_name` falls back to the current name unless it
@@ -1104,7 +1126,14 @@ shared screen, the party table, the online host). It is **never relayed** to
 phones or guests.
 
 **`start_game`** refuses unless Character, Campaign and Approved all hold on
-the live state, and names what is missing. A stale approval is named as one.
+the live state, and names what is missing; it also refuses while the
+`tone_safety` step has never been asked (lines and veils may be "none", but they
+must have been asked). A stale approval is named as one. The minimal
+requirements are the only blockers: the style's other expected parts
+(`styleWarningLine`, `campaign/styles.ts`) come back as a "Prep warning" line in
+the result (part names only, safe for the narrator), and the authoring checks
+that quote a secret's title (`campaignWarnings`) in `gmOnlyContext`, the GM's
+alone.
 Outside session zero it refuses with "The game has already started." On success
 it clears `sessionZeroActive` and its result carries the campaign intro
 (decision 144): a short briefing in the story's voice, then the opening scene,
@@ -1116,7 +1145,8 @@ the same way.
 turn may end only if, that turn, the tool **results** show progress: an
 answered `ask_question`; a `confirm_setup` that ended as `approved`,
 `changes` or `dismissed` (a refused or stopped one is not progress); a sheet
-or plan `create_note` / `edit_note` that changed the setup hashes; or a
+or plan `create_note` / `edit_note`, or a `campaign` write, that changed the
+setup hashes (a read, a refused write or a tick does not); or a
 successful start (`start_game`, or a card OK that started the game). An
 approval whose start was refused (`approved` with `started: false`) is a
 violation even though approval is progress, because the setup is not finished. On a violation the turn's round is taken back out of every store
@@ -1190,8 +1220,9 @@ the mode and sends the player line from the same updated story object, and
 typing first picks quick through the same path. Then the checklist shows
 Concept, Character, Campaign and Start (Start ticks on approval). In full mode
 a "Setup n/total" item sits after Concept, ticked when every required step is
-covered (`setupStripState`; 15 for a solo Blood & Bone build, 28 for a couch of
-two); quick mode keeps the four items. Character and Campaign open their notes. It hides while a turn is loading. Online guests get
+covered (`setupStripState`; 17 for a solo Blood & Bone build, 30 for a couch of
+two); quick mode keeps the four items. Character and Campaign open their notes
+(Campaign opens none for a story whose campaign is a record only). It hides while a turn is loading. Online guests get
 it read-only, with no buttons and no note links. Party phones do not render it.
 
 **`ask_question` with `multi_select`** (decision 146). The question shows
@@ -1352,7 +1383,9 @@ review in `docs/research/codex-judge-layer-review-2026-10-24.md`).
 `DEFAULT_OBSERVER_SETTINGS` (frozen; every reader gets a copy, `settingsFor`,
 `cloneDefaultObserverSettings`) has **every judge on** (decision 220): the three
 prose judges (`REWRITABLE_FLAG_TYPES`: length, agency, outcome) rewrite a
-flagged turn automatically (`triggersReset`), the other three flag. A stored
+flagged turn automatically (`triggersReset`), the others flag (and the three
+judges of the record added by judge layer v2, world consistency, secret leak
+and lines and veils, flag only for now). A stored
 config without `observerSettingsVersion: 3` (`OBSERVER_SETTINGS_VERSION`) is
 replaced by the defaults once, with a Debug Logs line (`getObserverSettings`,
 `layerSettings.ts`); a player's later choices are kept, and the flag-only table
@@ -1448,7 +1481,41 @@ given back if the GM answers with no words), while a tools-only contract re-ask
 keeps the draft and drops the acknowledgement. After narration the same checks
 run once more for the Debug Logs; the pacing hits make a GM-only
 `ScenePart.pacingNote`, carried into the next live block under the story-progress
-check-in (decision 235). Judge-based rewrites are unchanged in this slice.
+check-in (decision 235).
+
+**Judge layer v2, slice J2: the combined judge call** (`docs/judge-layer-v2-plan.md`
+slice 2; confirmation and the rewrite with facts are J3 and not built).
+`runObserver` no longer makes one call per judge: every judge whose
+precondition holds (`selectJudges`: length past the ceiling, agency with a
+player line, outcome with a typed ruling, world consistency when the prose names
+a person or place of the record, secret leak with an unrevealed secret, lines
+and veils with a line or veil, the oracle judge when no oracle ran, the tier
+judge below the top tier) goes into **one** `callSideModel` call per pass (the rewriting judges before release, the rest in the background wave, one more per pause)
+(`judges/combined.ts`, prompts in `judges/prompts.ts`) on the side-agent model
+at its explicit effort. The prompt is written to the prompt rules (decision
+238): each judge a numbered decision chain with a minimal pair (`RUBRICS`; the
+agency chain is the shared `AGENCY_CHAIN`), the turn's facts first, each in its
+own fields (`collectTurnFacts` now tags `topic` and `names`, adds the character
+sheet and the record's people-at-locations; `selectFactsFor` hands a judge only
+its kinds), the narration last, and a keyed JSON reply whose facts-shaped
+fields and reasoning come before the verdict. `parseJudgeVerdicts` trusts a
+verdict only when its severity is in the set, its quote is really in the
+narration (the player's line for the tier judge) and every fact id exists;
+anything else, a missing key and malformed JSON included, is "unknown": no flag,
+a Debug Logs line. Facts are never truncated: past about 3,000 tokens the call
+splits into two by judge group (`planCalls`). A judge's free-text `fix` goes to the corrective prompt and the Debug Logs only: every flag `detail` the player can see is a fixed sentence per judge. A Stop passes through; a failed
+call is unknown. The scene-increment question is a free phrase check
+(`sceneIncrementFlag`), not a judge. The per-judge calls survive as
+`runObserverSplit`, reachable only from the eval runner (J4), never Settings.
+**Every correction goes through one path:** the speculative length rewrite is
+gone, several major flags are acted on in `FLAG_PRIORITY` order (lines and veils,
+secret leak, outcome, world, agency, length; `pickMajorFlag`), and the full-turn
+tier retry is refused when the turn already threw dice (`executedRandomness`).
+The three new judges are flag-only (`FLAG_ONLY_FLAG_TYPES`) until slice 3; an
+older stored config that does not name them reads their defaults
+(`ObserverSettings` lets the newer types be absent), so no settings-version
+bump. A secret-leak flag is generic and never quotes the secret; the quote
+stays in the Debug Logs.
 
 ## BYOK, no accounts, local storage, native shells
 

@@ -21,6 +21,7 @@ import { SIDE_AGENT_DEFAULT_MODEL_KEY } from "@/app/misc/layerSettings";
 import { createMockGMFetch, sseStreamResponse } from "./helpers/mockGMFetch";
 import type { StoryData } from "@/app/misc/structs";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import { isJudgeCall, judgeReply, requestedJudges } from "./helpers/combinedJudges";
 
 const NARRATION = "The lock clicks open. The corridor beyond is dark.";
 /** Well past the "medium" band's ceiling, so the Observer's length check trips. */
@@ -88,23 +89,15 @@ const isStoryProgress = (c: Call) => firstMessage(c).includes("story-progress re
 const isCompaction = (c: Call) => firstMessage(c).includes("running summary");
 const isReflection = (c: Call) => firstMessage(c).includes("memory-reflection layer");
 const isClassifier = (c: Call) => firstMessage(c).includes("Classify the following player action");
-const isLengthJudge = (c: Call) => firstMessage(c).includes("usual ceiling of ~");
+const isLengthJudge = (c: Call) => isJudgeCall(c.body) && requestedJudges(c.body).includes("length");
 const isRewrite = (c: Call) => lastMessage(c).includes("flagged by an automated reviewer");
 const isChoices = (c: Call) => c.url === "/api/generate-stream" && !c.body.tools && firstMessage(c).includes("choice designer");
 const isNarrationStream = (c: Call) => c.url === "/api/generate-stream" && !c.body.tools && !isChoices(c);
 const isGmRound = (c: Call) => c.url === "/api/generate-stream" && !!c.body.tools;
 
-const judgeVerdict = (justified: boolean) =>
-  JSON.stringify({
-    justified,
-    violation: false,
-    severity: "minor",
-    reason: "",
-    contradicts: false,
-    missed_oracle_or_table: false,
-    missed_scene_increment: false,
-    should_escalate: false,
-  });
+/** The judges are one call; this scripted string stands for "the length judge says major". */
+const LENGTH_MAJOR = "LENGTH_MAJOR";
+const judgeVerdict = (justified: boolean) => (justified ? "{}" : LENGTH_MAJOR);
 
 function memoryStorage(entries: Record<string, string> = {}) {
   const map = new Map(Object.entries(entries));
@@ -166,7 +159,11 @@ async function runTurn({
     const call: Call = { url: String(url), body: JSON.parse(init!.body as string) };
     calls.push(call);
     if (call.url === "/api/generate") {
-      return { ok: true, json: async () => ({ content: respond(call) }) } as unknown as Response;
+      const scripted = respond(call);
+      const content = isJudgeCall(call.body)
+        ? judgeReply(call.body, scripted === LENGTH_MAJOR ? { length: "major" } : {})
+        : scripted;
+      return { ok: true, json: async () => ({ content }) } as unknown as Response;
     }
     if (isChoices(call)) {
       return sseStreamResponse({ content: CHOICES, meta: NARRATION_META });

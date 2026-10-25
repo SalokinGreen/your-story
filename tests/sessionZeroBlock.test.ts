@@ -90,7 +90,7 @@ function bnStory(
   ]);
 }
 
-const QUICK_COVERED = { table: ["setting", "tone"], players: {} };
+const QUICK_COVERED = { table: ["setting", "tone", "tone_safety"], players: {} };
 
 const approvedSetup = (s: StoryData, extra: Partial<SetupState> = {}): SetupState => ({
   mode: "quick",
@@ -137,7 +137,7 @@ describe("buildSessionZeroBlock: the checklist and the next step", () => {
     expect(block).toContain("✓ Character");
     expect(block).toContain("→ Campaign");
     expect(block).toContain("read_notes");
-    expect(block).toContain('type: "gm_plan"');
+    expect(block).toContain("campaign` tool");
   });
 
   it("asks for confirm_setup when sheet and plan exist but are not approved", () => {
@@ -225,7 +225,7 @@ describe("buildSessionZeroBlock: the rule and the mode", () => {
       },
     };
     const character = buildSessionZeroBlock(done);
-    expect(character).toContain("Every step is covered: write the sheet and the plan");
+    expect(character).toContain("Every step is covered: write the sheet and build the campaign");
     expect(character).toContain("NEXT: the character");
   });
 

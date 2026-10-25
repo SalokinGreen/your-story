@@ -1,23 +1,17 @@
 /**
- * Integration test for the speculative shortened rewrite as it actually runs
- * inside generateStoryTurn (app/misc/generation.ts, search "SPECULATIVE
- * SHORTENED REWRITE"), as opposed to the pure-logic coverage of
- * prospectiveLengthFlag in tests/observer.test.ts.
- *
- * The mechanism: the response_length check's word-count trip is deterministic
- * and free, so the moment a turn comes in over the ceiling, generateStoryTurn
- * already knows exactly what a length rewrite would be asked to do - only
- * whether it'll be WANTED is still open, and that's what the justification
- * judge answers. So the shortened version is started immediately, concurrently
- * with the observer, and the verdict decides whether to keep it (judge
- * confirms the turn was too long) or throw it away and abort the call (judge
- * justifies the overage, or a different flag wins).
+ * The length rewrite as it runs inside generateStoryTurn after the combined
+ * judge call (app/misc/generation.ts; judge layer v2, plan slice 2 and
+ * "Revised after Codex's review", finding 12). It replaced the speculative
+ * shortened rewrite, which started a rewrite before the length judge had
+ * answered and threw it away when the judge disagreed. There is one path now:
+ * the judges answer, the highest-priority major flag is chosen
+ * (judges/combined.ts FLAG_PRIORITY), and only then is a rewrite asked for.
  *
  * Every scenario here scripts a single prose-only GM round, so the GM's own
  * output becomes the story content directly (gmFinalStoryContent in
- * generation.ts) and the only other fetches are the observer's /api/generate
- * judge calls plus the rewrite. The story fixture carries a character_sheet
- * note on purpose: without one the observer suspends itself entirely
+ * generation.ts) and the only other fetches are the judges' /api/generate call
+ * plus the rewrite. The story fixture carries a character_sheet note on
+ * purpose: without one the observer suspends itself entirely
  * (observerSuspensionReason - "still in setup"), and nothing here would run.
  *
  * The choices regeneration that follows a successful rewrite is deliberately
@@ -32,6 +26,13 @@ import {
   type ScriptedGMRound,
 } from "./helpers/mockGMFetch";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import {
+  isJudgeCall,
+  judgeReply,
+  requestedJudges,
+  type JudgeSpec,
+} from "./helpers/combinedJudges";
+import type { JudgeId } from "@/app/misc/judges/types";
 import type { StoryData } from "@/app/misc/structs";
 
 /** Well past the "medium" band's 85-word high, times the default 2x overage multiplier. */
@@ -98,14 +99,17 @@ interface ObserverCall {
   signal?: AbortSignal;
 }
 
-function isLengthJudge(call: ObserverCall): boolean {
-  return call.body.messages[0]?.content?.includes("usual ceiling of ~") ?? false;
-}
+const judgesOf = (call: ObserverCall): JudgeId[] =>
+  isJudgeCall(call.body) ? requestedJudges(call.body) : [];
+const isLengthJudge = (call: ObserverCall) => judgesOf(call).includes("length");
 
 function isRewrite(call: ObserverCall): boolean {
   const last = call.body.messages[call.body.messages.length - 1];
   return last?.content?.includes("flagged by an automated reviewer") ?? false;
 }
+
+/** What the side agents that are not judges are answered with: JSON that says nothing. */
+const OTHER_SIDE_CALL = JSON.stringify({});
 
 /**
  * Routes the observer's non-streaming /api/generate calls to `respond`, and
@@ -148,18 +152,9 @@ function createFetchMock(
   return { fetchMock, observerCalls };
 }
 
-/** Every LLM-judged check passing; the length judge's verdict is set per-test. */
-function passingJudgeContent(justified: boolean): string {
-  return JSON.stringify({
-    justified,
-    violation: false,
-    severity: "minor",
-    reason: "",
-    contradicts: false,
-    missed_oracle_or_table: false,
-    missed_scene_increment: false,
-    should_escalate: false,
-  });
+/** The judges' answer: every judge none, except those named. */
+function judges(call: ObserverCall, spec: Partial<Record<JudgeId, JudgeSpec | "major" | "minor">>) {
+  return judgeReply(call.body, spec);
 }
 
 const originalFetch = global.fetch;
@@ -169,40 +164,25 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("speculative shortened rewrite - generateStoryTurn integration", () => {
-  it("has the rewrite already in flight before the length judge answers, and keeps it once the judge confirms", async () => {
-    // The whole point of the mechanism: the rewrite must already be in flight
-    // at the moment the judge is asked. Recorded synchronously when the length
-    // judge's call arrives rather than inferred from timing - under the old
-    // sequential design (judge first, rewrite only once a flag came back) this
-    // is false, and it can't be made true by anything racing.
-    let rewriteInFlightWhenJudgeAsked: boolean | null = null;
-
-    // The judge also holds its answer until the rewrite has responded, so the
-    // two calls genuinely overlap rather than merely being issued in order.
-    let markRewriteAnswered: () => void = () => {};
-    const rewriteAnswered = new Promise<void>((resolve) => {
-      markRewriteAnswered = resolve;
-    });
+describe("the length rewrite - generateStoryTurn integration", () => {
+  it("asks for the rewrite only after the judges have answered, and keeps it", async () => {
+    let judgeAnswered = false;
+    let rewriteAskedBeforeJudges: boolean | null = null;
 
     const { fetchMock, observerCalls } = createFetchMock(
       LONG_NARRATION,
       async (call) => {
         if (isRewrite(call)) {
-          markRewriteAnswered();
+          rewriteAskedBeforeJudges = !judgeAnswered;
           return REWRITTEN;
         }
         if (isLengthJudge(call)) {
-          rewriteInFlightWhenJudgeAsked = observerCalls.some(isRewrite);
-          // Guarded so a regression stalls the assertion below instead of
-          // hanging the suite.
-          await Promise.race([
-            rewriteAnswered,
-            new Promise((resolve) => setTimeout(resolve, 2000)),
-          ]);
-          return passingJudgeContent(false);
+          // Slow, so a rewrite started alongside it would show.
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          judgeAnswered = true;
+          return judges(call, { length: "major" });
         }
-        return passingJudgeContent(true);
+        return OTHER_SIDE_CALL;
       },
     );
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -215,39 +195,22 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
       { onObserverRewrite },
     );
 
-    expect(rewriteInFlightWhenJudgeAsked).toBe(true);
+    expect(rewriteAskedBeforeJudges).toBe(false);
     expect(result.content).toBe(REWRITTEN);
     expect(onObserverRewrite).toHaveBeenCalledTimes(1);
-
-    // The turn only gets one rewrite, and the speculation starts before the
-    // other reviewers have answered - so their complaints ride along as
-    // conditional instructions instead of being lost.
-    const speculativePrompt = observerCalls
-      .filter(isRewrite)[0]
-      .body.messages.map((m) => m.content)
-      .join("\n");
-    expect(speculativePrompt).toContain("makes a significant choice for them");
-    expect(speculativePrompt).toContain("Do not invent a problem to fix");
-
-    // Exactly one rewrite call - the speculation was reused, not re-issued
-    // alongside a second one once the flag came back.
     expect(observerCalls.filter(isRewrite)).toHaveLength(1);
-    expect(result.scenePart.correctedObserverFlags?.[0]?.type).toBe(
-      "response_length",
-    );
+    expect(result.scenePart.correctedObserverFlags?.[0]?.type).toBe("response_length");
     // The player can still put the original back.
-    expect(result.scenePart.observerRewriteOriginal?.content).toBe(
-      LONG_NARRATION,
-    );
+    expect(result.scenePart.observerRewriteOriginal?.content).toBe(LONG_NARRATION);
   });
 
-  it("discards and aborts the speculation when the judge justifies the overage", async () => {
+  it("makes no rewrite call at all when the judge says the length is earned", async () => {
     const { fetchMock, observerCalls } = createFetchMock(
       LONG_NARRATION,
       async (call) => {
         if (isRewrite(call)) return REWRITTEN;
-        if (isLengthJudge(call)) return passingJudgeContent(true);
-        return passingJudgeContent(true);
+        if (isLengthJudge(call)) return judges(call, {});
+        return OTHER_SIDE_CALL;
       },
     );
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -260,23 +223,17 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
       { onObserverRewrite },
     );
 
-    // The speculation still fired (the word counter tripped) - it just wasn't
-    // used, and the long narration the judge blessed is what the player keeps.
-    const rewriteCalls = observerCalls.filter(isRewrite);
-    expect(rewriteCalls).toHaveLength(1);
+    // No speculation: nothing is billed for a rewrite nobody asked for.
+    expect(observerCalls.filter(isRewrite)).toHaveLength(0);
     expect(result.content).toBe(LONG_NARRATION);
     expect(onObserverRewrite).not.toHaveBeenCalled();
     expect(result.scenePart.observerRewriteOriginal).toBeUndefined();
-
-    // Cancelled rather than left running - an unwanted speculation shouldn't
-    // keep burning tokens after the verdict is in.
-    expect(rewriteCalls[0].signal?.aborted).toBe(true);
   });
 
-  it("never speculates for a turn inside the length ceiling", async () => {
+  it("never asks the length judge about a turn inside the length ceiling", async () => {
     const { fetchMock, observerCalls } = createFetchMock(
       SHORT_NARRATION,
-      async () => passingJudgeContent(true),
+      async (call) => (isJudgeCall(call.body) ? judges(call, {}) : OTHER_SIDE_CALL),
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -289,9 +246,7 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
 
     expect(result.content).toBe(SHORT_NARRATION);
     expect(observerCalls.filter(isRewrite)).toHaveLength(0);
-    // The length judge isn't asked either - the free word count already
-    // settled it (this is unchanged behavior, asserted here so a future
-    // "speculate earlier" change can't quietly start paying for both).
+    // The free word count already settled it.
     expect(observerCalls.filter(isLengthJudge)).toHaveLength(0);
   });
 
@@ -310,8 +265,8 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
       ],
       async (call) => {
         if (isRewrite(call)) return REWRITTEN;
-        if (isLengthJudge(call)) return passingJudgeContent(false);
-        return passingJudgeContent(true);
+        if (isLengthJudge(call)) return judges(call, { length: "major" });
+        return OTHER_SIDE_CALL;
       },
     );
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -334,30 +289,24 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
     expect(rewritePrompt).not.toContain("TAGGED_COT");
   });
 
-  it("does not reuse the speculation for a different major flag", async () => {
-    // The length judge justifies the overage, but the agency judge flags the
-    // turn: the corrective prompt is a different complaint entirely, so the
-    // shortened version must be thrown away and a fresh rewrite issued
-    // against the agency flag.
+  it("acts on the higher-priority major flag: agency before length, one rewrite", async () => {
+    // Both judges say major. The design's order puts the player's agency ahead
+    // of length, so the one rewrite the turn gets is for agency.
     const { fetchMock, observerCalls } = createFetchMock(
       LONG_NARRATION,
       async (call) => {
         if (isRewrite(call)) {
-          return call.body.messages.some((m) =>
-            m.content?.includes("Spoke for the player"),
-          )
+          return call.body.messages.some((m) => m.content?.includes("taken a decision away"))
             ? "You hesitate at the lock."
             : REWRITTEN;
         }
-        if (isLengthJudge(call)) return passingJudgeContent(true);
-        if (call.body.messages[0]?.content?.includes("took a decision away from the player")) {
-          return JSON.stringify({
-            violation: true,
-            severity: "major",
-            reason: "Spoke for the player.",
+        if (isLengthJudge(call)) {
+          return judges(call, {
+            length: "major",
+            agency: { severity: "major", fix: "Spoke for the player." },
           });
         }
-        return passingJudgeContent(true);
+        return OTHER_SIDE_CALL;
       },
     );
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -369,14 +318,16 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
       {},
     );
 
-    const rewriteCalls = observerCalls.filter(isRewrite);
-    expect(rewriteCalls).toHaveLength(2);
-    // The speculative one was aborted; the agency rewrite is what landed.
-    expect(rewriteCalls[0].signal?.aborted).toBe(true);
+    expect(observerCalls.filter(isRewrite)).toHaveLength(1);
+    // The one rewrite also carries the other major's fix, so it cuts the length too.
+    const prompt = observerCalls
+      .filter(isRewrite)[0]
+      .body.messages.map((m) => m.content)
+      .join("\n");
+    expect(prompt).toContain("runs longer than the moment needs");
+    expect(prompt).not.toContain("makes a significant choice for them"); // the chosen flag is not its own clause
     expect(result.content).toBe("You hesitate at the lock.");
-    expect(result.scenePart.correctedObserverFlags?.[0]?.type).toBe(
-      "player_agency",
-    );
+    expect(result.scenePart.correctedObserverFlags?.[0]?.type).toBe("player_agency");
   });
 });
 
@@ -479,8 +430,8 @@ describe("the narration turn in the rewrite's conversation", () => {
       storyRound,
       async (call) => {
         if (isRewrite(call)) return REWRITTEN;
-        if (isLengthJudge(call)) return passingJudgeContent(false);
-        return passingJudgeContent(true);
+        if (isLengthJudge(call)) return judges(call, { length: "major" });
+        return OTHER_SIDE_CALL;
       },
     );
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -526,8 +477,8 @@ describe("the narration turn in the rewrite's conversation", () => {
       storyRound,
       async (call) => {
         if (isRewrite(call)) return REWRITTEN;
-        if (isLengthJudge(call)) return passingJudgeContent(false);
-        return passingJudgeContent(true);
+        if (isLengthJudge(call)) return judges(call, { length: "major" });
+        return OTHER_SIDE_CALL;
       },
     );
     global.fetch = fetchMock as unknown as typeof fetch;

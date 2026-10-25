@@ -59,6 +59,13 @@ const FORBIDDEN = {
   gmConversation: "LEAK_GM_CONVERSATION",
   summary: "LEAK_SCENE_SUMMARY",
   apiKey: "sk-or-v1-LEAKEDKEY",
+  // The campaign record (slice 3): nothing in it reaches a phone until the
+  // player's view (slice 6) projects it.
+  campaignSecret: "LEAK_CAMPAIGN_SECRET",
+  campaignDoom: "LEAK_CAMPAIGN_DOOM",
+  campaignLine: "LEAK_CAMPAIGN_LINE",
+  campaignClock: "LEAK_CAMPAIGN_CLOCK",
+  campaignPerson: "LEAK_CAMPAIGN_PERSON",
 };
 
 const MARA_SHEET = "MARA_SHEET_OK";
@@ -116,6 +123,52 @@ function story(): StoryData {
         { id: "mara", name: "Mara", color: "#22c55e" },
         { id: "tom", name: "Tom", color: "#3b82f6" },
       ],
+    },
+    campaign: {
+      version: 1,
+      style: "mystery",
+      pitch: { premise: FORBIDDEN.campaignSecret, tone: [FORBIDDEN.campaignSecret] },
+      safety: {
+        lines: [{ id: "saf_a", text: FORBIDDEN.campaignLine, keywords: [FORBIDDEN.campaignLine] }],
+        veils: [],
+      },
+      factions: [{ id: "fac_a", name: FORBIDDEN.campaignSecret, goal: FORBIDDEN.campaignSecret }],
+      fronts: [
+        {
+          id: "frt_a",
+          name: FORBIDDEN.campaignDoom,
+          dangers: [],
+          portents: [],
+          doom: FORBIDDEN.campaignDoom,
+          stakes: [FORBIDDEN.campaignDoom],
+          status: "active",
+        },
+      ],
+      clocks: [
+        {
+          id: "clk_a",
+          name: FORBIDDEN.campaignClock,
+          segments: 6,
+          filled: 1,
+          triggers: ["scene"],
+          visible: true,
+          paused: false,
+          crossed: [],
+        },
+      ],
+      people: [{ npcId: "x", want: FORBIDDEN.campaignPerson, secret: FORBIDDEN.campaignPerson }],
+      secrets: [
+        {
+          id: "sec_a",
+          title: FORBIDDEN.campaignSecret,
+          truth: FORBIDDEN.campaignSecret,
+          keyPhrases: [],
+          revealed: false,
+          clues: [{ id: "clu_a", text: FORBIDDEN.campaignSecret, found: true }],
+        },
+      ],
+      locations: [],
+      endStates: [{ id: "end_a", text: FORBIDDEN.campaignSecret }],
     },
   } as unknown as StoryData;
 }

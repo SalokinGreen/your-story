@@ -30,6 +30,64 @@ Meters panel renders to static markup in that test. What no session could do:
   GM rolling plain `feat_roll`s and ignoring the new parameters (the core note
   that teaches them is slice E2).
 
+## 2026-10-25 — Judge layer J2: the combined judge call
+
+Every item needs a live model and the author's go; the parsing, the
+preconditions, the facts and the wiring are covered by `tests/judges.combined.test.ts`,
+`tests/generation.judgeFacts.test.ts` and `tests/generation.lengthRewrite.test.ts`.
+The labelled set (J4) is what will measure these properly.
+
+- **The combined call answers in the shape the parser wants.** Play five turns
+  with a Haiku side agent and the default judges (a player line each turn). In
+  the Debug Logs, "Judge … : unknown" lines should be rare. Failure looks like
+  every judge "unknown" with "the reply was not a JSON object" (the model wraps
+  the object in prose or breaks the JSON), or "the quote is not in the
+  narration" on a clean turn (it paraphrases instead of quoting).
+- **No new false flags from the prose judges.** On those turns, a turn that
+  narrates only the declared action ("go on", "I climb down") must not get an
+  agency flag, and a long setup answer must not get a length rewrite. Failure
+  looks like "Revised after a check" on an ordinary turn.
+- **The judges of the record.** In a campaign with an unrevealed secret, a line
+  and a dead person (the Designer does not write them yet: add them by hand to
+  `StoryData.campaign`), play a turn where the narration states the secret and
+  one where a dead person speaks. Expected: a Secret Leak or World Consistency
+  flag in the turn's details, no rewrite (they flag only in this slice), and the
+  Debug Logs show the quote. Failure looks like no flag (the judge answered
+  "none") or a flag on a turn that only hints.
+- **One call per pass.** In the Debug Logs' cost breakdown, a normal turn shows
+  one "judges (…)" observer call (two when a rewriting judge and a background
+  judge both run), not five. Failure looks like the old per-judge labels.
+- **Length rewrite latency.** A turn well over the length ceiling now waits for
+  the judge and then for the rewrite (the speculative rewrite is gone). Note the
+  wait; it should be one judge call plus one rewrite.
+
+## 2026-10-25 — Campaign slice 3: session zero builds the campaign
+
+Needs a live model and the author's go (or a screenshot session for the card);
+the engine side is covered by `tests/campaign.sessionZero.test.ts` and
+`tests/generation.campaignSetup.test.ts`.
+
+- **The setup card with a campaign record.** Start a new adventure, choose
+  Step by step, and answer through to the card. Expected: "Campaign: Mystery"
+  (or the style chosen) with the premise, tone, lines and veils (or "none"),
+  the names of factions and threats, places and any visible clock, and no
+  secret, doom or hidden clock anywhere on it. Check the card at phone width.
+- **Does a real GM build the record?** Quick setup with a live model: it should
+  ask setting, tone and lines and veils, pick a style, then call `campaign`
+  (style, pitch, safety, a faction or front with a clock) before
+  `confirm_setup`. Failure looks like the GM writing a `gm_plan` note instead
+  (still accepted, but it skips the record), or `start_game` refusing with
+  "the campaign is not ready" repeatedly.
+- **Lines and veils in session zero.** The deterministic keyword check for a
+  line's `keywords` logs only in session zero (its re-ask is off there, because
+  the setup talk names the lines); play a turn after starting with a line like
+  "harm to children" and confirm the Debug Logs show "Rung 1 check: line" if
+  the prose uses a keyword.
+- **System prompt wording.** The system prompt's CAMPAIGN PLAN section still
+  tells the GM to create a "Campaign Plan" `gm_plan` note in session zero (the
+  live block now says to use the `campaign` tool). Watch for the GM following
+  the older wording.
+
 ## 2026-10-25 — Campaign slice 2: the narration context
 
 Needs a live model and the author's go; the allowlist itself is covered by

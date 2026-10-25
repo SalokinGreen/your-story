@@ -25,6 +25,8 @@
  * prompt nudge for a story that's several turns old with setup still unfinished.
  */
 import type { StoryData, StoryLore, PlanState, SpineLength } from "./structs";
+import type { CampaignRecord } from "./campaign/types";
+import { hasPartBeyondPitch } from "./campaign/styles";
 import {
   describeMissing,
   getCreationProgress,
@@ -146,7 +148,20 @@ export function isPlanAwaitingNextBeat(state: StoryData): boolean {
  */
 export function hasCampaignPlan(state: StoryData): boolean {
   if (state.planState) return true;
-  return !!findSpinePlanNote(state);
+  return !!findSpinePlanNote(state) || campaignRecordReady(state);
+}
+
+/**
+ * Whether the story's campaign record is enough to start on (design section 8,
+ * plan slice 3): a style, and at least one part beyond the pitch. A record the
+ * timer migration made and nothing else has (`origin: "migrated"`) never counts:
+ * readiness follows the old plan note until the record gains a style (plan,
+ * "Legacy precedence").
+ */
+export function campaignRecordReady(state: StoryData): boolean {
+  const record = state.campaign;
+  if (!record || record.origin === "migrated") return false;
+  return !!record.style && hasPartBeyondPitch(record);
 }
 
 /** How many player turns this story is old - the cadence the setup reminders
@@ -253,13 +268,56 @@ export function getSetupNotes(story: StoryData): {
   return { sheets: populatedSheets(story), plan: findSpinePlanNote(story) };
 }
 
-/** The hashes of the current sheet(s) and plan, as `setup.approval` stores them. */
+// Fields the engine moves during play. Hashing them would cancel an approval
+// for a change nobody made to the campaign itself.
+const VOLATILE_RECORD_KEYS = new Set(["filled", "crossed", "found", "revealed", "paused"]);
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .filter((k) => !VOLATILE_RECORD_KEYS.has(k) && o[k] !== undefined)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableJson(o[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/**
+ * A hash of the whole campaign record as the player approved it: everything
+ * the setup card shows (its public projection) and everything it does not
+ * (secrets, dooms, a person's secret), so a later edit to any of it cancels
+ * the approval. Play state the engine moves (a clock's fill, a found clue) is
+ * left out.
+ */
+export function hashCampaignRecord(record: CampaignRecord): string {
+  return hashNotes([{ title: "campaign", content: stableJson(record) }]);
+}
+
+/**
+ * The hashes of the current sheet(s), plan note and campaign record, as
+ * `setup.approval` stores them. `campaignHash` is present whenever the
+ * story has a record (any origin), so an approval on a story with a
+ * plan note and no record is exactly what it was before the record existed.
+ */
 export function currentSetupHashes(story: StoryData): {
   sheetHash: string;
   planHash: string;
+  campaignHash?: string;
 } {
   const { sheets, plan } = getSetupNotes(story);
-  return { sheetHash: hashNotes(sheets), planHash: hashNotes(plan ? [plan] : []) };
+  const hashes: { sheetHash: string; planHash: string; campaignHash?: string } = {
+    sheetHash: hashNotes(sheets),
+    planHash: hashNotes(plan ? [plan] : []),
+  };
+  // Whatever its origin: a write to a migrated record before it has a style
+  // is setup progress too (the hash ignores play state).
+  if (story.campaign) {
+    hashes.campaignHash = hashCampaignRecord(story.campaign);
+  }
+  return hashes;
 }
 
 /** Most titles `setup.referenceTitles` keeps. */
@@ -381,8 +439,9 @@ export function getSetupProgress(
     character = sheets.length > 0;
   }
 
-  const plan = findSpinePlanNote(story);
-  const campaign = !!plan;
+  // Ready on a record with a style and a part beyond the pitch, or (older
+  // stories, and a record made only by the timer migration) on a plan note.
+  const campaign = campaignRecordReady(story) || !!findSpinePlanNote(story);
   const setup = story.setup;
   // No mode dependency: nothing writes setup.mode (it only shapes the strip
   // and the prompt), so a sheet or an answered concept is what ticks Concept.
@@ -395,7 +454,9 @@ export function getSetupProgress(
   if (approval && character && campaign) {
     const now = currentSetupHashes(story);
     approved =
-      approval.sheetHash === now.sheetHash && approval.planHash === now.planHash;
+      approval.sheetHash === now.sheetHash &&
+      approval.planHash === now.planHash &&
+      approval.campaignHash === now.campaignHash;
   }
 
   const started = story.sessionZeroActive !== true;
@@ -442,7 +503,7 @@ const SETUP_STEP_HANDBACK: Record<SetupStep, string> = {
   character:
     "Next up: your character sheet. Anything you want me to know before I write it?",
   campaign:
-    "Next up: the campaign plan. Anything you'd like in it before I write it?",
+    "Next up: the campaign. Anything you'd like in it before I build it?",
   confirm: "Next up: the setup card, for your OK. Anything to change first?",
   start_game: "Everything's set.",
 };
@@ -543,7 +604,7 @@ export function setupGateMessage(
       head = `A question for the player has to go through ask_question, so their answer is recorded and the turn moves on.${said}`;
       break;
     case "prose_note":
-      head = `The character sheet and the plan are saved only by create_note; text in the reply is not kept.${said}`;
+      head = `The character sheet is saved only by create_note and the campaign only by the campaign tool; text in the reply is not kept.${said}`;
       break;
     case "nothing":
       head =
@@ -566,9 +627,9 @@ export function setupGateMessage(
     case "character":
       return `${head} Next step: write the character sheet with create_note (type "character_sheet"), then continue.`;
     case "campaign":
-      return `${head} Next step: write the campaign plan with create_note (type "gm_plan"), then continue.`;
+      return `${head} Next step: build the campaign with the campaign tool (part "style", part "pitch", part "safety" if not yet recorded, then at least one more part: a front, a faction, a location, a secret with its clues...), then continue.`;
     case "confirm":
-      return `${head} Next step: call confirm_setup so the player can review the sheet and the plan and press Start.`;
+      return `${head} Next step: call confirm_setup so the player can review the sheet and the campaign and press Start.`;
     case "start_game":
       return `${head} The player has approved. Call start_game now, then write the campaign intro.`;
     default:

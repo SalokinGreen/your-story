@@ -22,6 +22,7 @@ import {
   LEGACY_OBSERVER_SETTINGS,
   FLAG_ONLY_OBSERVER_SETTINGS,
 } from "./helpers/observerSettings";
+import { isJudgeCall, judgeReply, requestedJudges } from "./helpers/combinedJudges";
 import type { ObserverSettings } from "@/app/misc/observer";
 import type { ObserverFlag, StoryData } from "@/app/misc/structs";
 import type { ResolvedTier } from "@/app/misc/reasoningTiers";
@@ -43,6 +44,7 @@ const ALL_CLEAR = JSON.stringify({
   should_escalate: false,
 });
 const LENGTH_UNJUSTIFIED = JSON.stringify({ justified: false, reason: "padding" });
+const TIER_NEEDED = JSON.stringify({ should_escalate: true, reason: "This needed more care." });
 
 function story(overrides: Partial<StoryData> = {}): StoryData {
   return {
@@ -89,7 +91,9 @@ interface Call {
 const first = (c: Call) => c.body.messages[0]?.content ?? "";
 const last = (c: Call) => c.body.messages[c.body.messages.length - 1]?.content ?? "";
 const isRewrite = (c: Call) => last(c).includes("flagged by an automated reviewer");
-const isLengthJudge = (c: Call) => first(c).includes("usual ceiling of ~");
+const judgesOf = (c: Call): string[] => (isJudgeCall(c.body) ? requestedJudges(c.body) : []);
+const isLengthJudge = (c: Call) => judgesOf(c).includes("length");
+const isTierJudge = (c: Call) => judgesOf(c).includes("tier_gap");
 const isChoices = (c: Call) =>
   c.url === "/api/generate-stream" && !c.body.tools && first(c).includes("choice designer");
 
@@ -107,7 +111,15 @@ function installFetch(
     const call: Call = { url: String(url), body: JSON.parse(init!.body as string) };
     calls.push(call);
     if (call.url === "/api/generate") {
-      const content = await respond(call);
+      const scripted = await respond(call);
+      // The judges are one call that answers a keyed verdict per judge: the
+      // scripted strings below stand for "this judge says major".
+      const content = isJudgeCall(call.body)
+        ? judgeReply(call.body, {
+            ...(scripted === LENGTH_UNJUSTIFIED && { length: "major" as const }),
+            ...(scripted === TIER_NEEDED && { tier_gap: "major" as const }),
+          })
+        : scripted;
       return { ok: true, json: async () => ({ content }) } as unknown as Response;
     }
     if (isChoices(call)) return sseStreamResponse({ content: CHOICES });
@@ -143,7 +155,7 @@ describe("the flag-only table (decision 187, a choice since decision 220)", () =
     // The side agents (memory, progress) may call; no Observer judge or rewrite does.
     expect(calls.filter(isLengthJudge)).toHaveLength(0);
     expect(calls.filter(isRewrite)).toHaveLength(0);
-    expect(calls.some((c) => first(c).includes("took a decision away from the player"))).toBe(false);
+    expect(calls.some((c) => judgesOf(c).includes("agency"))).toBe(false);
   });
 
   it("starts no speculative rewrite when the length judge may only flag", async () => {
@@ -329,18 +341,30 @@ describe("the reword path never re-runs the tools (finding 3)", () => {
     } as unknown as Partial<StoryData>);
   }
 
-  async function runFlagged(options: Partial<GenerationOptions>) {
+  async function runFlagged(options: Partial<GenerationOptions>, withDice = false) {
     const rollRound = {
-      toolCalls: [{ name: "formula_roll", arguments: { formulas: ["1d20"] } }],
+      toolCalls: [
+        { name: "formula_roll", arguments: { formulas: ["1d20"], reason: "Pick the lock" } },
+      ],
     };
     let issued = false;
+    // A scene with a challenge asks for a roll (the roll gate): a turn with no
+    // dice answers that prompt with prose twice, once per attempt.
+    const rounds = withDice
+      ? [rollRound, { content: FIRST_NARRATION }, rollRound, { content: RETRY_NARRATION }]
+      : [
+          { content: FIRST_NARRATION },
+          { content: FIRST_NARRATION },
+          { content: RETRY_NARRATION },
+          { content: RETRY_NARRATION },
+        ];
     installFetch(
-      [rollRound, { content: FIRST_NARRATION }, rollRound, { content: RETRY_NARRATION }],
+      rounds,
       (call) => {
-        const tier = first(call).includes("reasoning tier");
+        const tier = isTierJudge(call);
         if (tier && !issued) {
           issued = true;
-          return JSON.stringify({ should_escalate: true, reason: "This needed more care." });
+          return TIER_NEEDED;
         }
         return ALL_CLEAR;
       },
@@ -359,10 +383,16 @@ describe("the reword path never re-runs the tools (finding 3)", () => {
     return { result, resets: resets.length };
   }
 
-  it("rolls back and reruns the tools by default, for the heavier-tier retry", async () => {
+  it("rolls back and reruns the tools by default, for the heavier-tier retry, when no dice were thrown", async () => {
     const run = await runFlagged({});
     expect(run.resets).toBe(1);
     expect(run.result.content).toBe(RETRY_NARRATION);
+  });
+
+  it("keeps the turn when the retry would throw the dice again (judge layer v2)", async () => {
+    const run = await runFlagged({}, true);
+    expect(run.resets).toBe(0);
+    expect(run.result.content).toBe(FIRST_NARRATION);
   });
 
   it("keeps the turn when allowMechanicalRetry is false: its mechanics are already applied", async () => {

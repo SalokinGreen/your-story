@@ -377,7 +377,12 @@ export type ObserverFlagType =
   | "missing_oracle_or_table"
   | "missing_scene_increment"
   | "outcome_narration_mismatch"
-  | "tier_escalation_missed";
+  | "tier_escalation_missed"
+  // The judge layer v2's new judges (docs/judge-layer-v2-plan.md slice 2):
+  // flag-only until confirmation and the rewrite with facts land (slice 3).
+  | "world_consistency"
+  | "secret_leak"
+  | "lines_and_veils";
 export type ObserverSeverity = "minor" | "major";
 
 export interface ObserverFlag {
@@ -870,6 +875,10 @@ export interface SetupState {
   approval?: {
     sheetHash: string;
     planHash: string;
+    // The campaign record (hashCampaignRecord): present only when the story
+    // had a real record at approval. Absent on stories approved with a plan
+    // note alone, and on saves from before the record.
+    campaignHash?: string;
   };
   referenceTitles?: string[]; // notes read during setup, newest first
   questionsAsked?: number; // setup questions answered this session zero

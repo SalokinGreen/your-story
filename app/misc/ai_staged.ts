@@ -54,6 +54,13 @@ import {
 } from "@/app/misc/systems/fantastic-realms/engine";
 import { formatCampaignBrief } from "@/app/misc/campaign/brief";
 import {
+  STYLE_SPECS,
+  expectedPartLabel,
+  hasPart,
+  hasPartBeyondPitch,
+} from "@/app/misc/campaign/styles";
+import { CAMPAIGN_STYLES } from "@/app/misc/campaign/types";
+import {
   estimateRenderedPartTokens,
   renderHistoryPart,
 } from "@/app/misc/historyStubs";
@@ -1324,7 +1331,7 @@ function setupChecklist(p: SetupProgress): string {
         ] as Array<[string, boolean]>)
       : []),
     ["Character (a sheet for every player)", p.character],
-    ["Campaign (the Campaign Plan note)", p.campaign],
+    ["Campaign (a style and at least one part, built with the campaign tool)", p.campaign],
     ["Approval (the player pressed Start on the setup card)", p.approved],
     ["Start (start_game)", p.started],
   ];
@@ -1373,11 +1380,11 @@ function creationRules(
   const next = progress.creation.missing[0];
   const lines: string[] = [];
   lines.push(
-    `TAGGING: put \`setup_step\` (the step's id, from the list) on every \`ask_question\` item that covers a step. The engine counts a step only when it is tagged and answered; an untagged question counts for nothing.${mode === "quick" ? " In quick setup the steps are setting and tone: ask both, tagged." : ""}`,
+    `TAGGING: put \`setup_step\` (the step's id, from the list) on every \`ask_question\` item that covers a step. The engine counts a step only when it is tagged and answered; an untagged question counts for nothing.${mode === "quick" ? " In quick setup the steps are setting, tone and tone_safety (lines and veils, plainly; none counts): ask all three, tagged." : ""}`,
   );
   if (mode === "full") {
     lines.push(
-      "- Table and world steps (setting, tone, campaign, cohort) may be batched in one `ask_question`, each under its own tag. A character step (name and look, history, drives, abilities) is asked one at a time: never two different character tags in one call, and never mixed with another. Several questions under the same tag are fine (all must be answered).",
+      "- Table and world steps (setting, tone, style, tone_safety, campaign, cohort) may be batched in one `ask_question`, each under its own tag. A character step (name and look, history, drives, abilities) is asked one at a time: never two different character tags in one call, and never mixed with another. Several questions under the same tag are fine (all must be answered).",
       "- Always give `intro`: one or two sentences on what is being chosen and why it matters. Give 2-4 options whose descriptions say what each does in play, mechanics and flavour.",
       "- Creative steps (the table, world, name and look, history, drives): offer 2-4 suggestions and set allow_custom true. Tone is a multi_select.",
       "- With several players, a player step carries target_player_name (the player it is for) on every item; table steps are untargeted. Table steps first, then each player in turn.",
@@ -1389,7 +1396,7 @@ function creationRules(
     );
   } else if (mode === "full") {
     lines.push(
-      "Every step is covered: write the sheet and the plan from the answers, then confirm_setup.",
+      "Every step is covered: write the sheet and build the campaign from the answers, then confirm_setup.",
     );
   }
   return lines.join("\n");
@@ -1418,9 +1425,9 @@ function setupNextStep(
         : `NEXT: the character. Propose a complete one from the answers so far and write it from the template with \`create_note\` (type \`character_sheet\`), titled "Character: <name>" when more than one person is playing, one per player.${who}`;
     }
     case "campaign":
-      return `NEXT: the campaign. \`read_notes\` the existing lore, mechanics and setting notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (see the CAMPAIGN PLAN section for the rules). The player sees this plan on the setup card: write it in what the characters know, and put the truths, the secrets and the possible endings in a \`secret\` note instead.`;
+      return `NEXT: the campaign. \`read_notes\` the existing lore, mechanics and setting notes, then build the campaign with the \`campaign\` tool (the CAMPAIGN section below says which parts this style expects). The player sees the public parts on the setup card (the pitch, the lines and veils, the names of the factions and fronts, locations, visible clocks); secrets, dooms and what people hide stay hidden from the card. If you write a \`gm_plan\` note instead, the player sees that note in full on the card: truths, secrets and endings go in the record (\`campaign\`) or a \`secret\` note, never in a plan note.`;
     case "confirm":
-      return `NEXT: ask the player's OK. Call \`confirm_setup({ character_summary, campaign_hook, story_name, premise })\` with a short summary of the character (name, kind, the hook of their background), one or two sentences on the campaign (what the characters know, no secrets or endings), a short title for the story and a one-to-three sentence premise. The player sees a card with Start the story / Change something. When they press Start the game starts by itself: write the campaign intro in that same turn. If they ask for changes, edit the sheet or the plan, then call \`confirm_setup\` again.`;
+      return `NEXT: ask the player's OK. Call \`confirm_setup({ character_summary, campaign_hook, story_name, premise })\` with a short summary of the character (name, kind, the hook of their background), one or two sentences on the campaign (what the characters know, no secrets or endings), a short title for the story and a one-to-three sentence premise. The player sees a card with Start the story / Change something. When they press Start the game starts by itself: write the campaign intro in that same turn. If they ask for changes, edit the sheet or the campaign, then call \`confirm_setup\` again.`;
     case "start_game":
       return `NEXT: the player approved. Call \`start_game\` now with a title for the story and a short premise summary. After it succeeds, give the campaign intro: a short briefing (who they are, where they are, what is at stake and why they are here), then the opening scene, ending on a clear first choice.`;
     default:
@@ -1433,12 +1440,12 @@ function setupModeLines(mode: "quick" | "full"): string {
     return `MODE: step by step.
 - Ask the setup steps (listed below) in order before writing anything: character steps one per \`ask_question\` call, table and world steps may share a call.
 - Each question offers 2-4 options and a custom answer; never fill in a choice the player did not make.
-- Write the sheet only after every step is covered, then the plan from what you learned.
+- Write the sheet only after every step is covered, then build the campaign from what you learned.
 - Keep each reply short: the question, no story.`;
   }
   return `MODE: quick setup.
 - Ask only 2-4 short questions with \`ask_question\`, then PROPOSE: make the choices the player left open yourself.
-- Write the sheet and the plan without asking about every field. The player can change anything on the setup card.
+- Write the sheet and build the campaign without asking about every field. The player can change anything on the setup card.
 - Use the creation rules (below, when present) as grounding for what is legal, not as a script to walk through.
 - Keep each reply short: the question or the proposal, no story.`;
 }
@@ -1513,6 +1520,45 @@ export function buildSetupReference(
 }
 
 /**
+ * The campaign part of session zero (plan slice 3): how to build the record
+ * with the campaign tool, the style's expected parts with what is built and
+ * what is not, and the safety step's hint. Per-turn text, so it rides in the
+ * session-zero block of the live block.
+ */
+function campaignSetupGuide(story: StoryData): string {
+  const record =
+    story.campaign && story.campaign.origin !== "migrated"
+      ? story.campaign
+      : undefined;
+  const lines: string[] = ["## CAMPAIGN (build it with the `campaign` tool)"];
+  if (!record?.style) {
+    lines.push(
+      `Pick the style first (offer the ones that fit; the player may name another): ${CAMPAIGN_STYLES.map((s) => `${s} (${STYLE_SPECS[s].blurb})`).join("; ")}. Record it: \`campaign\` add, part "style", data {"style": "<one of those>"}.`,
+    );
+  } else {
+    const spec = STYLE_SPECS[record.style];
+    const built = spec.expects.filter((p) => hasPart(record, p));
+    const todo = spec.expects.filter((p) => !hasPart(record, p));
+    lines.push(
+      `Style: ${spec.label}. It expects ${spec.expects.map(expectedPartLabel).join(", ")}.`,
+      `Built: ${built.length > 0 ? built.map(expectedPartLabel).join(", ") : "nothing yet"}. Still to build: ${todo.length > 0 ? todo.map(expectedPartLabel).join(", ") : "nothing"}.`,
+      `Clock triggers that suit it: ${spec.triggers.join(", ")}.${spec.note ? ` ${spec.note}` : ""}`,
+    );
+    if (!hasPartBeyondPitch(record)) {
+      lines.push(
+        "The game cannot start until the campaign holds one part beyond the pitch.",
+      );
+    }
+  }
+  lines.push(
+    'Parts: `campaign` add/edit with part "pitch" (premise and 2-4 tone words), "safety", "faction", "front", "clock" (link it to its front), "person" (an NPC you added), "secret" (its clues), "location", "beat" (adventure path only), "end_state". `campaign` read with no part lists them; a refused write names the repair.',
+    'Lines and veils: a line never appears in the story; a veil may happen but off screen. Ask plainly, with examples (harm to children, graphic cruelty, a phobia); "none" is a real answer, recorded as empty lists. Give each line `keywords`, the words that would put it on screen: the engine checks the prose for them.',
+    "To start the game the campaign needs a style and one part beyond the pitch; the style's other expected parts only warn. Secrets, dooms and what people hide stay off the setup card, but a later edit to any of them cancels the player's OK.",
+  );
+  return lines.join("\n");
+}
+
+/**
  * The one session-zero section of the live block: where setup stands, what to
  * do next, the rule that nothing is narrated yet, the mode, the sheet
  * template, the system's creation rules and the notes read so far. Per-turn
@@ -1525,12 +1571,13 @@ export function buildSessionZeroBlock(story: StoryData): string {
   const lore = story.lore ?? [];
 
   let out = `\n## 🎭 SESSION ZERO - SETTING UP THE STORY\n${setupChecklist(progress)}\n\n${setupNextStep(progress, mode)}\n\n`;
-  out += `RULE: until \`start_game\` succeeds you never narrate the story. Every turn you either ask the player (\`ask_question\`), do a setup step (write the sheet or the plan) or call \`confirm_setup\`. A short out-of-character line is fine. Do not describe scenes, play out events or roll for the story yet.\n\n`;
+  out += `RULE: until \`start_game\` succeeds you never narrate the story. Every turn you either ask the player (\`ask_question\`), do a setup step (write the sheet or build the campaign) or call \`confirm_setup\`. A short out-of-character line is fine. Do not describe scenes, play out events or roll for the story yet.\n\n`;
   out += setupModeLines(mode) + "\n";
 
   const stepList = creationStepList(story);
   if (stepList) out += `\n${stepList}\n`;
   out += `\n${creationRules(progress, mode)}\n`;
+  out += `\n${campaignSetupGuide(story)}\n`;
 
   const template =
     story.characterSheetTemplate?.template || resolved.system?.sheetTemplate;

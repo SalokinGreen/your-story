@@ -593,6 +593,9 @@ describe("estimateTurnCost", () => {
         triggersReset: false,
         sensitivity: 5,
       },
+      world_consistency: { enabled: false, triggersReset: false, sensitivity: 5 },
+      secret_leak: { enabled: false, triggersReset: false, sensitivity: 5 },
+      lines_and_veils: { enabled: false, triggersReset: false, sensitivity: 5 },
     };
     const withObserver = estimateTurnCost();
     const without = estimateTurnCost({ observerSettings: allOff });

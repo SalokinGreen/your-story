@@ -385,3 +385,110 @@ runs rise by more than 2 of 20 on two separate runs.
 4. **A migrated record no longer disables the clock counter.** The record-level
    `origin === "migrated"` return is gone; migrated-timer and manual-only
    clocks are still filtered per clock.
+
+### 2026-10-25 — slice 2 (J2), the combined judge call
+
+Built on `claude/judges-j2`. Files: `app/misc/judges/prompts.ts` (rubrics, the
+shared `AGENCY_CHAIN`, the prompt builders), `app/misc/judges/combined.ts`
+(preconditions, the split, parsing, flags, priority), `facts.ts` (topics,
+`selectFactsFor`), and `observer.ts` / `generation.ts` wiring.
+
+- **Eight judges, as ids:** length, agency, outcome, world_consistency,
+  secret_leak, lines_veils, oracle_gap, tier_gap. The plan's "oracle and tier
+  gaps" is two judges. **The scene-increment question is not a judge any more:**
+  the design lists it as code (rung 1), so it is `sceneIncrementFlag`, a phrase
+  check ("the next morning", "hours later", "time passes"…) with no
+  `increment_scene` call. It is a heuristic: minor, major only at the old
+  sensitivity 8, never rewrites. The LLM version survives in `runObserverSplit`.
+- **Three new flag types** (`world_consistency`, `secret_leak`,
+  `lines_and_veils`) in `ObserverFlagType`. They are in `FLAG_ONLY_FLAG_TYPES`,
+  so `settingsFor` forces `triggersReset` false: **they flag only** until slice 3
+  gives the rewriter their facts and a confirming judge. J3 moves them into
+  `REWRITABLE_FLAG_TYPES`.
+- **Old settings keep working, no version bump.** `ObserverSettings` is now the
+  six legacy keys plus the three new ones as optional; `settingsFor` reads a
+  missing one from the defaults (on, sensitivity 5). `CompleteObserverSettings`
+  is the shape of the defaults and of `getObserverSettings()`. The `FLAG_ONLY`
+  fixture turns the three new ones off, because decision 187's table never had
+  them. Settings (slice 5) got a minimal Off / Flag row for each new judge so a
+  player can turn them off now.
+- **Preconditions** (`selectJudges`): agency needs a player line (the old agency
+  call also judged an opening with no line; the design table says "a player line
+  exists"); world consistency needs the prose to name, as a whole word, a person
+  or place a fact carries (`Fact.names`), and the sheet facts ride along only
+  then (a free-form sheet has nothing cheap to trigger on, finding 10); secret
+  needs an unrevealed secret fact; lines and veils need a line or veil fact; the
+  oracle judge needs no oracle/table tool this turn; the tier judge needs a tier
+  below the top.
+- **Facts.** `Fact` gained `topic` and `names`. `collectTurnFacts` now also adds
+  the character sheet(s) whole and one "the record places X here" fact per
+  campaign location with people, appended after the existing facts so earlier
+  ids do not move. The world judge's "last turns' summary" fact is **not**
+  built (no summary source that is not the GM's own words).
+- **The split.** About 3,000 estimated tokens of selected facts
+  (`JUDGE_FACT_BUDGET_TOKENS`, chars / 4) split the call into the engine judges
+  and the judges of the record; a group that is still too large goes alone,
+  whole. Never truncated.
+- **Validation.** A flag with an empty quote is "unknown" (the plan's finding 13;
+  the design's "no quote counts as none" gives the same result, no flag, and the
+  Debug Logs say why). A quote may skip words with an ellipsis and is matched
+  through curly quotes and case. The tier judge's quote may come from the
+  player's line.
+- **Sensitivity** is a per-judge "cut" line at the end of the user message
+  (`cutLine`), replacing `sensitivityInstruction` for the combined call. The
+  length judge's sensitivity still moves the code-side ceiling too.
+- **Priority** (revised finding 12): `pickMajorFlag` replaces "the first major
+  flag wins" at the end-of-turn pass and at a pause, in the design's order
+  (`FLAG_PRIORITY`). **Not built here, belongs to J3:** the two-confirmation
+  limit and "one rewrite addresses them all" (no confirmation exists yet; the
+  one rewrite still addresses the one chosen flag).
+- **The speculative length rewrite is removed**; `tests/generation.speculativeRewrite.test.ts`
+  became `tests/generation.lengthRewrite.test.ts`. `alsoFixIfPresent` and
+  `ALSO_FIX_CLAUSES` in `rewriteFlaggedNarration` have no caller now; they stay
+  for J3 to replace with confirmed findings.
+- **The mechanical retry** (tier escalation) is refused when the turn already
+  drew randomness (`executedRandomness`: dice tools, oracles and tables, a
+  track's progress roll; not `calculate`). Three tests that used a `formula_roll`
+  to satisfy the roll gate now let the GM decline the gate with prose instead;
+  one new test covers the refusal.
+- **No `combined` setting.** `runObserverSplit` is the old per-judge runner,
+  exported for the eval runner only; no Settings path reaches it.
+- **Private evidence.** `ObserverFlag` gained no field: a flag's `detail` is the
+  judge's one-sentence fix, except a secret-leak or lines-and-veils flag, whose
+  detail is fixed and generic. Quotes and fact ids go to the Debug Logs only.
+  The public/private split of `observerFlags` is J3.
+- **Cost estimate.** `turnCostEstimate.ts` and `countJudgeCalls` now count
+  passes (one shared call), not checks.
+- **Test helpers.** `tests/helpers/combinedJudges.ts` (`isJudgeCall`,
+  `requestedJudges`, `judgeReply`); the suites that scripted per-judge JSON
+  answer in the combined shape. `tests/observer.test.ts` keeps the version-1
+  coverage through `runObserverSplit`.
+- **GM request digests** (`tests/campaign.oldSaves.test.ts`) did not change: no
+  GM prompt, tool list or block moved.
+
+### 2026-10-25 — engine review of J2 (seven findings, all fixed)
+
+1. **A secret revealed this turn is no leak.** `collectTurnFacts` skips a secret
+   that is revealed in the story after the turn as well as before it.
+2. **A judge's `fix` never reaches the player.** Every flag `detail` is a fixed
+   sentence per judge (length keeps its word counts); the `fix` goes to the
+   `correctivePrompt` and the Debug Logs. A rewrite is therefore told the rule
+   that was broken ("took a decision away from the player…"), not the judge's
+   wording, until J3 hands it the facts. Tested with a canary in a secret, an
+   NPC status, a gm_roll line and a line, across all eight judges.
+3. **Quotes.** `quoteAppearsIn` strips surrounding quote marks and stray
+   punctuation, `*` and `_`, folds hyphens and dashes, requires the fragments in
+   the text's order, and refuses a quote under three words and twelve characters.
+4. **Reply cap.** `judgeMaxTokens` = 260 per judge + 240 + one third of the
+   narration's characters, at most 8,000, so span lists fit on a long turn.
+5. **Cost.** `countJudgeCalls` counts passes: a default turn is `always: 2`
+   (the agency pass before release, the oracle/tier pass in the background),
+   `sometimes: 0`; `turnCostEstimate` uses it (expected `always + 0.4 *
+   sometimes`, low `always`, high `always + sometimes + 1` for a pause), with
+   `OBSERVER_OUTPUT_TOKENS` 450 and input 2,600. CLAUDE.md says "one call per pass".
+6. **One rewrite fixes the other majors.** `alsoFixTypes` hands the other
+   rewritable majors to `rewriteFlaggedNarration` as `alsoFixIfPresent` (end of
+   turn and at a pause); `ALSO_FIX_CLAUSES` gained a `response_length` clause.
+   `runObserverSplit`'s comment now says the eval runner is slice J4 and not yet
+   written.
+7. **`generate_name`** counts as randomness in `executedRandomness`.

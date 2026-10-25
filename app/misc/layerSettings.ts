@@ -26,7 +26,7 @@ import {
 import { canRunClaudeCliModel, claudeCliBlockReason, isClaudeCliModel } from "./claudeCliModels";
 import type { ProviderKeys } from "./sideModelCall";
 import {
-  ObserverSettings,
+  CompleteObserverSettings,
   ObserverCheckSettings,
   OBSERVER_SETTINGS_VERSION,
   cloneDefaultObserverSettings,
@@ -344,7 +344,7 @@ type StoredObserverSettings = Partial<
  * stored, and setObserverCheckSetting wrote into that object: the first edit
  * changed the defaults for the rest of the session (Codex finding 9).
  */
-export function getObserverSettings(): ObserverSettings {
+export function getObserverSettings(): CompleteObserverSettings {
   if (typeof window === "undefined") return cloneDefaultObserverSettings();
   try {
     const raw = localStorage.getItem(OBSERVER_CHECK_SETTINGS_KEY);
