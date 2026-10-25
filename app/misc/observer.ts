@@ -315,14 +315,13 @@ export function canObserverTriggerReset(
  * happen HERE" - so generateStoryTurn can hand control straight back to the
  * player and run the observer in the background whenever the answer is no.
  *
- * player_agency is deliberately absent. It is the one reset-eligible check
- * with no free pre-signal at all: telling "the GM decided what the player
- * character does" apart from "the GM narrated an NPC" needs the judge, and
- * any regex standing in for it would be wrong in both directions. Listing it
- * here would mean "always plausible", which is exactly the always-block
- * behavior this function exists to end - so agency violations are caught by
- * the background pass instead, which only flags (decision 221: it no longer
- * rewrites, because the player already has the turn).
+ * player_agency has no free pre-signal: telling "the GM decided what the
+ * player character does" apart from "the GM narrated an NPC" needs the judge.
+ * Decision 237 ("Check before release"): with the text held until it is
+ * checked, the agency judge could otherwise only rewrite when another judge
+ * made the turn blocking, so it counts as plausible on every turn with a
+ * non-empty player line while it is enabled and rewriting. The cost is about
+ * one cheap call and a second of wait per turn.
  *
  * Erring toward NOT listing a type is safe: a missed one still gets judged in
  * the background wave, as a flag. What is lost is the automatic rewrite.
@@ -343,6 +342,8 @@ export function plausibleResetFlagTypes(params: {
    * below for why it gates that check specifically.
    */
   highStakes?: boolean;
+  /** The player's line this turn; player_agency is plausible when it is non-empty (decision 237). */
+  playerChoice?: string;
   settings?: ObserverSettings;
 }): ObserverFlagType[] {
   const { narration, rollResults = [], tierUsed } = params;
@@ -375,6 +376,10 @@ export function plausibleResetFlagTypes(params: {
     rollResults.some((r) => OUTCOME_CHECK_TOOL_NAMES.has(r.toolName))
   ) {
     types.push("outcome_narration_mismatch");
+  }
+
+  if (canReset("player_agency") && (params.playerChoice ?? "").trim()) {
+    types.push("player_agency");
   }
 
   // The two tool-usage gaps (missing_oracle_or_table, missing_scene_increment)
@@ -412,6 +417,31 @@ export function plausibleResetFlagTypes(params: {
   }
 
   return types;
+}
+
+/**
+ * Splits a config between the pass the player waits on and the background
+ * wave, so each enabled judge runs once per turn. `blocking` keeps only the
+ * judges that are enabled AND allowed to rewrite; `background` is everything
+ * else. When no blocking pass runs, the background keeps the whole config (it
+ * flags only, whatever a judge's reset setting).
+ */
+export function splitObserverSettings(
+  settings: ObserverSettings | undefined,
+  blockingRuns: boolean,
+): { blocking: ObserverSettings; background: ObserverSettings } {
+  const blocking = {} as ObserverSettings;
+  const background = {} as ObserverSettings;
+  for (const type of Object.keys(
+    DEFAULT_OBSERVER_SETTINGS,
+  ) as ObserverFlagType[]) {
+    const s = settingsFor(settings, type);
+    const rewriting = s.enabled && s.triggersReset;
+    blocking[type] = rewriting ? s : { ...s, enabled: false };
+    background[type] =
+      blockingRuns && rewriting ? { ...s, enabled: false } : s;
+  }
+  return { blocking, background };
 }
 
 function clampSensitivity(sensitivity: number): number {

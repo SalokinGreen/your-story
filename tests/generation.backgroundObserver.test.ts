@@ -25,6 +25,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
 import { createMockGMFetch } from "./helpers/mockGMFetch";
 import { LEGACY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
+import type { ObserverSettings } from "@/app/misc/observer";
 import {
   applyBackgroundFlags,
 } from "@/app/misc/backgroundPatch";
@@ -93,6 +94,14 @@ const baseOptions: GenerationOptions = {
   observerSettings: LEGACY_OBSERVER_SETTINGS,
   // The id the page gives the turn's part: a late result is applied by id.
   scenePartId: PART_ID,
+};
+
+// Decision 237: agency is plausible on every turn with a player line while it
+// can rewrite, so it would make every turn here block. The deferral tests opt
+// it down to a flag, which leaves it to the background wave.
+const AGENCY_FLAGS_ONLY: ObserverSettings = {
+  ...LEGACY_OBSERVER_SETTINGS,
+  player_agency: { enabled: true, triggersReset: false, sensitivity: 5 },
 };
 
 interface ObserverCall {
@@ -219,7 +228,7 @@ describe("observer deferral - generateStoryTurn integration", () => {
     const result = await generateStoryTurn(
       createTestStory(),
       "I pick the lock",
-      baseOptions,
+      { ...baseOptions, observerSettings: AGENCY_FLAGS_ONLY },
       {},
     );
 
@@ -286,10 +295,10 @@ describe("the player's line reaches the Observer on a typed turn", () => {
 
 describe("the background observer never rewrites (decision 221) - generateStoryTurn integration", () => {
   it("flags a violation found in the background, makes no rewrite call and leaves the text alone", async () => {
-    // player_agency is the check with no free pre-signal, so it is always
-    // judged in the background. Even with rewriting turned on for it, the
-    // player already has the turn by then, and text they have read is not
-    // replaced behind them: the finding is an advisory flag.
+    // With agency set to flag only (it does not wait, decision 237) it is
+    // judged in the background. The player already has the turn by then, and
+    // text they have read is not replaced behind them: the finding is an
+    // advisory flag.
     const { fetchMock, observerCalls } = createFetchMock(
       SHORT_NARRATION,
       async (call) => {
@@ -304,14 +313,19 @@ describe("the background observer never rewrites (decision 221) - generateStoryT
     const advisory: Array<{ flags: ObserverFlag[]; partId: string }> = [];
     let completedContent: string | undefined;
 
-    await generateStoryTurn(storyData, "I pick the lock", baseOptions, {
-      onStoryContent: scenePartPublisher(storyData),
-      onComplete: (result) => {
-        completedContent = result.content;
+    await generateStoryTurn(
+      storyData,
+      "I pick the lock",
+      { ...baseOptions, observerSettings: AGENCY_FLAGS_ONLY },
+      {
+        onStoryContent: scenePartPublisher(storyData),
+        onComplete: (result) => {
+          completedContent = result.content;
+        },
+        onBackgroundObserverFlags: (flags, partId) =>
+          advisory.push({ flags, partId }),
       },
-      onBackgroundObserverFlags: (flags, partId) =>
-        advisory.push({ flags, partId }),
-    });
+    );
 
     expect(completedContent).toBe(SHORT_NARRATION);
     await flushBackground();
@@ -355,11 +369,16 @@ describe("the background observer never rewrites (decision 221) - generateStoryT
     const storyData = createTestStory();
     const advisory: Array<{ flags: ObserverFlag[]; partId: string }> = [];
 
-    await generateStoryTurn(storyData, "I pick the lock", baseOptions, {
-      onStoryContent: scenePartPublisher(storyData),
-      onBackgroundObserverFlags: (flags, partId) =>
-        advisory.push({ flags, partId }),
-    });
+    await generateStoryTurn(
+      storyData,
+      "I pick the lock",
+      { ...baseOptions, observerSettings: AGENCY_FLAGS_ONLY },
+      {
+        onStoryContent: scenePartPublisher(storyData),
+        onBackgroundObserverFlags: (flags, partId) =>
+          advisory.push({ flags, partId }),
+      },
+    );
 
     await flushBackground();
 

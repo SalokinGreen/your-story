@@ -90,7 +90,7 @@ const LAYERS: LayerInfo[] = [
     title: "Adjudication",
     badge: "Layer 5",
     summary:
-      "The Observer reviews each completed turn against rules the GM was already given. Every check is on by default: the three that judge the prose rewrite a flagged turn before you see it, and the other three only flag. It never re-rolls a turn. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
+      "The Observer reviews each completed turn against rules the GM was already given. Every check is on by default: the three that judge the prose rewrite a flagged turn before you see it (the agency check runs on every turn that has your line, so it can), and the other three only flag, after the turn appears. When the GM stops to ask you something, the text written so far is checked and shown first. It never re-rolls a turn. A separate, free consistency check runs alongside it for dead-NPC-narrated-as-present style mistakes and writes to the Debug Logs only.",
     files: "app/misc/observer.ts, app/misc/consistencyCheck.ts",
     aiDriven: true,
   },

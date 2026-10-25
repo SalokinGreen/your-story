@@ -80,6 +80,7 @@ import {
   isTurnLocked,
   shouldHoldNarrationForJudge,
 } from "./turnLock";
+import { liveRelayText } from "@/app/misc/liveRelayText";
 import { cancelImageJobsForTurn } from "../misc/imageJobs";
 import { pickImageProvider } from "../misc/imageProvider";
 import {
@@ -770,6 +771,10 @@ function StoryPageContent() {
   // chunks from a previous turn are discardable on the guest side.
   const relayTurnIdRef = useRef(0);
   const lastStreamedTextRef = useRef("");
+  // storyText as it stood when the current turn began streaming: a held turn
+  // (decision 221) leaves the previous turn's prose in storyText until release,
+  // and that must not be relayed to guests as new text (liveRelayText.ts).
+  const storyTextAtTurnStartRef = useRef("");
   // Tracks storyTextReady's previous value so the host streaming effect can
   // detect turn start (ready -> not-ready) and completion (not-ready -> ready).
   const prevStoryReadyRef = useRef(true);
@@ -1123,14 +1128,16 @@ function StoryPageContent() {
       // A new turn just started streaming - fresh relay id.
       relayTurnIdRef.current += 1;
       lastStreamedTextRef.current = "";
+      storyTextAtTurnStartRef.current = storyText;
     }
 
     const turnId = String(relayTurnIdRef.current);
     if (!storyTextReady) {
-      const text =
-        liveNarrationText && liveNarrationText.length > 0
-          ? liveNarrationText
-          : storyText;
+      const text = liveRelayText({
+        liveNarrationText,
+        storyText,
+        storyTextAtTurnStart: storyTextAtTurnStartRef.current,
+      });
       if (text && text !== lastStreamedTextRef.current) {
         lastStreamedTextRef.current = text;
         broadcastNetStoryStream({ turnId, text, stage: loadingStage, done: false });

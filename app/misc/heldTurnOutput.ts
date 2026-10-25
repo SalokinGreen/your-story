@@ -36,8 +36,13 @@ const NO_USAGE: TokenUsage = {
 export interface HeldTurnOutput {
   /** The callbacks to give the attempt: the five queue, the rest pass through. */
   callbacks: GenerationCallbacks;
-  /** Play the narration out once. A rewrite replaces the text. Idempotent. */
-  release(finalNarration?: string): void;
+  /**
+   * Play the narration out once. A rewrite replaces the text. Idempotent. An
+   * empty held turn appends nothing (no onStoryContent). `alreadyShown` is the
+   * prose a pause released earlier this turn (decision 240): the live timeline
+   * already holds it, so only what follows it is added there.
+   */
+  release(finalNarration?: string, alreadyShown?: string): void;
   /** Play the queued choices, in order, once. */
   flushChoices(): void;
   /** Throw the queued choices away. */
@@ -87,17 +92,33 @@ export function createHeldTurnOutput(
   return {
     callbacks: held,
 
-    release(finalNarration) {
+    release(finalNarration, alreadyShown) {
       if (released) return;
       released = true;
-      if (!started && lastFull === null && !completed) return;
+      if (finalNarration === undefined && !started && lastFull === null && !completed) {
+        return;
+      }
       const content =
         finalNarration ?? completed?.content ?? lastFull ?? "";
+      const usage = completed?.usage ?? NO_USAGE;
       // The text was never streamed live, so it is "not narrated by the GM
-      // stage" whichever stage wrote it: the page appends it itself.
-      callbacks.onStoryStart?.(false);
-      callbacks.onStoryContent?.(content, content);
-      callbacks.onStoryComplete?.(content, completed?.usage ?? NO_USAGE);
+      // stage" whichever stage wrote it: the page appends it itself. After a
+      // pause release the live timeline already shows the first part, so the
+      // page is told the GM stage narrated it and only the new tail is added.
+      const shown = alreadyShown?.trim() ?? "";
+      const continuation = shown !== "" && content.startsWith(shown);
+      if (continuation) {
+        const tail = content.slice(shown.length).trim();
+        if (tail) callbacks.onGMContent?.(tail, tail);
+        callbacks.onLiveNarrationUpdate?.(content);
+      }
+      callbacks.onStoryStart?.(continuation);
+      // An empty turn has no part to add: an empty one would show as a blank
+      // turn. The page is still told the narration is complete.
+      if (finalNarration !== undefined || content.trim() !== "") {
+        callbacks.onStoryContent?.(content, content);
+      }
+      callbacks.onStoryComplete?.(content, usage);
     },
 
     flushChoices() {

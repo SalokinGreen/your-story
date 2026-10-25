@@ -119,3 +119,32 @@ describe("createHeldTurnOutput", () => {
     expect(log).toEqual([]);
   });
 });
+
+describe("an empty held turn and a continuation after a pause release", () => {
+  it("appends no part for an empty turn, but still completes the narration", () => {
+    const { log, callbacks } = recorder();
+    const held = createHeldTurnOutput(callbacks);
+    held.callbacks.onStoryStart?.(false);
+    held.callbacks.onStoryComplete?.("", USAGE);
+    held.release();
+    expect(log.some((l) => l.startsWith("content:"))).toBe(false);
+    expect(log).toContain("complete:|3");
+  });
+
+  it("still releases a rewrite given for an otherwise empty queue", () => {
+    const { log, callbacks } = recorder();
+    const held = createHeldTurnOutput(callbacks);
+    held.release("Rewritten.");
+    expect(log).toContain("content:Rewritten.|Rewritten.");
+  });
+
+  it("adds only the tail to the live view when a pause already showed the start", () => {
+    const { log, callbacks } = recorder();
+    const held = createHeldTurnOutput(callbacks);
+    writeTurn(held.callbacks, "First part.\n\nSecond part.");
+    held.release(undefined, "First part.");
+    expect(log).toContain("gm:Second part.");
+    expect(log).toContain("start:true");
+    expect(log).toContain("content:First part.\n\nSecond part.|First part.\n\nSecond part.");
+  });
+});

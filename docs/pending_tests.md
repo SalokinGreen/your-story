@@ -10,7 +10,7 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
-## 2026-10-25 — Judges on, turns held (decisions 220–221)
+## 2026-10-25 — Judges on, turns held (decisions 220–221, 237, 240)
 
 Built and unit-tested (the held turn's callbacks, the phases, the rewrite
 released once, the Stop); not played on the APK or against a real model:
@@ -29,9 +29,23 @@ released once, the Stop); not played on the APK or against a real model:
   first, or no Undo revision.
 - **Flag-only judges still stream.** In Settings, set every judge to Flag.
   Expected: the next turn streams live as before, with no "Checking the turn…".
-- **The agency judge flags, but does not rewrite.** `player_agency` is judged in
-  the background wave, which no longer rewrites, so a turn that speaks for the
-  player gets a flag in its details and a toast, not a revision.
+- **The agency judge rewrites (decision 237).** Play a turn where your line
+  is short ("I nod.") against a GM that tends to speak for you. Expected: every
+  turn with a line shows "Checking the turn…" for about a second; a turn that
+  decides what your character says or feels is revised before you see it, with
+  "Undo revision". Failure looks like: such a turn appearing at once with only
+  a flag toast.
+- **A pause shows the scene first (decision 240).** Play until the GM writes a
+  few paragraphs and then asks a question, a roll or the dice tray. Expected:
+  the paragraphs are on screen, checked, before the question appears; the text
+  after your answer appears together once checked. Failure looks like: the
+  question over an empty turn, or the first paragraphs changing after you
+  answered. Also try it as an online guest: the host's question should not show
+  the previous turn's text as "being written".
+- **A failed suggestions call keeps the turn.** With Suggested Choices on, turn
+  the network off just as the turn's text is about to appear (or use a model
+  that rejects the choices call). Expected: the narration still appears, with
+  no suggestions and a Debug Logs line "Choices generation failed".
 
 ## 2026-10-25 — Starters welcome you in (decisions 197–200)
 

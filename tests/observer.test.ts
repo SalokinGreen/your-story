@@ -29,6 +29,7 @@ import {
   rewriteFlaggedNarration,
   settingsFor,
   plausibleResetFlagTypes,
+  splitObserverSettings,
   DEFAULT_OBSERVER_SETTINGS,
   FLAG_ONLY_FLAG_TYPES,
   canObserverTriggerReset,
@@ -2952,5 +2953,58 @@ describe("rewriteFlaggedNarration", () => {
     });
 
     expect(rewritten).toBeNull();
+  });
+});
+
+describe("agency is plausible with a player line (decision 237)", () => {
+  const rewriting = cloneDefaultObserverSettings();
+
+  it("lists player_agency when the turn has a non-empty player line", () => {
+    expect(
+      plausibleResetFlagTypes({
+        narration: "The lock clicks open.",
+        playerChoice: "I pick the lock",
+        settings: rewriting,
+      }),
+    ).toContain("player_agency");
+  });
+
+  it("does not list it for an empty line, or when agency is off or only flags", () => {
+    const base = { narration: "The lock clicks open.", playerChoice: "I pick the lock" };
+    expect(
+      plausibleResetFlagTypes({ ...base, playerChoice: "  ", settings: rewriting }),
+    ).not.toContain("player_agency");
+    expect(
+      plausibleResetFlagTypes({
+        ...base,
+        settings: { ...rewriting, player_agency: { enabled: false, triggersReset: false, sensitivity: 3 } },
+      }),
+    ).not.toContain("player_agency");
+    expect(
+      plausibleResetFlagTypes({
+        ...base,
+        settings: { ...rewriting, player_agency: { enabled: true, triggersReset: false, sensitivity: 3 } },
+      }),
+    ).not.toContain("player_agency");
+  });
+});
+
+describe("splitObserverSettings: each judge runs once", () => {
+  it("gives the blocking pass the rewriting judges and the background the rest", () => {
+    const { blocking, background } = splitObserverSettings(cloneDefaultObserverSettings(), true);
+    for (const type of ["response_length", "player_agency", "outcome_narration_mismatch"] as const) {
+      expect(blocking[type].enabled).toBe(true);
+      expect(background[type].enabled).toBe(false);
+    }
+    for (const type of ["missing_oracle_or_table", "missing_scene_increment", "tier_escalation_missed"] as const) {
+      expect(blocking[type].enabled).toBe(false);
+      expect(background[type].enabled).toBe(true);
+    }
+  });
+
+  it("keeps the whole config in the background when no blocking pass runs", () => {
+    const { background } = splitObserverSettings(cloneDefaultObserverSettings(), false);
+    expect(background.player_agency.enabled).toBe(true);
+    expect(background.response_length.enabled).toBe(true);
   });
 });

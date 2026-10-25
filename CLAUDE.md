@@ -1257,10 +1257,24 @@ the queued choices, and a reset `discard()`s the attempt; a Stop flushes
 nothing. `onTurnPhase` ("writing", "checking", "revising") feeds the work line.
 When every judge can only flag, nothing is held and text streams live. **The
 background wave never rewrites** (`onBackgroundObserverRewrite` and
-`applyBackgroundRewrite` are gone): it only flags. Because `player_agency` has
-no free pre-signal, `plausibleResetFlagTypes` never lists it, so it is judged in
-that background wave and, as it stands, never rewritten (see
-`docs/judge-layer-design.md`'s 2026-10-25 note).
+`applyBackgroundRewrite` are gone): it only flags, and it runs only the judges
+the blocking pass did not (`splitObserverSettings`: the blocking pass runs the
+enabled-and-rewriting judges, the wave the rest, so each runs once per turn).
+`player_agency` has no free pre-signal, so `plausibleResetFlagTypes` lists it on
+every turn with a non-empty player line while it is enabled and rewriting
+(decision 237), which makes such a turn wait for one cheap call. **A pause
+releases first** (decision 240): when the GM's loop is about to pause on the
+player (`ask_question`, `ask_for_roll`, a dice throw, `confirm_setup`), the
+four handlers `generateStoryTurnOnce` passes to `executeGMTools` are wrapped by
+`beforePausing`; `GenerationOptions.beforePause` (set by `generateStoryTurn`,
+not in session zero) judges the prose written since the last release with the
+verdicts so far, rewrites it on a major flag, and the prose is then shown
+through `onGMContent` / `onLiveNarrationUpdate` and kept as the first entry of
+the accumulation. The end-of-turn pass judges and rewrites only the tail after
+it, and `held.release(text, pause.text)` adds only the tail to the live view.
+A tier retry is refused once anything is on screen. A choices call that fails
+no longer throws the turn away (`runChoicesGeneration` logs and uses none). See
+`docs/judge-layer-design.md`'s 2026-10-25 note.
 `missing_oracle_or_table` and `missing_scene_increment`
 are flag-only by type (`FLAG_ONLY_FLAG_TYPES`; `settingsFor` reports them
 unable to reset), and `rewriteFlaggedNarration` returns null for them and for
