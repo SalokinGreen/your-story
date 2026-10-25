@@ -1,6 +1,6 @@
 # Fantastic Realms — design
 
-**Status:** design, revised after Codex's review
+**Status:** approved ("Build it", decision 219), revised after Codex's review
 ([`research/codex-fantastic-realms-review-2026-10-25.md`](research/codex-fantastic-realms-review-2026-10-25.md)),
 for the author's go. Not approved for building yet. Decisions 201–218
 (`docs/decisions.md`). The implementation plan (files, signatures and slice
