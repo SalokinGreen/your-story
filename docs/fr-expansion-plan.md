@@ -395,3 +395,72 @@ Judgment calls the plan left to the builder. None changes the plan's scope.
   the GM applying a miscast cost, not the hero acting.
 - **Tool budget after the fixes:** 11,449 tokens against the 11,500 limit
   (+1,468 of the 1,500 system extra); 51 tokens of room.
+
+### 2026-10-25 — E2 (the rules notes and the note update)
+
+Judgment calls the plan left to the builder. None changes the plan's scope.
+
+- **The history lists every shipped text, current last** (`builtinNoteHistory.ts`,
+  generated once from the notes themselves): the older hash then the current one
+  for the FR core and creation note, only the current hash for every other note
+  of every system (Blood & Bone's too, as the plan says). `tests/systems.noteUpdate.test.ts`
+  fails when a list does not end on the current text, so a later change to a
+  note must append its hash. The hash is `hashNotes` over the content alone
+  (`hashNoteContent`), so it does not depend on the title.
+- **The pre-E2 texts are frozen in `tests/helpers/frPreE2Notes.ts`**, so the
+  tests update a story holding the real old core and creation note, not a
+  stand-in. The creation note changed too (a callings line), so it has a history
+  of two; no other FR note changed text.
+- **The "player's own edit" line is logged only for a note whose history has a
+  newer version** (more than one entry). A Blood & Bone note that differs from
+  its single recorded hash is silent, because it may be an older release rather
+  than an edit, and nothing could be applied to it anyway.
+- **`updateBuiltinNotes` is separate from `addMissingBuiltinNotes`** and
+  returns `{ updated, keptEdited }`; the story page runs it first and writes
+  the Debug Logs lines (the module stays free of the logger). It replaces only
+  `content` (title, `on`, type, tags and keys are kept), and does nothing to a
+  story that is not kept up to date (no core held, or the system tools off).
+- **The nine rules notes are `mechanics`, not `table`.** The spell, quality,
+  condition and word lists are prose lists, so `checkTableShape` has no new
+  notes to check; the four existing tables still pass it. The realms' d12
+  miscast tables are E3's.
+- **The plan's "FR — Core rules" must name every tool and every `manage_feats`
+  action**, so section 4 lists the actions it does not teach elsewhere in one
+  line (rename, retire, rejoin, add_party_feat, remove_party_feat,
+  clear_condition). The test reads the actions from the live schema.
+- **Calling moves lean on what the engine has:** `manage_feats use` per rest to
+  count a move, `clear_condition` and `mend` for the ones that clear or mend,
+  and a DC one lower (never under 2) for the two that help a roll, because the
+  core already lets the GM move a DC by 1. No move needs a new tool parameter.
+- **A calling kit is the signature plus three of five** (design 14), so the note
+  and the creation hint say so, and a freeform hero's personal move is counted
+  the same way.
+- **Hardy, Warded and Bright are the counted qualities** (`use`, per rest, scene
+  and scene); Cursed spends the harm budget; Keen and Swift are the engine's.
+  The other six are fiction the GM reads, each with a plain rule in FR — Gear.
+- **Sizes (cl100k):** core 2,256 (limit 3,000); Magic, Gear, Conditions,
+  Callings, Bestiary, Legends, Travel, Downtime and Group play are printed by
+  `tests/systems.fantasticRealms.rules.test.ts`, all under 2,500.
+
+### 2026-10-25 — E2 engine-review fixes
+
+- **The history is the full shipped record.** It was rebuilt by extracting
+  `app/misc` at each of the 40 commits on master that touched
+  `app/misc/systems`, loading `BUILTIN_SYSTEMS` there and hashing every note
+  text (oldest first, current last). The FR core now has three entries (the
+  first release, bcc2c735, hash `85639573ad5c6de4-7118`; the pre-E2 text; the
+  current one), so stories started on the first release update. **Blood & Bone
+  is no longer "current hash only":** 60-odd of its notes changed on master
+  since they first shipped, so an older story that never edited one now gets
+  the current text on load (an edited one is kept, with the Debug Logs line).
+  That is the intended behaviour of the update, and the one change to B&B
+  stories this slice makes. The first-release core is frozen in
+  `tests/helpers/frPreE2Notes.ts` (`FIRST_RELEASE_CORE`) and tested.
+- **A hit that cannot hurt a foe leaves `target` out of the `feat_roll`**
+  (Bestiary strange words, and one line in the core), because a roll that names
+  a foe is owed damage by J1's `foe-damage` contract. Test: the contract stays
+  silent for a landed roll with no target.
+- **Realm sections are hedged** in Magic and Callings (and Travel's road
+  tables) as arriving with the realms in a later release (E3).
+- **Travel** says rounds = the days, 2 to 5 (a one-day trip is one roll).
+  **Downtime's** away-from-hearth `use` names the `hero`.

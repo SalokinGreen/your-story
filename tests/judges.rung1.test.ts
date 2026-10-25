@@ -130,6 +130,17 @@ describe("event contract: foe-damage (Fantastic Realms)", () => {
     expect(hits[0].factIds.length).toBeGreaterThan(0);
   });
 
+  it("stays silent for a landed roll with no target (a hit that cannot hurt a strange-worded foe)", () => {
+    const hits = runRung1(
+      turn({
+        storyAfter: withGoblin,
+        system: FR,
+        results: [featRoll("c1", "strong_hit", undefined)],
+      }),
+    );
+    expect(hits).toEqual([]);
+  });
+
   it("misses (passes) when the Hearts change equals the damage", () => {
     const hits = runRung1(
       turn({

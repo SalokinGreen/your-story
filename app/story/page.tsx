@@ -56,7 +56,10 @@ import {
 } from "../misc/reasoningTiers";
 import { migrateCustomTablesToNotes } from "../misc/tableNotes";
 import { ensureStoryDataArrays } from "../misc/storyDataDefaults";
-import { addMissingBuiltinNotes } from "../misc/systems/builtinNotes";
+import {
+  addMissingBuiltinNotes,
+  updateBuiltinNotes,
+} from "../misc/systems/builtinNotes";
 import { migrateTimers } from "../misc/campaign/migrate";
 import {
   enqueueImageJob,
@@ -1416,6 +1419,20 @@ function StoryPageContent() {
       // A story that runs a built-in system gains the system's notes added
       // since it started (Blood & Bone expansion, decision 156). Only adds;
       // a note the story holds or deleted is left alone.
+      // First, a built-in note the player never edited is brought up to the
+      // text the app ships now (Fantastic Realms expansion E2); an edited one
+      // is kept, and said so here.
+      const updatedBuiltin = updateBuiltinNotes(loadedStoryData);
+      if (updatedBuiltin.updated.length > 0) {
+        logger.info(
+          `[Story Load] Updated ${updatedBuiltin.updated.length} built-in note${updatedBuiltin.updated.length === 1 ? "" : "s"} to the current rules: ${updatedBuiltin.updated.join(", ")}`,
+        );
+      }
+      for (const title of updatedBuiltin.keptEdited) {
+        logger.info(
+          `[Story Load] "${title}" is the player's own edit; the new rules were not applied`,
+        );
+      }
       const addedBuiltin = addMissingBuiltinNotes(loadedStoryData);
       if (addedBuiltin > 0) {
         logger.info(

@@ -835,8 +835,7 @@ report's §11.3. The ones that shape play:
   starter is *Wolfwillow Crossing*, an arrival in a Larkenfell village on
   Lantern Eve, which copies every realm (a starter's story is seeded as already
   offered every note, so the loader would never add one). **The engine grown
-  (slice E1 of `docs/fr-expansion-plan.md`, decisions 243–256; the rules notes
-  are E2–E5, not yet written):** every new field is optional, so an old save
+  (slice E1 of `docs/fr-expansion-plan.md`, decisions 243–256):** every new field is optional, so an old save
   rolls exactly as before (`tests/systems.fantasticRealms.grown.test.ts`).
   A feat may be a `spell` or an `item` (`qualities`, at most two; `status`
   `broken` or `lost`, which keep the item's id and burn); a hero has
@@ -863,6 +862,25 @@ report's §11.3. The ones that shape play:
   holds Supplies (world, 0–6, start 3). The tool list for a Fantastic Realms
   story is 11,449 tokens against the 11,500 limit: a new parameter needs text
   moved out of the schemas first.
+  **The rules notes (slice E2, `rules/`):** nine on-demand `mechanics` notes in
+  the Rules pack: FR — Magic (forty example spell feats, miscasts, healing),
+  Gear (the twelve qualities and what each does), Conditions (sixteen, with cures,
+  and scars), Callings (twelve, each a signature, a kit of five, eight path feats
+  and a move), Bestiary (the twenty foe words, tactics, phases), Legends (a stub
+  that E4 fills), Travel (a journey is a `tally` challenge; Supplies), Downtime
+  (and the hearth as party feats) and Group play. Each is under the 2,500-token
+  read cap. The core was rewritten with an operational section (one harm budget
+  per roll, down, helping, team burns, healing, conditions, miscasts, items,
+  counted uses, the index) and is about 2,260 tokens, under its 3,000. The tools teach
+  their usage there, so no schema grew. **Built-in notes now update**
+  (`updateBuiltinNotes`, `builtinNotes.ts`, called by the story page before
+  `addMissingBuiltinNotes`): `BUILTIN_NOTE_HISTORY` (`builtinNoteHistory.ts`)
+  lists the hash of every shipped text of every built-in note, current last; a held
+  note whose text hashes to an earlier entry is replaced by the current text (the
+  pinned core included), one that matches none is the player's edit and is kept
+  with a Debug Logs line, and a note with one recorded version (Blood & Bone's)
+  never changes. **Changing a built-in note's text means appending its new hash**
+  (`tests/systems.noteUpdate.test.ts` fails when the last entry is not current).
   **Its campaign** is an
   `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
   Week, the barrow king's front (a hidden clock on `rest`) and the goblins'

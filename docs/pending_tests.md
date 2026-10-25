@@ -111,6 +111,17 @@ browser preview and a screenshot, which a worker without a display cannot take.
 - **Latency.** A rewrite turn now waits for the judge, the confirmation (two in
   parallel at most) and the rewrite. Note the wait.
 
+## 2026-10-25 — Fantastic Realms E2 (the rules notes and the note update)
+
+No session could run a live model, so these are owed:
+
+- **Does a GM read the new notes and use the tools they teach?** With the
+  author's go, start a Fantastic Realms story from Wolfwillow Crossing and play
+  a fight and a journey. Expected: the GM reads FR — Magic before a first spell,
+  passes `hindered_by` for a condition, calls `manage_feats add_condition` and
+  `use`, and starts a journey as a tally challenge. Failure looks like plain
+  `feat_roll`s with no condition words, or a miscast that also costs a heart.
+
 ## 2026-10-25 — Fantastic Realms E1 (the engine)
 
 The engine is covered by `tests/systems.fantasticRealms.grown.test.ts`; the

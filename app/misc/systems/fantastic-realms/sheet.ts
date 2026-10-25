@@ -18,6 +18,11 @@ export const FANTASTIC_REALMS_SHEET_TEMPLATE = `# {{Name | Your hero's name | Un
 
 ## Gear
 {{Gear | A few things you carry, in words | A traveller's cloak, a waterskin, a lucky coin}}
+**Items (feats you carry, with qualities):** {{Items | Any good item that is one of your feats, with its quality words, or none | none}}
+
+## Conditions and scars
+**Conditions:** {{Conditions | Words that cost a die for now (the engine keeps them), or none | none}}
+**Scars:** {{Scars | Lasting words that cost a die only in their own situation, or none | none}}
 
 ## Background
 **Realm tie:** {{Realm tie | Why you are in the starting realm | Looking for work on the frontier}}
@@ -42,7 +47,7 @@ export const FANTASTIC_REALMS_CREATION_STEPS: CreationStep[] = [
   step(
     "feats",
     "Feats",
-    "Four feats, words or short phrases: at least one about who they are and one about something they carry. Suggest a few drawn from the concept and the realm, say what each is good for, and tell them a magic power is a feat too. Ask for all four in one go, under this tag.",
+    "Four feats, words or short phrases: at least one about who they are and one about something they carry. Suggest a few drawn from the concept and the realm, say what each is good for, and tell them a magic power is a feat too (a spell), and a good item you carry is one (an item). Offer a calling (FR — Callings) as an option: a calling's kit is its signature feat plus three from its five suggestions, and a freeform hero picks one personal move of the same size, a once-per-rest flourish of their own, instead. Ask for all four feats in one go, under this tag.",
   ),
   step(
     "realm_tie",

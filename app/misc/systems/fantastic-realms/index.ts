@@ -11,6 +11,15 @@ import { FANTASTIC_REALMS_EVENT_CONTRACTS } from "./contracts";
 import { CORE_NOTE, FANTASTIC_REALMS_CORE_ID } from "./core";
 import { CREATION_NOTE } from "./creation";
 import { FOES_NOTE, LEVELS_NOTE } from "./foes";
+import { BESTIARY_NOTE } from "./rules/bestiary";
+import { CALLINGS_NOTE } from "./rules/callings";
+import { CONDITIONS_NOTE } from "./rules/conditions";
+import { DOWNTIME_NOTE } from "./rules/downtime";
+import { GEAR_NOTE } from "./rules/gear";
+import { GROUP_NOTE } from "./rules/group";
+import { LEGENDS_NOTE } from "./rules/legends";
+import { MAGIC_NOTE } from "./rules/magic";
+import { TRAVEL_NOTE } from "./rules/travel";
 import {
   FANTASTIC_REALMS_CREATION_STEPS,
   FANTASTIC_REALMS_HISTORY_HINT,
@@ -29,6 +38,15 @@ export const FANTASTIC_REALMS_RULES_NOTES: BuiltinNote[] = [
   CREATION_NOTE,
   FOES_NOTE,
   LEVELS_NOTE,
+  MAGIC_NOTE,
+  GEAR_NOTE,
+  CONDITIONS_NOTE,
+  CALLINGS_NOTE,
+  BESTIARY_NOTE,
+  LEGENDS_NOTE,
+  TRAVEL_NOTE,
+  DOWNTIME_NOTE,
+  GROUP_NOTE,
 ];
 
 export const FANTASTIC_REALMS_WORLD_NOTES: BuiltinNote[] = [
@@ -42,7 +60,7 @@ export const FANTASTIC_REALMS_RULES_PACK: BuiltinPack = {
   systemId: FANTASTIC_REALMS_ID,
   title: "Fantastic Realms — Rules",
   description:
-    "The rules of Fantastic Realms: a small core the GM always carries, and character creation, foes and levels it reads on demand. Importing it turns on the feat, initiative, XP and rest tools.",
+    "The rules of Fantastic Realms: a small core the GM always carries, and character creation, foes, levels, magic, gear, conditions, callings, the bestiary, legends, travel, downtime and group play it reads on demand. Importing it turns on the feat, initiative, XP and rest tools.",
   notes: FANTASTIC_REALMS_RULES_NOTES,
 };
 
