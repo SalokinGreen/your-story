@@ -318,3 +318,51 @@ describe("the Coding Plan stays out of reach", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("GLM 5.3 through DeepInfra", () => {
+  // https://deepinfra.com/zai-org/GLM-5.3 (read 2026-10-25): reasoning_effort
+  // low, high or max, max when it is left out, and no way to turn thinking off.
+  async function deepInfra(body: Partial<GenerateRequestBody>): Promise<SentRequest> {
+    const fetchMock = stubFetch();
+    await generateNonStreaming({
+      messages: [{ role: "user", content: "verdict?" }],
+      model: "DeepInfra GLM 5.3",
+      deepinfraKey: "di-key",
+      ...body,
+    });
+    return sent(fetchMock);
+  }
+
+  it.each([
+    ["none", "low"],
+    ["low", "low"],
+    ["normal", "high"],
+    ["high", "high"],
+    ["xhigh", "max"],
+    [undefined, "low"],
+  ])("maps tier effort %s to reasoning_effort %s, never leaving DeepInfra's max default", async (effort, expected) => {
+    const request = await deepInfra({ reasoningEffort: effort });
+    expect(request.url).toBe("https://api.deepinfra.com/v1/openai/chat/completions");
+    expect(request.body.model).toBe("zai-org/GLM-5.3");
+    expect(request.body.reasoning_effort).toBe(expected);
+  });
+
+  it("keeps a small output cap above what thinking needs", async () => {
+    expect((await deepInfra({ maxTokens: 200 })).body.max_tokens).toBe(4096);
+    expect((await deepInfra({ maxTokens: 8000 })).body.max_tokens).toBe(8000);
+  });
+
+  it("leaves the other DeepInfra models without a reasoning parameter", async () => {
+    const fetchMock = stubFetch();
+    await generateNonStreaming({
+      messages: [{ role: "user", content: "verdict?" }],
+      model: "DeepInfra GLM 4.6",
+      deepinfraKey: "di-key",
+      maxTokens: 200,
+      reasoningEffort: "none",
+    });
+    const request = sent(fetchMock);
+    expect(request.body.reasoning_effort).toBeUndefined();
+    expect(request.body.max_tokens).toBe(200);
+  });
+});
