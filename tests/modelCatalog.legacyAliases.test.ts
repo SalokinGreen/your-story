@@ -59,6 +59,20 @@ const RETIRED: { key: string; id: string; successor: AIModelKey }[] = [
   { key: "Devstral 2", id: "devstral-2512", successor: "Mistral Medium 3.5" },
 ];
 
+/**
+ * DeepInfra's retirements of 2026-10-25 (ai_prices.ts, the DEEPINFRA MODELS
+ * note): gone from DeepInfra, without tool calling, or superseded. Phi 4 has
+ * no id alias, because OpenRouter's own Phi 4 entry calls the same id.
+ */
+const DEEPINFRA_RETIRED: { key: string; id?: string; successor: AIModelKey }[] = [
+  { key: "DeepInfra Kimi-K2-Thinking", id: "moonshotai/Kimi-K2-Thinking", successor: "DeepInfra Kimi K2.6" },
+  { key: "DeepInfra MiniMax M2", id: "MiniMaxAI/MiniMax-M2", successor: "DeepInfra DeepSeek V4 Flash" },
+  { key: "DeepInfra Phi 4", successor: "DeepInfra Nemotron 3.5 Lightning" },
+  { key: "DeepInfra DeepSeek V3.1", id: "deepseek-ai/DeepSeek-V3.1", successor: "DeepInfra DeepSeek V3.2" },
+  { key: "DeepInfra Qwen3 32B", id: "Qwen/Qwen3-32B", successor: "DeepInfra Qwen3.6 35B A3B" },
+  { key: "DeepInfra Qwen3 30B A3B", id: "Qwen/Qwen3-30B-A3B", successor: "DeepInfra Qwen3.6 35B A3B" },
+];
+
 const MISTRAL_ONLY = { mistralKey: "mistral-key" };
 const OPENROUTER_ONLY = { openRouterKey: "or-key" };
 
@@ -152,7 +166,7 @@ describe("the successors", () => {
 describe("LEGACY_MODEL_KEY_ALIASES", () => {
   it("maps exactly the retired keys, each to its successor", () => {
     expect(LEGACY_MODEL_KEY_ALIASES).toEqual(
-      Object.fromEntries(RETIRED.map((r) => [r.key, r.successor])),
+      Object.fromEntries([...RETIRED, ...DEEPINFRA_RETIRED].map((r) => [r.key, r.successor])),
     );
   });
 
@@ -170,9 +184,19 @@ describe("LEGACY_MODEL_KEY_ALIASES", () => {
   });
 
   it("every successor is a Mistral model that can call tools, so a Mistral-key pin stays on Mistral", () => {
-    for (const newKey of Object.values(LEGACY_MODEL_KEY_ALIASES)) {
-      expect(AI_MODELS[newKey].provider, newKey).toBe("mistral");
-      expect(AI_MODELS[newKey].supportsToolCalling, newKey).toBe(true);
+    for (const { successor } of RETIRED) {
+      expect(AI_MODELS[successor].provider, successor).toBe("mistral");
+      expect(AI_MODELS[successor].supportsToolCalling, successor).toBe(true);
+    }
+  });
+
+  it("every DeepInfra successor is a DeepInfra model that can call tools, so a DeepInfra-key pin stays on DeepInfra", () => {
+    for (const { key, successor } of DEEPINFRA_RETIRED) {
+      expect(Object.keys(AI_MODELS), key).not.toContain(key);
+      expect(AI_MODELS[successor].provider, successor).toBe("deepinfra");
+      expect(AI_MODELS[successor].supportsToolCalling, successor).toBe(true);
+      expect(getModelConfig(key), key).toBe(AI_MODELS[successor]);
+      expect(getRequiredKeyForModel(key), key).toBe("deepinfraKey");
     }
   });
 });
@@ -337,10 +361,13 @@ describe("a saved choice saved as a provider model id (the PDF importer's)", () 
   });
 
   it("agrees with the key aliases, pair by pair", () => {
-    for (const { id, key } of RETIRED) {
-      expect(LEGACY_PROVIDER_MODEL_IDS[id], id).toBe(LEGACY_MODEL_KEY_ALIASES[key]);
+    const withIds = [...RETIRED, ...DEEPINFRA_RETIRED].filter((r) => r.id);
+    for (const { id, key } of withIds) {
+      expect(LEGACY_PROVIDER_MODEL_IDS[id!], id).toBe(LEGACY_MODEL_KEY_ALIASES[key]);
     }
-    expect(Object.keys(LEGACY_PROVIDER_MODEL_IDS)).toHaveLength(RETIRED.length);
+    expect(Object.keys(LEGACY_PROVIDER_MODEL_IDS)).toHaveLength(withIds.length);
+    // OpenRouter's Phi 4 calls the id DeepInfra's Phi 4 did; it is left alone.
+    expect(resolveLegacyProviderModelId("microsoft/phi-4")).toBe("microsoft/phi-4");
   });
 
   it("leaves a current id, the importer's default and an unknown id alone", () => {

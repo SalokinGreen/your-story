@@ -73,11 +73,11 @@ describe("computeGMStageBudget limits", () => {
     expect(
       computeGMStageBudget(1_000_000, "Mistral Small 4").totalContextBudget,
     ).toBe(256000 - GM_STAGE_DEFAULT_OUTPUT);
-    // DeepInfra Phi 4: 16k window, 8k max output, so the model's own maximum
-    // is what is reserved, below the 12k default.
+    // DeepInfra Gemma 3 27B: 131k window, 8,192 max output, so the model's
+    // own maximum is what is reserved, below the 12k default.
     expect(
-      computeGMStageBudget(200000, "DeepInfra Phi 4").totalContextBudget,
-    ).toBe(16000 - 8000);
+      computeGMStageBudget(200000, "DeepInfra Gemma 3 27B").totalContextBudget,
+    ).toBe(131072 - 8192);
   });
 
   it("reserves the output the round requests, not the declared max", () => {
@@ -113,7 +113,7 @@ describe("getGMStageOutputTokens", () => {
       GM_STAGE_DEFAULT_OUTPUT,
     );
     expect(getGMStageOutputTokens(4000, "Kimi K3")).toBe(4000);
-    expect(getGMStageOutputTokens(50000, "DeepInfra Phi 4")).toBe(8000);
+    expect(getGMStageOutputTokens(50000, "DeepInfra Gemma 3 27B")).toBe(8192);
   });
 });
 
