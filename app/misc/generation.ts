@@ -122,6 +122,7 @@ import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
 import { resolveSystem } from "@/app/misc/systems/resolve";
 import { pendingCheck, splitPlayerLines } from "@/app/misc/turnEndChecks";
 import { deAiifyText } from "@/app/misc/deAiify";
+import { newTurnLedger } from "@/app/misc/campaign/clocks";
 import {
   executeGMTools,
   GMToolResult,
@@ -2968,6 +2969,11 @@ async function generateStoryTurnOnce(
         let gmBaseTools: unknown[] = [];
         let needsGMPromptRebuild = true;
 
+        // The turn's clock event ledger (campaign clocks tick once per
+        // trigger per turn, across rounds). Kept here, handed to every batch
+        // and replaced by the one it returns.
+        let turnLedger = newTurnLedger();
+
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
 
@@ -3541,8 +3547,10 @@ async function generateStoryTurnOnce(
                 imageJobs: options.imageToolContext,
                 abortSignal: options.abortSignal,
                 setupPlayers: options.setupPlayers,
+                turnLedger,
               },
             );
+            if (gmExecution.turnLedger) turnLedger = gmExecution.turnLedger;
 
             // Stopped during the batch (the signal fired, or Stop on the
             // setup card): the executor committed nothing, and neither do we.

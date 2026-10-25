@@ -1,5 +1,19 @@
 // Collection of the various structs used throughout the application
 
+import type { CampaignRecord } from "./campaign/types";
+export type {
+  CampaignRecord,
+  CampaignStyle,
+  Clock,
+  ClockTrigger,
+  Portent,
+  Front,
+  Faction,
+  Secret,
+  Clue,
+  Beat,
+} from "./campaign/types";
+
 export interface User {
   id: string;
   name: string;
@@ -914,6 +928,9 @@ export interface StoryData {
   // bookkeeping, not meaningful once the turn ends - don't read it elsewhere.
   notesReadThisTurn?: boolean;
   timers?: CountdownTimer[]; // Countdown timers for deadlines/events
+  // The campaign record (docs/campaign-format-design.md): factions, fronts, clocks,
+  // secrets and clues, beats. Absent on old saves, which run as they always did.
+  campaign?: CampaignRecord;
   meters?: Meter[]; // Numeric meters (Stress, Beast, Heat...), see metersAndTracks.ts
   progressTracks?: ProgressTrack[]; // Vows, conditions, enemies, journeys
   systemState?: SystemState; // Session count, once-per dedup keys, the tools switch
@@ -1080,6 +1097,7 @@ export interface PendingDirectorMove {
     | "spotlight_tag";
   targetThreadId?: string; // For tick_a_clock / put_someone_in_a_spot / offer_opportunity
   targetTimerId?: string; // For tick_a_clock
+  targetClockId?: string; // For tick_a_clock: a campaign clock (checked before targetTimerId)
   targetCouchPlayerId?: string; // For spotlight_couch_player
   targetLoreTitle?: string; // For reveal_unwelcome_truth - a StoryLore.title
   context?: string; // Why this move fired (e.g. which trigger condition)

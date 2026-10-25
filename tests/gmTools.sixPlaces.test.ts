@@ -8,7 +8,9 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildGMStagePrompt } from "@/app/misc/ai_staged";
-import { executeGMTools } from "@/app/misc/gmExecutor";
+import { executeGMTools, rollAwareToolName } from "@/app/misc/gmExecutor";
+import { stubPolicy, stubToolResult } from "@/app/misc/historyStubs";
+import { OBSERVER_UNREGISTERED_TOOLS } from "@/app/misc/observer";
 import { GM_TOOL_MAP } from "@/app/misc/gmTools";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { TOOL_LABELS } from "@/app/misc/gmToolLabels";
@@ -198,5 +200,54 @@ describe("the removed tools", () => {
       expect(r.contextForStory, r.toolName).toContain("Unknown tool");
     }
     expect(JSON.stringify(out.modifiedStoryData)).toBe(before);
+  });
+});
+
+// The campaign tool (campaign format, slice C1) is always offered, so the list
+// stays one stable list. It lives in the six places CLAUDE.md names, and in the
+// two unions and the history-stub policy the plan adds.
+describe("the campaign tool", () => {
+  const gmToolsSource = readFileSync(join(process.cwd(), "app/misc/gmTools.ts"), "utf8");
+
+  it("is offered on every kind of story", () => {
+    expect(offered(story())).toContain("campaign");
+    expect(offered(story({ diceMode: "manual" } as Partial<StoryData>))).toContain("campaign");
+    expect(offered(story({ sessionZeroActive: true } as Partial<StoryData>))).toContain("campaign");
+  });
+
+  it("has a schema, a whitelist entry, an executor, a Google entry and a label", () => {
+    expect(GM_TOOL_MAP.has("campaign"), "schema").toBe(true);
+    expect(whitelist.has("campaign"), "whitelist").toBe(true);
+    expect(gmExecutorSource, "executor").toContain('case "campaign":');
+    expect(GOOGLE_ESSENTIAL_TOOLS.has("campaign"), "google").toBe(true);
+    expect("campaign" in TOOL_LABELS, "label").toBe(true);
+  });
+
+  it("is in the params union and the result union", () => {
+    expect(gmToolsSource).toContain('{ name: "campaign"; params: CampaignParams }');
+    expect(gmExecutorSource).toContain("| GMCampaignResult");
+  });
+
+  it("is recorded as deliberately outside the Observer", () => {
+    expect(OBSERVER_UNREGISTERED_TOOLS.has("campaign")).toBe(true);
+    // not a dice tool: the Observer's outcome checks never see it
+    expect(rollAwareToolName({ toolName: "campaign" })).toBe("campaign");
+  });
+
+  it("keeps only a read result subject to size stubbing in history", () => {
+    expect(stubPolicy("campaign", { action: "tick" })).toBe("whole");
+    expect(stubPolicy("campaign", { action: "find_clue" })).toBe("whole");
+    expect(stubPolicy("campaign", { action: "read" })).toBe("by_size");
+    const long = "x ".repeat(2000);
+    expect(stubToolResult("campaign", { action: "read" }, long)).not.toBe(long);
+    expect(stubToolResult("campaign", { action: "reveal_secret" }, long)).toBe(long);
+  });
+
+  it("is hidden from the player's tool log", async () => {
+    const out = await executeGMTools(
+      [{ id: "c1", function: { name: "campaign", arguments: JSON.stringify({ action: "read" }) } }],
+      story(),
+    );
+    expect(out.results[0].hiddenFromPlayer).toBe(true);
   });
 });

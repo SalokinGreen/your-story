@@ -229,6 +229,15 @@ export function cloneDefaultObserverSettings(): ObserverSettings {
  * from Settings, and settingsFor reports them as unable to reset whatever a
  * stored config says.
  */
+/**
+ * GM tools the Observer deliberately does not register. `campaign` is not a
+ * dice tool and produces no verdict: its clock ticks come from typed results
+ * (campaign/events.ts), its writes are the GM's own bookkeeping, and there is
+ * nothing in it for a judge to compare the narration against. The six-places
+ * test holds this list, so a new tool must choose.
+ */
+export const OBSERVER_UNREGISTERED_TOOLS: ReadonlySet<string> = new Set(["campaign"]);
+
 export const FLAG_ONLY_FLAG_TYPES: ReadonlySet<ObserverFlagType> = new Set([
   "missing_oracle_or_table",
   "missing_scene_increment",

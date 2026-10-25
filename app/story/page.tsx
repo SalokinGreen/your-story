@@ -57,6 +57,7 @@ import {
 import { migrateCustomTablesToNotes } from "../misc/tableNotes";
 import { ensureStoryDataArrays } from "../misc/storyDataDefaults";
 import { addMissingBuiltinNotes } from "../misc/systems/builtinNotes";
+import { migrateTimers } from "../misc/campaign/migrate";
 import {
   enqueueImageJob,
   type ImageJobDeps,
@@ -1420,6 +1421,12 @@ function StoryPageContent() {
         logger.info(
           `[Story Load] Added ${addedBuiltin} built-in note${addedBuiltin === 1 ? "" : "s"} from the story's system`,
         );
+      }
+
+      // Countdown timers become manual clocks (idempotent, keyed by the timer id).
+      // Nothing is deleted; the timers stay beside the clocks.
+      if (migrateTimers(loadedStoryData)) {
+        logger.info("[Story Load] Migrated countdown timers to campaign clocks");
       }
 
       // A banner never survives a different story.
