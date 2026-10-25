@@ -33,7 +33,7 @@ export function graveWatcherCampaign(): CampaignRecord {
       }),
       starterFaction({
         id: "fac_gw_ashcombe",
-        name: "Ashcombe Holdings",
+        name: "Outside money",
         goal: "Recover the buried strongbox and the old waterfront deed, then buy the valley's land.",
         methods: "Cash through a nervous local man, patience, and a lawyer rather than a gun.",
         clockId: "clk_gw_ashcombe",
@@ -42,7 +42,7 @@ export function graveWatcherCampaign(): CampaignRecord {
     fronts: [
       starterFront({
         id: "frt_gw_tally",
-        name: "The Tally",
+        name: "The green light",
         doom: "On Ferry Day the count reaches sixty-three and the dead rise and walk home along the old picnic route, to the houses on Main Street, asking for supper.",
         dangers: [
           { name: "The Tally", impulse: "to count every unrecorded name until each has been spoken aloud" },
@@ -55,15 +55,14 @@ export function graveWatcherCampaign(): CampaignRecord {
           [7, "The green light stops walking. The Tally is waiting for the last name."],
         ],
         stakes: [
-          "Will the town admit what it buried?",
-          "Will Teddy Vance be turned, or caught?",
-          "What does the Watch owe sixty-three people nobody wrote down?",
+          "What is the green light looking for?",
+          "Who is the newcomer with more money than he should have, and what does he want?",
         ],
         clockId: "clk_gw_tally",
       }),
       starterFront({
         id: "frt_gw_six",
-        name: "Tower Six keeps its watch",
+        name: "Tower Six has gone quiet",
         doom: "The dead channel reaches the rest of the net, June's silence breaks, and the Board closes Six for good.",
         dangers: [
           { name: "The 2:11 call", impulse: "to be answered, by anyone, and to ask for Ines" },
@@ -73,10 +72,7 @@ export function graveWatcherCampaign(): CampaignRecord {
           [2, "The voice asks, very politely, for Ines."],
           [3, "June changes the subject twice in one evening, and a second logbook goes missing from her desk."],
         ],
-        stakes: [
-          "Who will answer the channel, and what will they promise?",
-          "Will June be forgiven for what she logged?",
-        ],
+        stakes: ["Why did Tower Six stop answering last spring?"],
         clockId: "clk_gw_six",
       }),
     ],
@@ -85,7 +81,7 @@ export function graveWatcherCampaign(): CampaignRecord {
         id: "clk_gw_season",
         name: "The season turns",
         segments: 8,
-        triggers: ["session"],
+        triggers: ["manual"],
         onFill: "Ferry Day arrives. The season is over, and what the town does that day is the ending.",
         visible: true,
       }),
@@ -197,7 +193,7 @@ export function graveWatcherCampaign(): CampaignRecord {
         title: "The Tally",
         truth:
           "On 4 May 1911 the excursion steamer Annabel Hollins went down at the landing, and sixty-three died. The owner paid the undertaker to bury them that night, unrecorded, in the field now called the Old Lot. A grieving Witch among the families laid a counting on the ground: it counts the unrecorded until every one is named aloud. It slept 114 years, and woke when someone started digging. The green light is her lantern, looking for the next name.",
-        keyPhrases: ["Tally", "Old Lot", "sixty-three", "Annabel Hollins"],
+        keyPhrases: ["Tally", "sixty-three", "Annabel Hollins"],
         clues: [
           [
             "clu_gw_tally_1",
@@ -250,7 +246,7 @@ export function graveWatcherCampaign(): CampaignRecord {
         title: "What happened at Tower Six",
         truth:
           "Last March the crew of Six, Ines Calloway and Pell Garrity, went to the Old Lot fence at 2:11 a.m. to see why there were lights. Pell went down into a freshly dug grave and died there; he was the great-grandson of one of the Tally's names. Ines fled the valley at dawn. June logged it as radio failure on the Board's instruction. Pell keeps watch on the dead channel and asks for Ines.",
-        keyPhrases: ["Tower Six", "Ines", "Pell", "2:11"],
+        keyPhrases: ["Ines", "Pell", "2:11"],
         clues: [
           [
             "clu_gw_six_1",
@@ -311,28 +307,18 @@ export function graveWatcherCampaign(): CampaignRecord {
         name: "The library and historical society",
         features: [
           "One room, one librarian, every record that exists",
-          "A Ferry Day exhibit case that has been empty for years",
-          "A registry with a hole where the Old Lot should be",
+          "A Ferry Day exhibit being set up for spring",
+          "A reading lamp that is never switched off",
         ],
         npcIds: ["npc-bea-lindqvist"],
-      }),
-      starterLocation({
-        id: "loc_gw_hendricks",
-        name: "The Hendricks place",
-        features: [
-          "A big house, empty for years, lit at three in the morning",
-          "A cellar that backs onto the Old Lot fence",
-          "A hearse in the drive on some nights",
-        ],
-        npcIds: ["npc-teddy-vance"],
       }),
       starterLocation({
         id: "loc_gw_old_lot",
         name: "The Old Lot",
         features: [
           "No records at all; it is quiet, and that is the problem",
-          "A rusted fence always a little further in than it was",
-          "Ground that sinks in rows after rain",
+          "A rusted fence that seems a little further in each time",
+          "No Watcher has patrolled it in a decade",
         ],
         npcIds: [],
       }),

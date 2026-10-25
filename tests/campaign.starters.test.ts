@@ -29,6 +29,8 @@ interface Spec {
   id: string;
   style: CampaignStyle;
   starter: BuiltinAdventure;
+  /** Words a player must not meet on the setup card: culprits' names and truths. */
+  banned: string[];
 }
 
 const byId = (list: BuiltinAdventure[], id: string): BuiltinAdventure => {
@@ -42,21 +44,25 @@ const SPECS: Spec[] = [
     id: "The Hollow Hour",
     style: "mystery",
     starter: byId(BLOOD_AND_BONE.starters, "builtin:blood-and-bone:hollow-hour"),
+    banned: ["Runa", "Sandhu", "Callum", "fledgling", "maker", "Salon", "nest", "Mum"],
   },
   {
     id: "Grave Watcher",
     style: "slice_of_life",
     starter: byId(BLOOD_AND_BONE.starters, "builtin:blood-and-bone:grave-watcher"),
+    banned: ["Tally", "Teddy", "Vance", "Ashcombe", "strongbox", "Hendricks", "sixty-three", "Annabel", "Ines", "Pell", "hearse", "cellar", "buried", "Greaves"],
   },
   {
     id: "The Last Resort",
     style: "sandbox",
     starter: byId(BLOOD_AND_BONE.starters, "builtin:blood-and-bone:last-resort"),
+    banned: ["Boarder", "Room 0", "Corbin", "Vane", "Last Dance", "Gideon", "Sunday plate", "service stairs", "spa"],
   },
   {
     id: "Wolfwillow Crossing",
     style: "adventure_path",
     starter: byId(FANTASTIC_REALMS.starters, "builtin:fantastic-realms:wolfwillow-crossing"),
+    banned: ["Hollin", "Greycrown", "king", "lantern promise", "grandfather", "Warchief", "Redthistle"],
   },
 ];
 
@@ -196,6 +202,16 @@ for (const spec of SPECS) {
       for (const s of record.secrets) expect(shown).not.toContain(s.truth);
     });
 
+    it("shows the player only what the characters can know at the start", () => {
+      const shown = JSON.stringify(publicCampaignView(record));
+      const words = [...spec.banned, ...record.secrets.flatMap((sec) => [sec.title, ...sec.keyPhrases])];
+      for (const w of words) {
+        const escaped = w.replace(/[^A-Za-z0-9 ]/g, "\$&");
+        const re = new RegExp(`(^|[^A-Za-z])${escaped}([^A-Za-z]|$)`, "i");
+        expect(re.test(shown), `"${w}" appears on the card`).toBe(false);
+      }
+    });
+
     it("has a brief inside its budget that holds no secret's truth", () => {
       const brief = formatCampaignBrief(story);
       expect(brief.length).toBeGreaterThan(0);
@@ -226,6 +242,29 @@ for (const spec of SPECS) {
   });
 }
 
+describe("the starters' clock pacing", () => {
+  const rec = (id: string) => storyFor(SPECS.find((x) => x.id === id)!).campaign!;
+  const clk = (id: string, cid: string) => rec(id).clocks.find((c) => c.id === cid)!;
+
+  it("ticks the hunter on scenes only, and the goblins on scenes rather than every miss", () => {
+    expect(clk("The Hollow Hour", "clk_hh_hunter").triggers).toEqual(["scene"]);
+    expect(clk("Wolfwillow Crossing", "clk_ww_goblins").triggers).toEqual(["scene"]);
+  });
+
+  it("leaves the season and bank clocks to the GM, who ticks them with the calendar", () => {
+    expect(clk("Grave Watcher", "clk_gw_season").triggers).toEqual(["manual"]);
+    expect(clk("The Last Resort", "clk_lr_bank").triggers).toEqual(["manual"]);
+  });
+});
+
+describe("the brief names a style without underscores", () => {
+  it("prints slice of life", () => {
+    const story = storyFor(SPECS[1]);
+    expect(formatCampaignBrief(story)).toContain("slice of life");
+    expect(formatCampaignBrief(story)).not.toContain("slice_of");
+  });
+});
+
 describe("the starters' triggers can fire", () => {
   it("uses no `rest` trigger in Blood & Bone, which has no take_rest", () => {
     for (const spec of SPECS.filter((s) => s.starter.id.includes("blood-and-bone"))) {
@@ -242,6 +281,21 @@ describe("a started starter in session zero", () => {
     const block = buildSessionZeroBlock(story);
     expect(block).toContain("shipped with its campaign already built");
     expect(block).toContain("campaign_review");
+    expect(block).not.toContain("build it with the `campaign` tool");
+    expect(block).not.toContain("then build the campaign");
+    expect(block).toContain("review the shipped campaign");
+  });
+
+  it("does not tell the GM to build the campaign once every step is covered", () => {
+    const base = { ...storyFor(spec), sessionZeroActive: true, setup: { mode: "full" } } as StoryData;
+    const steps = getCreationSteps(base);
+    const covered = {
+      table: steps.filter((st) => st.scope === "table").map((st) => st.id),
+      players: { solo: steps.filter((st) => st.scope === "player").map((st) => st.id) },
+    };
+    const block = buildSessionZeroBlock({ ...base, setup: { mode: "full", covered } } as StoryData);
+    expect(block).toContain("The campaign is already built");
+    expect(block).not.toContain("write the sheet and build the campaign");
   });
 
   it("keeps the starter mark when the player changes the style, so the review step stays", () => {

@@ -28,7 +28,7 @@ export function wolfwillowCampaign(): CampaignRecord {
     factions: [
       starterFaction({
         id: "fac_ww_goblins",
-        name: "The Redthistle goblins",
+        name: "The goblins",
         goal: "Get south, away from whatever is stirring under Greyhill.",
         methods: "Early raids, scouts who steal pies, and a Warchief who will go through any farm to save his people.",
       }),
@@ -48,7 +48,7 @@ export function wolfwillowCampaign(): CampaignRecord {
     fronts: [
       starterFront({
         id: "frt_ww_king",
-        name: "Hollin Greycrown wakes",
+        name: "The barrow on Greyhill",
         doom: "On the night of the last lantern the barrow opens, and Hollin Greycrown, a king buried alive by his own people, rises to come home.",
         dangers: [
           { name: "Hollin Greycrown", impulse: "to be remembered, and to come home" },
@@ -61,14 +61,14 @@ export function wolfwillowCampaign(): CampaignRecord {
           [7, "A light walks on Greyhill, carrying nothing."],
         ],
         stakes: [
-          "Will the village lay the king to rest by name, fight him, or bargain with him?",
-          "Will the heroes learn the lantern promise before the barrow opens?",
+          "What is stirring on Greyhill?",
+          "Will the village be ready for whatever it is?",
         ],
         clockId: "clk_ww_king",
       }),
       starterFront({
         id: "frt_ww_goblins",
-        name: "The Redthistle flight",
+        name: "Goblins in the orchards",
         doom: "The goblins, fleeing the hill, raid Oakhallow Mill under their Warchief; the dam cracks and the barrow's moat starts to drain.",
         dangers: [
           { name: "The Goblin Warchief", impulse: "to get his people south, over any farm that stands in the way" },
@@ -79,8 +79,8 @@ export function wolfwillowCampaign(): CampaignRecord {
           [5, "Smoke rises over Oakhallow Mill at dusk."],
         ],
         stakes: [
-          "Will the heroes stop the raid, or understand it?",
-          "What does Wynn do when he learns what his dam has done?",
+          "Why are the goblins early this year?",
+          "Will the heroes stop the raids, or understand them?",
         ],
         clockId: "clk_ww_goblins",
       }),
@@ -98,8 +98,8 @@ export function wolfwillowCampaign(): CampaignRecord {
       starterClock({
         id: "clk_ww_goblins",
         name: "The goblins grow bold",
-        segments: 6,
-        triggers: ["miss"],
+        segments: 8,
+        triggers: ["scene"],
         link: { kind: "front", id: "frt_ww_goblins" },
         onFill: "The Warchief leads a real raid on Oakhallow Mill by night.",
         visible: true,
@@ -153,7 +153,7 @@ export function wolfwillowCampaign(): CampaignRecord {
         title: "The king under Greyhill",
         truth:
           "Hollin Greycrown, a king buried alive by his own people, lies in the barrow on Greyhill and is waking. The new dam at Oakhallow Mill has changed the water, and the river no longer fills the barrow's moat. The Redthistle goblins have always known he was there, and are fleeing south from his stirring. He can be fought, laid to rest by giving him back his name and a funeral, or bargained with.",
-        keyPhrases: ["Hollin", "Greycrown", "barrow", "king"],
+        keyPhrases: ["Hollin", "Greycrown", "king"],
         clues: [
           [
             "clu_ww_king_1",
@@ -177,7 +177,7 @@ export function wolfwillowCampaign(): CampaignRecord {
         title: "The lantern promise",
         truth:
           "Orrin Fash's grandfather swore the village to keep a lantern on the bridge so that the king, if he ever woke, would know the way home and not come looking. The village has kept the promise as a custom and forgotten the reason. The best endings give the king what the promise only postponed: his name, a light and a burial done right.",
-        keyPhrases: ["lantern", "promise", "Orrin"],
+        keyPhrases: ["lantern promise", "grandfather"],
         clues: [
           [
             "clu_ww_lantern_1",
@@ -203,7 +203,7 @@ export function wolfwillowCampaign(): CampaignRecord {
         name: "The bridge",
         features: [
           "Long, wooden and hung with paper lanterns",
-          "One lantern on the middle post that is never lit",
+          "A paper lantern hung from every post along the rails",
           "The old willow leaning from the far bank",
         ],
         npcIds: ["npc-tobin-sparrowgate"],
@@ -243,7 +243,7 @@ export function wolfwillowCampaign(): CampaignRecord {
         name: "Greyhill",
         features: [
           "A green hill above the village with a standing stone",
-          "A barrow ringed by a moat that is draining",
+          "A barrow ringed by an old moat",
           "A silence where the birds should be",
         ],
         npcIds: [],

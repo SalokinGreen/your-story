@@ -45,7 +45,7 @@ export function lastResortCampaign(): CampaignRecord {
       }),
       starterFaction({
         id: "fac_lr_corbin",
-        name: "Corbin & Vane Hospitality",
+        name: "Outside interests",
         goal: "Buy the Belhaven's land and build a spa.",
         methods: "A man inside the family, a patient offer, and the bank as an ally.",
         clockId: "clk_lr_corbin",
@@ -54,7 +54,7 @@ export function lastResortCampaign(): CampaignRecord {
     fronts: [
       starterFront({
         id: "frt_lr_boarder",
-        name: "The Boarder",
+        name: "The cold below",
         doom: "On the last night of the season the decade falls due: a living guest is kept in the building, as the 1924 bargain requires.",
         dangers: [
           { name: "The Boarder", impulse: "to be treated as a paying guest, at last" },
@@ -66,8 +66,7 @@ export function lastResortCampaign(): CampaignRecord {
           [6, "The cold climbs the hotel floor by floor, and the dead stop speaking above a whisper."],
         ],
         stakes: [
-          "Will the family feed it, evict it, check it out or bargain with it?",
-          "What will the dead do if the thing that holds them goes?",
+          "What lives below the Belhaven, and what does it want?",
         ],
         clockId: "clk_lr_boarder",
       }),
@@ -105,7 +104,7 @@ export function lastResortCampaign(): CampaignRecord {
         id: "clk_lr_bank",
         name: "The bank's deadline",
         segments: 8,
-        triggers: ["session"],
+        triggers: ["manual"],
         link: { kind: "front", id: "frt_lr_bank" },
         onFill: "Founders' Weekend ends and the month turns. The bank acts on the loan.",
         visible: true,
@@ -195,7 +194,7 @@ export function lastResortCampaign(): CampaignRecord {
         title: "How Winnie died",
         truth:
           "Winifred Alder died of heart failure on the service stairs between the boiler room and the kitchen, carrying the Sunday plate back up, uneaten. She had decided to stop feeding the Boarder, hoping to starve it out or make it show itself. The thing downstairs called her name up the stairwell for an hour and she ran. It never touched her. It does not need to.",
-        keyPhrases: ["Winnie", "service stairs", "Sunday plate"],
+        keyPhrases: ["service stairs", "Sunday plate", "counting the stairs"],
         clues: [
           [
             "clu_lr_death_1",
@@ -224,7 +223,7 @@ export function lastResortCampaign(): CampaignRecord {
         title: "What is in the boiler room",
         truth:
           "In 1924 Cornelius Belhaven signed a guest into Room 0, which is on no plans, and agreed a rent: one plate each Sunday, and a lodger who would not leave once every decade. The Boarder is not a demon but a guest that cannot check out. It holds every resident on the register, which is why the dead cannot leave. It can be checked out only by someone with a right to the register, and that signature is Dara's now.",
-        keyPhrases: ["Boarder", "Room 0", "boiler"],
+        keyPhrases: ["Boarder", "Room 0"],
         clues: [
           [
             "clu_lr_boarder_1",
@@ -248,7 +247,7 @@ export function lastResortCampaign(): CampaignRecord {
         title: "The song",
         truth:
           "'Last Dance at the Belhaven' was the tune of the 1924 opening night, and the number the drummer never reached at the Gala of '58. Its last bar is the Boarder's invitation: the one dance it was never given. Played in full, the Boarder comes up to the Silver Room as a guest for a single dance, the one time it can be spoken to in person, and a mortal who dances it becomes the decade's lodger.",
-        keyPhrases: ["Last Dance", "gramophone", "Silver Room"],
+        keyPhrases: ["Last Dance"],
         clues: [
           [
             "clu_lr_song_1",
@@ -308,7 +307,7 @@ export function lastResortCampaign(): CampaignRecord {
         name: "The basement",
         features: [
           "A green steel door to the boiler room",
-          "The Sunday door, a small hatch beside the boiler",
+          "Pipes that tick after dark",
           "Heat that is flat, steady and not quite warm",
         ],
         npcIds: ["npc-hester-quill"],
@@ -328,7 +327,7 @@ export function lastResortCampaign(): CampaignRecord {
         name: "Winnie's suite",
         features: [
           "Room 401, with her tea still warm on the table",
-          "A desk with a register that has one blank page",
+          "A desk full of her handwriting",
           "A stairwell to the roof",
         ],
         npcIds: [],
@@ -338,7 +337,7 @@ export function lastResortCampaign(): CampaignRecord {
         name: "The kitchen and cold store",
         features: [
           "A range that lights at 3 a.m.",
-          "A cold store frosted over from the inside",
+          "A cold store with a heavy latch",
           "Tickets that arrive from nowhere",
         ],
         npcIds: ["npc-anselm-rooke"],

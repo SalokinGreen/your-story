@@ -110,7 +110,7 @@ const CAMPAIGN_REVIEW_STEP: CreationStep = {
   label: "Review the campaign",
   group: "world",
   scope: "table",
-  hint: 'This adventure ships with a built campaign (read it with the campaign tool). Summarise its public parts in a few lines: the pitch, the factions and fronts by name with their stakes, the locations and the visible clocks. Never read out secrets, dooms, portents or what a person hides. Ask what they would change, and apply it with the campaign tool (edit, add or remove); "nothing" is a real answer. Do not rebuild it.',
+  hint: 'This adventure ships with a built campaign (read it with the campaign tool). Tell the player in a few lines only what their characters could know at the start: the pitch and tone, the places, the factions by name and any clock marked visible. Never read out or hint at secrets, dooms, portents, what a person hides, or what a front is really about. Ask what they would change, and apply it with the campaign tool (edit, add or remove); "nothing" is a real answer. Do not rebuild it.',
 };
 
 /** The world steps of a story whose campaign a starter shipped. */

@@ -776,12 +776,12 @@ report's §11.3. The ones that shape play:
   is a `mystery` (`hollowHourCampaign.ts`: a hunter front and a "Margot loses
   patience" front, two secrets with three clues each, Runa, Callum and Margot
   as people, four endings), *Grave Watcher* a `slice_of_life`
-  (`grave-watcher/campaign.ts`: a season clock on `session`, the Tally and
+  (`grave-watcher/campaign.ts`: a season clock the GM ticks about every four weeks, the Tally and
   Tower Six as slow manual fronts, Ashcombe Holdings with a faction clock,
   twelve regulars with wants, three secrets with four clues, six locations,
   the three Ferry Day endings) and *The Last Resort* a `sandbox`
   (`last-resort/campaign.ts`: four factions, the Boarder and the bank as
-  fronts, four secrets, six locations, the four endings). Blood & Bone has no
+  fronts (the bank clock ticked weekly by hand), four secrets, six locations, the four endings). Blood & Bone has no
   `take_rest`, so none of its clocks use `rest`.
   **The core's "Reading abilities" line** (decisions 174–177, after Codex
   reviewed the whole book on 2026-10-24) is how every ability is read:
@@ -837,7 +837,7 @@ report's §11.3. The ones that shape play:
   offered every note, so the loader would never add one). Its campaign is an
   `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
   Week, the barrow king's front (a hidden clock on `rest`) and the goblins'
-  flight (a visible clock on `miss`), two secrets with three clues each, and
+  flight (a visible clock on `scene`), two secrets with three clues each, and
   the seven village people as the starter's NPCs (`people.ts`).
   **A shipped record is `origin: "starter"`** (`starterKit.ts` builds them,
   with fixed ids): session zero then replaces the `campaign` step with

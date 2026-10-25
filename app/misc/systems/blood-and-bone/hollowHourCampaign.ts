@@ -43,7 +43,7 @@ export function hollowHourCampaign(): CampaignRecord {
     fronts: [
       starterFront({
         id: "frt_hh_hunter",
-        name: "The hunter closes in",
+        name: "A night running out",
         doom: "Callum finds Runa before the Cohort does and ends her, and the Vigil learns who was too slow.",
         dangers: [
           { name: "Callum Reyes", impulse: "to end the killing tonight, by whatever means is closest to hand" },
@@ -54,14 +54,14 @@ export function hollowHourCampaign(): CampaignRecord {
           [5, "Three flashes of light come up the shaft: Callum has her scent."],
         ],
         stakes: [
-          "Will Runa be killed, taught or handed over?",
-          "Does Callum learn what the Cohort are before he learns what Runa is?",
+          "Will the Cohort find what is feeding in the tunnels before someone else does?",
+          "What will they do with it when they do?",
         ],
         clockId: "clk_hh_hunter",
       }),
       starterFront({
         id: "frt_hh_heat",
-        name: "Margot's patience",
+        name: "The Heat",
         doom: "The Heat reaches 4 and Margot Severin steps on stage herself; the Cohort's problem becomes her solution.",
         dangers: [
           { name: "Margot Severin", impulse: "to make the mortal investigation stop and take the credit for it" },
@@ -81,7 +81,7 @@ export function hollowHourCampaign(): CampaignRecord {
         id: "clk_hh_hunter",
         name: "Callum reaches the nest",
         segments: 6,
-        triggers: ["scene", "miss"],
+        triggers: ["scene"],
         link: { kind: "front", id: "frt_hh_hunter" },
         onFill:
           "Callum finds Runa first. Unless the Cohort stands between them, she is dead or caged before dawn and he holds a file that points at the Cohort.",
@@ -195,7 +195,7 @@ export function hollowHourCampaign(): CampaignRecord {
         features: [
           "A slow drip, and under it a faint tapping",
           "Doors painted with numbers older than the lines",
-          "A nest of coats behind the third door",
+          "Fresh footprints that stop at a blank wall",
         ],
         npcIds: ["npc-runa-sandhu"],
       }),

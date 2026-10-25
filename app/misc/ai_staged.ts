@@ -1356,6 +1356,7 @@ function creationStepList(story: StoryData): string {
 function creationRules(
   progress: SetupProgress,
   mode: "quick" | "full",
+  shipped = false,
 ): string {
   const next = progress.creation.missing[0];
   const lines: string[] = [];
@@ -1376,7 +1377,9 @@ function creationRules(
     );
   } else if (mode === "full") {
     lines.push(
-      "Every step is covered: write the sheet and build the campaign from the answers, then confirm_setup.",
+      shipped
+        ? "Every step is covered: write the sheet, then confirm_setup. The campaign is already built; change only what the player asked to."
+        : "Every step is covered: write the sheet and build the campaign from the answers, then confirm_setup.",
     );
   }
   return lines.join("\n");
@@ -1415,17 +1418,18 @@ function setupNextStep(
   }
 }
 
-function setupModeLines(mode: "quick" | "full"): string {
+function setupModeLines(mode: "quick" | "full", shipped = false): string {
+  const campaignWord = shipped ? "review the shipped campaign" : "build the campaign";
   if (mode === "full") {
     return `MODE: step by step.
 - Ask the setup steps (listed below) in order before writing anything: character steps one per \`ask_question\` call, table and world steps may share a call.
 - Each question offers 2-4 options and a custom answer; never fill in a choice the player did not make.
-- Write the sheet only after every step is covered, then build the campaign from what you learned.
+- Write the sheet only after every step is covered, then ${campaignWord} ${shipped ? "with the player" : "from what you learned"}.
 - Keep each reply short: the question, no story.`;
   }
   return `MODE: quick setup.
 - Ask only 2-4 short questions with \`ask_question\`, then PROPOSE: make the choices the player left open yourself.
-- Write the sheet and build the campaign without asking about every field. The player can change anything on the setup card.
+- Write the sheet and ${campaignWord} without asking about every field. The player can change anything on the setup card.
 - Use the creation rules (below, when present) as grounding for what is legal, not as a script to walk through.
 - Keep each reply short: the question or the proposal, no story.`;
 }
@@ -1510,7 +1514,11 @@ function campaignSetupGuide(story: StoryData): string {
     story.campaign && story.campaign.origin !== "migrated"
       ? story.campaign
       : undefined;
-  const lines: string[] = ["## CAMPAIGN (build it with the `campaign` tool)"];
+  const lines: string[] = [
+    record?.origin === "starter"
+      ? "## CAMPAIGN (shipped built; change it with the `campaign` tool)"
+      : "## CAMPAIGN (build it with the `campaign` tool)",
+  ];
   if (record?.origin === "starter") {
     lines.push(
       "This adventure shipped with its campaign already built. Do not rebuild it: read it (`campaign` read), review its public parts with the player (the `campaign_review` step), and change only what they ask for. Its secrets, dooms and what people hide are yours; keep them off the card and out of the table talk.",
@@ -1556,12 +1564,12 @@ export function buildSessionZeroBlock(story: StoryData): string {
   const lore = story.lore ?? [];
 
   let out = `\n## 🎭 SESSION ZERO - SETTING UP THE STORY\n${setupChecklist(progress)}\n\n${setupNextStep(progress, mode)}\n\n`;
-  out += `RULE: until \`start_game\` succeeds you never narrate the story. Every turn you either ask the player (\`ask_question\`), do a setup step (write the sheet or build the campaign) or call \`confirm_setup\`. A short out-of-character line is fine. Do not describe scenes, play out events or roll for the story yet.\n\n`;
-  out += setupModeLines(mode) + "\n";
+  out += `RULE: until \`start_game\` succeeds you never narrate the story. Every turn you either ask the player (\`ask_question\`), do a setup step (write the sheet or ${story.campaign?.origin === "starter" ? "review the campaign" : "build the campaign"}) or call \`confirm_setup\`. A short out-of-character line is fine. Do not describe scenes, play out events or roll for the story yet.\n\n`;
+  out += setupModeLines(mode, story.campaign?.origin === "starter") + "\n";
 
   const stepList = creationStepList(story);
   if (stepList) out += `\n${stepList}\n`;
-  out += `\n${creationRules(progress, mode)}\n`;
+  out += `\n${creationRules(progress, mode, story.campaign?.origin === "starter")}\n`;
   out += `\n${campaignSetupGuide(story)}\n`;
 
   const template =
