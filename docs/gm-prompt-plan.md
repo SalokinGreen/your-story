@@ -285,3 +285,29 @@ revised section, with the "beyond noise" rule there.
   `manage_track` (action `progress_roll`) when it is offered (this replaces the
   earlier note that `progress_roll` never appears).
 - The `isPinnedNoteType` comments no longer say mechanics is pinned.
+
+### 2026-10-25, slice 4
+
+- **There is no person setting.** The only control is `storytellerMode` (`dm`
+  says second person already). The person rule therefore lives in the fixed
+  `NARRATOR_SYSTEM_PROMPT` (second person by default; a style note naming another
+  person, or the tense and person of "Earlier in the story", wins) and the
+  continuation prompt repeats it for Narrator mode; DM mode gained only the
+  perception clause. Narrator mode used to name no person at all.
+- **Perception and the hidden-text case are in the system message**, which is
+  constant, so the stable block and the cache stay byte-identical
+  (`tests/gmPrompt.narration.test.ts`). The GM request is untouched.
+- **The behavioural case** is `evals/generation/narration-hidden-note-stays-out.json`,
+  not `evals/turns/public/`, because that folder is the judge set (30 to 50
+  judge turns, a test counts them). A generation fixture's `expect` only had
+  `calls` and `noCalls`; the case adds `expect.narrationExcludes` (phrases the
+  narration must not contain) with `noCalls: []`. The format type in
+  `evalFormat.ts` was not edited (G2 owns the runner); the runner must read the
+  new key. The live run is owed (`docs/pending_tests.md`).
+- **Player notes (coordinator's fix).** `story.player_notes` (Settings default
+  notes, copied into each story) now joins the narration context's stable block
+  under "The player's own style notes (these override your defaults for person,
+  tense and style)", through `stripHiddenLoreContent`; the system message says
+  they override the default person. `author_notes` (the Designer's private GM
+  notes) are deliberately not carried. Rewrites get both, as they continue the
+  same context.

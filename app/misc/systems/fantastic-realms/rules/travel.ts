@@ -28,7 +28,7 @@ Run it with start_challenge, mode "tally", rounds = the days, 2 to 5 (a one-day 
 - Let any hero lead a day. Another helps (FR — Group play), and a hero with a fitting feat (*Knows Every Road*) is the natural pick.
 
 ## The road
-The shared table is FR — On the road (each realm will add its own, later): roll it with formula_roll on a miss, or when a journey needs a moment. An encounter is a scene, not a roll for its own sake: a stranger, a toll, a storm, a sign.
+The shared table is FR — On the road, and each realm's tables note (FR — Aurelane tables and its siblings) has a d20 of its own: roll it with formula_roll on a miss, or when a journey needs a moment. An encounter is a scene, not a roll for its own sake: a stranger, a toll, a storm, a sign.
 
 ## The Thin Mile
 Where one realm gives way to the next, the road thins: a mile of mist, a ford, a gate, a stretch of burnt ground. The Thin Mile is a scene, not a roll. Say what changes when the party crosses it: the rest rule, the realm's magic and its miscasts, the local callings. The heroes keep all they carry. A condition from one realm may mean something else in the next: *Hollow-Eyed* is a sorrow in Gloamreach and a fashion in Aurelane. Call take_rest with the realm the party is resting in.`,

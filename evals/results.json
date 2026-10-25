@@ -1,0 +1,5 @@
+{
+  "v": 1,
+  "note": "Empty until a run: node scripts/eval-judges.mjs --go writes the summary here. Settings reads it at build time and shows nothing for a judge it holds no figure for.",
+  "modes": []
+}

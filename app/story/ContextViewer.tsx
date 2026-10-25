@@ -274,6 +274,12 @@ function TurnHistoryCard({ turn }: { turn: TurnSummary }) {
                       [{f.severity}] {f.type}
                     </span>
                     : {f.detail}
+                    {f.finding && (
+                      <span className="block text-ys-muted">
+                        Finding: &ldquo;{f.finding.evidence}&rdquo;
+                        {f.finding.fix ? ` - fix: ${f.finding.fix}` : ""}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

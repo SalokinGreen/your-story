@@ -446,7 +446,7 @@ always runs **before** the story stage:
    a rewrite sees, and only on this path). Claude's cache marks apply to
    tool-carrying requests only, so this tool-less call keeps just the
    `session_id` (`:narration`) and the stable block's byte-identity. The narrator
-   no longer sees lore, memory or the summary (a quality risk plan G4 revisits). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
+   no longer sees lore, memory or the summary (a quality risk the plan leaves open). Its fixed system message (`NARRATOR_SYSTEM_PROMPT`, GM prompt plan G4) names the grammatical person (second, unless a style note or the earlier narration uses another), says to write only what the character perceives, and gives the excluded case with an invented example (hidden text is never narrated, not even by hint); the continuation prompt repeats person and perception. The stable block also carries the player's own style notes (`player_notes`, which override the default person, tense and style; never `author_notes`). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
    default GLM 5.3 through OpenRouter, decision 50), not the GM's tier model.
 3. **The choices stage** — a separate call on the narration model
    (`generateChoicesWithRetry` → `parseChoices`), only when
@@ -881,6 +881,15 @@ report's §11.3. The ones that shape play:
   with a Debug Logs line, and a note with one recorded version (Blood & Bone's)
   never changes. **Changing a built-in note's text means appending its new hash**
   (`tests/systems.noteUpdate.test.ts` fails when the last entry is not current).
+  **The original realms grown (slice E3, `world/realms/`, one file per realm,
+  ids unchanged):** each of Aurelane, Larkenfell and Gloamreach is a realm note
+  (a "Magic here" section, two local callings in the Callings format, and twelve
+  foes, each stat line followed by a `*Tactics:*` line) and a new tables note,
+  `builtin:fantastic-realms:realm-<id>-tables` (type `table`: a d12 miscast
+  table, a d20 treasure table and a d20 "On the road" table); the shared
+  treasure and foes tables grew (`checkTableShape` now accepts a d12). Magic,
+  Callings and Travel point at them. The three new notes ride in the Crossroads
+  pack, so the loader offers them to existing stories.
   **Its campaign** is an
   `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
   Week, the barrow king's front (a hidden clock on `rest`) and the goblins'
@@ -1554,6 +1563,15 @@ keeps the draft and drops the acknowledgement. After narration the same checks
 run once more for the Debug Logs; the pacing hits make a GM-only
 `ScenePart.pacingNote`, carried into the next live block under the story-progress
 check-in (decision 235).
+
+**Judge layer v2, slice J5: Settings and the turn details** (plan slice 5).
+`judges/measured.ts` bundles `evals/results.json` (a committed stub until the
+author's first `eval-judges.mjs --go`) and gives Settings each judge's measured
+precision at the rewriting severity (`MEASURED_JUDGES`; nothing shown when absent);
+`JUDGE_DEFAULT_OVERRIDES` (`observer.ts`, empty) holds the judges that ship as Flag
+below 0.7, updated by hand from the report. The turn's work line shows
+`publicNotice` as "Checked" or "Revised after a check" (`TurnWorkLine`); the private
+`finding` is in the Debug Logs and the Context Viewer only.
 
 **Judge layer v2, slice J2: the combined judge call** (`docs/judge-layer-v2-plan.md`
 slice 2; confirmation and the rewrite with facts are J3, below).

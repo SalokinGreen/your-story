@@ -195,9 +195,12 @@ describe("review fixes", () => {
     expect(CORE_NOTE.content).toContain("leave target out");
   });
 
-  it("hedges what the realms add later", () => {
-    expect(MAGIC_NOTE.content).toContain("added with the realms in a later release");
-    expect(CALLINGS_NOTE.content).toContain("with the realms in a later release");
+  it("points at the realm notes now that they carry the realm content (E3)", () => {
+    expect(MAGIC_NOTE.content).not.toContain("later release");
+    expect(MAGIC_NOTE.content).toContain("FR — Aurelane tables");
+    expect(CALLINGS_NOTE.content).not.toContain("later release");
+    expect(CALLINGS_NOTE.content).toContain("Dragon-Sworn");
+    expect(byId("travel").content).not.toContain("later");
   });
 
   it("states the journey length and names the hero for a hearth use", () => {
