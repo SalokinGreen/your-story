@@ -649,6 +649,8 @@ export type ManageFeatsAction =
   | "add_scar"
   | "scar_to_feat"
   | "use"
+  | "retire"
+  | "rejoin"
   | "add_party_feat"
   | "remove_party_feat";
 
@@ -2107,7 +2109,7 @@ const manageFeatsTool: ToolSchema = {
           enum: [
             "add", "rename", "remove", "burn", "break", "lose", "recover", "mend",
             "add_condition", "clear_condition", "add_scar", "scar_to_feat", "use",
-            "add_party_feat", "remove_party_feat",
+            "retire", "rejoin", "add_party_feat", "remove_party_feat",
           ],
         },
         feat: { type: "string", description: "The feat's wording (add) or current wording; use: a feat or named move" },

@@ -682,6 +682,8 @@ export interface FantasticRealmsHero {
   /** Award sources already credited to this hero (award_xp refuses repeats). */
   rewards: string[];
   conditions?: HeroCondition[];
+  /** Died or left the party: kept for history, out of party rests, default selections and the hero line. */
+  retired?: boolean;
   /** Counted uses spent, keyed "<featId>:<scene|rest|adventure>". */
   uses?: Record<string, number>;
 }

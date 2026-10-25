@@ -7073,7 +7073,9 @@ function executeManageFeats(
     action === "add_condition" ||
     action === "clear_condition" ||
     action === "add_scar" ||
-    action === "scar_to_feat"
+    action === "scar_to_feat" ||
+    action === "retire" ||
+    action === "rejoin"
   );
   if (needsFeat && !feat) return fail(`manage_feats needs "feat"`);
   const key = normalizeKey(name);
@@ -7169,6 +7171,14 @@ function executeManageFeats(
     if (isFail(target)) return target;
     if (action === "remove") {
       hero = { ...existing!, feats: existing!.feats.filter((f) => f.id !== target.id) };
+      // A later feat may reuse the id: it must not inherit this one's counters.
+      if (hero.uses) {
+        const kept = Object.fromEntries(
+          Object.entries(hero.uses).filter(([k]) => !k.startsWith(`${target.id}:`))
+        );
+        if (Object.keys(kept).length > 0) hero.uses = kept;
+        else delete hero.uses;
+      }
       line = `${name} lost the feat "${target.wording}"`;
     } else {
       const next = frStr(params.new_wording);
@@ -7223,9 +7233,12 @@ function executeManageFeats(
   } else if (action === "add_condition" || action === "add_scar") {
     const word = frStr(params.condition);
     if (!match(word)) return fail(`${action} needs "condition"`);
-    hero = existing ?? { name, feats: [], rewards: [] };
+    // Only an existing hero takes a condition: a foe or an NPC is not a hero.
+    const missing = needExisting();
+    if (missing) return missing;
+    hero = existing!;
     if (!hero.name) hero = { ...hero, name };
-    const have = (hero.conditions ?? []).find((c) => match(c.word) === match(word));
+    const have =(hero.conditions ?? []).find((c) => match(c.word) === match(word));
     if (have) {
       // Each word is stored once; giving it again does nothing (design 14).
       state.heroes[key] = hero;
@@ -7294,13 +7307,33 @@ function executeManageFeats(
     if (remaining.length > 0) hero.conditions = remaining;
     else delete hero.conditions;
     line = `${name}'s scar "${scar.word}" became the feat "${next}"`;
+  } else if (action === "retire" || action === "rejoin") {
+    // A hero who died or left the party is kept for history but is out of the
+    // party rest, the default hero selections and the hero line.
+    const missing = needExisting();
+    if (missing) return missing;
+    if (action === "retire") {
+      if (existing!.retired) return fail(`${name} has already left the party`);
+      hero = { ...existing!, retired: true };
+      line = `${name} left the party: kept for history, out of party rests, awards and the hero line`;
+    } else {
+      if (!existing!.retired) return fail(`${name} has not left the party`);
+      hero = { ...existing! };
+      delete hero.retired;
+      line = `${name} rejoined the party`;
+    }
   } else if (action === "use") {
     const missing = needExisting();
     if (missing) return missing;
     const per = params.per;
     if (!per || !FR_USE_PERS.includes(per)) return fail(`use needs "per": scene, rest or adventure`);
-    const limit = params.limit === undefined ? 1 : params.limit;
-    if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 99) {
+    if (
+      params.limit !== undefined &&
+      (typeof params.limit !== "number" ||
+        !Number.isInteger(params.limit) ||
+        params.limit < 1 ||
+        params.limit > 99)
+    ) {
       return fail(`limit must be a whole number from 1 up`);
     }
     const ownFeat = frFindFeat(existing!.feats, feat);
@@ -7316,12 +7349,22 @@ function executeManageFeats(
     const counterKey = usageKey(id, per);
     const book = partyFeat ? state.partyUses ?? {} : existing!.uses ?? {};
     const spent = book[counterKey] ?? 0;
+    // The limit is fixed by the first use (kept beside the counter, so it
+    // resets with it) and a later call may not choose another.
+    const limitKey = `${id}:limit:${per}`;
+    const storedLimit = book[limitKey];
+    if (storedLimit !== undefined && params.limit !== undefined && params.limit !== storedLimit) {
+      return fail(
+        `"${label}" is counted at ${storedLimit} per ${per}; the limit cannot change until it resets`
+      );
+    }
+    const limit = storedLimit ?? params.limit ?? 1;
     if (spent >= limit) {
       return fail(
         `"${label}" has already been used ${spent} of ${limit} ${limit === 1 ? "time" : "times"} this ${per}`
       );
     }
-    const nextBook = { ...book, [counterKey]: spent + 1 };
+    const nextBook = { ...book, [counterKey]: spent + 1, [limitKey]: limit };
     if (partyFeat) {
       state.partyUses = nextBook;
       hero = existing!;
@@ -7331,7 +7374,7 @@ function executeManageFeats(
     line = `${name} used "${label}" (${spent + 1} of ${limit} this ${per})`;
   } else {
     return fail(
-      `manage_feats action must be add, rename, remove, burn, break, lose, recover, mend, add_condition, clear_condition, add_scar, scar_to_feat, use, add_party_feat or remove_party_feat`
+      `manage_feats action must be add, rename, remove, burn, break, lose, recover, mend, add_condition, clear_condition, add_scar, scar_to_feat, use, retire, rejoin, add_party_feat or remove_party_feat`
     );
   }
   state.heroes[key] = hero;
@@ -7390,6 +7433,7 @@ function frResolveContributor(
   const hero = state.heroes[key];
   if (!hero) return { error: `${heroName} has no feats recorded. Add them with manage_feats first.` };
   const who = frDisplayName(storyData, key);
+  if (hero.retired) return { error: `${who} has left the party` };
   if (frIsDown(storyData, who, hero)) {
     return { error: `${who} is down and cannot ${role === "help" ? "help" : "burn a feat"}` };
   }
@@ -7419,6 +7463,7 @@ async function executeFeatRoll(
   }
   // Refusals, in order. None of them writes anything: the burns, the team-burn
   // counter and the helper are recorded only once the faces exist.
+  if (hero.retired) return fail(`${name} has left the party`);
   if (frIsDown(storyData, name, hero)) {
     return fail(
       `${name} is down and cannot roll, help or burn a feat until a rest or a healing spell lifts them`
@@ -7563,7 +7608,7 @@ async function executeFeatRoll(
 
   const spells = [...poolFeats, ...(ownBurn ? [ownBurn] : [])].filter((f) => f.kind === "spell");
   const magic = spells.length > 0;
-  const qualities = used.flatMap(itemQualities);
+  const qualities = [...poolFeats, ...(ownBurn ? [ownBurn] : [])].flatMap(itemQualities);
   const damage = attackDamage(result, qualities);
   const target = typeof params.target === "string" ? params.target.trim() : "";
   const keenBonus = damage > 0 && damage > attackDamage(result, []);
@@ -7639,6 +7684,7 @@ async function executeInitiativeRoll(
     const name = frHeroName(e);
     if (!name) return fail(`every initiative entry needs a "hero"`);
     const hero = state.heroes[normalizeKey(name)];
+    if (hero?.retired) return fail(`${name} has left the party`);
     if (frIsDown(storyData, name, hero)) {
       return fail(`${name} is down and takes no part in the fight until a rest or a healing spell lifts them`);
     }
@@ -7720,7 +7766,9 @@ function frSelectHeroes(
   storyData: StoryData,
   named: unknown
 ): { keys: string[] } | { error: string } {
-  const all = Object.keys(frState(storyData).heroes);
+  const heroes = frState(storyData).heroes;
+  // A hero who left the party is kept but not selected by default.
+  const all = Object.keys(heroes).filter((k) => !heroes[k].retired);
   if (named === undefined || named === null) {
     return all.length > 0
       ? { keys: all }
@@ -7732,6 +7780,9 @@ function frSelectHeroes(
   const keys: string[] = [];
   for (const n of named as string[]) {
     const k = normalizeKey(n);
+    if (heroes[k]?.retired) {
+      return { error: `${frDisplayName(storyData, k)} has left the party (manage_feats rejoin brings them back)` };
+    }
     const hasMeters = (storyData.meters ?? []).some((m) => normalizeKey(m.owner) === k);
     if (!all.includes(k) && !hasMeters) {
       return {
@@ -7919,7 +7970,7 @@ function executeTakeRest(
   storyData.meters = meters;
   // A rest that includes every hero in the state is a party rest: it renews
   // the team burns and the hearth's per-rest uses. A partial rest does not.
-  const allKeys = Object.keys(state.heroes);
+  const allKeys = Object.keys(state.heroes).filter((k) => !state.heroes[k].retired);
   const partyRest = allKeys.length > 0 && allKeys.every((k) => picked.keys.includes(k));
   if (partyRest) {
     delete state.teamBurnsUsed;
@@ -7941,7 +7992,7 @@ function executeTakeRest(
   }
   ctx += partyRest
     ? `\n[Party rest: every hero rested, so the team burns are renewed (${TEAM_BURNS_PER_REST} of ${TEAM_BURNS_PER_REST} left)]`
-    : `\n[Partial rest: not every hero rested, so the team burns are not renewed (${Math.max(0, TEAM_BURNS_PER_REST - (state.teamBurnsUsed ?? 0))} of ${TEAM_BURNS_PER_REST} left)]`;
+    : `\n[Partial rest: ${allKeys.filter((k) => !picked.keys.includes(k)).map((k) => frDisplayName(storyData, k)).join(", ")} did not rest, so the team burns are not renewed (${Math.max(0, TEAM_BURNS_PER_REST - (state.teamBurnsUsed ?? 0))} of ${TEAM_BURNS_PER_REST} left)]`;
   if (condition) {
     ctx += `\n[Rest condition in ${realm}: ${condition} Whether the fiction allows it is your call.]`;
   } else if (realm) {

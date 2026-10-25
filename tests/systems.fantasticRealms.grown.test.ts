@@ -299,14 +299,14 @@ describe("manage_feats: items, conditions, scars and counted uses", () => {
     s = (await use("scene", "Sword", 2)).story;
     expect((await use("scene", "Sword", 2)).result.success).toBe(false);
     s = (await use("adventure", "Armor")).story;
-    expect(Object.keys(bryn(s).uses!).sort()).toEqual(["feat-3:scene", "feat-4:adventure", "~rally:rest"]);
+    expect(Object.keys(bryn(s).uses!).sort()).toEqual(["feat-3:limit:scene", "feat-3:scene", "feat-4:adventure", "feat-4:limit:adventure", "~rally:limit:rest", "~rally:rest"]);
 
     // A scene ends: only the scene counter goes.
     const scene = await run(s, "increment_scene", {});
-    expect(Object.keys(bryn(scene.story).uses!).sort()).toEqual(["feat-4:adventure", "~rally:rest"]);
+    expect(Object.keys(bryn(scene.story).uses!).sort()).toEqual(["feat-4:adventure", "feat-4:limit:adventure", "~rally:limit:rest", "~rally:rest"]);
     // A rest ends the rest counters of the heroes who rested.
     const rest = await run(scene.story, "take_rest", {});
-    expect(Object.keys(bryn(rest.story).uses!)).toEqual(["feat-4:adventure"]);
+    expect(Object.keys(bryn(rest.story).uses!)).toEqual(["feat-4:adventure", "feat-4:limit:adventure"]);
     // The adventure ends.
     const end = await run(rest.story, "end_session", { reason: "x" });
     expect(bryn(end.story).uses).toBeUndefined();
@@ -329,7 +329,7 @@ describe("manage_feats: items, conditions, scars and counted uses", () => {
     expect(fr(s).partyFeats).toEqual([{ id: "party-1", wording: "Library", burned: false }]);
     expect((await run(s, "manage_feats", { action: "add_party_feat", feat: "library" })).result.success).toBe(false);
     s = (await run(s, "manage_feats", { hero: "Bryn", action: "use", feat: "Library", per: "adventure" })).story;
-    expect(fr(s).partyUses).toEqual({ "party-1:adventure": 1 });
+    expect(fr(s).partyUses).toEqual({ "party-1:adventure": 1, "party-1:limit:adventure": 1 });
     expect((await run(s, "manage_feats", { hero: "Bryn", action: "use", feat: "Library", per: "adventure" })).result.success).toBe(false);
     const end = await run(s, "end_session", { reason: "x" });
     expect(fr(end.story).partyUses).toBeUndefined();
@@ -646,7 +646,7 @@ describe("take_rest", () => {
     s = (await run(s, "manage_feats", { hero: "Bryn", action: "use", feat: "Rally", per: "rest" })).story;
     const out = await run(s, "take_rest", { heroes: ["Bryn"] });
     expect(bryn(out.story).uses).toBeUndefined();
-    expect(mira(out.story).uses).toEqual({ "~prayer:rest": 1 });
+    expect(mira(out.story).uses).toEqual({ "~prayer:rest": 1, "~prayer:limit:rest": 1 });
   });
 });
 
@@ -761,6 +761,110 @@ describe("the heroes' line in the live block", () => {
     );
   });
 });
+
+describe("engine review fixes", () => {
+  it("retire takes a hero out of the party rest, default selections, rolls and the hero line; rejoin undoes it", async () => {
+    let s = await party();
+    const burn = (hero: string, own: string, partner: string, feat: string) =>
+      run(s, "feat_roll", { hero, feats: [], dc: 3, reason: "x", dice: [1], team_burn: { hero: partner, feat, own_feat: own } });
+    s = (await burn("Bryn", "Brave", "Mira", "Healer")).story;
+    expect(fr(s).teamBurnsUsed).toBe(1);
+    const retired = await run(s, "manage_feats", { hero: "Mira", action: "retire" });
+    expect(retired.result.success).toBe(true);
+    s = retired.story;
+    expect(mira(s).retired).toBe(true);
+    expect((await run(s, "manage_feats", { hero: "Mira", action: "retire" })).result.success).toBe(false);
+    // A rest of everyone still in the party is a party rest.
+    const rest = await run(s, "take_rest", {});
+    expect((rest.result.result as GMTakeRestResult).partyRest).toBe(true);
+    expect(fr(rest.story).teamBurnsUsed).toBeUndefined();
+    expect(rest.story.meters!.find((m) => m.owner === "Mira" && m.name === "Hearts")!.value).toBe(3);
+    // Awards skip them by default, and naming them is refused.
+    const xp = await run(s, "award_xp", { amount: 100, source: "goblins" });
+    expect((xp.result.result as { credited: string[] }).credited).toEqual(["Bryn"]);
+    expect((await run(s, "award_xp", { amount: 100, source: "x", heroes: ["Mira"] })).result.success).toBe(false);
+    // They cannot roll, help or be a partner, and are not on the hero line.
+    expect((await run(s, "feat_roll", { hero: "Mira", feats: [], dc: 3, reason: "x", dice: [4] })).result.success).toBe(false);
+    expect((await run(s, "feat_roll", { hero: "Bryn", feats: [], dc: 3, reason: "x", dice: [4, 4], help: { hero: "Mira", feat: "Lantern" } })).result.success).toBe(false);
+    expect(formatHeroFeatsState(s)).not.toContain("Mira");
+    // Back in.
+    const back = await run(s, "manage_feats", { hero: "Mira", action: "rejoin" });
+    expect(mira(back.story).retired).toBeUndefined();
+    expect(formatHeroFeatsState(back.story)).toContain("Mira");
+    expect((await run(back.story, "manage_feats", { hero: "Mira", action: "rejoin" })).result.success).toBe(false);
+  });
+
+  it("a partial rest names who did not rest", async () => {
+    const s = await party();
+    const out = await run(s, "take_rest", { heroes: ["Bryn"] });
+    expect(text(out.result)).toContain("Mira did not rest");
+  });
+
+  it("a condition or scar for a name with no hero record is refused and creates nothing", async () => {
+    const s = await party();
+    for (const action of ["add_condition", "add_scar"]) {
+      const out = await run(s, "manage_feats", { hero: "Goblin", action, condition: "Frightened" });
+      expect(out.result.success, action).toBe(false);
+      expect(fr(out.story).heroes["goblin"]).toBeUndefined();
+    }
+  });
+
+  it("Keen on a team-burned item gives the same damage whether or not it was also in feats", async () => {
+    let s = await party();
+    s = (await run(s, "manage_feats", { hero: "Bryn", action: "add", feat: "Keen Axe", kind: "item", qualities: ["keen"] })).story;
+    const swing = (feats: string[]) =>
+      run(s, "feat_roll", {
+        hero: "Bryn", feats, dc: 3, reason: "x", target: "Goblin", dice: [6, 1],
+        team_burn: { hero: "Mira", feat: "Healer", own_feat: "Keen Axe" },
+      });
+    const listed = await swing(["Brave", "Keen Axe"]);
+    const unlisted = await swing(["Brave"]);
+    expect((listed.result.result as GMFeatRollResult).damage).toBe(3);
+    expect((unlisted.result.result as GMFeatRollResult).damage).toBe(3);
+  });
+
+  it("Down reads the Hearts meter the way the executors do, a hand-made lower-case one included", async () => {
+    const s = (await chain(frStory(), feats("Bryn", ["Brave"]))).story;
+    s.meters = [
+      { id: "bryn::hearts", owner: "Bryn", name: "hearts", min: 0, max: 3, cap: 3, floor: 0, value: 0 },
+    ] as Meter[];
+    expect(formatHeroFeatsState(s)).toContain("DOWN");
+    expect(html(s)).toContain("Down");
+    expect((await run(s, "feat_roll", { hero: "Bryn", feats: [], dc: 3, reason: "x", dice: [4] })).result.success).toBe(false);
+  });
+
+  it("removing a feat drops its counters, so a reused id starts clean", async () => {
+    let s = await party();
+    s = (await run(s, "manage_feats", { hero: "Bryn", action: "use", feat: "Armor", per: "rest" })).story;
+    expect(bryn(s).uses).toBeDefined();
+    s = (await run(s, "manage_feats", { hero: "Bryn", action: "remove", feat: "Armor" })).story;
+    expect(bryn(s).uses).toBeUndefined();
+    s = (await run(s, "manage_feats", { hero: "Bryn", action: "add", feat: "Shield" })).story;
+    expect(featOf(bryn(s), "Shield").id).toBe("feat-4");
+    expect((await run(s, "manage_feats", { hero: "Bryn", action: "use", feat: "Shield", per: "rest" })).result.success).toBe(true);
+  });
+
+  it("the first use fixes the limit; a different one is refused until the counter resets", async () => {
+    let s = await party();
+    const use = (limit?: number) =>
+      run(s, "manage_feats", { hero: "Bryn", action: "use", feat: "Rally", per: "scene", ...(limit ? { limit } : {}) });
+    s = (await use(2)).story;
+    const bigger = await use(5);
+    expect(bigger.result.success).toBe(false);
+    expect(text(bigger.result)).toContain("counted at 2 per scene");
+    // Omitting it uses the stored one.
+    s = (await use()).story;
+    const full = await use();
+    expect(text(full.result)).toContain("already been used 2 of 2");
+    // After the scene ends it may be chosen again.
+    s = (await run(s, "increment_scene", {})).story;
+    expect((await use(5)).result.success).toBe(true);
+  });
+});
+
+const htmlOf = (s: StoryData) =>
+  renderToStaticMarkup(createElement(MetersPanel, { meters: s.meters, heroFeats: fr(s).heroes }));
+const html = htmlOf;
 
 describe("the Meters panel", () => {
   const html = (s: StoryData) =>

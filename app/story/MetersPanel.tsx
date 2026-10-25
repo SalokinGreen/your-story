@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
-import { currentThreshold, normalizeKey } from "@/app/misc/metersAndTracks";
+import { currentThreshold, findMeter, normalizeKey } from "@/app/misc/metersAndTracks";
 import { isDown } from "@/app/misc/systems/fantastic-realms/engine";
 import type {
   FantasticRealmsHero,
@@ -270,7 +270,7 @@ export default function MetersPanel({
   const tracks = progressTracks ?? [];
   const challenge = activeChallenge?.active ? activeChallenge : undefined;
   const featHeroes = Object.entries(heroFeats ?? {}).filter(
-    ([, h]) => h.feats.length > 0 || (h.conditions ?? []).length > 0,
+    ([, h]) => !h.retired && (h.feats.length > 0 || (h.conditions ?? []).length > 0),
   );
   if (
     visibleMeters.length === 0 &&
@@ -342,9 +342,7 @@ export default function MetersPanel({
               {(() => {
                 const hero = heroFeats?.[normalizeKey(owner)];
                 if (!hero) return null;
-                const hearts = (meters ?? []).find(
-                  (m) => m.owner === owner && m.name === "Hearts",
-                )?.value;
+                const hearts = findMeter(meters, owner, "Hearts")?.value;
                 return (
                   <FeatChips hero={hero} down={isDown(hearts, hero.conditions)} />
                 );

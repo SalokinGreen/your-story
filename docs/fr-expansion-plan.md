@@ -366,3 +366,32 @@ Judgment calls the plan left to the builder. None changes the plan's scope.
 - **Tool budget:** the Fantastic Realms list grew from 11,118 to 11,443 tokens
   (the system extra from +1,139 to +1,462 of the 1,500 allowed). No schema
   text had to move into the core note, but there is 57 tokens of room left.
+
+### 2026-10-25 — E1 engine-review fixes
+
+`engine-review` found nothing blocking; these were fixed, each with a test in
+`tests/systems.fantasticRealms.grown.test.ts` ("engine review fixes").
+
+- **`retire` / `rejoin`** (two enum values on `manage_feats`, `hero.retired`).
+  A retired hero is kept for history but is out of the party-rest test, the
+  default selections of `award_xp` and `take_rest` (naming one is refused),
+  `feat_roll` (as roller, helper or partner), `initiative_roll`, the hero line
+  and the Meters panel chips. Without it a dead hero would stop team burns
+  renewing for good. The "Partial rest" line now names who did not rest.
+- **`add_condition` / `add_scar` refuse a name with no hero record**, as
+  `clear_condition` does, so a Frightened Goblin never becomes a hero.
+- **Keen reads the same set as the magic check** (the pool feats plus the
+  team-burned own feat), so listing that item in `feats` or not gives the
+  same damage.
+- **Down is read one way.** The hero line and the Meters panel use
+  `findMeter(meters, owner, "Hearts")`, as the executors do.
+- **Removing a feat drops its `uses`** (keys starting with `<id>:`), so a
+  reused id starts clean.
+- **`use`'s limit is fixed by the first use**, stored beside the counter as
+  `<id>:limit:<per>` (so it resets with it); a different limit later is
+  refused until the counter resets; omitting it uses the stored one.
+- **Spec notes.** "Per adventure" resets at `end_session`, so in practice it is
+  per session. `manage_feats burn` on a hero who is down stays allowed: it is
+  the GM applying a miscast cost, not the hero acting.
+- **Tool budget after the fixes:** 11,449 tokens against the 11,500 limit
+  (+1,468 of the 1,500 system extra); 51 tokens of room.

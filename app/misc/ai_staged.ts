@@ -27,7 +27,7 @@ import {
   type SetupProgress,
 } from "@/app/misc/campaignPlan";
 import { cleanString } from "@/app/misc/textUtils";
-import { currentThreshold, filledBoxes, normalizeKey } from "@/app/misc/metersAndTracks";
+import { currentThreshold, filledBoxes, findMeter, normalizeKey } from "@/app/misc/metersAndTracks";
 import { resolveSystem } from "@/app/misc/systems/resolve";
 import {
   getCreationProgress,
@@ -543,6 +543,7 @@ export function formatHeroFeatsState(
   const lines: string[] = ["## 🛡️ HEROES' FEATS"];
   for (const key of keys) {
     const hero = fr.heroes[key];
+    if (hero.retired) continue;
     const name =
       hero.name ??
       (storyData.meters ?? []).find(
@@ -556,9 +557,8 @@ export function formatHeroFeatsState(
     if (conditions) line += `; conditions: ${conditions}`;
     const scars = describeScars(hero.conditions);
     if (scars) line += `; scars: ${scars}`;
-    const hearts = (storyData.meters ?? []).find(
-      (m) => normalizeKey(m.owner) === key && m.name === "Hearts",
-    )?.value;
+    // The same lookup the executors use for Down (a hand-made "hearts" meter counts).
+    const hearts = findMeter(storyData.meters, name, "Hearts")?.value;
     if (isDown(hearts, hero.conditions)) line += `; DOWN`;
     lines.push(line);
   }

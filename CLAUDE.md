@@ -835,7 +835,7 @@ report's §11.3. The ones that shape play:
   that are not scars), never stored. `featUsable` is the one check a feat
   passes in `feat_roll`, `initiative_roll`, helping and team burns. `manage_feats`
   grew `burn`, `break`/`lose`/`recover`/`mend`, `add_condition`/`clear_condition`/`add_scar`/`scar_to_feat`,
-  `use` (a feat, a hearth improvement or a named move, with `per` and `limit`)
+  `retire`/`rejoin` (a hero who died or left is out of party rests and defaults), `use` (a feat, a hearth improvement or a named move, with `per` and a `limit` fixed by the first use)
   and `add_party_feat`/`remove_party_feat`. `feat_roll` takes `hindered_by`
   (a die each, pool floor 1), `help` (one helper, +1 die) and `team_burn` (two
   sure successes, no dice from the two burned feats, twice per party rest);
@@ -849,7 +849,7 @@ report's §11.3. The ones that shape play:
   `:adventure` ones. `record_challenge_result` takes `hit` only in a story
   that runs Fantastic Realms (`tallyScore`). The "Fantastic Realms party" set
   holds Supplies (world, 0–6, start 3). The tool list for a Fantastic Realms
-  story is 11,443 tokens against the 11,500 limit: a new parameter needs text
+  story is 11,449 tokens against the 11,500 limit: a new parameter needs text
   moved out of the schemas first.
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9
   chaos factor) and the 45 **built-in** Mythic element tables. The
