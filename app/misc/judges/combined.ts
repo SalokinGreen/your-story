@@ -113,6 +113,15 @@ export function pickMajorFlag(
   settings: ObserverSettings | undefined,
   allowed: (type: ObserverFlagType) => boolean = () => true,
 ): ObserverFlag | undefined {
+  return majorFlagsInOrder(flags, settings, allowed)[0];
+}
+
+/** Every major flag the player let correct the turn, highest priority first. */
+export function majorFlagsInOrder(
+  flags: readonly ObserverFlag[],
+  settings: ObserverSettings | undefined,
+  allowed: (type: ObserverFlagType) => boolean = () => true,
+): ObserverFlag[] {
   const rank = (type: ObserverFlagType) => {
     const i = FLAG_PRIORITY.indexOf(type);
     return i < 0 ? FLAG_PRIORITY.length : i;
@@ -124,7 +133,7 @@ export function pickMajorFlag(
         allowed(f.type) &&
         settingsFor(settings, f.type).triggersReset,
     )
-    .sort((a, b) => rank(a.type) - rank(b.type))[0];
+    .sort((a, b) => rank(a.type) - rank(b.type));
 }
 
 /** What the combined call reads of a turn. */
@@ -244,7 +253,7 @@ export function planCalls(judges: readonly JudgeId[], facts: readonly Fact[]): J
 // Parsing and validating the verdicts
 // ---------------------------------------------------------------------------
 
-function normalizeQuote(text: string): string {
+export function normalizeQuote(text: string): string {
   return text
     .replace(/[‘’‛]/g, "'")
     .replace(/[“”]/g, '"')
@@ -256,7 +265,7 @@ function normalizeQuote(text: string): string {
 }
 
 /** A fragment without the quote marks and stray punctuation a judge wraps around it. */
-function trimFragment(fragment: string): string {
+export function trimFragment(fragment: string): string {
   return fragment.replace(/^[\s"'`.,;:!?-]+|[\s"'`.,;:!?-]+$/g, "");
 }
 
@@ -421,10 +430,16 @@ export function judgeMaxTokens(judgeCount: number, narration: string): number {
   return Math.min(8000, 260 * judgeCount + 240 + Math.ceil(narration.length / 3));
 }
 
-async function callJudges(
+/**
+ * One judge call for the given judges. The combined call uses it per planned
+ * group; the confirming judge (confirm.ts) uses it with one judge and another
+ * model, `role` only naming the call in the cost breakdown and the logs.
+ */
+export async function callJudges(
   turn: JudgeTurn,
   judges: JudgeId[],
   apiOptions: ObserverApiOptions,
+  role: "judge" | "confirm" = "judge",
 ): Promise<Partial<Record<JudgeId, JudgeVerdict>>> {
   const factsByJudge: Partial<Record<JudgeId, Fact[]>> = {};
   const allowedFactIds: Partial<Record<JudgeId, ReadonlySet<string>>> = {};
@@ -463,7 +478,10 @@ async function callJudges(
   });
 
   const unknownAll = (reason: string): Partial<Record<JudgeId, JudgeVerdict>> => {
-    logger.action("Judges: no verdicts", { judges, reason });
+    logger.action(role === "confirm" ? "Confirming judge: no verdict" : "Judges: no verdicts", {
+      judges,
+      reason,
+    });
     const out: Partial<Record<JudgeId, JudgeVerdict>> = {};
     for (const id of judges) out[id] = { ...UNKNOWN };
     return out;
@@ -472,7 +490,7 @@ async function callJudges(
   try {
     const result = await callSideModel({
       stage: "observer",
-      label: `judges (${judges.join(", ")})`,
+      label: role === "confirm" ? `confirming judge (${judges.join(", ")})` : `judges (${judges.join(", ")})`,
       model: apiOptions.model,
       messages: [
         { role: "system", content: system },
@@ -495,12 +513,14 @@ async function callJudges(
       allowedFactIds,
     });
     for (const p of parsed.problems) {
-      logger.action(`Judge ${p.judge}: unknown`, { reason: p.reason });
+      logger.action(`${role === "confirm" ? "Confirming judge" : "Judge"} ${p.judge}: unknown`, {
+        reason: p.reason,
+      });
     }
     for (const id of judges) {
       const v = parsed.verdicts[id];
       if (v && v.severity !== "none" && v.severity !== "unknown") {
-        logger.action(`Judge ${id}: ${v.severity}`, {
+        logger.action(`${role === "confirm" ? "Confirming judge" : "Judge"} ${id}: ${v.severity}`, {
           evidence: v.evidence,
           factIds: v.factIds,
           fix: v.fix,
@@ -646,7 +666,17 @@ export function combinedResultToFlags(
     const v = result.verdicts[judge];
     if (!v) continue;
     const flag = flagFor(judge, v, ctx);
-    if (flag) flags.push(flag);
+    if (flag) {
+      flags.push({
+        ...flag,
+        finding: {
+          evidence: v.evidence,
+          factIds: v.factIds,
+          // A leak or a line could be named by its own fix: those keep none.
+          fix: judge === "secret_leak" || judge === "lines_veils" ? "" : v.fix,
+        },
+      });
+    }
   }
   return flags;
 }

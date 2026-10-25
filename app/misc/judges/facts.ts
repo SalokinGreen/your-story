@@ -10,6 +10,7 @@
  * world-consistency judge, which is its first reader.
  */
 import type { ClockReport } from "../campaign/clocks";
+import { publicSummary } from "../turnTimeline";
 import type { Fact, FactTopic, JudgeId, JudgeStoryView, JudgeToolResult } from "./types";
 
 /** Tool results that carry a ruling or a state change worth handing a judge. */
@@ -38,11 +39,18 @@ const FACT_TOOLS: ReadonlySet<string> = new Set([
   "campaign",
 ]);
 
-/** The first line of a result's text, bounded, without the player-redacted tail. */
+/**
+ * A tool result as the player-facing summary says it (turnTimeline.ts
+ * `publicSummary`, the text the narration context is built from), bounded and on
+ * one line. A result the player never sees (a hidden roll, the campaign tool)
+ * has none and so is no fact: the judges, and through their `fix` the rewrite,
+ * never read what the GM kept behind the screen, and an NPC roll's reason
+ * (which the summary strips) never reaches either.
+ */
 function resultLine(r: JudgeToolResult): string {
-  const text = (r.contextForStory ?? "").trim();
-  const first = text.split("\n")[0] ?? "";
-  return first.length > 320 ? `${first.slice(0, 317)}...` : first;
+  const summary = publicSummary(r as Parameters<typeof publicSummary>[0], {});
+  const flat = (summary ?? "").replace(/\s+/g, " ").trim();
+  return flat.length > 320 ? `${flat.slice(0, 317)}...` : flat;
 }
 
 function isErrorText(r: JudgeToolResult): boolean {

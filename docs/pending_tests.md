@@ -10,6 +10,53 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — Judge layer J3: confirmation and the rewrite with facts
+
+Everything below needs a live model and the author's go, plus an OpenRouter key
+(the confirming judge is GLM 5.3). The gate, the fix plan, the re-check, the
+facts and what leaves the host are covered by `tests/judges.confirm.test.ts`,
+`tests/generation.confirm.test.ts` and the updated generation suites; the
+labelled set (J4) measures the judges themselves. The Settings card needs the
+browser preview and a screenshot, which a worker without a display cannot take.
+
+- **The Rewrite confirmation card.** Settings → AI → Advanced settings: under
+  Observer there is a "Rewrite confirmation" card, off by default, saying
+  "Off - GLM 5.3 confirms (needs your OpenRouter key), effort none". Switching it
+  on offers a model picker starting at GLM 5.3 and an effort picker; the pick
+  survives a reload. The three judges of the record (World Consistency, Secret
+  Leak, Lines and Veils) offer "Rewrite automatically" in the Architecture tab.
+- **A real agency or length rewrite is confirmed.** Play a turn that gets an
+  agency or length flag as a rewrite (say "go on" and watch for the GM voicing
+  your character, or a long answer to a one-line action). In the Debug Logs a
+  "Confirming judge agentic/…: major" line comes before "Observer rewrote…", the
+  cost breakdown shows one "confirming judge (…)" call on GLM 5.3, and the turn
+  says "Revised after a check" with "Undo revision". Failure looks like the
+  confirming judge never agreeing ("the confirming judge quoted something else"
+  on every turn: GLM paraphrases instead of quoting), so nothing is ever
+  rewritten.
+- **The fix plan parses with a real model.** On those rewrites the Debug Logs
+  should not say "the reply has no prose separator" or "a fix plan span is not
+  in the original text". Failure looks like the narration model ignoring the
+  `===PROSE===` instruction or quoting a span with different punctuation; then
+  every rewrite is rejected and the original is released with its flag.
+- **No key means a flag, not a failure.** Remove the OpenRouter key (keep a Z.ai
+  or Mistral key) and play a flagged turn: the Debug Logs say "Rewrite skipped:
+  no second judge to confirm the finding", the turn is released unchanged with its
+  flag, and nothing errors. Pick the Observer's own family as the confirming
+  model: the same line, naming the family.
+- **A secret never reaches the rewrite.** In a campaign with an unrevealed
+  secret and Secret Leak set to Rewrite automatically, play a turn whose
+  narration states the secret. Expected: "Revised after a check", the new text
+  does not state or hint at it, and the "Copy GM context"/Debug Logs show the
+  rewrite request without the secret's truth (the confirming request has it, by
+  design). Failure looks like the truth in the rewrite request, or the rewrite
+  restating it.
+- **Online guests.** Host a room, play a revised turn, and look at the guest's
+  screen: the revised text only, no Undo, no flag. (The campaign data in the same
+  snapshot is the named gap, 6.12.)
+- **Latency.** A rewrite turn now waits for the judge, the confirmation (two in
+  parallel at most) and the rewrite. Note the wait.
+
 ## 2026-10-25 — Fantastic Realms E1 (the engine)
 
 The engine is covered by `tests/systems.fantasticRealms.grown.test.ts`; the

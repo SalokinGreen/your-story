@@ -2659,72 +2659,7 @@ describe("rewriteFlaggedNarration", () => {
     expect(userMessage).toContain("formula_roll: SUCCESS");
   });
 
-  it("adds conditional 'fix this too' clauses for the checks named in alsoFixIfPresent", async () => {
-    // The speculative rewrite starts before the other reviewers have answered,
-    // and the turn only gets one rewrite - so their complaints ride along
-    // conditionally rather than being lost.
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ content: "You draw your sword, saying nothing." }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await rewriteFlaggedNarration({
-      narration: Array(400).fill("word").join(" "),
-      playerChoice: "I draw my sword",
-      flag: {
-        type: "response_length",
-        severity: "major",
-        detail: "This turn ran 400 words.",
-        correctivePrompt: "Shorter.",
-      },
-      alsoFixIfPresent: ["player_agency", "outcome_narration_mismatch"],
-      apiOptions: { model: "test-model", token: "tok" },
-    });
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    const prompt = body.messages
-      .map((m: { content: string }) => m.content)
-      .join("\n");
-    expect(prompt).toContain("makes a significant choice for them");
-    expect(prompt).toContain("contradicts what a roll or check mechanically");
-    // Conditional, never asserted as found - a clean narration must not be
-    // "corrected" for a problem it doesn't have.
-    expect(prompt).toContain("have NOT necessarily been found here");
-    expect(prompt).toContain("Do not invent a problem to fix");
-  });
-
-  it("skips alsoFixIfPresent entries a rewrite could not fix, and the flag's own type", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ content: "You draw your sword, saying nothing." }),
-    });
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await rewriteFlaggedNarration({
-      narration: "You draw your sword and apologize.",
-      playerChoice: "I draw my sword",
-      flag,
-      // The tool-usage and tier checks are complaints about tool calls and
-      // reasoning tier, not about the prose - no clause exists for them.
-      // player_agency is the flag being fixed already.
-      alsoFixIfPresent: [
-        "player_agency",
-        "missing_oracle_or_table",
-        "missing_scene_increment",
-        "tier_escalation_missed",
-      ],
-      apiOptions: { model: "test-model", token: "tok" },
-    });
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    const prompt = body.messages
-      .map((m: { content: string }) => m.content)
-      .join("\n");
-    expect(prompt).not.toContain("have NOT necessarily been found here");
-  });
-
-  it("produces the unchanged prompt when alsoFixIfPresent is omitted", async () => {
+  it("gives the single-flag prompt (no fix plan) when no findings are handed over", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ content: "You draw your sword, saying nothing." }),

@@ -12,7 +12,7 @@ import type { GenerationCallbacks } from "@/app/misc/generation";
 import { createMockGMFetch, sseStreamResponse } from "./helpers/mockGMFetch";
 import { expectAlternatingRoles } from "./helpers/roles";
 import { FLAG_ONLY_OBSERVER_SETTINGS } from "./helpers/observerSettings";
-import { isJudgeCall, judgeReply, requestedJudges } from "./helpers/combinedJudges";
+import { isJudgeCall, judgeReply, requestedJudges, rewriteReply } from "./helpers/combinedJudges";
 import { cloneDefaultObserverSettings } from "@/app/misc/observer";
 import type { StoryData } from "@/app/misc/structs";
 import type { ObserverSettings } from "@/app/misc/observer";
@@ -105,7 +105,7 @@ const baseOptions: GenerationOptions = {
 
 interface Call {
   url: string;
-  body: { messages: { role: string; content: string }[]; tools?: unknown[] };
+  body: { messages: { role: string; content: string }[]; tools?: unknown[]; model?: string };
 }
 const first = (c: Call) => c.body.messages[0]?.content ?? "";
 const last = (c: Call) => c.body.messages[c.body.messages.length - 1]?.content ?? "";
@@ -146,7 +146,9 @@ function installFetch(
               agency: { severity: "major" as const, fix: "Spoke for the player." },
             }),
           })
-        : scripted;
+        : isRewrite(call)
+          ? rewriteReply(call.body, scripted)
+          : scripted;
       return { ok: true, json: async () => ({ content }) } as unknown as Response;
     }
     if (isChoices(call)) {
@@ -382,8 +384,10 @@ describe("the blocking pass waits only on the judges that can rewrite (follow-up
     // Before the player sees anything: only the rewriting judges and the rewrite.
     const before = events.slice(0, release);
     expect(before).not.toContain("call:other");
-    expect(calls.filter(isLengthJudge)).toHaveLength(1);
-    expect(calls.filter(isAgencyJudge)).toHaveLength(1);
+    // One call each from the first judge, plus the second family confirming a major.
+    const firstJudge = (c: Call) => c.body.model !== "GLM 5.3";
+    expect(calls.filter(isLengthJudge).filter(firstJudge)).toHaveLength(1);
+    expect(calls.filter(isAgencyJudge).filter(firstJudge)).toHaveLength(1);
     // The flag-only judges (tool usage, tier) ran, once each, after release.
     const others = calls.filter(
       (c) => c.url === "/api/generate" && !isRewrite(c) && !isAnyJudge(c),

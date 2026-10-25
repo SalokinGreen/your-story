@@ -1097,7 +1097,7 @@ export default function Story({
         undoLabel={revision ? "Undo revision" : "Undo"}
         undoTitle={
           revision
-            ? `The ${revision.flag.type.replace(/_/g, " ")} check revised this response (${revision.flag.detail}) - undo puts the GM's original back`
+            ? "Undo revision puts the GM's original back"
             : "Undo last action"
         }
         onEdit={onEdit && !busy ? () => startEditing(partIndex) : undefined}

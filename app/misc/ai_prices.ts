@@ -3,6 +3,7 @@ import {
   isClaudeCliAvailablePlatform,
   isClaudeCliUsable,
 } from "@/app/misc/claudeCliModels";
+import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 
 export const AI_MODELS = {
   "Grok 4.5": {
@@ -1474,6 +1475,63 @@ export function hasKeyForModel(
       ? "openRouterKey"
       : null;
   return field ? !!keys[field] : false;
+}
+
+/** The vendor prefix of a provider's model id, mapped to one family name. */
+const FAMILY_BY_VENDOR: Readonly<Record<string, string>> = {
+  anthropic: "anthropic",
+  "z-ai": "zai",
+  "zai-org": "zai",
+  zai: "zai",
+  google: "google",
+  deepseek: "deepseek",
+  "deepseek-ai": "deepseek",
+  mistralai: "mistral",
+  mistral: "mistral",
+  "x-ai": "xai",
+  qwen: "qwen",
+  openai: "openai",
+  "meta-llama": "meta",
+  moonshotai: "moonshot",
+  minimax: "minimax",
+};
+
+/**
+ * The model family a key belongs to, for the judge layer's rule that the
+ * confirming judge comes from another family than the first one (design 11.5,
+ * decision 228: a judge favours its own family's writing). Read from the
+ * catalog's own data: a Claude subscription model is Anthropic's, a provider
+ * that serves only its own models (DeepSeek, Google AI Studio, Mistral, Z.ai)
+ * names the family, and an OpenRouter or DeepInfra id carries its vendor
+ * before the slash. A custom model's UUID is its own family: nothing says what
+ * it is, so it is never taken for the first judge's.
+ */
+export function confirmModelFamily(modelKey: string): string {
+  const key = resolveModelKeyAlias(modelKey);
+  if (!Object.prototype.hasOwnProperty.call(AI_MODELS, key)) {
+    // A custom model names its OpenRouter id ("vendor/model"): the vendor is the family.
+    const vendor = getCustomModelIfUUID(key)?.modelId?.split("/")[0]?.toLowerCase();
+    return vendor ? (FAMILY_BY_VENDOR[vendor] ?? vendor) : `custom:${key}`;
+  }
+  const config = AI_MODELS[key as AIModelKey] as unknown as AIModelConfig;
+  switch (config.provider) {
+    case "claude-cli":
+      return "anthropic";
+    case "deepseek":
+      return "deepseek";
+    case "google":
+      return "google";
+    case "mistral":
+      return "mistral";
+    case "zai":
+      return "zai";
+    default: {
+      const vendor = config.model.includes("/")
+        ? config.model.split("/")[0].toLowerCase()
+        : "";
+      return FAMILY_BY_VENDOR[vendor] ?? (vendor || `unknown:${key}`);
+    }
+  }
 }
 
 export interface AIModelConfig {

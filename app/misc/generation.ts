@@ -76,11 +76,11 @@ import {
   runObserver,
   buildObserverWarningNote,
   buildObserverCorrectionNote,
-  rewriteFlaggedNarration,
   reconcileGmConversationAfterRewrite,
   reconcileGmThinkingAfterRewrite,
   settingsFor,
   canObserverTriggerReset,
+  flagOnlyRewritables,
   plausibleResetFlagTypes,
   splitObserverSettings,
   restrictObserverSettings,
@@ -93,6 +93,7 @@ import {
   REWRITABLE_FLAG_TYPES,
   REWRITE_META_OPENERS,
   ObserverSettings,
+  type ObserverParams,
   extractGmReasoning,
 } from "@/app/misc/observer";
 import { formatTintLine } from "@/app/misc/primaMateria";
@@ -101,6 +102,8 @@ import { runDirectorAssistant } from "@/app/misc/directorAssistant";
 import { runStoryProgressObserver } from "@/app/misc/storyProgressObserver";
 import {
   getObserverSettings,
+  getRewriteConfirmModel,
+  REWRITE_CONFIRM_DEFAULT_MODEL_KEY,
   getObserverModelOverride,
   getMemoryKeeperModelOverride,
   getReflectionModelOverride,
@@ -125,7 +128,11 @@ import { pendingCheck, splitPlayerLines } from "@/app/misc/turnEndChecks";
 import { collectTurnFacts, snapshotJudgeView } from "@/app/misc/judges/facts";
 import { buildReask, pacingNoteFor, runRung1, secretHits } from "@/app/misc/judges/rung1";
 import { pickMajorFlag } from "@/app/misc/judges/combined";
-import type { Fact } from "@/app/misc/judges/types";
+import { confirmAndRewrite } from "@/app/misc/judges/correction";
+import { resolveConfirmModel } from "@/app/misc/judges/confirm";
+import { recheckRewrite } from "@/app/misc/judges/rewritePlan";
+import { kindOnlyFlag } from "@/app/misc/judges/publicView";
+import type { ConfirmedFinding, Fact } from "@/app/misc/judges/types";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
 import { appendToLastUser, buildNarrationContext } from "@/app/misc/campaign/narrationContext";
@@ -260,22 +267,6 @@ export function mergeRefusedDiceCalls(
     return refused;
   });
   return { ...execution, results };
-}
-
-/** The other rewritable majors of a turn, to be fixed in the same rewrite as `chosen`. */
-export function alsoFixTypes(
-  flags: readonly ObserverFlag[],
-  chosen: ObserverFlag,
-): ObserverFlagType[] {
-  return flags
-    .filter(
-      (f) =>
-        f !== chosen &&
-        f.type !== chosen.type &&
-        f.severity === "major" &&
-        REWRITABLE_FLAG_TYPES.has(f.type),
-    )
-    .map((f) => f.type);
 }
 
 /**
@@ -1163,6 +1154,34 @@ export async function generateStoryTurn(
     }
   };
 
+  // The deterministic checks (rung 1) run again on a rewrite before it replaces
+  // anything: a line's keyword, a key phrase of an unrevealed secret, or a
+  // departed person the first draft did not have acting fails it (rewritePlan.ts).
+  const recheckFor =
+    (original: string) =>
+    (rewritten: string, confirmed: ConfirmedFinding[] = []): string | null => {
+      try {
+        const checked = recheckRewrite({
+          rewritten,
+          original,
+          fixing: {
+            line: confirmed.some((c) => c.judge === "lines_veils"),
+            secret: confirmed.some((c) => c.judge === "secret_leak"),
+          },
+          storyBefore: preTurnSnapshot ?? storyData,
+          storyAfter: storyData,
+        });
+        return checked.ok ? null : checked.reason;
+      } catch (recheckError) {
+        // Closed, not open: an unchecked rewrite is not released.
+        logger.action("Rewrite re-check could not run - keeping the original", {
+          error:
+            recheckError instanceof Error ? recheckError.message : String(recheckError),
+        });
+        return "the re-check could not run";
+      }
+    };
+
   // Carry forward any flags that survived the PRIOR turn (minor flags never
   // trigger a reset, and a major flag can still survive if the reset budget
   // ran out) - otherwise a flagged mistake reaches the player via the
@@ -1198,7 +1217,28 @@ export async function generateStoryTurn(
   // Explicit caller-supplied settings win; otherwise fall back to the user's
   // stored Architecture-tab config (DEFAULT_OBSERVER_SETTINGS, decision 220).
   // Read once per turn, before the loop, because the hold below depends on it.
-  const observerSettings = options.observerSettings ?? getObserverSettings();
+  const requestedObserverSettings = options.observerSettings ?? getObserverSettings();
+  // A rewrite needs a second judge of another family (judges/confirm.ts). When
+  // none can run this turn, the rewriting judges are flag-only for it: nothing is
+  // held for a rewrite that cannot happen, and they are judged in the
+  // background wave. Resolved once, before the hold decision below.
+  const confirmerKeys = pickProviderKeys(options);
+  const confirmer = resolveConfirmModel({
+    judgeModel: resolveSideCallModel(getObserverModelOverride(), confirmerKeys).model,
+    keys: confirmerKeys,
+    pick: getRewriteConfirmModel(),
+    fallbackModel: REWRITE_CONFIRM_DEFAULT_MODEL_KEY,
+  });
+  const observerSettings = confirmer.ok
+    ? requestedObserverSettings
+    : flagOnlyRewritables(requestedObserverSettings);
+  if (!confirmer.ok && canObserverTriggerReset(requestedObserverSettings)) {
+    logger.action("No second judge can confirm a rewrite this turn - the judges only flag", {
+      reason: confirmer.reason,
+      pick: confirmer.model,
+      family: confirmer.family,
+    });
+  }
   // Decision 221: when a judge may rewrite this turn, the player never sees,
   // hears or is sent text a rewrite could replace. The live callbacks stay
   // silent (holdLiveText) and the narration callbacks queue in `held` until the
@@ -1280,6 +1320,8 @@ export async function generateStoryTurn(
       ranJudges: false,
       flags: [] as ObserverFlag[],
       corrected: undefined as ObserverFlag | undefined,
+      /** Every flag a pause rewrite fixed (the first is `corrected`). */
+      correctedAll: [] as ObserverFlag[],
       swaps: [] as { rewritten: string; original: string }[],
       /** Stretches released with no judge run (nothing plausible there). */
       unjudged: [] as string[],
@@ -1347,6 +1389,7 @@ export async function generateStoryTurn(
       });
       if (pauseSuspended) return finish(ctx.prose);
       const pauseTier = storyData.reasoningTierState?.currentTier;
+      const pauseJudgeInputs = judgeInputsFor(ctx.gmResults, ctx.prose);
       const pausePlausible = plausibleResetFlagTypes({
         narration: ctx.prose,
         replyLength: options.replyLength,
@@ -1355,6 +1398,7 @@ export async function generateStoryTurn(
         tierUsed: pauseTier,
         highStakes: isSceneGatedForRoll(storyData),
         playerChoice: playerLine,
+        facts: pauseJudgeInputs.facts,
         settings: observerSettings,
       }).filter((type) => REWRITABLE_FLAG_TYPES.has(type));
       if (pausePlausible.length === 0) {
@@ -1367,27 +1411,27 @@ export async function generateStoryTurn(
       pause.ranJudges = true;
       const pauseCharacterContext = buildObserverCharacterContext(storyData);
       let pauseFlags: ObserverFlag[] = [];
-      const pauseJudgeInputs = judgeInputsFor(ctx.gmResults, ctx.prose);
+      const pauseObserverParams: ObserverParams = {
+        narration: ctx.prose,
+        playerChoice: playerLine,
+        replyLength: options.replyLength,
+        toolNames: pauseToolNames,
+        rollResults: pauseVerdicts,
+        gmStoryContext: ctx.gmStoryContext,
+        characterContext: pauseCharacterContext,
+        facts: pauseJudgeInputs.facts,
+        phraseHits: pauseJudgeInputs.phraseHits,
+        // The prose judges alone: a stored config that lets the tier judge
+        // reset must not run it at every pause and again at the end.
+        settings: splitObserverSettings(
+          observerSettings,
+          true,
+          REWRITABLE_FLAG_TYPES,
+        ).blocking,
+        apiOptions: observerApiOptions,
+      };
       try {
-        pauseFlags = await runObserver({
-          narration: ctx.prose,
-          playerChoice: playerLine,
-          replyLength: options.replyLength,
-          toolNames: pauseToolNames,
-          rollResults: pauseVerdicts,
-          gmStoryContext: ctx.gmStoryContext,
-          characterContext: pauseCharacterContext,
-          facts: pauseJudgeInputs.facts,
-          phraseHits: pauseJudgeInputs.phraseHits,
-          // The prose judges alone: a stored config that lets the tier judge
-          // reset must not run it at every pause and again at the end.
-          settings: splitObserverSettings(
-            observerSettings,
-            true,
-            REWRITABLE_FLAG_TYPES,
-          ).blocking,
-          apiOptions: observerApiOptions,
-        });
+        pauseFlags = await runObserver(pauseObserverParams);
       } catch (pauseError) {
         if (isAbortError(pauseError) || options.abortSignal?.aborted) {
           throw new Error("Generation cancelled by user");
@@ -1417,28 +1461,42 @@ export async function generateStoryTurn(
         resetAttempts++;
         callbacks.onTurnPhase?.("revising");
         let rewritten: string | null = null;
+        let pauseConfirmed: ConfirmedFinding[] = [];
         try {
-          rewritten = await rewriteFlaggedNarration({
-            narration: ctx.prose,
-            playerChoice: playerLine,
-            narrationContext: buildNarrationContext(
-              {
-                playerLine,
-                results: ctx.gmResults,
-                scenePartId,
-              },
-              storyData,
-            ),
-            flag: pauseMajor,
-            alsoFixIfPresent: alsoFixTypes(pauseFlags, pauseMajor),
-            replyLength: options.replyLength,
-            storytellerMode: options.storytellerMode,
-            characterContext: pauseCharacterContext,
-            apiOptions: observerRewriteApiOptions,
-            deAiifyWords: options.deAiifyWords,
-            alreadyRead: pause.text,
-            endsAtPause: true,
+          // Two judges of different families must agree, then one rewrite
+          // fixes every confirmed finding (judges/correction.ts).
+          const correction = await confirmAndRewrite({
+            flags: pauseFlags,
+            rewritable: REWRITABLE_FLAG_TYPES,
+            judged: pauseObserverParams,
+            judgeApi: observerApiOptions,
+            rewriteApi: observerRewriteApiOptions,
+            rewrite: {
+              playerChoice: playerLine,
+              narrationContext: buildNarrationContext(
+                {
+                  playerLine,
+                  results: ctx.gmResults,
+                  scenePartId,
+                },
+                storyData,
+              ),
+              replyLength: options.replyLength,
+              storytellerMode: options.storytellerMode,
+              characterContext: pauseCharacterContext,
+              deAiifyWords: options.deAiifyWords,
+              alreadyRead: pause.text,
+              endsAtPause: true,
+            },
+            recheck: recheckFor(ctx.prose),
           });
+          rewritten = correction.rewritten;
+          pauseConfirmed = correction.confirmed;
+          if (!rewritten && correction.skipped) {
+            logger.action("Observer rewrite before a pause not attempted", {
+              reason: correction.skipped,
+            });
+          }
         } catch (rewriteError) {
           if (isAbortError(rewriteError) || options.abortSignal?.aborted) {
             throw new Error("Generation cancelled by user");
@@ -1453,15 +1511,17 @@ export async function generateStoryTurn(
             },
           );
         }
-        if (rewritten) {
+        if (rewritten && pauseConfirmed.length > 0) {
+          const fixed = pauseConfirmed.map((c) => c.flag);
           logger.action("Observer rewrote the prose before a pause", {
-            type: pauseMajor.type,
+            types: fixed.map((f) => f.type),
           });
           pause.swaps.push({ rewritten: rewritten.trim(), original: ctx.prose });
-          pause.corrected ??= pauseMajor;
-          pauseFlags = pauseFlags.filter((f) => f !== pauseMajor);
+          pause.corrected ??= fixed[0];
+          pause.correctedAll.push(...fixed);
+          pauseFlags = pauseFlags.filter((f) => !fixed.includes(f));
           released = rewritten;
-          rewrittenBy = pauseMajor;
+          rewrittenBy = fixed[0];
         }
       }
       pause.flags.push(...pauseFlags);
@@ -1683,9 +1743,12 @@ export async function generateStoryTurn(
     // observer runs in the background wave below, which can still rewrite -
     // just after the player already has control (see runBackgroundLayers).
     // A suspended turn can't produce a flag at all, so it never blocks.
+    // The facts and the key-phrase hits every judge pass of this turn shares.
+    const judgeInputs = judgeInputsFor(result.gmResults, judgedText);
     const plausibleFlagTypes = suspensionReason
       ? []
       : plausibleResetFlagTypes({
+          facts: judgeInputs.facts,
           narration: judgedText,
           playerChoice: playerLine,
           replyLength: options.replyLength,
@@ -1723,33 +1786,33 @@ export async function generateStoryTurn(
       resetPossible ? undefined : REWRITABLE_FLAG_TYPES,
     );
     const blockingPassRan = resetPossible || pause.ranJudges;
-    // The facts and the key-phrase hits every judge pass of this turn shares.
-    const judgeInputs = judgeInputsFor(result.gmResults, judgedText);
     let flags: ObserverFlag[] = [];
+    // What the judges read this pass; the confirming judge reads the same.
+    const endObserverParams: ObserverParams = {
+      facts: judgeInputs.facts,
+      phraseHits: judgeInputs.phraseHits,
+      narration: judgedText,
+      playerChoice: playerLine,
+      replyLength: options.replyLength,
+      toolNames: turnToolNames,
+      rollResults: outcomeVerdicts,
+      tierUsed: tierUsedThisTurn,
+      gmStoryContext: result.gmStoryContext,
+      characterContext: observerCharacterContext,
+      // Lets the outcome-mismatch judge see the rules ruling behind the
+      // prose (see ObserverParams.narrationThoughts) - a correctly-called
+      // partial success is usually explained in the reasoning, not the
+      // narration.
+      narrationThoughts: result.narrationThoughts,
+      // Only the judges that can rewrite wait here; the rest run once in
+      // the background wave (observerSplit).
+      settings: observerSplit.blocking,
+      apiOptions: observerApiOptions,
+    };
     if (resetPossible) {
       if (held) callbacks.onTurnPhase?.("checking");
       try {
-        flags = await runObserver({
-          facts: judgeInputs.facts,
-          phraseHits: judgeInputs.phraseHits,
-          narration: judgedText,
-          playerChoice: playerLine,
-          replyLength: options.replyLength,
-          toolNames: turnToolNames,
-          rollResults: outcomeVerdicts,
-          tierUsed: tierUsedThisTurn,
-          gmStoryContext: result.gmStoryContext,
-          characterContext: observerCharacterContext,
-          // Lets the outcome-mismatch judge see the rules ruling behind the
-          // prose (see ObserverParams.narrationThoughts) - a correctly-called
-          // partial success is usually explained in the reasoning, not the
-          // narration.
-          narrationThoughts: result.narrationThoughts,
-          // Only the judges that can rewrite wait here; the rest run once in
-          // the background wave (observerSplit).
-          settings: observerSplit.blocking,
-          apiOptions: observerApiOptions,
-        });
+        flags = await runObserver(endObserverParams);
       } catch (observerError) {
         // A Stop is not an infra failure (finding 8): never commit past it.
         if (isAbortError(observerError) || options.abortSignal?.aborted) {
@@ -1812,31 +1875,42 @@ export async function generateStoryTurn(
         // re-run the tools (allowMechanicalRetry), takes the full-turn reset
         // below, which also forces the retry onto a higher tier.
         let rewrittenNarration: string | null = null;
+        // The findings two judges of different families agreed on: the flags
+        // this rewrite fixes, and the facts it was handed.
+        let confirmedFindings: ConfirmedFinding[] = [];
         if (REWRITABLE_FLAG_TYPES.has(majorFlag.type)) {
           try {
-            rewrittenNarration = await rewriteFlaggedNarration({
-              narration: judgedText,
-              playerChoice: playerLine,
-              flag: majorFlag,
-              replyLength: options.replyLength,
-              storytellerMode: options.storytellerMode,
-              characterContext: observerCharacterContext,
-              // The same allowlisted context the narration was written from:
-              // the player's line, the public roll summaries, the tone and
-              // style notes, the recent prose. Not the GM's reasoning or notes.
-              narrationContext: result.narrationContext,
-              narrationThoughts: result.narrationOwnThoughts,
-              // The turn gets one rewrite, so the other rewritable majors ride
-              // along as conditional "fix this too" clauses (priority decides
-              // which is the flag; the rest are fixed in the same pass).
-              alsoFixIfPresent: alsoFixTypes(flags, majorFlag),
+            const correction = await confirmAndRewrite({
+              flags,
+              rewritable: REWRITABLE_FLAG_TYPES,
+              judged: endObserverParams,
+              judgeApi: observerApiOptions,
               // The Observer's pin if the player set one, else the narration
               // voice (decision 52) - not sideCallApiOptions, or the rewrite
               // would silently skip that pin.
-              apiOptions: observerRewriteApiOptions,
-              deAiifyWords: options.deAiifyWords,
-              alreadyRead: pause.text || undefined,
+              rewriteApi: observerRewriteApiOptions,
+              rewrite: {
+                playerChoice: playerLine,
+                replyLength: options.replyLength,
+                storytellerMode: options.storytellerMode,
+                characterContext: observerCharacterContext,
+                // The same allowlisted context the narration was written from:
+                // the player's line, the public roll summaries, the tone and
+                // style notes, the recent prose. Not the GM's reasoning or notes.
+                narrationContext: result.narrationContext,
+                narrationThoughts: result.narrationOwnThoughts,
+                deAiifyWords: options.deAiifyWords,
+                alreadyRead: pause.text || undefined,
+              },
+              recheck: recheckFor(judgedText),
             });
+            rewrittenNarration = correction.rewritten;
+            confirmedFindings = correction.confirmed;
+            if (!rewrittenNarration && correction.skipped) {
+              logger.action("Observer rewrite not attempted", {
+                reason: correction.skipped,
+              });
+            }
           } catch (rewriteError) {
             if (isAbortError(rewriteError) || options.abortSignal?.aborted) {
               throw new Error("Generation cancelled by user");
@@ -1875,10 +1949,14 @@ export async function generateStoryTurn(
           majorFlag.type === "tier_escalation_missed" &&
           escalationRetryTier === null;
 
-        if (rewrittenNarration) {
+        if (rewrittenNarration && confirmedFindings.length > 0) {
+          // Every flag the rewrite addressed; the first stands for them when
+          // the GM's history is reconciled and the page is told.
+          const fixedFlags = confirmedFindings.map((c) => c.flag);
+          const primaryFlag = fixedFlags[0];
           logger.action(
             "Observer rewrite succeeded, keeping tool calls/rolls and replacing narration",
-            { type: majorFlag.type },
+            { types: fixedFlags.map((f) => f.type) },
           );
 
           // Snapshot the draft the observer is about to replace, BEFORE any
@@ -1891,7 +1969,8 @@ export async function generateStoryTurn(
           rewrittenNarration = withReleased(tailRewrite);
           const rewriteOriginal: ObserverRewriteOriginal = {
             content: undoPauseRewrites(result.content),
-            flag: majorFlag,
+            // Its kind only: what Undo shows is never the finding's words.
+            flag: kindOnlyFlag(primaryFlag),
             gmConversation: undoPauseHistory(result.scenePart.gmConversation),
             gmThinking: undoPauseThinking(result.scenePart.gmThinking),
             choices: result.choices,
@@ -1909,12 +1988,12 @@ export async function generateStoryTurn(
             gmConversation: reconcileGmConversationAfterRewrite(
               result.scenePart.gmConversation,
               rewrittenNarration,
-              majorFlag,
+              primaryFlag,
             ),
             gmThinking: reconcileGmThinkingAfterRewrite(
               result.scenePart.gmThinking,
               rewrittenNarration,
-              majorFlag,
+              primaryFlag,
             ),
           };
           // The held text is released as the rewrite, before the page is told
@@ -1923,7 +2002,7 @@ export async function generateStoryTurn(
           held?.release(rewrittenNarration, pause.text);
           callbacks.onObserverRewrite?.(
             flags,
-            majorFlag,
+            primaryFlag,
             rewrittenNarration,
             rewriteOriginal,
           );
@@ -1948,7 +2027,7 @@ export async function generateStoryTurn(
           // Any OTHER flags from this turn (the one just fixed aside) still
           // get surfaced to the player, same as a turn that finishes with
           // surviving minor flags normally would.
-          flags = flags.filter((f) => f !== majorFlag);
+          flags = flags.filter((f) => !fixedFlags.includes(f));
 
           // The fixed flag itself doesn't disappear - it's recorded
           // separately (see buildObserverCorrectionNote) so the NEXT turn's
@@ -1958,10 +2037,7 @@ export async function generateStoryTurn(
             ...result.scenePart,
             // The reconcile above rewrote every round's prose, so the history
             // is fixed whatever the pause could do with its own rounds.
-            correctedObserverFlags: [
-              ...(pause.corrected ? [pause.corrected] : []),
-              majorFlag,
-            ],
+            correctedObserverFlags: [...pause.correctedAll, ...fixedFlags],
             observerRewriteOriginal: rewriteOriginal,
           };
         } else if (majorFlag.type !== "tier_escalation_missed") {
@@ -2070,7 +2146,7 @@ export async function generateStoryTurn(
     ) {
       const pauseOriginal: ObserverRewriteOriginal = {
         content: undoPauseRewrites(result.content),
-        flag: pause.corrected,
+        flag: kindOnlyFlag(pause.corrected),
         gmConversation: undoPauseHistory(result.scenePart.gmConversation),
         gmThinking: undoPauseThinking(result.scenePart.gmThinking),
         choices: result.choices,
@@ -2084,10 +2160,10 @@ export async function generateStoryTurn(
           ? {
               observerFlags: [
                 ...(result.scenePart.observerFlags ?? []),
-                pause.corrected,
+                ...pause.correctedAll,
               ],
             }
-          : { correctedObserverFlags: [pause.corrected] }),
+          : { correctedObserverFlags: [...pause.correctedAll] }),
         observerRewriteOriginal: pauseOriginal,
       };
       callbacks.onObserverRewrite?.(
@@ -2096,6 +2172,14 @@ export async function generateStoryTurn(
         result.content,
         pauseOriginal,
       );
+    }
+
+    // The public half of the findings (design 11.4): the turn's details say only
+    // that it was revised after a check, or checked and something stayed flagged.
+    if (result.scenePart.observerRewriteOriginal) {
+      result.scenePart = { ...result.scenePart, publicNotice: "revised" };
+    } else if ((result.scenePart.observerFlags?.length ?? 0) > 0) {
+      result.scenePart = { ...result.scenePart, publicNotice: "checked" };
     }
 
     // Everything past this point is best-effort side-channel work that

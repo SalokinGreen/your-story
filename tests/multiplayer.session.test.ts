@@ -288,6 +288,44 @@ describe("NetSession", () => {
     expect("stats" in storyData).toBe(false);
   });
 
+  it("sends a guest no judge finding and not the draft a rewrite replaced (judge layer v2)", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const snapshot = vi.fn();
+    guest.onSnapshot(snapshot);
+
+    const flag = {
+      type: "secret_leak" as const,
+      severity: "major" as const,
+      detail: "fixed",
+      correctivePrompt: "c",
+      finding: { evidence: "LEAK_EVIDENCE", factIds: [], fix: "" },
+    };
+    const storyData = fakeStoryData({
+      scene: {
+        parts: [
+          {
+            content: "The corrected text.",
+            imageUrl: "",
+            user: false,
+            role: "assistant",
+            observerFlags: [flag],
+            observerRewriteOriginal: { content: "LEAK_DRAFT", flag },
+          },
+        ],
+      },
+    } as never);
+    host.broadcastSnapshot(storyData);
+
+    const sent = JSON.stringify(snapshot.mock.calls[0][0]);
+    expect(sent).toContain("The corrected text.");
+    expect(sent).not.toContain("LEAK_EVIDENCE");
+    expect(sent).not.toContain("LEAK_DRAFT");
+    expect(sent).not.toContain("observerFlags");
+    expect(sent).toContain('"publicNotice":"revised"');
+    // The host keeps its own findings for the Undo and the logs.
+    expect(JSON.stringify(storyData)).toContain("LEAK_DRAFT");
+  });
+
   it("does not let a guest broadcast a snapshot or a host send a player action", async () => {
     const { host, guest } = await createHostAndGuest("host-1", "guest-1");
     const hostAction = vi.fn();

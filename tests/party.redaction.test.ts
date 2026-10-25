@@ -57,6 +57,7 @@ const FORBIDDEN = {
   gmStoryContext: "LEAK_GM_STORY_CONTEXT",
   reasoning: "LEAK_REASONING",
   gmConversation: "LEAK_GM_CONVERSATION",
+  judgeFinding: "LEAK_JUDGE_FINDING",
   summary: "LEAK_SCENE_SUMMARY",
   apiKey: "sk-or-v1-LEAKEDKEY",
   // The campaign record (slice 3): nothing in it reaches a phone until the
@@ -113,6 +114,19 @@ function story(): StoryData {
           gmStoryContext: FORBIDDEN.gmStoryContext,
           reasoning: FORBIDDEN.reasoning,
           gmConversation: [{ role: "assistant", content: FORBIDDEN.gmConversation }],
+          // The judge layer's private findings (plan slice 3): a phone is told
+          // nothing about them, and not the draft a rewrite replaced.
+          observerFlags: [
+            {
+              type: "secret_leak",
+              severity: "major",
+              detail: FORBIDDEN.judgeFinding,
+              correctivePrompt: FORBIDDEN.judgeFinding,
+              finding: { evidence: FORBIDDEN.judgeFinding, factIds: [], fix: FORBIDDEN.judgeFinding },
+            },
+          ],
+          observerRewriteOriginal: { content: FORBIDDEN.judgeFinding, flag: { type: "secret_leak", severity: "major", detail: "", correctivePrompt: "" } },
+          publicNotice: "revised",
           choices: [{ text: "Climb the tower" }, { text: "Wait" }],
         },
       ],

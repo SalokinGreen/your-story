@@ -2,7 +2,12 @@
  * The engine review of judge layer v2 slice 2: each finding has a test here.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { JUDGE_IDS, judgeMaxTokens, quoteAppearsIn } from "@/app/misc/judges/combined";
+import {
+  JUDGE_IDS,
+  judgeMaxTokens,
+  majorFlagsInOrder,
+  quoteAppearsIn,
+} from "@/app/misc/judges/combined";
 import { collectTurnFacts } from "@/app/misc/judges/facts";
 import type { Fact } from "@/app/misc/judges/types";
 import {
@@ -10,7 +15,7 @@ import {
   cloneDefaultObserverSettings,
   countJudgeCalls,
 } from "@/app/misc/observer";
-import { alsoFixTypes, executedRandomness } from "@/app/misc/generation";
+import { executedRandomness } from "@/app/misc/generation";
 import type { GMToolResult } from "@/app/misc/gmExecutor";
 import type { ObserverFlag } from "@/app/misc/structs";
 import { emptyCampaign } from "@/app/misc/campaign/types";
@@ -113,23 +118,32 @@ describe("the cost count (finding 5)", () => {
   });
 });
 
-describe("one rewrite for several majors (finding 6)", () => {
+describe("several majors, one order (finding 6, revised by the confirming judge)", () => {
   const flag = (type: ObserverFlag["type"], severity: ObserverFlag["severity"] = "major"): ObserverFlag => ({
     type,
     severity,
     detail: type,
     correctivePrompt: type,
   });
-  it("names the other rewritable majors, not the chosen one, minors or flag-only types", () => {
-    const chosen = flag("player_agency");
+  it("lists the majors the player let correct the turn in the design's priority order", () => {
+    const settings = cloneDefaultObserverSettings();
+    settings.secret_leak.triggersReset = true;
     const flags = [
       flag("response_length"),
-      chosen,
+      flag("player_agency"),
       flag("outcome_narration_mismatch", "minor"),
       flag("secret_leak"),
       flag("missing_oracle_or_table"),
     ];
-    expect(alsoFixTypes(flags, chosen)).toEqual(["response_length"]);
+    expect(majorFlagsInOrder(flags, settings).map((f) => f.type)).toEqual([
+      "secret_leak",
+      "player_agency",
+      "response_length",
+    ]);
+  });
+  it("leaves out a flag-only type and one whose rewrite is off", () => {
+    const flags = [flag("secret_leak"), flag("missing_oracle_or_table")];
+    expect(majorFlagsInOrder(flags, cloneDefaultObserverSettings())).toEqual([]);
   });
 });
 
