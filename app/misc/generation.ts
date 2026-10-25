@@ -3844,13 +3844,16 @@ async function generateStoryTurnOnce(
               const noteWritten = gmExecution.results.some(
                 (r) =>
                   r.success &&
-                  (r.toolName === "create_note" || r.toolName === "edit_note"),
+                  (r.toolName === "create_note" ||
+                    r.toolName === "edit_note" ||
+                    r.toolName === "campaign"),
               );
               if (noteWritten) {
                 const after = currentSetupHashes(storyData);
                 if (
                   after.sheetHash !== setupHashesBefore.sheetHash ||
-                  after.planHash !== setupHashesBefore.planHash
+                  after.planHash !== setupHashesBefore.planHash ||
+                  after.campaignHash !== setupHashesBefore.campaignHash
                 ) {
                   setupProgressThisTurn = true;
                 }

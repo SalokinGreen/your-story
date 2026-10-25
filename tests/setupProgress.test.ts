@@ -42,7 +42,7 @@ function story(overrides: Partial<StoryData> = {}): StoryData {
 }
 
 /** Quick setup's two required steps, asked and answered. */
-const QUICK_COVERED = { table: ["setting", "tone"], players: {} };
+const QUICK_COVERED = { table: ["setting", "tone", "tone_safety"], players: {} };
 
 /** A story with the sheet, the plan and an approval of exactly those. */
 function approvedStory(overrides: Partial<StoryData> = {}): StoryData {

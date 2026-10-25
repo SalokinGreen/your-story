@@ -44,7 +44,7 @@ function story(overrides: Partial<StoryData> = {}): StoryData {
     setup: {
       mode: "quick",
       conceptDone: true,
-      covered: { table: ["setting", "tone"], players: {} },
+      covered: { table: ["setting", "tone", "tone_safety"], players: {} },
     },
     ...overrides,
   } as unknown as StoryData;
@@ -139,7 +139,7 @@ describe("confirm_setup: the card", () => {
     const req = requests[0];
     expect(req.characterSummary).toBe(CONFIRM_ARGS.character_summary);
     expect(req.campaignHook).toBe(CONFIRM_ARGS.campaign_hook);
-    expect(req.plan).toEqual({ title: "Campaign Plan", content: "# Plan\nOpening Image" });
+    expect(req.plan).toEqual({ note: { title: "Campaign Plan", content: "# Plan\nOpening Image" } });
     // Whatever the sheet text is by now in the working copy, the card shows it
     // and the approval binds to it.
     const sheetInWorkingCopy = out.modifiedStoryData.lore.find((l) => l.type === "character_sheet");

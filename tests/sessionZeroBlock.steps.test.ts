@@ -48,11 +48,11 @@ function story(setup: SetupState | undefined, lore: StoryLore[] = [], extra: Par
 }
 
 describe("the tagging rule and the step list", () => {
-  it("both modes carry the tagging rule; quick names setting and tone", () => {
+  it("both modes carry the tagging rule; quick names setting, tone and tone_safety", () => {
     const quick = buildSessionZeroBlock(story({ mode: "quick" }));
     expect(quick).toContain("TAGGING");
     expect(quick).toContain("`setup_step`");
-    expect(quick).toContain("setting and tone");
+    expect(quick).toContain("setting, tone and tone_safety");
     expect(quick).toContain("- setting: →");
     expect(quick).toContain("- tone: ·");
     expect(quick).toContain("NEXT STEP TO ASK: setting");
@@ -67,7 +67,7 @@ describe("the tagging rule and the step list", () => {
 
   it("full mode lists every step with ✓, → and · and the next step's hint", () => {
     const s = story(
-      { mode: "full", covered: { table: ["setting", "tone", "campaign"], players: { solo: ["kind"] } } },
+      { mode: "full", covered: { table: ["setting", "tone", "style", "tone_safety", "campaign"], players: { solo: ["kind"] } } },
       [BB],
     );
     const block = buildSessionZeroBlock(s);
@@ -77,7 +77,7 @@ describe("the tagging rule and the step list", () => {
     expect(block).toContain("- stats: Nik ·");
     expect(block).toContain("- drives: Nik ·");
     expect(block).toContain("NEXT STEP TO ASK: archetype (Nik).");
-    expect(block).toContain("Setup steps (4/15 asked and answered)");
+    expect(block).toContain("Setup steps (6/17 asked and answered)");
     // The rules for asking.
     expect(block).toContain("Always give `intro`");
     expect(block).toContain("2-4 options whose descriptions say what each does in play");
@@ -105,17 +105,17 @@ describe("the tagging rule and the step list", () => {
     expect(block).toContain("target_player_name");
   });
 
-  it("full mode ends the interview with 'write the sheet and the plan', not the nudge", () => {
+  it("full mode ends the interview with 'write the sheet and build the campaign', not the nudge", () => {
     const s = story({
       mode: "full",
       questionsAsked: SETUP_QUESTION_NUDGE_AT + 4,
       covered: {
-        table: ["setting", "tone", "campaign"],
+        table: ["setting", "tone", "style", "tone_safety", "campaign"],
         players: { solo: ["name_look", "history", "drives"] },
       },
     });
     const block = buildSessionZeroBlock(s);
-    expect(block).toContain("Every step is covered: write the sheet and the plan");
+    expect(block).toContain("Every step is covered: write the sheet and build the campaign");
     expect(block).not.toContain("setup questions. Enough");
     // Mid-interview, even many questions in, full mode does not nudge.
     const mid = buildSessionZeroBlock(story({ mode: "full", questionsAsked: SETUP_QUESTION_NUDGE_AT + 4 }));
@@ -129,7 +129,7 @@ describe("the tagging rule and the step list", () => {
     const sheet = { title: "Character: Nik", type: "character_sheet", content: "Nik.", enabled: true } as StoryLore;
     const plan = { title: "Campaign Plan", type: "gm_plan", content: "# P", enabled: true } as StoryLore;
     const block = buildSessionZeroBlock(
-      story({ mode: "quick", conceptDone: true, covered: { table: ["setting", "tone"], players: {} } }, [sheet, plan]),
+      story({ mode: "quick", conceptDone: true, covered: { table: ["setting", "tone", "tone_safety"], players: {} } }, [sheet, plan]),
     );
     expect(block).toContain("confirm_setup({ character_summary, campaign_hook, story_name, premise })");
     expect(block).toContain("the game starts by itself");
