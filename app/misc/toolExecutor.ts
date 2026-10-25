@@ -48,6 +48,7 @@ import {
 import { findBestMatch } from "@/app/misc/fuzzyMatch";
 import { isHiddenFromPlayerNote } from "@/app/misc/noteVisibility";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
+import { resetCountersOnState } from "@/app/misc/systems/fantastic-realms/engine";
 
 const VISIBILITY_RESTRICTION: Record<string, number> = {
   always_reveal: 0,
@@ -1752,6 +1753,10 @@ export function executeTools(
 
         // Increment scene
         storyData.agmtState.sceneCount++;
+
+        // Fantastic Realms: per-scene counted uses start over. A no-op for a
+        // story with no Fantastic Realms state.
+        resetCountersOnState(storyData.systemState?.fantasticRealms, "scene");
 
         // Record this as a scene boundary for compaction.ts to prefer over
         // an arbitrary token-budget cutoff (see §3.2 in
