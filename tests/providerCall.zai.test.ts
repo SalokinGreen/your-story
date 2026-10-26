@@ -372,7 +372,9 @@ describe("GLM 5.3 through DeepInfra", () => {
     });
     const request = sent(fetchMock);
     expect(request.body.reasoning_effort).toBe(sentEffort);
-    expect(request.body.max_tokens).toBe(200);
+    // A thinking request keeps the 4,096 floor, so its thinking cannot eat a
+    // short cap; "none" does not think and keeps the cap it asked for.
+    expect(request.body.max_tokens).toBe(effort === "none" ? 200 : 4096);
   });
 
   it("leaves a DeepInfra call with no effort at the model's default", async () => {

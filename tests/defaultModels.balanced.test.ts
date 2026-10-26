@@ -212,6 +212,13 @@ describe("the default efforts reach OpenRouter in a form each model accepts", ()
     }
   });
 
+  it("a short-capped call on the narration voice keeps the 4,096 floor while it thinks (an Observer rewrite's 1,100)", async () => {
+    const thinking = await sentBody(String(NARRATION_MODEL_KEY), "normal", 1100);
+    expect(thinking.max_tokens).toBe(4096);
+    const notThinking = await sentBody(String(NARRATION_MODEL_KEY), "none", 1100);
+    expect(notThinking.max_tokens).toBe(1100);
+  });
+
   it("tiers 2 and 3: DeepSeek V4 Flash gets high, as OpenRouter's high", async () => {
     for (const tier of [REASONING_TIERS[2], REASONING_TIERS[3]]) {
       const body = await sentBody(String(tier.modelKey), tier.reasoningEffort);

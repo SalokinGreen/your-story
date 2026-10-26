@@ -422,8 +422,9 @@ function reasoningCannotBeTurnedOff(
 }
 
 /**
- * The smallest `max_tokens` a request to a model that always thinks goes out
- * with: Claude 5.5 and GLM-5.3, neither of which can turn thinking off. Thinking counts against `max_tokens`, so the 200-300 token caps the
+ * The smallest `max_tokens` a thinking request goes out with (requestThinks):
+ * Claude 5.5 and GLM-5.3, which cannot turn thinking off, and any model asked
+ * for an effort above "none". Thinking counts against `max_tokens`, so the 200-300 token caps the
  * side agents use for a short verdict can be spent before any text arrives;
  * and OpenRouter documents turning `reasoning.effort` into a thinking budget
  * of at least 1,024 tokens that must stay below `max_tokens`. A cap, not a
@@ -432,14 +433,32 @@ function reasoningCannotBeTurnedOff(
 const ALWAYS_THINKING_MIN_MAX_TOKENS = 4096;
 
 /**
+ * True when this request will think: a model that cannot stop, or one asked
+ * for an effort above "none" on a provider that turns it into thinking
+ * (OpenRouter, DeepInfra, DeepSeek). Such a request gets the max_tokens floor
+ * too, since its thinking counts against the cap: DeepSeek V4 Flash at
+ * "normal" could otherwise spend an Observer rewrite's 1,100 tokens before
+ * writing a word (engine review of decision 257).
+ */
+function requestThinks(
+  config: Pick<AIModelConfig, "provider" | "model" | "reasoningMandatory">,
+  provider: Provider,
+  reasoningEffort: string | undefined,
+): boolean {
+  if (reasoningCannotBeTurnedOff(config, provider)) return true;
+  if (!reasoningEffort || reasoningEffort === "none") return false;
+  return provider === "openrouter" || provider === "deepinfra" || provider === "deepseek";
+}
+
+/**
  * The max_tokens a request for `modelKey` actually goes out with: `maxTokens`,
  * raised to ALWAYS_THINKING_MIN_MAX_TOKENS where that floor applies. The GM
  * loop compares these, not the raw caps, before asking a cut-off round again
  * (decision 196), so a raise the floor swallows is not paid for twice.
  */
-export function sentMaxTokens(modelKey: string, maxTokens: number): number {
+export function sentMaxTokens(modelKey: string, maxTokens: number, reasoningEffort?: string): number {
   const config = getModelConfig(modelKey);
-  return reasoningCannotBeTurnedOff(config, config.provider as Provider)
+  return requestThinks(config, config.provider as Provider, reasoningEffort)
     ? Math.max(maxTokens, ALWAYS_THINKING_MIN_MAX_TOKENS)
     : maxTokens;
 }
@@ -1251,7 +1270,9 @@ async function requestNonStreaming(
     const requestBody: any = {
       model: config.model,
       messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
-      max_tokens: thinksAlways ? Math.max(maxTokens, ALWAYS_THINKING_MIN_MAX_TOKENS) : maxTokens,
+      max_tokens: requestThinks(config, provider, body.reasoningEffort)
+        ? Math.max(maxTokens, ALWAYS_THINKING_MIN_MAX_TOKENS)
+        : maxTokens,
     };
     // Claude 5.5 rejects any non-default sampling value.
     if (!isClaude) requestBody.temperature = clampTemperature(provider, temperature);
@@ -1459,7 +1480,9 @@ export function generateStream(
         const requestBody: any = {
           model: config.model,
           messages: buildRequestMessages(messages, provider, hasTools, hasPrefill, config),
-          max_tokens: thinksAlways ? Math.max(maxTokens, ALWAYS_THINKING_MIN_MAX_TOKENS) : maxTokens,
+          max_tokens: requestThinks(config, provider, body.reasoningEffort)
+        ? Math.max(maxTokens, ALWAYS_THINKING_MIN_MAX_TOKENS)
+        : maxTokens,
           stream: true,
           stream_options: { include_usage: true },
         };
