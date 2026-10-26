@@ -641,6 +641,29 @@ the old oracle cases, and the played session. Both spend the author's keys.
 - **Not done:** `tests/campaign.oldSaves.test.ts`-style digests are
   untouched (no system prompt change).
 
+### 2026-10-26, slice R5
+
+- **The chain:** step 3 gained the person-who-knows clause; the innkeeper
+  example now says she knows who the stranger is, and a locked-cellar example
+  (no note describes it: the oracle or a table) sits before the weather one. The
+  system prompt grew 264 characters; `tests/campaign.oldSaves.test.ts`'s
+  system digest was retaken with a dated comment, the other fourteen untouched.
+- **`nameFrom`** lives on `expect`: `"drawer"` accepts a name in the fixture's
+  drawer or in a `generate_name` / `roll_table` result of the run, `"rolled"`
+  only the latter. A fixture that asks for `"drawer"` must carry a `drawer`
+  (the parser says so). Matching is case-insensitive and either-way substring.
+- **The report** gains `runDetails` (every run: prose first 2,000 characters,
+  calls with arguments cut at 300), so `eval-generation.mjs` writes it with no
+  script change. A baseline written before this has none and still compares.
+- **A bug found and fixed from R4:** the GM stage renders pending events in its
+  own block (`gmStagePendingEventsSection`, `ai_staged.ts`), not the one R4
+  labelled, so a tripwire event showed with no label. The label is now in both.
+  R4's live-block test had only asserted the id.
+- **Cases:** `names-new-npc-uses-drawer` and `drawer-quiet-turn-forces-nothing`
+  carry a drawer (Maret Hollin, Corvane Aldis, Yssa Bren; Abandon / Mysterious);
+  the table case adds a "Toll-house rooms" d6 table note; the tripwire case has
+  a pending tripwire event. All four are on the Tallow Gate story, none has been
+  run (the author's go).
 ### 2026-10-26, slice R4 engine-review fixes
 
 - **Travel is no longer `textCrosses` on a phrase table.** `TRAVEL_CHECK` is

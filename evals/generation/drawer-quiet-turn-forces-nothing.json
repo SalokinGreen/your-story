@@ -1,0 +1,73 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "drawer-quiet-turn-forces-nothing",
+  "published": true,
+  "note": "Drawer: a quiet turn with nobody new to meet. The drawer's names must not appear in the prose and no NPC is added.",
+  "storySnapshot": {
+    "story_name": "The Tallow Gate",
+    "premise": "A mountain toll-town in winter. Ilse Varrow, a courier, carries a sealed tin to the toll-house at the far end of the Pim causeway.",
+    "player_name": "Ilse Varrow",
+    "difficulty": "medium",
+    "scene": {
+      "parts": [
+        {
+          "content": "Odrell Pim hands you a lantern and points at a low door behind the bar. \"Cellar. Go and see for yourself.\"",
+          "imageUrl": "",
+          "user": false,
+          "role": "assistant"
+        }
+      ]
+    },
+    "lore": [
+      {
+        "title": "Character: Ilse Varrow",
+        "type": "character_sheet",
+        "content": "Ilse Varrow, courier. Quick, stubborn, owes the Hobnail Guild a debt. Carries a sealed tin she has not opened.",
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": [],
+        "enabled": true
+      }
+    ],
+    "npcs": [
+      {
+        "id": "npc-odrell-pim",
+        "name": "Odrell Pim",
+        "description": "Round-shouldered innkeeper of the Kettle & Rook. Fond of gossip, evasive about his cellar.",
+        "role": "Innkeeper",
+        "status": "alive",
+        "relationship": "Stranger",
+        "attitude": "neutral",
+        "createdAt": 1
+      }
+    ]
+  },
+  "playerLine": "I finish my soup and warm my hands by the stove.",
+  "expect": {
+    "noCalls": [
+      "add_npc",
+      "generate_name"
+    ],
+    "narrationExcludes": [
+      "Maret Hollin",
+      "Corvane Aldis",
+      "Yssa Bren",
+      "Maret",
+      "Corvane",
+      "Yssa"
+    ]
+  },
+  "drawer": {
+    "names": [
+      "Maret Hollin",
+      "Corvane Aldis",
+      "Yssa Bren"
+    ],
+    "meaning": {
+      "action": "Abandon",
+      "description": "Mysterious"
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "tripwire-pending-event-resolved",
+  "published": true,
+  "note": "Tripwires: a pending event raised by a tripwire waits in the live block. The GM works it into the scene and calls resolve_random_event with its id.",
+  "storySnapshot": {
+    "story_name": "The Tallow Gate",
+    "premise": "A mountain toll-town in winter. Ilse Varrow, a courier, carries a sealed tin to the toll-house at the far end of the Pim causeway.",
+    "player_name": "Ilse Varrow",
+    "difficulty": "medium",
+    "scene": {
+      "parts": [
+        {
+          "content": "Odrell Pim hands you a lantern and points at a low door behind the bar. \"Cellar. Go and see for yourself.\"",
+          "imageUrl": "",
+          "user": false,
+          "role": "assistant"
+        }
+      ]
+    },
+    "lore": [
+      {
+        "title": "Character: Ilse Varrow",
+        "type": "character_sheet",
+        "content": "Ilse Varrow, courier. Quick, stubborn, owes the Hobnail Guild a debt. Carries a sealed tin she has not opened.",
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": [],
+        "enabled": true
+      }
+    ],
+    "npcs": [
+      {
+        "id": "npc-odrell-pim",
+        "name": "Odrell Pim",
+        "description": "Round-shouldered innkeeper of the Kettle & Rook. Fond of gossip, evasive about his cellar.",
+        "role": "Innkeeper",
+        "status": "alive",
+        "relationship": "Stranger",
+        "attitude": "neutral",
+        "createdAt": 1
+      }
+    ],
+    "pendingRandomEvents": [
+      {
+        "id": "event_tripwire_1",
+        "source": "tripwire",
+        "tripwire": "travel",
+        "focus": "NPC action",
+        "action": "Abandon",
+        "subject": "A rival",
+        "portent": "A promise is quietly broken",
+        "context": "Tripwire: travel (d6=1)",
+        "createdAt": 1
+      }
+    ]
+  },
+  "playerLine": "I finish my drink and watch the room.",
+  "expect": {
+    "calls": [
+      "resolve_random_event"
+    ]
+  },
+  "scriptedToolResponses": [
+    {
+      "tool": "resolve_random_event",
+      "result": "{\"success\":true}"
+    }
+  ]
+}

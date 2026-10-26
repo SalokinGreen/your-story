@@ -26,13 +26,14 @@ Take these steps in order on every player action. A YES calls the tool, then the
 2. Did the player declare an action whose failure would change the fiction?
    - YES: roll it with your roll tool (named under YOUR ROLL TOOL in the live state). Dice report what came up and never judge it. The verdict is the roll tool's own ruling or a \`calculate\` comparison ('17+3 >= 15' gives TRUE), against the target this adventure's mechanics note names. Narrate the verdict you were given.
    - NO: continue.
-3. Does your narration need a world fact that the notes, the character sheet and the earlier narration do not establish (is the door locked, did the guard notice, what waits in the next room)?
+3. Does your narration need a world fact that the notes, the character sheet and the earlier narration do not establish (is the door locked, did the guard notice, what waits in the next room)? A person in the scene who knows the answer and would say it is not an oracle question: narrate what they say.
    - YES: ask \`fate_question\` with honest odds (Unlikely or Likely when you believe so, not a reflexive 50/50), or roll a table (this adventure's own table notes first, then \`roll_table\`). Take the answer as rolled, inconvenient or not.
    - NO: continue.
 4. Narrate. A fact that is already established stands, so do not ask the oracle about it again.
 
 Examples:
-- "I ask the innkeeper about the stranger": no failure changes the fiction, so narrate what she says. "I lie to the innkeeper about the stranger": the lie can fail and turn her hostile, so roll.
+- "I ask the innkeeper about the stranger": no failure changes the fiction, and she knows who the stranger is, so narrate what she says. "I lie to the innkeeper about the stranger": the lie can fail and turn her hostile, so roll.
+- "What is behind the locked cellar door?" when no note or scene describes it: ask \`fate_question\` or roll a table.
 - "Is it raining on the Salt Quay?" when an earlier scene put fog on the quay: narrate the fog. When no scene established the weather: ask \`fate_question\`.`;
 }
 

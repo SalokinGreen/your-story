@@ -1,0 +1,72 @@
+{
+  "v": 1,
+  "kind": "generation",
+  "id": "table-undescribed-room-rolls-note",
+  "published": true,
+  "note": "Tables: no note describes the room behind the door, and the adventure holds a room table. The GM rolls it with roll_table instead of inventing the room.",
+  "storySnapshot": {
+    "story_name": "The Tallow Gate",
+    "premise": "A mountain toll-town in winter. Ilse Varrow, a courier, carries a sealed tin to the toll-house at the far end of the Pim causeway.",
+    "player_name": "Ilse Varrow",
+    "difficulty": "medium",
+    "scene": {
+      "parts": [
+        {
+          "content": "At the far end of the toll-house corridor there is one more door, shut, with a bar of light under it.",
+          "imageUrl": "",
+          "user": false,
+          "role": "assistant"
+        }
+      ]
+    },
+    "lore": [
+      {
+        "title": "Character: Ilse Varrow",
+        "type": "character_sheet",
+        "content": "Ilse Varrow, courier. Quick, stubborn, owes the Hobnail Guild a debt. Carries a sealed tin she has not opened.",
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": [],
+        "enabled": true
+      },
+      {
+        "title": "Toll-house rooms",
+        "type": "table",
+        "content": "Rooms in the toll-house. Roll when the player opens a room no note describes.\n\n## Room (1d6)\n1. A cold ledger room, shelves of damp toll books\n2. A guard barracks, three bunks and a cold brazier\n3. A kitchen with a pot still warm\n4. A strongroom with its door ajar\n5. A chapel to the Pim saints, candles lit\n6. A bare cell with a single chair",
+        "relatedCharacters": [],
+        "relatedLocations": [],
+        "secrtet": false,
+        "keys": [],
+        "enabled": true
+      }
+    ],
+    "npcs": [
+      {
+        "id": "npc-odrell-pim",
+        "name": "Odrell Pim",
+        "description": "Round-shouldered innkeeper of the Kettle & Rook. Fond of gossip, evasive about his cellar.",
+        "role": "Innkeeper",
+        "status": "alive",
+        "relationship": "Stranger",
+        "attitude": "neutral",
+        "createdAt": 1
+      }
+    ]
+  },
+  "playerLine": "I open the last door in the corridor and step in. What is this room?",
+  "expect": {
+    "calls": [
+      "roll_table"
+    ],
+    "noCalls": [
+      "fate_question"
+    ]
+  },
+  "scriptedToolResponses": [
+    {
+      "tool": "roll_table",
+      "result": "{\"table\":\"Toll-house rooms > Room\",\"die\":\"1d6\",\"roll\":3,\"result\":\"A kitchen with a pot still warm\"}"
+    }
+  ]
+}

@@ -493,8 +493,8 @@ timers, pending events and moves, then the setup blocks, the Observer,
 progress, repetition and knowledge notes, the pacing note and the GM tip),
 marked `"turn"`. **The system prompt's rules are two chains** (GM prompt slice 2,
 `gmPromptChains.ts`, `docs/gm-prompt-design.md` 2.1 and 2.3): `rollDecisionChain()`
-(read, roll if a failure changes the fiction, ask the oracle if the notes do not
-establish a fact, narrate) and `agencyRule()`, which carries the judge's
+(read, roll if a failure changes the fiction, ask the oracle or roll a table if the notes do not
+establish a fact and no person in the scene would simply say it, narrate) and `agencyRule()`, which carries the judge's
 `AGENCY_CHAIN` verbatim; the system prompt names no system's roll tool (it says
 "your roll tool, named under YOUR ROLL TOOL"), so it is identical for every story.
 The `<thinking>` instruction rides in the player-turn message and only for a model
@@ -1999,7 +1999,8 @@ asserted over the published turns by `tests/judges.evalSet.test.ts` (free).
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest (254 files and 4,326 tests on 2026-10-25 after GM prompt slice 5), earlier 211 files and 3,427 tests (2026-10-25, after the
+- **Randomness (R1 to R5, decisions 259 to 261, `docs/randomness-design.md`, plan `docs/randomness-plan.md`)** is four engine-owned sources and one prompt rule: `roll_table` rolls a table note (R1), names are rolled and checked (R2), a very light dice drawer of three names and a meaning pair rides in the live block (R3), and tripwires queue a surprise on a quiet turn that crossed a line (R4). R5 is the roll chain's person-who-knows clause and the cases that measure it (`evals/generation/`: `names-new-npc-uses-drawer`, `table-undescribed-room-rolls-note`, `tripwire-pending-event-resolved`, `drawer-quiet-turn-forces-nothing`; the runner's `expect.nameFrom` and the report's `runDetails`). Neither the drawer nor the tripwires run in session zero.
+- `tests/` — Vitest (261 files and 4,432 tests on 2026-10-26 after randomness R5), earlier 254 files and 4,326 tests on 2026-10-25 after GM prompt slice 5, earlier 211 files and 3,427 tests (2026-10-25, after the
   starter welcomes; earlier 3,418 after feedback and the session-zero
   hand-back, 210 files and 3,410 after feedback;
   the counts were run). Earlier: 203 files and 3,228 tests (after the judge
