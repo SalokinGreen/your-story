@@ -247,7 +247,21 @@ function ensureRecord(story: StoryData): CampaignRecord {
   return story.campaign;
 }
 
-function executeWrite(story: StoryData, p: CampaignParams, toolCallId: string): GMToolResult {
+/**
+ * Options only the GM's own tool passes (the Designer and the starters write
+ * freely): `rejectName` returns a refusal for a new or renamed location whose
+ * name the engine did not roll (names/accept.ts), else null.
+ */
+export interface CampaignWriteOptions {
+  rejectName?: (name: string, kind: "place") => string | null;
+}
+
+function executeWrite(
+  story: StoryData,
+  p: CampaignParams,
+  toolCallId: string,
+  opts: CampaignWriteOptions = {},
+): GMToolResult {
   const isEdit = p.action === "edit";
   if (!p.part || !(CAMPAIGN_PARTS as readonly string[]).includes(p.part)) {
     return result(toolCallId, p, false, `${p.action} needs \`part\`, one of ${CAMPAIGN_PARTS.join(", ")}`);
@@ -288,6 +302,14 @@ function executeWrite(story: StoryData, p: CampaignParams, toolCallId: string): 
   const candidate = existing ? mergeForEdit(stripState(part, existing), p.data) : p.data;
   const v = validatePart(part, candidate, ctxFor(story, record, !isEdit));
   if (!v.ok) return result(toolCallId, p, false, v.error);
+  if ((part === "location" || part === "faction") && opts.rejectName) {
+    const nextName = (v.value as { name?: string }).name;
+    const oldName = existing && typeof existing.name === "string" ? existing.name : undefined;
+    if (nextName && nextName !== oldName) {
+      const why = opts.rejectName(nextName, "place");
+      if (why) return result(toolCallId, p, false, why);
+    }
+  }
 
   const rec = ensureRecord(story);
   const taken = allIds(rec);
@@ -651,13 +673,14 @@ export function executeCampaign(
   toolCallId: string,
   p: CampaignParams,
   story: StoryData,
+  opts: CampaignWriteOptions = {},
 ): GMToolResult {
   switch (p.action) {
     case "read":
       return executeRead(story, p, toolCallId);
     case "add":
     case "edit":
-      return executeWrite(story, p, toolCallId);
+      return executeWrite(story, p, toolCallId, opts);
     default:
       break;
   }

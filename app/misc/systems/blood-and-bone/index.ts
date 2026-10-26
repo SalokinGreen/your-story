@@ -189,6 +189,24 @@ export const BLOOD_AND_BONE: BuiltinSystem = {
     buildLastResort(RULES_NOTES),
   ],
   sheetTemplate: BLOOD_AND_BONE_SHEET_TEMPLATE,
+  // Modern horror in the real world: places come from the map, names from a
+  // modern list when no table answers.
+  realWorldPlaces: true,
+  defaultNameStyle: "modern",
+  // A starter's own list first (Grave Watcher's town), then the People table.
+  nameSources: [
+    {
+      kind: "person",
+      noteTitle: "Grave Watcher — Names",
+      compose: [["First names"], ["Family names"]],
+      setting: "grave-watch",
+    },
+    {
+      kind: "person",
+      noteId: "builtin:blood-and-bone:oracles-people",
+      compose: [["Names"]],
+    },
+  ],
   creationNoteId: "builtin:blood-and-bone:character-creation",
   creationSteps: BLOOD_AND_BONE_CREATION_STEPS,
   meterSets: BLOOD_AND_BONE_METER_SETS,

@@ -2450,11 +2450,11 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Built-in tables** are the fallback, rolled with \`roll_table\` by name: ${MYTHIC_TABLE_NAMES.join(", ")}.
 - Only improvise freely when no matching table exists. Tables keep the world feeling alive and unpredictable instead of relying on the same GM instincts every time.
 
-### Naming (DON'T REACH FOR THE FIRST NAME THAT COMES TO MIND)
-- **Before naming any new NPC, place, faction, creature or notable object**, call \`generate_name\` and build the name from the pointers it gives you. The first name that surfaces on its own is almost always one you've used a hundred times before - Elara, Kael, Lyra, Thorne, Ravenwood - and a cast of those reads as generic no matter how good the prose around it is.
-- The pointers are a starting letter and syllable count per part (**binding** - the name you write must match them), plus seed sounds (**inspiration only** - reshape them completely if that's what the setting needs).
-- The roll deliberately steers away from letters already used in this story, so the cast stays distinguishable. Pass \`flavor\` to keep the result in the right cultural register, and \`starts_with\` only when a letter genuinely must be fixed (a sibling of an existing NPC, a clan naming convention).
-- A name the player already knows is a name that exists - don't re-roll established NPCs or places, only new ones.
+### Naming (NAMES ARE ROLLED, NOT INVENTED)
+- **A new person or place takes a rolled name.** Roll it with \`generate_name\` (three candidates; kind person or place), or from a name table in your notes (\`roll_table\`), and use one as it is. \`add_npc\`, \`update_npc\` (a rename) and \`campaign\` locations refuse a name that was not rolled; the refusal offers three, and calling \`generate_name\` again is always fine.
+- The first name that surfaces on its own is almost always one you've used a hundred times before, and a cast of those reads as generic no matter how good the prose around it is.
+- A name the player or the story already gave is a name that exists: use it, don't re-roll established people or places. A name the player types for their own character is theirs.
+- When this adventure has its own name table (a note with Names in the title, or a system's), the roll comes from it; \`style\` picks a built-in list otherwise (fantasy, modern, historical-european, nordic) and is remembered for the story.
 
 ${imageSection}### State Changes
 - **Player Stats:** Update their character sheet with \`edit_note\` as needed

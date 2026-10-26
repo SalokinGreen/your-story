@@ -190,11 +190,13 @@ import {
   type PortentResult,
 } from "./primaMateria";
 import {
-  collectUsedInitials,
-  formatNamePointers,
-  generateNamePointers,
-  NamePointers,
-} from "./nameGenerator";
+  isNameAccepted,
+  newNameTurn,
+  pushOffered,
+  type NameCheckContext,
+  type NameTurnState,
+} from "./names/accept";
+import { entryName, isNameStyle, rollNames } from "./names/roll";
 import {
   applyTierEscalation,
   stakesFloor,
@@ -250,6 +252,15 @@ export interface GMToolContext {
   // hands the updated one back as `turnLedger`; the caller keeps it with the
   // story it commits.
   turnLedger?: TurnLedger;
+  // What the turn has said so far for the name check (names/accept.ts): notes
+  // the GM made this turn (they prove nothing) and the players' words not yet
+  // in the story. Carried across the turn's rounds like the ledger above.
+  nameTurn?: NameTurnState;
+  // The story's lore as it stood when the turn began, kept by reference (the
+  // batches replace the array, never edit it): the name check reads notes from
+  // here, so a note made or edited this turn proves nothing. Unset: the lore
+  // this batch started with.
+  turnStartLore?: readonly StoryLore[];
 }
 
 /**
@@ -553,7 +564,8 @@ export interface GMRollPortentResult {
 
 export interface GMGenerateNameResult {
   type: "generate_name";
-  pointers: NamePointers;
+  kind: "person" | "place";
+  names: string[];
   reason?: string;
 }
 
@@ -973,6 +985,8 @@ export interface GMExecutionResult {
   aborted?: boolean;
   // The turn's clock event ledger after this batch (see GMToolContext).
   turnLedger?: TurnLedger;
+  // The name check's turn state after this batch (see GMToolContext).
+  nameTurn?: NameTurnState;
 }
 
 // What the setup card needs (confirm_setup, session zero). The sheet and plan
@@ -1102,6 +1116,14 @@ export async function executeGMTools(
   let ledger: TurnLedger = toolContext.turnLedger
     ? structuredClone(toolContext.turnLedger)
     : newTurnLedger();
+  const nameTurn: NameTurnState = toolContext.nameTurn
+    ? structuredClone(toolContext.nameTurn)
+    : newNameTurn();
+  const turnStartLore = toolContext.turnStartLore ?? storyData.lore ?? [];
+  const nameCtx = (): NameCheckContext => ({
+    turnStartLore,
+    playerTextThisTurn: nameTurn.playerTextThisTurn,
+  });
   const results: GMToolResult[] = [];
   const contextParts: string[] = [];
   const signal = toolContext.abortSignal;
@@ -1445,7 +1467,13 @@ export async function executeGMTools(
           );
           break;
         case "campaign":
-          result = executeCampaign(call.id, params as CampaignParams, modified);
+          result = executeCampaign(call.id, params as CampaignParams, modified, {
+            // A system whose settings are the real world (Blood & Bone) names
+            // its places from the map: only people are checked.
+            rejectName: resolveSystem(modified).system?.realWorldPlaces
+              ? undefined
+              : (name, kind) => unrolledNameRefusal(modified, kind, name, nameCtx()),
+          });
           break;
         // System tools (meters, tracks, sessions, action rolls)
         case "manage_meter":
@@ -1506,13 +1534,14 @@ export async function executeGMTools(
           break;
         // NPC management tools
         case "add_npc":
-          result = executeAddNPC(call.id, params as AddNPCParams, modified);
+          result = executeAddNPC(call.id, params as AddNPCParams, modified, nameCtx());
           break;
         case "update_npc":
           result = executeUpdateNPC(
             call.id,
             params as UpdateNPCParams,
-            modified
+            modified,
+            nameCtx()
           );
           break;
         case "remove_npc":
@@ -1677,6 +1706,19 @@ export async function executeGMTools(
       };
     }
 
+    // What the name check learns from this call: a note the GM just made
+    // proves nothing, and a player's answer to a question is their own text.
+    if (result.toolName === "confirm_setup") {
+      const changes = result.result as GMConfirmSetupResult | undefined;
+      if (changes?.outcome === "changes" && changes.note) {
+        nameTurn.playerTextThisTurn.push(changes.note);
+      }
+    }
+    if (result.success && result.toolName === "ask_question") {
+      const answers = (result.result as GMAskQuestionResult | undefined)?.answers ?? [];
+      for (const a of answers) if (!a.skipped && a.answer) nameTurn.playerTextThisTurn.push(a.answer);
+    }
+
     // Stamp oracle recency here rather than inside the two executors:
     // roll_table returns from three places (custom table, built-in table,
     // table-not-found) and only the successful ones should count as having
@@ -1784,6 +1826,7 @@ export async function executeGMTools(
     modifiedStoryData: modified,
     storyContext: contextParts.join("\n"),
     turnLedger: ledger,
+    nameTurn,
   };
 }
 
@@ -3424,6 +3467,7 @@ function executeRollTable(
     // Roll on the AGMT element table
     // (isAgmtTable already confirmed normalizedName is a member of MYTHIC_TABLE_NAMES)
     const result = generateElement(normalizedName as ElementCategory);
+    if (normalizedName === "names") pushRolledName(storyData, result.element);
     const prettifiedName = rawName
       .replace(/_/g, " ")
       .replace(/\b\w/g, (l: string) => l.toUpperCase());
@@ -3514,6 +3558,8 @@ function executeRollTable(
 
   const table = picked.table;
   const { roll, entry } = rollTable(table);
+  // A rolled name is the engine's: add_npc takes it (names/accept.ts).
+  pushRolledName(storyData, entry.text);
   const label = tablePathLabel(table.path);
   const rolledOn = `${note.title}${label ? ` > ${label}` : ""}`;
   const instructions = [table.instructions, parsed.noteInstructions]
@@ -3623,39 +3669,65 @@ function closestTableTitles(storyData: StoryData, name: string): string[] {
 }
 
 /**
- * Roll naming pointers (starting letters, syllable counts, seed sounds) for
- * an entity the GM is about to name. Read-only: it inspects the story's
- * existing names to steer initials away from letters already in play, but
- * changes no state - the name itself is written by the GM in narration and
- * recorded through add_npc/create_note like any other name.
+ * Roll three names for a new person or place (randomness plan R2, decision
+ * 260). The names come from the story's name tables, its system's declared
+ * ones, or the built-in lists (names/); they go on the story's ledger, so
+ * add_npc and the campaign tool accept them. `style` asks for the built-in
+ * lists in that style and is remembered the first time it is given.
  */
 function executeGenerateName(
   toolCallId: string,
   params: GenerateNameParams,
   storyData: StoryData
 ): GMToolResult {
-  const pointers = generateNamePointers(
-    {
-      kind: params.kind,
-      parts: params.parts,
-      flavor: params.flavor,
-      starts_with: params.starts_with,
-      syllables: params.syllables,
-    },
-    collectUsedInitials(storyData)
-  );
-
+  const kind = params?.kind === "place" ? "place" : "person";
+  const style = isNameStyle(params?.style) ? params.style : undefined;
+  if (style && !storyData.nameStyle) storyData.nameStyle = style;
+  const names = rollNames(storyData, kind, 3, { style });
+  pushOffered(storyData, names);
   return {
     toolName: "generate_name",
     toolCallId,
     success: true,
     result: {
       type: "generate_name",
-      pointers,
-      reason: params.reason,
+      kind,
+      names,
+      reason: params?.reason,
     } as GMGenerateNameResult,
-    contextForStory: formatNamePointers(pointers, params.reason),
+    contextForStory: `[Names rolled for a new ${kind}${
+      params?.reason ? ` (${params.reason})` : ""
+    }: ${names.join(", ")}. Use one of them, as it is.]`,
   };
+}
+
+/**
+ * Puts a table entry on the name ledger when it reads as a name (a few words,
+ * no sentence), so rolling "Names" and then calling add_npc works. A long entry
+ * (a rumour, a hook) would only push real names off the ledger.
+ */
+function pushRolledName(story: StoryData, text: string): void {
+  const name = entryName(text);
+  if (!name || name.length > 40 || name.split(/\s+/).length > 4 || /[.!?]/.test(name)) return;
+  pushOffered(story, [name]);
+}
+
+/**
+ * The refusal for a name the engine did not roll, or null when the name is
+ * accepted (names/accept.ts). Offers three fresh names and puts them on the
+ * ledger, so the GM's retry passes. Mutates `story` (the working copy).
+ */
+function unrolledNameRefusal(
+  story: StoryData,
+  kind: "person" | "place",
+  name: string | undefined,
+  nameCtx?: NameCheckContext
+): string | null {
+  if (!name || !name.trim()) return null;
+  if (isNameAccepted(name, story, nameCtx)) return null;
+  const offered = rollNames(story, kind, 3);
+  pushOffered(story, offered);
+  return `That name wasn't rolled. Use one of: ${offered.join(", ")}, or call generate_name.`;
 }
 
 const IMAGE_DESCRIPTION_MAX_CHARS = 400;
@@ -8208,11 +8280,29 @@ function executeTakeRest(
 function executeAddNPC(
   toolCallId: string,
   params: AddNPCParams,
-  storyData: StoryData
+  storyData: StoryData,
+  nameCtx?: NameCheckContext
 ): GMToolResult {
   // Initialize NPCs array if it doesn't exist
   if (!storyData.npcs) {
     storyData.npcs = [];
+  }
+
+  // A new person takes a name the engine rolled (or one already established).
+  // Before the duplicate check: an existing NPC's name is in the record.
+  const refusal = unrolledNameRefusal(storyData, "person", params.name, nameCtx);
+  if (refusal) {
+    return {
+      toolName: "add_npc",
+      toolCallId,
+      success: false,
+      result: {
+        type: "add_npc",
+        npc: {} as NPC,
+        message: refusal,
+      } as GMAddNPCResult,
+      contextForStory: `[NPC Error: ${refusal}]`,
+    };
   }
 
   // Check if NPC already exists
@@ -8292,7 +8382,8 @@ const MAX_ATTITUDE_STEP_PER_CALL = 2;
 function executeUpdateNPC(
   toolCallId: string,
   params: UpdateNPCParams,
-  storyData: StoryData
+  storyData: StoryData,
+  nameCtx?: NameCheckContext
 ): GMToolResult {
   if (!storyData.npcs || storyData.npcs.length === 0) {
     return {
@@ -8333,6 +8424,25 @@ function executeUpdateNPC(
 
   const npc = storyData.npcs[npcIndex];
   const changes: string[] = [];
+
+  // A rename takes a rolled name too.
+  if (params.name && params.name !== npc.name) {
+    const refusal = unrolledNameRefusal(storyData, "person", params.name, nameCtx);
+    if (refusal) {
+      return {
+        toolName: "update_npc",
+        toolCallId,
+        success: false,
+        result: {
+          type: "update_npc",
+          npc,
+          changes: [],
+          message: refusal,
+        } as GMUpdateNPCResult,
+        contextForStory: `[NPC Error: ${refusal}]`,
+      };
+    }
+  }
 
   // Apply updates
   if (params.name && params.name !== npc.name) {

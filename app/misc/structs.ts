@@ -927,6 +927,14 @@ export interface StoryData {
   setup?: SetupState;
   player_name: string;
   player_summary: string;
+  // Names the engine offered (the last 30: generate_name's candidates and the
+  // drawer's), accepted by add_npc and the campaign tool (names/accept.ts).
+  // Private like the drawer: stripped from online snapshots
+  // (withoutPrivateRandomness). Optional, so old saves need no backfill.
+  nameLedger?: string[];
+  // The built-in name list's style, recorded the first time generate_name is
+  // given one (names/builtinLists.ts). Unset means "fantasy".
+  nameStyle?: "fantasy" | "modern" | "historical-european" | "nordic";
   // Custom display settings for chat-like story view (multiplayer-ready)
   displayName?: string; // Custom display name (falls back to player_name, then auth user name)
   displayAvatar?: string; // Custom avatar URL (falls back to auth user avatar)

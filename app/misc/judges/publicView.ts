@@ -27,6 +27,19 @@ export function withoutPrivateFindings(story: StoryData): StoryData {
   };
 }
 
+/**
+ * The story as a guest may see it, without the engine's private randomness: the
+ * name ledger and the name style (randomness plan R2). A copy; the host's own
+ * story is untouched, and a story with neither is returned as it is.
+ */
+export function withoutPrivateRandomness(story: StoryData): StoryData {
+  if (story.nameLedger === undefined && story.nameStyle === undefined) return story;
+  const copy = { ...story };
+  delete copy.nameLedger;
+  delete copy.nameStyle;
+  return copy;
+}
+
 function hasPrivateFindings(p: ScenePart): boolean {
   return Boolean(p.observerFlags || p.correctedObserverFlags || p.observerRewriteOriginal);
 }
