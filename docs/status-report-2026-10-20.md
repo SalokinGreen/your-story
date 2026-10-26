@@ -609,6 +609,13 @@ generate the icons (`generate-icons.sh` exists at the repo root).
 > `remove_npc`, `take_rest`, the `edit_lore_*` family), and the Designer's
 > tools are still stripped. The list is still hard-coded rather than derived, and
 > `tool_choice: "required"` is still forced.
+>
+> **Update 2026-10-26 (randomness plan R1): three more fixed.**
+> `GOOGLE_ESSENTIAL_TOOLS` now also holds `roll_table`, `generate_name` and
+> `resolve_random_event`, so Gemini has the same randomness tools as the other
+> providers (`tests/gmTools.sixPlaces.test.ts` asserts all six places for the
+> three; `resolve_random_event` also gained its missing label in
+> `gmToolLabels.ts`). The rest of the list above is unchanged.
 
 ### 6.15 Rules notes are titles only, though the prompt, comments and docs say pinned
 

@@ -161,6 +161,8 @@ function confirmSetupStartedGame(result: PublicSummarySource): boolean {
 function scrubGMText(text: string): string {
   return text
     .replace(/\n?\[(?:Reason|Context): [^\n]*\]/g, "")
+    // roll_table's text around a note's table: the GM's to apply, not the narrator's.
+    .replace(/\n?\[Around the table, for you to apply: [^\n]*\]/g, "")
     .replace(/(\[Challenge Cancelled: "[^"\n]*") - [^\n]*\]/g, "$1]")
     .replace(/(\[NPC Roll: [^\n]*?= -?\d+(?:\.\d+)?) - [^\n]*\]/g, "$1]")
     .replace(/\n?\[No [^\n]*`calculate`[^\n]*\]/g, "")

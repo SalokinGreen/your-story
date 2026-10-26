@@ -18,6 +18,20 @@ import { BLOOD_AND_BONE_KINDS } from "@/app/misc/systems/blood-and-bone/kindList
 export const KINDS: readonly string[] = BLOOD_AND_BONE_KINDS;
 
 import { rollFormula } from "../../app/misc/diceFormula";
+import { parseTableNote } from "../../app/misc/tableRoll";
+
+/**
+ * The engine's own reading of the note (tableRoll.ts): roll_table must be able
+ * to roll every table this check passes, and find as many tables as the note
+ * has `##` headings (a per-Kind list counts once, its Kinds being nested).
+ */
+function engineProblems(content: string, expectedTables: number | null): string[] {
+  const parsed = parseTableNote(content);
+  if (!parsed.ok) return [`roll_table cannot read it: ${parsed.reason}`];
+  if (expectedTables === null) return [];
+  const top = new Set(parsed.tables.map((t) => t.path[0]));
+  return top.size === expectedTables ? [] : [`roll_table finds ${top.size} tables, the note has ${expectedTables}`];
+}
 
 const D66_HEAD = 'd66: roll ["1d6","1d6"], first die is the tens';
 
@@ -95,6 +109,7 @@ export function checkTableShape(title: string, content: string): string[] {
   if (old) {
     const err = sequence(numbered(content.split("\n")), Number(old[1]));
     if (err) problems.push(`d${old[1]}: ${err}`);
+    problems.push(...engineProblems(content, null));
     return problems;
   }
 
@@ -166,5 +181,6 @@ export function checkTableShape(title: string, content: string): string[] {
   const paragraphs = content.trim().split(/\n\s*\n/);
   const last = paragraphs[paragraphs.length - 1] ?? "";
   if (!last.startsWith("Use when ")) problems.push('does not end on a "Use when " paragraph');
+  problems.push(...engineProblems(content, headers.length));
   return problems;
 }

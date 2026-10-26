@@ -19,7 +19,8 @@ import {
   selectGMAdviceForTurn,
   formatGMAdviceNote,
 } from "@/app/misc/gmAdvice";
-import { formatOracleRecencyLine } from "@/app/misc/mythic";
+import { formatOracleRecencyLine, MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
+import { parseTableNote, summarizeTables } from "@/app/misc/tableRoll";
 import { formatTintLine } from "@/app/misc/primaMateria";
 import {
   getSetupProgress,
@@ -1741,23 +1742,31 @@ export function buildLiveBlock(input: LiveBlockInput): string {
  * once, the rest joined with "; " (a title may hold a comma). A pack that
  * grows to hundreds of notes then costs a few lines, not one per note, and
  * the line says how to rebuild the exact title. Pure, and per-turn text, so
- * it belongs in the live block only.
+ * it belongs in the live block only. With `showTables`, a note that parses as
+ * a table (tableRoll.ts) shows its sub-tables and dice in brackets on the same
+ * line, so the GM can ask `roll_table` for one without reading the note.
  */
 export function renderNoteTitleList(
-  notes: { title: string; libraryNoteId?: string }[],
+  notes: { title: string; libraryNoteId?: string; content?: string }[],
   noun: string,
+  showTables = false,
 ): string {
   const lines: string[] = [];
   const groups = new Map<string, string[]>();
+  const tablesOf = (n: { content?: string }): string => {
+    if (!showTables || typeof n.content !== "string") return "";
+    const parsed = parseTableNote(n.content);
+    return parsed.ok ? ` [${summarizeTables(parsed.tables)}]` : "";
+  };
   for (const n of notes) {
     const sep = n.title.indexOf(" — ");
     if (!isBuiltinNote(n) || sep <= 0 || sep + 3 >= n.title.length) {
-      lines.push(`- ${n.title}.md`);
+      lines.push(`- ${n.title}.md${tablesOf(n)}`);
       continue;
     }
     const prefix = n.title.slice(0, sep);
     const list = groups.get(prefix) ?? [];
-    list.push(n.title.slice(sep + 3));
+    list.push(`${n.title.slice(sep + 3)}${tablesOf(n)}`);
     groups.set(prefix, list);
   }
   for (const [prefix, rest] of groups) {
@@ -2050,8 +2059,8 @@ export function buildGMStagePrompt({
     (l) => !isBuiltinCreationPrompts(l),
   );
   if (rollableTables.length > 0) {
-    loreSection += `\n## 🎲 TABLES (use read_notes to view, then roll the die the note names with formula_roll and read off the result. When one of these covers what you need, such as a name, a face, a place or a rumour, roll it rather than inventing the answer or calling generate_name)\n`;
-    loreSection += renderNoteTitleList(rollableTables, "tables");
+    loreSection += `\n## 🎲 TABLES (roll with roll_table: table_name is the title, and \`table\` picks a sub-table shown in brackets. Dice are in the brackets too. When one of these covers what you need, such as a name, a face, a place or a rumour, roll it rather than inventing the answer or calling generate_name)\n`;
+    loreSection += renderNoteTitleList(rollableTables, "tables", true);
     loreSection += "\n";
   }
   if (creationPromptNotes.length > 0) {
@@ -2437,8 +2446,8 @@ You and the player can talk OOC by wrapping text in (round brackets).
 
 ### Tables (USE THEM - DON'T JUST IMPROVISE)
 - Before inventing random content (loot, encounters, NPC traits, weather, complications, plot twists, rumors, etc.), check whether a relevant table exists and roll on it instead of making it up.
-- **This adventure's own tables are notes** (the 🎲 Tables section of your notes) and take priority - check those first. You roll them yourself: read the note, roll the die it names with \`formula_roll\`, and read off the entry that came up. The note is prose, so read what it says around the listing too - when to roll it, what the results mean, whether an entry sends you somewhere else.
-- **Built-in AGMT tables** are the fallback, rolled with \`roll_table\` (character traits, locations, plot twists, magic items, and more - see the tool description for the full list).
+- **This adventure's own tables are notes** (the 🎲 Tables section of your notes) and take priority - check those first. Roll one with \`roll_table\`: \`table_name\` is the note's title, and \`table\` names one sub-table when the note holds several. The engine rolls the die and returns the entry, with any text around the table ("roll again", a cross-reference) for you to apply. Only when the result says the note can't be rolled that way: read it with \`read_notes\`, roll the die it names with \`formula_roll\` and read off the entry that came up.
+- **Built-in tables** are the fallback, rolled with \`roll_table\` by name: ${MYTHIC_TABLE_NAMES.join(", ")}.
 - Only improvise freely when no matching table exists. Tables keep the world feeling alive and unpredictable instead of relying on the same GM instincts every time.
 
 ### Naming (DON'T REACH FOR THE FIRST NAME THAT COMES TO MIND)

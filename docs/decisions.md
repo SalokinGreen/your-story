@@ -473,3 +473,14 @@ After the first live evals on a temporary DeepInfra key ([`research/model-eval-2
 |---|---|---|
 | 257 | "Okay new defaults. Deepseek flash normal for normal and high for advanced." | **DeepSeek V4 Flash on every tier:** Default (tiers 0–2) at `normal`, tier 2 kept at `high` by decision 123, Advanced (tier 3) at `high`. Narration follows Default. The side agents stay on Claude Haiku 5.5 (decision 51) and rewrite confirmation on GLM 5.3. The first passes sent DeepInfra no effort, so they ran Flash without thinking (about 10% failed); after the fix, `normal` failed 3/50 and `high` 7/50, too few runs to rank the two. The author confirmed `normal` for Default ("Okay flash at normal. That's good."). A thinking request now keeps the 4,096 `max_tokens` floor (`requestThinks`, `providerCall.ts`), or an Observer rewrite's 1,100-token cap is spent on thinking. |
 | 258 | "Which provider should the new default DeepSeek V4 Flash run through?" | **"OpenRouter (Recommended)."** `deepseek/deepseek-v4-flash` as the catalog key "DeepSeek V4 Flash (OpenRouter)", with DeepInfra asked first (`openRouterProviderOrder`, fallbacks allowed), the listing the eval measured; so one OpenRouter key still runs the GM, the narrator and the side agents. Rejected: DeepInfra direct (two keys to start); DeepSeek's own API (V4 Flash retired there, peak-hour pricing). |
+
+### Interview — real randomness for the GM (2026-10-26)
+
+The author: "I also am not happy with the oracle tables use, the GM should use the tables a lot more for randomness because LLM randomness isn't random enough." Design: [`randomness-design.md`](randomness-design.md).
+
+| # | question | decision |
+|---|---|---|
+| 259 | "How should the engine put real randomness in front of the GM?" | **"Both but the draw every turn needs to be very light. Too strong is too random."** A small engine-rolled drawer in every turn's live block, offered as material rather than orders, plus one-call rolls on any table note. Rejected: drawer only; on demand only. |
+| 260 | "Names: LLMs reuse the same few (Elara, Kael). What should the engine do?" | **"Names only from tables (Recommended)."** A new named person or place takes a name the engine rolled from the setting's name tables; the engine flags one that wasn't. Rejected: offer, don't require; leave as today. |
+| 261 | "Should the engine check for surprises on its own schedule, OSR-style, even when the GM doesn't ask?" | **"Tripwires (Recommended)."** The engine rolls a chance of a random event when play crosses a line (a new scene, travel, time passing, a rest, a run of turns with no oracle) and hands the GM an event to work in. Rejected: every N turns; Mythic's own only. |
+| 262 | "You confirmed Flash at normal for Default. What about Advanced?" | **"Keep high (Recommended)."** As in decision 257. |

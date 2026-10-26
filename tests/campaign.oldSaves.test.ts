@@ -74,8 +74,11 @@ function promptDigests(story: StoryData): string[] {
 // 2026-10-25 (GM prompt slice 5): the system prompt again, by design: the length
 // brackets say beats and sentences and the pacing section has a second example
 // pair. Every story gets it; the other fourteen are untouched.
+// 2026-10-26 (randomness R1): the system prompt again, by design: the Tables section
+// rolls table notes with roll_table and lists the built-in table names. Every
+// story gets it; the other fourteen are untouched.
 const BEFORE: string[] = [
-  "system:27021:e2c47c36c370a0f4",
+  "system:27716:6c6a4e9b02fa2a6d",
   "user:9575:ec82a88c82afe716",
   "assistant:39:44c002ba5a7f3e3a",
   "user:65:21f6cbf4db8f7103",

@@ -342,6 +342,19 @@ export function markOracleConsulted(storyData: StoryData): void {
   storyData.agmtState.lastOracleTurn = currentTurnIndex(storyData);
 }
 
+/**
+ * The tools whose successful result counts as "the GM consulted the oracle or
+ * a table": the recency counter in the prompt's Oracle State section, the
+ * observer's missing_oracle_or_table check and the combined judge's
+ * precondition all read this one set (randomness plan R1). A `formula_roll` is
+ * never counted, however near a table it was.
+ */
+export const ORACLE_USE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "fate_question",
+  "roll_table",
+  "roll_portent",
+]);
+
 // Turn gaps at which the counter stops being a neutral readout and starts
 // pushing back. Three turns is roughly a scene's worth of beats decided
 // without rolling for anything; six is long enough that the GM is near

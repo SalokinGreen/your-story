@@ -173,6 +173,19 @@ describe("the tools session zero cannot do without", () => {
   });
 });
 
+describe("the randomness tools Gemini keeps (randomness plan R1)", () => {
+  it.each(["roll_table", "generate_name", "resolve_random_event"])(
+    "%s is in the whitelist, the schema, the executor, the Google list and the labels",
+    (name) => {
+      expect(whitelist.has(name), "whitelist").toBe(true);
+      expect(GM_TOOL_MAP.has(name) || TOOL_MAP.has(name), "schema").toBe(true);
+      if (GM_TOOL_MAP.has(name)) expect(gmExecutorSource, "executor").toContain(`case "${name}":`);
+      expect(GOOGLE_ESSENTIAL_TOOLS.has(name), "google").toBe(true);
+      expect(name in TOOL_LABELS, "label").toBe(true);
+    },
+  );
+});
+
 describe("the removed tools", () => {
   it("are in no schema, whitelist, Google filter or label", () => {
     for (const name of REMOVED_TOOLS) {
