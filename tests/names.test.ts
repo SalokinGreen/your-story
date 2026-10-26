@@ -9,7 +9,9 @@ import { describe, expect, it } from "vitest";
 import { executeGMTools } from "@/app/misc/gmExecutor";
 import { executeCampaign } from "@/app/misc/campaign/executor";
 import { runRung1 } from "@/app/misc/judges/rung1";
-import { isNameAccepted, newNameTurn, pushOffered, NAME_LEDGER_SIZE } from "@/app/misc/names/accept";
+import { isNameAccepted, newNameTurn, pushDrawerNames, pushOffered, NAME_LEDGER_SIZE } from "@/app/misc/names/accept";
+import { drawDrawer } from "@/app/misc/diceDrawer";
+import { withoutPrivateRandomness } from "@/app/misc/judges/publicView";
 import {
   BUILTIN_NAME_LISTS,
   NAME_STYLES,
@@ -564,5 +566,29 @@ describe("review fixes (randomness R2)", () => {
     const s = story({ npcs: [{ name: "Ond\u0159ej Mal\u00fd" }, { name: "Sinead O'Hare" }] });
     expect(isNameAccepted("Ondrej Maly", s)).toBe(true);
     expect(isNameAccepted("Sinead O\u2019Hare", s)).toBe(true);
+  });
+});
+
+describe("drawer names do not starve a small name table (randomness R4 review)", () => {
+  it("a one-realm Fantastic Realms story keeps getting realm names after ten drawers", () => {
+    const lark = new Set(entriesOf(NAMES_TABLE.content, "Larkenfell names"));
+    const s = story({
+      lore: [builtinNote(NAMES_TABLE)],
+      systemState: {
+        systemId: "fantastic-realms",
+        sessionCount: 0,
+        dedupKeys: [],
+        fantasticRealms: { heroes: {}, realm: "larkenfell" },
+      },
+    });
+    for (let turn = 0; turn < 10; turn++) {
+      pushDrawerNames(s, drawDrawer(s, seeded(100 + turn)).names);
+      for (const n of rollNames(s, "person", 3, { rng: seeded(turn) })) expect(lark.has(n), `${turn}: ${n}`).toBe(true);
+    }
+    expect((s.recentDrawerNames ?? []).length).toBe(9);
+    expect(s.nameLedger ?? []).toEqual([]);
+    // The drawn names are still accepted by add_npc, and stripped from guests.
+    expect(isNameAccepted(s.recentDrawerNames![8], s)).toBe(true);
+    expect(withoutPrivateRandomness(s).recentDrawerNames).toBeUndefined();
   });
 });

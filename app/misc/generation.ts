@@ -141,7 +141,7 @@ import { kindOnlyFlag } from "@/app/misc/judges/publicView";
 import type { ConfirmedFinding, Fact } from "@/app/misc/judges/types";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
-import { newNameTurn, pushOffered, type NameTurnState } from "@/app/misc/names/accept";
+import { newNameTurn, pushDrawerNames, type NameTurnState } from "@/app/misc/names/accept";
 import { drawDrawer, type DiceDrawer } from "@/app/misc/diceDrawer";
 import { applyTripwireRoll, evaluateTripwire, tripwireLogLine } from "@/app/misc/tripwires";
 import { appendToLastUser, buildNarrationContext } from "@/app/misc/campaign/narrationContext";
@@ -3241,7 +3241,7 @@ async function generateStoryTurnOnce(
         const turnDrawer: DiceDrawer | undefined = sessionZeroTurn
           ? undefined
           : drawDrawer(storyData);
-        if (turnDrawer) pushOffered(storyData, turnDrawer.names);
+        if (turnDrawer) pushDrawerNames(storyData, turnDrawer.names);
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;

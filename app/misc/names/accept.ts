@@ -50,6 +50,14 @@ export function pushOffered(story: StoryData, names: readonly string[]): void {
   story.nameLedger = ledger.slice(-NAME_LEDGER_SIZE);
 }
 
+/** Records the drawer's names, newest last, keeping the last 9. Mutates. Not avoided by rollNames. */
+export function pushDrawerNames(story: StoryData, names: readonly string[]): void {
+  const kept = (story.recentDrawerNames ?? []).filter(
+    (n) => !names.some((m) => m.toLowerCase() === n.toLowerCase()),
+  );
+  story.recentDrawerNames = [...kept, ...names.map((n) => n.trim()).filter(Boolean)].slice(-9);
+}
+
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -173,7 +181,7 @@ function establishedText(story: StoryData, ctx: NameCheckContext): string {
 
 /** A check that reads its texts once; ask it about as many names as needed. */
 export function createNameChecker(story: StoryData, ctx: NameCheckContext = {}): (name: string) => boolean {
-  const ledger = (story.nameLedger ?? []).map(normalizeForNames);
+  const ledger = [...(story.nameLedger ?? []), ...(story.recentDrawerNames ?? [])].map(normalizeForNames);
   const record = recordNames(story).map(normalizeForNames);
   const player = normalizeForNames(playerText(story, ctx));
   const established = normalizeForNames(establishedText(story, ctx));
