@@ -1444,7 +1444,7 @@ const setReasoningTierTool: ToolSchema = {
   function: {
     name: "set_reasoning_tier",
     description:
-      `Request that the NEXT reasoning step run at a higher tier. Only when the task genuinely exceeds you (complex multi-entity adjudication, a tricky rules interaction, a pivotal plot decision), never for ordinary narration.`,
+      `Run the NEXT step at a higher tier. Ask for: a boss or multi-sided fight (2-3); a rules clash the notes don't settle (2); NPC goals colliding (2); a pivotal plot or secret decision (3). Not for ordinary narration.`,
     parameters: {
       type: "object",
       properties: {
@@ -1452,11 +1452,11 @@ const setReasoningTierTool: ToolSchema = {
           type: "integer",
           minimum: 0,
           maximum: 3,
-          description: "Requested reasoning tier (0 = lightest, 3 = heaviest).",
+          description: "0 lightest, 3 heaviest.",
         },
         reason: {
           type: "string",
-          description: "One line: why this needs more reasoning.",
+          description: "One line: why.",
         },
       },
       required: ["tier", "reason"],

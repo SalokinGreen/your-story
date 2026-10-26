@@ -10,6 +10,28 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-25 — GM prompts slice 5: the dawn judge and the length wording
+
+No model was called. The dawn judge ships off (the phrase table is live), so
+nothing changes for a player until this passes and the switch is turned on.
+
+- **Score the dawn judge.** `.env.eval` with `OPENROUTER_API_KEY`. `node scripts/eval-dawn.mjs`
+  prints the 13 cases and where the phrase table is wrong (6) with no call. Then
+  `node scripts/eval-dawn.mjs --go` (130 calls on Haiku 5.5). Expected: a
+  "Verdict: no rise in missed dawns... safe to turn on." line (missed dawns no
+  higher than the table's 30, false dawns reported apart). Failure looks like:
+  "do NOT turn the judge on" (read the per-case rows: a `yes` on the flashback,
+  painting or plan cases is a false dawn; `no` on the dawn cases is a miss) or
+  many `unknown` (the quote was not in the text: the prompt needs work).
+- **Then try it in play.** In the desktop app's console `localStorage.setItem("ys:turnEndJudge","on")`,
+  play a Blood & Bone night to dawn with prose that avoids the table's words;
+  Debug Logs should show "Turn-end check night-ended: ... sending the GM back once".
+  Setting it to anything else returns to the phrase table.
+- **Length and tiers.** The brackets and the second example pair are covered by
+  the generation cases only in the next `eval-generation.mjs` baseline-then-compare
+  (slice 2's entry below), run after this change too: replies should not get
+  longer, and `set_reasoning_tier` should be called on boss fights.
+
 ## 2026-10-25 — GM prompts slice 2: the roll chain and the agency chain
 
 The prompt, the live block's roll tool, the stakes text and the generation-case

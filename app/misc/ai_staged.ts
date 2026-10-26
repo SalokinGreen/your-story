@@ -1187,26 +1187,26 @@ export function getLengthGuidance(replyLength: ReplyLength = "medium"): {
   switch (replyLength) {
     case "short":
       return {
-        routine: "1 short sentence (roughly 8-25 words)",
-        notable: "1-2 sentences (up to ~45 words)",
-        climax: "a short paragraph (up to ~80 words)",
+        routine: "one beat, 1 short sentence (roughly 8-25 words)",
+        notable: "one beat, 1-2 sentences (up to ~45 words)",
+        climax: "two beats at most, 3-4 sentences (up to ~80 words)",
         paragraphs:
           "Keep it to one or two sentences. Only a genuinely big beat earns a short paragraph - never more than that.",
       };
     case "long":
       return {
-        routine: "1 paragraph (roughly 40-90 words)",
-        notable: "up to 2 paragraphs (90-160 words)",
-        climax: "up to 3 paragraphs (160-260 words)",
+        routine: "one beat, 2-4 sentences, 1 paragraph (roughly 40-90 words)",
+        notable: "two beats, 4-7 sentences, up to 2 paragraphs (90-160 words)",
+        climax: "three beats at most, 7-11 sentences, up to 3 paragraphs (160-260 words)",
         paragraphs:
           "Write 1 paragraph by default. Use a second only if the moment really needs it, and a third only for a big beat like a combat climax or major reveal.",
       };
     case "medium":
     default:
       return {
-        routine: "1-2 sentences (roughly 15-45 words)",
-        notable: "a short paragraph (up to ~90 words)",
-        climax: "1-2 tight paragraphs (up to ~130 words)",
+        routine: "one beat, 1-2 sentences (roughly 15-45 words)",
+        notable: "one or two beats, 3-5 sentences, a short paragraph (up to ~90 words)",
+        climax: "three beats at most, 5-8 sentences, 1-2 tight paragraphs (up to ~130 words)",
         paragraphs:
           "Keep it to a single short paragraph - a sentence or two is often enough. Use a second paragraph only for a genuinely big moment.",
       };
@@ -2364,6 +2364,9 @@ These are hard ceilings, not targets to fill. Never pad a turn to hit a length b
 - Bad (too much staging): "You slide your hand into the paint case with the practiced ease of a man who's done this a thousand times. As you lift the tube, you tilt it just so, letting the light catch the crimp. There. A tiny roll of microfilm. 'Saving that blue for the next one, Bob?' calls Danny, the cameraman. 'Oh, you know me,' you say, flashing that gentle smile. 'Phthalo Blue waits for no one.' Danny chuckles and disappears. The microfilm is pressed between your fingers as you hum a tune."
 - Good (same beat, no padding): "You palm the tube - there's a grain of microfilm tucked against the cap. Danny glances over but doesn't clock it. Read it now, or wait till you're alone?"
 Same information, same stakes, a third of the words.
+- Bad (a second beat nobody asked for): The player asks the innkeeper about the road north. "The innkeeper wipes a mug and says the pass is snowed in. You thank her, finish your stew, climb the stairs and lie awake listening to the wind, wondering whether the guards at the pass can be bribed."
+- Good (one beat, then stop): "The innkeeper wipes a mug. 'Pass is snowed in. Nobody's come down since Tuesday.' She watches your face. 'Planning something?'"
+A beat is one thing happening and its immediate answer. When the answer is on the page, hand the turn back.
 
 ## RUNNING THE GAME WELL
 The tools resolve mechanics; these principles are what make you a *good* GM.

@@ -15,6 +15,12 @@ import type { SystemTurnEndCheck } from "../types";
 export const NIGHT_ENDED_CHECK: SystemTurnEndCheck = {
   id: "night-ended",
   trigger: {
+    // The judge reads the turn; the table below is its fallback and what runs
+    // while the judge is off, which is the default (slice 5 ships dark until
+    // the dawn cases show no rise in missed or false dawns).
+    kind: "judge",
+    question:
+      "Did the night end in this turn's text, so that it is now day (dawn has come, or the character sleeps or waits through to morning)? A plan, a question, a memory or a time still to come does not count.",
     phrases: [
       /\bat dawn\b/i,
       /\bdawn\s+(?:breaks|broke|comes|came|arrives|arrived)\b/i,

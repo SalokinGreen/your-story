@@ -76,6 +76,15 @@ more than 2 of 20 on two separate runs.
 
 Generation fixtures live in `evals/generation/` (the first, from slice 3: full-mode setup asks one player step per call). Their `expect` is tool names; a case that needs argument checks adds an `expectArguments` key for the runner to read.
 
+## The dawn judge's cases
+
+`evals/dawn/cases.json` holds 13 yes/no cases for Blood & Bone's turn-end judge
+(GM prompt plan slice 5): `gmProse`, `playerLines`, `dawn` (the truth) and `phrase`
+(what the phrase table says, pinned by `tests/dawnCases.test.ts`).
+`node scripts/eval-dawn.mjs` lists them and the table's errors with no call;
+`--go` asks the judge `--runs` (10) times per case on your keys and prints the
+verdict: missed and false dawns separately, failing on any rise in missed dawns (they cost more: `end_session` never runs) and weighting them 3 to 1. It costs money and waits for the author's go.
+
 ## Drafting a turn from your own play
 
 ```

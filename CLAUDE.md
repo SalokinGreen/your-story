@@ -811,7 +811,21 @@ report's §11.3. The ones that shape play:
   message sent to the GM. `turnEndChecks.ts` (`textCrosses`, `pendingCheck`,
   `splitPlayerLines`) is the one evaluator and `generation.ts` the one gate;
   a second system adds data, not engine code. Blood & Bone declares
-  `night-ended` (`blood-and-bone/turnEndChecks.ts`). `GenerateRequestBody.toolChoice`
+  `night-ended` (`blood-and-bone/turnEndChecks.ts`). **A trigger may be
+  `kind: "judge"`** (GM prompt plan slice 5): it carries a yes/no `question`
+  ("did the night end in this turn's text?") that `askTurnEndJudge`
+  (`judges/turnEndJudge.ts`: one `callSideModel` on the side-agent model at an
+  explicit effort, temperature 0, a quoted `yes`) answers at the same place
+  the phrase table runs, on the GM's final prose before narration (one extra
+  side call per check per turn at most, and none with fewer than three rounds
+  left; later rounds use the phrase table). `pendingCheck` takes the
+  answer (`judged`): yes makes the check pending, no clears it, unknown (an unsettled text is "unknown", not "no") or a
+  failed call falls back to the phrase table, and the previous-turn
+  suppression, the prompted set and the three reserved rounds are unchanged; a
+  Stop passes through. **It ships dark:** `isTurnEndJudgeEnabled()` is true only
+  when localStorage `ys:turnEndJudge` is `"on"` (no Settings control), so the
+  phrase table is what runs by default until `node scripts/eval-dawn.mjs --go`
+  (`evals/dawn/cases.json`) shows no rise in missed or false dawns. `GenerateRequestBody.toolChoice`
   now also takes `"auto"`, which every provider honours (Google's unset
   default is still `required`).
 - **Fantastic Realms is the second default system** (decisions 201–219,
@@ -1918,7 +1932,7 @@ asserted over the published turns by `tests/judges.evalSet.test.ts` (free).
   sync backend. `scripts/` — `patchDiceBox.mjs` (postinstall) and
   `build-standalone.mjs`. `.github/workflows/build-apps.yml` — the manual
   native release build, never run.
-- `tests/` — Vitest, 211 files and 3,427 tests (2026-10-25, after the
+- `tests/` — Vitest (254 files and 4,326 tests on 2026-10-25 after GM prompt slice 5), earlier 211 files and 3,427 tests (2026-10-25, after the
   starter welcomes; earlier 3,418 after feedback and the session-zero
   hand-back, 210 files and 3,410 after feedback;
   the counts were run). Earlier: 203 files and 3,228 tests (after the judge

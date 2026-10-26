@@ -124,7 +124,12 @@ import {
 } from "@/app/misc/turnTimeline";
 import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
 import { resolveSystem } from "@/app/misc/systems/resolve";
-import { pendingCheck, splitPlayerLines } from "@/app/misc/turnEndChecks";
+import {
+  judgeChecksToAsk,
+  pendingCheck,
+  splitPlayerLines,
+} from "@/app/misc/turnEndChecks";
+import { askTurnEndJudge } from "@/app/misc/judges/turnEndJudge";
 import { collectTurnFacts, snapshotJudgeView } from "@/app/misc/judges/facts";
 import { buildReask, pacingNoteFor, runRung1, secretHits } from "@/app/misc/judges/rung1";
 import { pickMajorFlag } from "@/app/misc/judges/combined";
@@ -2913,6 +2918,9 @@ async function generateStoryTurnOnce(
         // A system's turn-end checks (decision 183, turnEndChecks.ts): the ids
         // already sent back this turn. One reminder per check per turn.
         const turnEndChecksPrompted = new Set<string>();
+        // The "judge" checks already read this turn: one reading per check
+        // per turn (judge plan ceiling); the phrase table decides after it.
+        const turnEndJudgeAsked = new Set<string>();
 
         // Rung 2 of the judge layer (judges/rung1.ts, design 11.1): one re-ask
         // of the GM per turn, sent when a verified rung-1 hit can be fixed with
@@ -4246,18 +4254,50 @@ async function generateStoryTurnOnce(
             // unchanged.
             if (!sessionZeroTurn && !isRepetitive) {
               const resolved = resolveSystem(storyData);
-              const pending = resolved.usesSystemTools
-                ? pendingCheck(resolved.system, {
-                    text: {
-                      gmProse: extractVisibleText(
-                        gmAccumulatedStory.join("\n\n"),
-                      ),
-                      playerLines: splitPlayerLines(gmUserChoice),
+              const turnEndTurn = {
+                text: {
+                  gmProse: extractVisibleText(gmAccumulatedStory.join("\n\n")),
+                  playerLines: splitPlayerLines(gmUserChoice),
+                },
+                results: gmResults,
+                prompted: turnEndChecksPrompted,
+                priorParts: storyData.scene?.parts ?? [],
+              };
+              // A "judge" check (Blood & Bone's night-ended, when the switch
+              // is on) is read by one cheap model call on this final prose,
+              // once per distinct text. A failed or unsure call is "unknown"
+              // and the phrase table decides; a Stop passes through.
+              const judged: Record<
+                string,
+                { answer: "yes" | "no" | "unknown"; quote?: string }
+              > = {};
+              if (resolved.usesSystemTools) {
+                // Only while a "yes" could still act (three rounds left, as
+                // below), and at most one reading per check per turn: after
+                // it, the phrase table decides the rest of the turn.
+                const canAct = MAX_GM_ROUNDS - gmRound >= 3;
+                for (const check of canAct
+                  ? judgeChecksToAsk(resolved.system, turnEndTurn)
+                  : []) {
+                  if (turnEndJudgeAsked.has(check.id)) continue;
+                  turnEndJudgeAsked.add(check.id);
+                  const sideKeys = pickProviderKeys(options);
+                  judged[check.id] = await askTurnEndJudge(
+                    {
+                      question: check.trigger.question ?? "",
+                      gmProse: turnEndTurn.text.gmProse,
+                      playerLines: turnEndTurn.text.playerLines,
                     },
-                    results: gmResults,
-                    prompted: turnEndChecksPrompted,
-                    priorParts: storyData.scene?.parts ?? [],
-                  })
+                    {
+                      ...resolveSideCallModel(null, sideKeys),
+                      ...sideKeys,
+                      abortSignal: options.abortSignal,
+                    },
+                  );
+                }
+              }
+              const pending = resolved.usesSystemTools
+                ? pendingCheck(resolved.system, { ...turnEndTurn, judged })
                 : null;
               // The tool that settles the check must be on this turn's list
               // (a story with the system tools off never offers it).

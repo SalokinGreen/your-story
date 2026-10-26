@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "note": "Behavioural cases for the dawn judge (GM prompt plan slice 5; docs/dawn-gate-design.md). dawn is the truth: did the night end in this turn's text. phrase is what the phrase table says today (pinned by tests/dawnCases.test.ts, free). The judge ships only if, over 10+ runs per case, it misses no more dawns and raises no more false dawns than the phrase table (see evals/README.md).",
+  "cases": [
+    { "id": "dawn-breaks", "dawn": true, "phrase": true, "gmProse": "Dawn breaks over the cemetery and the fog lifts off the stones.", "playerLines": ["I keep watch"] },
+    { "id": "light-no-keyword", "dawn": true, "phrase": false, "gmProse": "Pale light creeps over the rooftops and the bells of St. Anne begin to ring. Your hands are cold and the candle is a puddle of wax.", "playerLines": ["I keep watch"] },
+    { "id": "bells-and-birds", "dawn": true, "phrase": false, "gmProse": "The shutters turn from black to grey. Somewhere a rooster, somewhere a cart, and the whole street is awake and ordinary again.", "playerLines": ["I stay by the window"] },
+    { "id": "player-sleeps-until-dusk", "dawn": true, "phrase": false, "gmProse": "The cellar is dark and the lock holds. Nothing stirs.", "playerLines": ["I lie down in the coffin and sleep until dusk"] },
+    { "id": "sunrise-from-the-hill", "dawn": true, "phrase": true, "gmProse": "You watch the sunrise from the hill, the Masquerade a held breath behind you, and the city below shakes itself awake.", "playerLines": ["I wait for the others"] },
+    { "id": "plan-at-dawn", "dawn": false, "phrase": false, "gmProse": "Marta pours two cups. 'The ship sails at dawn. If we are not on it, we stay another year.'", "playerLines": ["I nod and finish the wine"] },
+    { "id": "before-dawn", "dawn": false, "phrase": false, "gmProse": "You have until first light to find the relic, and the sky is already thinning at the edges. Hurry.", "playerLines": ["I run for the crypt"] },
+    { "id": "hours-till-dawn", "dawn": false, "phrase": false, "gmProse": "The clock tower strikes two. Hours till sunrise, and the hunters are three streets away.", "playerLines": ["I slip into the alley"] },
+    { "id": "question-about-morning", "dawn": false, "phrase": false, "gmProse": "'Will we leave at sunrise?' Anja asks, her bag already packed.", "playerLines": ["Not yet, I tell her"] },
+    { "id": "flashback-next-morning", "dawn": false, "phrase": true, "gmProse": "You remember the night your sire left. The next morning the house was empty, the table laid for two. You shake the memory off and the alley is still dark.", "playerLines": ["I move on"] },
+    { "id": "plan-in-the-morning-player", "dawn": false, "phrase": true, "gmProse": "The innkeeper shows you a narrow room with a lamp. Outside the rain is steady.", "playerLines": ["We leave in the morning, but first I want to look around the room"] },
+    { "id": "painting-of-sunrise", "dawn": false, "phrase": true, "gmProse": "On the wall hangs a painting of a sunrise over the marsh, the frame cracked. Behind it, a hollow in the plaster.", "playerLines": ["I look behind the painting"] },
+    { "id": "gm-in-the-morning-plan", "dawn": false, "phrase": false, "gmProse": "'Come back in the morning,' the clerk says, stamping nothing. 'The ledger is locked until then.' It is the middle of the night.", "playerLines": ["I thank him and go"] }
+  ]
+}
