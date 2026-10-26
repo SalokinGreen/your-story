@@ -612,3 +612,31 @@ the old oracle cases, and the played session. Both spend the author's keys.
 - **Test limit:** the mock fetch cannot script a context-overflow error, so the
   overflow rebuild is covered by two `buildGMStagePrompt` calls with one drawer
   object being byte-identical, and the multi-round case by a recorded two-round turn.
+
+### 2026-10-26, slice R4
+
+- **Where it runs:** `generateStoryTurnOnce`, just before the final tier is
+  resolved (after the post-narration rung-1 pass), on `storyData`, which the
+  executor already merges in place; so the event persists like any other state
+  change. A function-level `tripwireOff` is set from `sessionZeroActive` as the
+  attempt starts (before `start_game` flips it) and by any repetitive round.
+  The pending ids are captured at the same point (`eventsBefore`).
+- **Skipped crossings are logged** (`Tripwire rest: skipped (an event is
+  pending)`); a turn with no crossing and session zero write nothing.
+  `evaluateTripwire`'s skip result carries an optional `tripwire` for that line.
+- **Die:** `dN` for odds 1-in-N, a hit on 1 (the log reads `d6=2 vs 1-in-6`).
+  A story with no `agmtState` is skipped.
+- **Quiet run:** the turn index is `currentTurnIndex` (scene part count), a
+  never-consulted oracle counts from 0, and `applyTripwireRoll` stamps
+  `lastQuietRunRoll` on any quiet-run roll, hit or miss.
+- **Travel exceptions** are whole-sentence: a question mark, a condition or
+  plan word (if, will, plan, let's, should, need to, would, could...), a
+  negation (not, never, no, don't...), or a memory word (remember, used to,
+  once) anywhere in the sentence drops a crossing in it. Over-suppression is
+  the cautious side; "no one noticed ... by evening" is dropped.
+- **Display:** the live block marks a tripwire event "(a surprise the dice
+  raised)"; the Context Viewer adds "(tripwire: travel)". No code switched on
+  `.source`. Party phones never receive `pendingRandomEvents` (grep of
+  `app/misc/party` finds none); online guests still get it whole (§6.12).
+- **Not done:** `tests/campaign.oldSaves.test.ts`-style digests are
+  untouched (no system prompt change).

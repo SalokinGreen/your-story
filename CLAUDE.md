@@ -1098,6 +1098,7 @@ report's §11.3. The ones that shape play:
   same secrets, as do secret and `gm_plan` notes and the rest of `StoryData`
   (§6.12). A guest's setup strip reads the rebuilt record, so in session zero
   its Campaign and Start ticks can lag the host's; it is read-only.
+- **Tripwires** (`tripwires.ts`, randomness R4, decision 261): after the final round and the narration, `generateStoryTurnOnce` rolls one die (1 in 8, 7, 6, 5 or 4 by chaos) when a quiet turn crossed a line: a successful `end_session` or `take_rest`, travel or time passing (`TRAVEL_CHECK`, read by `textCrosses`, completed crossings only), or six turns with no oracle or table use (`agmtState.lastQuietRunRoll`). A hit queues a `PendingRandomEvent` with `source: "tripwire"` for the next live block; it never adds a round. Skipped when an event is pending, was added or was resolved this turn, for a repetitive round, on the reword and precomputed-retry paths, and for the whole of session zero (the start-game turn included). One Debug Logs line per roll.
 - `manage_timer` — countdown timers. **On a story with no campaign record,
   `auto_advance` timers never tick (§6.1)**: nothing ticks them. The branch that would have was dead (it sat
   behind `end_gm_thinking`) and was deleted on 2026-10-23 (decision 128).
