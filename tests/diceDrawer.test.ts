@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { buildGMStagePrompt } from "@/app/misc/ai_staged";
 import { drawDrawer, formatDrawer } from "@/app/misc/diceDrawer";
-import { isNameAccepted } from "@/app/misc/names/accept";
+import { isNameAccepted, pushDrawerNames } from "@/app/misc/names/accept";
 import { estimateTokens } from "@/app/misc/tokenCounter";
 import {
   DESIGN_FIXTURE,
@@ -115,7 +115,7 @@ describe("the dice drawer", () => {
     story.sessionZeroActive = false;
     const drawer = drawDrawer(story, seeded(11));
     // The engine pushes them at the draw; the check reads the ledger.
-    story.nameLedger = [...(story.nameLedger ?? []), ...drawer.names];
+    pushDrawerNames(story, drawer.names);
     for (const n of drawer.names) expect(isNameAccepted(n, story)).toBe(true);
     expect(isNameAccepted("Zzyzx Qwertley", story)).toBe(false);
   }, LONG);

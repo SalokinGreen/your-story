@@ -959,7 +959,7 @@ ${[formatTintLine(storyData), formatOracleRecencyLine(storyData)]
 ${pendingEvents
   .map(
     (e) =>
-      `- [${e.id}] [${e.focus || "Event"}] "${e.action} ${e.subject}"${
+      `- [${e.id}] [${e.focus || "Event"}]${e.source === "tripwire" ? " (a surprise the dice raised)" : ""} "${e.action} ${e.subject}"${
         e.portent ? ` — condition: ${e.portent}` : ""
       } - work this into the story, then call resolve_random_event(id: "${e.id}")`,
   )

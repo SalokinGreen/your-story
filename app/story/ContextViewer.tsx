@@ -1153,6 +1153,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                     {pendingEvents.slice(0, 3).map((e) => (
                       <li key={e.id}>
                         [{e.focus || "Event"}] {e.action} {e.subject}
+                        {e.source === "tripwire" ? ` (tripwire: ${(e.tripwire ?? "").replace("_", " ")})` : ""}
                       </li>
                     ))}
                     {pendingEvents.length > 3 && (

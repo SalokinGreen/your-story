@@ -141,8 +141,9 @@ import { kindOnlyFlag } from "@/app/misc/judges/publicView";
 import type { ConfirmedFinding, Fact } from "@/app/misc/judges/types";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
-import { newNameTurn, pushOffered, type NameTurnState } from "@/app/misc/names/accept";
+import { newNameTurn, pushDrawerNames, type NameTurnState } from "@/app/misc/names/accept";
 import { drawDrawer, type DiceDrawer } from "@/app/misc/diceDrawer";
+import { applyTripwireRoll, evaluateTripwire, tripwireLogLine } from "@/app/misc/tripwires";
 import { appendToLastUser, buildNarrationContext } from "@/app/misc/campaign/narrationContext";
 import {
   executeGMTools,
@@ -2579,6 +2580,11 @@ async function generateStoryTurnOnce(
     let gmResults: GMToolResult[] = [];
     // The story as this attempt found it, for the judge layer's rung-1 checks.
     const storyBeforeJudgeView = snapshotJudgeView(storyData);
+    // Tripwires (tripwires.ts): the pending events the turn began with, and
+    // whether the turn is one they stay off for (session zero, read before
+    // start_game flips it, or a repetitive round).
+    const tripwireEventsBefore = (storyData.pendingRandomEvents ?? []).map((e) => e.id);
+    let tripwireOff = storyData.sessionZeroActive === true;
     // The name check's state at the end of the GM's rounds, for the prose flag.
     let lastNameTurn: NameTurnState | undefined;
     let lastTurnStartLore: StoryLore[] | undefined;
@@ -3235,7 +3241,7 @@ async function generateStoryTurnOnce(
         const turnDrawer: DiceDrawer | undefined = sessionZeroTurn
           ? undefined
           : drawDrawer(storyData);
-        if (turnDrawer) pushOffered(storyData, turnDrawer.names);
+        if (turnDrawer) pushDrawerNames(storyData, turnDrawer.names);
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
@@ -4050,6 +4056,7 @@ async function generateStoryTurnOnce(
 
             // Check for repetition (AI stuck in a loop)
             const isRepetitive = detectRepetition(content);
+            if (isRepetitive) tripwireOff = true;
 
             // The M2 gate asked on `auto` and this round, the one right after
             // the prompt, called no tool at all: the GM declined. That ends
@@ -5255,6 +5262,36 @@ async function generateStoryTurnOnce(
             ? rung1Error.message
             : String(rung1Error),
       });
+    }
+
+    // Tripwires (randomness plan R4): one roll on a quiet turn that crossed a
+    // line, on the story about to be returned. A hit queues an event for the
+    // next turn's live block; it never adds a round. Not on the reword or
+    // precomputed-retry paths: the turn already had its chance.
+    if (!options.precomputedGMResults && !options.precomputedGMConversation) {
+      try {
+        const outcome = evaluateTripwire({
+          story: storyData,
+          results: gmResults,
+          gmProse: storyContent,
+          playerLines: splitPlayerLines(gmUserChoice),
+          eventsBefore: tripwireEventsBefore,
+          resolvedThisTurn: gmResults.some(
+            (r) => r.success && r.toolName === "resolve_random_event",
+          ),
+          sessionZero: tripwireOff,
+        });
+        const line = tripwireLogLine(outcome);
+        if (outcome.rolled) applyTripwireRoll(storyData, outcome);
+        if (line) logger.action(line);
+      } catch (tripwireError) {
+        logger.action("Tripwire check failed - skipped", {
+          error:
+            tripwireError instanceof Error
+              ? tripwireError.message
+              : String(tripwireError),
+        });
+      }
     }
 
     // Final tier reached this turn (after any mid-turn self-escalation or

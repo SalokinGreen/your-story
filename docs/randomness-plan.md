@@ -612,3 +612,62 @@ the old oracle cases, and the played session. Both spend the author's keys.
 - **Test limit:** the mock fetch cannot script a context-overflow error, so the
   overflow rebuild is covered by two `buildGMStagePrompt` calls with one drawer
   object being byte-identical, and the multi-round case by a recorded two-round turn.
+
+### 2026-10-26, slice R4
+
+- **Where it runs:** `generateStoryTurnOnce`, just before the final tier is
+  resolved (after the post-narration rung-1 pass), on `storyData`, which the
+  executor already merges in place; so the event persists like any other state
+  change. A function-level `tripwireOff` is set from `sessionZeroActive` as the
+  attempt starts (before `start_game` flips it) and by any repetitive round.
+  The pending ids are captured at the same point (`eventsBefore`).
+- **Skipped crossings are logged** (`Tripwire rest: skipped (an event is
+  pending)`); a turn with no crossing and session zero write nothing.
+  `evaluateTripwire`'s skip result carries an optional `tripwire` for that line.
+- **Die:** `dN` for odds 1-in-N, a hit on 1 (the log reads `d6=2 vs 1-in-6`).
+  A story with no `agmtState` is skipped.
+- **Quiet run:** the turn index is `currentTurnIndex` (scene part count), a
+  never-consulted oracle counts from 0, and `applyTripwireRoll` stamps
+  `lastQuietRunRoll` on any quiet-run roll, hit or miss.
+- **Travel exceptions** are whole-sentence: a question mark, a condition or
+  plan word (if, will, plan, let's, should, need to, would, could...), a
+  negation (not, never, no, don't...), or a memory word (remember, used to,
+  once) anywhere in the sentence drops a crossing in it. Over-suppression is
+  the cautious side; "no one noticed ... by evening" is dropped.
+- **Display:** the live block marks a tripwire event "(a surprise the dice
+  raised)"; the Context Viewer adds "(tripwire: travel)". No code switched on
+  `.source`. Party phones never receive `pendingRandomEvents` (grep of
+  `app/misc/party` finds none); online guests still get it whole (§6.12).
+- **Not done:** `tests/campaign.oldSaves.test.ts`-style digests are
+  untouched (no system prompt change).
+
+### 2026-10-26, slice R4 engine-review fixes
+
+- **Travel is no longer `textCrosses` on a phrase table.** `TRAVEL_CHECK` is
+  gone; `travelCrossing(gmProse, playerLines)` strips quoted text (straight and
+  curly; an unclosed quote runs to its line's end), drops any sentence with a
+  question mark, speech or recap marker, plan, condition or negation, then
+  accepts only (a) a journey verb (travel, journey, ride, sail, fly, drive,
+  trek, hike, take the train/bus/ferry/boat...) with a preposition and a
+  destination that is a settlement word or a capitalised proper noun, (b) "set
+  out/off for", "leave for", "head out for", "make for" the same way, (c) "spend
+  the week on the road", (d) a time skip that opens the sentence ("The next
+  morning", "By nightfall", "Hours later"). "Walk", "head" and "march" are no
+  longer journey verbs, and "the inn" or "the bar" is not a destination: the
+  cautious side.
+- **Player turns, not parts.** `playerTurnsSince(story, partIndex)` counts user
+  parts after an index. `lastOracleTurn`, `lastQuietRunRoll` and the new
+  `lastTripwireRoll` all stay in scene-part-index units (the unit the oracle
+  already used) and are read through that count. `QUIET_RUN_TURNS` = 6 player
+  turns. Assumes the turn's own user part is already in `scene.parts` when the
+  tripwire runs.
+- **Base.** With neither `lastOracleTurn` nor `lastQuietRunRoll` set, the first
+  look stamps `lastQuietRunRoll` and counts nothing; session zero (the
+  start-game turn included) stamps it every turn. `evaluateTripwire` now writes
+  those two stamps (it was pure before).
+- **One roll per three player turns** (`TRIPWIRE_MIN_GAP`), any kind, logged as a
+  skip.
+- **Drawer names are not ledger names.** `StoryData.recentDrawerNames` (last 9,
+  `pushDrawerNames`) is accepted by the name check but `rollNames` does not
+  avoid it; stripped from guest snapshots with the ledger. A test narrows a
+  Fantastic Realms story to one realm and rolls after ten drawers.

@@ -932,6 +932,10 @@ export interface StoryData {
   // Private like the drawer: stripped from online snapshots
   // (withoutPrivateRandomness). Optional, so old saves need no backfill.
   nameLedger?: string[];
+  // The names of the last few turns' dice drawers (the last 9). Accepted like
+  // the ledger, but never avoided by rollNames, so drawers cannot starve a
+  // small name table. Private like the ledger.
+  recentDrawerNames?: string[];
   // The built-in name list's style, recorded the first time generate_name is
   // given one (names/builtinLists.ts). Unset means "fantasy".
   nameStyle?: "fantasy" | "modern" | "historical-european" | "nordic";
@@ -1122,6 +1126,12 @@ export interface AGMTState {
   // consulted in this story. Never set by the model; it only moves when an
   // oracle tool actually runs.
   lastOracleTurn?: number;
+  // The turn a quiet-run tripwire last rolled (tripwires.ts), so the oracle
+  // nudge's own counter is never faked. Unset until the first roll.
+  lastQuietRunRoll?: number;
+  // The scene part index at the last tripwire roll of any kind (tripwires.ts):
+  // at most one roll per three player turns. Unset until the first roll.
+  lastTripwireRoll?: number;
   // Prima Materia's tonal register (see primaMateria.ts). Distinct from
   // chaosFactor/tension, which are both *intensity* dials - this tracks
   // what KIND of moment the story is in, and is what stops the GM drifting
@@ -1144,7 +1154,10 @@ export const MAX_PENDING_RANDOM_EVENTS = 5;
 // a single advisory line in the prompt that can be silently missed.
 export interface PendingRandomEvent {
   id: string;
-  source: "fate_question" | "scene_check"; // Which oracle mechanism triggered it
+  // Which mechanism triggered it. "tripwire" is the engine's own roll when a
+  // quiet turn crossed a line (tripwires.ts, randomness plan R4).
+  source: "fate_question" | "scene_check" | "tripwire";
+  tripwire?: "rest" | "session" | "travel" | "quiet_run"; // Set when source is "tripwire"
   focus?: string; // Event Focus category (e.g. "NPC action", "Move toward a thread")
   action: string; // Meaning table Action roll (e.g. "Betray")
   subject: string; // Meaning table Subject roll (e.g. "A rival")
