@@ -460,10 +460,20 @@ the old oracle cases, and the played session. Both spend the author's keys.
   needs all 36 keys), or the note is `ok: false` with the reason. The shipped
   packs all pass (`tests/tableRoll.packs.test.ts`); only the four miss tables
   and the eleven creation-prompt notes are on the allow-list, by title prefix.
-- **A built-in name wins over a note title.** `roll_table` tries an exact
-  built-in name first, as the plan says. "Names" therefore rolls the Mythic
-  table; a story's names note is reached by its full title (R2 moves names
-  onto the notes anyway).
+- **A note wins over a built-in of the same name** (reverted from the first
+  build's "a built-in name wins", after the engine review: the live block shows
+  `FR — Names` as "Names", so the built-in could never be reached by a note's
+  short name and `table` was dropped). `roll_table` rolls a note when the name
+  matches one (exact title or the part after a built-in's " — "; for a name that
+  is also a built-in, only those two tiers, so `city` is not taken over by
+  "Places in the city"), and only falls back to the built-in when no note
+  matches. A note-wins result says the built-in can be rolled with
+  `table_name: "builtin:<name>"`, which skips the notes.
+- **Review fixes (same day):** extra words in a heading's parenthesis
+  (`(1d4, roll twice and combine)`) become the table's `instructions`; a refusal
+  about a hidden note is `hiddenFromPlayer` and `closestTableTitles` leaves hidden
+  notes out; `scrubGMText` strips the "[Around the table, for you to apply: …]"
+  line so it never reaches the narrator.
 - **Title matching** is its own small helper in `gmExecutor.ts` (`findTableNotes`),
   following `read_notes` (exact title, then the part after a built-in's " — ",
   then containment), because `read_notes`' matcher is local to its function. Several

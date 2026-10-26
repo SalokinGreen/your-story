@@ -3407,13 +3407,20 @@ function executeRollTable(
   params: RollTableParams,
   storyData: StoryData
 ): GMToolResult {
-  const rawName = typeof params.table_name === "string" ? params.table_name : "";
+  let rawName = typeof params.table_name === "string" ? params.table_name : "";
+  // "builtin:names" asks for the built-in table even when a note has that name.
+  const builtinPrefix = /^built-?in[: ]\s*(.+)$/i.exec(rawName.trim());
+  if (builtinPrefix) rawName = builtinPrefix[1];
   // Try as AGMT element table (normalize name: spaces to underscores, lowercase)
   const normalizedName = rawName.toLowerCase().replace(/\s+/g, "_");
 
   const isAgmtTable = (MYTHIC_TABLE_NAMES as string[]).includes(normalizedName);
 
-  if (isAgmtTable) {
+  // A table note by that name wins over a built-in of the same name (the live
+  // block shows the GM the notes by their short names, "Names" for "FR — Names"),
+  // and a `table` argument can only mean a note.
+  const found = builtinPrefix ? [] : findTableNotes(storyData, rawName, isAgmtTable);
+  if (isAgmtTable && found.length === 0) {
     // Roll on the AGMT element table
     // (isAgmtTable already confirmed normalizedName is a member of MYTHIC_TABLE_NAMES)
     const result = generateElement(normalizedName as ElementCategory);
@@ -3444,11 +3451,13 @@ function executeRollTable(
   const displayName = params.display_name || "Table Roll";
   const refuse = (
     text: string,
-    extra: Partial<GMRollTableResult> = {}
+    extra: Partial<GMRollTableResult> = {},
+    hidden = false
   ): GMToolResult => ({
     toolName: "roll_table",
     toolCallId,
     success: false,
+    ...(hidden ? { hiddenFromPlayer: true } : {}),
     result: {
       type: "roll_table",
       tableName: rawName,
@@ -3461,13 +3470,13 @@ function executeRollTable(
   });
 
   // Not a built-in table: one of this adventure's table notes.
-  const found = findTableNotes(storyData, rawName);
   if (found.length > 1) {
     return refuse(
       `"${rawName}" matches several table notes: ${found
         .map((n) => `"${n.title}"`)
         .join(", ")}. Call again with the exact title.`,
-      { tableNotFound: true }
+      { tableNotFound: true },
+      found.some(isHiddenTableNote)
     );
   }
   if (found.length === 0) {
@@ -3487,7 +3496,8 @@ function executeRollTable(
   if (!parsed.ok) {
     return refuse(
       `"${note.title}" can't be rolled in one call (${parsed.reason}). Read it with \`read_notes\`, roll the die it names with \`formula_roll\`, and read off the entry that came up.`,
-      { noteTitle: note.title }
+      { noteTitle: note.title },
+      isHiddenTableNote(note)
     );
   }
   const picked = selectTable(parsed.tables, params.table);
@@ -3497,7 +3507,8 @@ function executeRollTable(
       params.table
         ? `"${note.title}" has no single table "${params.table}". Its tables: ${list}. Call again with \`table\` set to one of them.`
         : `"${note.title}" holds several tables: ${list}. Call again with \`table\` set to the one you want.`,
-      { noteTitle: note.title }
+      { noteTitle: note.title },
+      isHiddenTableNote(note)
     );
   }
 
@@ -3516,11 +3527,13 @@ function executeRollTable(
   if (instructions) {
     contextForStory += `\n[Around the table, for you to apply: ${instructions}]`;
   }
+  if (isAgmtTable) {
+    contextForStory += `\n[A built-in table is also called "${normalizedName}". To roll that one instead, call roll_table with table_name "builtin:${normalizedName}".]`;
+  }
 
   // A note the player may not read ahead of play keeps its roll private, as
   // gm_roll does: publicSummary returns null for a hidden result.
-  const hidden =
-    note.visibility !== undefined && note.visibility !== "always_reveal";
+  const hidden = isHiddenTableNote(note);
   return {
     toolName: "roll_table",
     toolCallId,
@@ -3557,7 +3570,15 @@ const normalizeTableTitle = (title: string): string =>
  * that matches anything decides; several matches are returned so the caller
  * can refuse and list them.
  */
-function findTableNotes(storyData: StoryData, name: string): StoryLore[] {
+function isHiddenTableNote(l: StoryLore): boolean {
+  return l.visibility !== undefined && l.visibility !== "always_reveal";
+}
+
+function findTableNotes(
+  storyData: StoryData,
+  name: string,
+  strict = false
+): StoryLore[] {
   const wanted = normalizeTableTitle(name);
   if (!wanted) return [];
   const notes = (storyData.lore || []).filter(
@@ -3572,6 +3593,8 @@ function findTableNotes(storyData: StoryData, name: string): StoryLore[] {
     return at >= 0 && t.slice(at + 3) === wanted;
   });
   if (byName.length) return byName;
+  // A built-in's name ("city") is only taken over by a note of that exact name.
+  if (strict) return [];
   return notes.filter((l) => {
     const t = normalizeTableTitle(l.title);
     return t.includes(wanted) || wanted.includes(t);
@@ -3586,7 +3609,7 @@ function closestTableTitles(storyData: StoryData, name: string): string[] {
       .filter((w) => w.length > 1)
   );
   return (storyData.lore || [])
-    .filter((l) => l.type === "table" && l.enabled !== false)
+    .filter((l) => l.type === "table" && l.enabled !== false && !isHiddenTableNote(l))
     .map((l) => ({
       title: l.title,
       score: normalizeTableTitle(l.title)

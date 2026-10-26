@@ -69,6 +69,8 @@ interface Section {
   /** Heading text in parentheses that names a die, if any. */
   dieText?: string;
   perKind: boolean;
+  /** Words in the heading's parenthesis after the die, e.g. "roll twice and combine". */
+  extra?: string;
   body: string[];
 }
 
@@ -103,13 +105,20 @@ function splitSections(content: string): { preface: string[]; sections: Section[
       let name = h[2];
       let dieText: string | undefined;
       let perKind = false;
+      let extra: string | undefined;
       const d = HEAD_DIE.exec(name);
       if (d) {
         dieText = d[1];
         perKind = /on the [\w' ]*list/i.test(d[1]);
+        const rest = d[1]
+          .replace(/^(?:\d*d\d+|d66)/i, "")
+          .replace(/:?\s*roll \["1d6","1d6"\],?\s*first die is the tens/i, "")
+          .replace(/,?\s*on the [\w' ]*list/i, "")
+          .replace(/^[\s,:;]+|[\s,:;]+$/g, "");
+        if (rest) extra = rest;
         name = name.slice(0, d.index).trim();
       }
-      current = { level, name, dieText, perKind, body: [] };
+      current = { level, name, dieText, perKind, extra, body: [] };
       sections.push(current);
     } else if (h && h[1].length === 1) {
       // A "# Title" line is the note's own heading, not a table.
@@ -280,10 +289,16 @@ export function parseTableNote(content: string): ParsedTableNote {
     const inherited: string[] = [];
     if (parent?.perKind) {
       const pp = parseBody(parent.body);
+      if (parent.extra) inherited.push(parent.extra);
       inherited.push(...pp.lead);
     }
     const lastOfNote = i === lastIndex || sections.slice(i + 1).every((x) => parseBody(x.body).entries.length === 0 && !x.dieText);
-    const ownInstructions = [...inherited, ...parsed.lead, ...(lastOfNote ? [] : parsed.trailing)]
+    const ownInstructions = [
+      ...(s.extra ? [s.extra] : []),
+      ...inherited,
+      ...parsed.lead,
+      ...(lastOfNote ? [] : parsed.trailing),
+    ]
       .join(" ")
       .trim();
     if (lastOfNote && tail) noteBits.push(tail);

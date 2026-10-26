@@ -967,7 +967,7 @@ report's §11.3. The ones that shape play:
   the tool description). The adventure's own tables are `StoryLore` notes with
   `type: "table"`. **`roll_table` rolls a table note in one call** (randomness
   plan R1, decision 259): `table_name` is a built-in name or the note's title
-  (found as `read_notes` finds one), `table` names one sub-table (a heading or
+  (found as `read_notes` finds one; a note wins over a built-in of the same name, and `builtin:<name>` forces the built-in), `table` names one sub-table (a heading or
   "A > B") when the note holds several. `tableRoll.ts` parses a bounded
   contract (`## Name (1dN)`, d66, `(…, on the Kind's list)` with `###` Kinds, a
   `Roll 1dN:` lead-in, `N.` / `a-b.` / `NN` entries, multi-line entries); the

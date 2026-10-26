@@ -224,6 +224,83 @@ describe("roll_table on a table note", () => {
   });
 });
 
+describe("a note and a built-in table with the same name", () => {
+  const frNames = (): StoryData =>
+    noteStory({
+      title: "FR — Names",
+      libraryNoteId: "builtin:fantastic-realms:table-names",
+      content: "## Aurelane names (1d2)\n1. Aurel\n2. Brisa\n\n## Larkenfell names (1d2)\n1. Cob\n2. Dilly",
+    });
+
+  it("rolls the note, with its sub-table, when a note has the short name", async () => {
+    const { r } = await roll(frNames(), { table_name: "Names", table: "Aurelane names" });
+    expect(r.success).toBe(true);
+    expect(r.contextForStory).toMatch(/FR — Names > Aurelane names \(d2\) rolled [12]: "(Aurel|Brisa)"/);
+    expect(r.contextForStory).toContain('"builtin:names"');
+  });
+
+  it("still rolls the built-in when no note matches, and when asked for it by the builtin: prefix", async () => {
+    const plain = noteStory({});
+    const a = await roll(plain, { table_name: "Names" });
+    expect(a.r.success).toBe(true);
+    expect((a.r.result as { noteTitle?: string }).noteTitle).toBeUndefined();
+    const b = await roll(frNames(), { table_name: "builtin:names" });
+    expect(b.r.success).toBe(true);
+    expect((b.r.result as { noteTitle?: string }).noteTitle).toBeUndefined();
+  });
+
+  it("does not let a loosely named note take over a built-in name", async () => {
+    const story = noteStory({ title: "Places in the city" });
+    const { r } = await roll(story, { table_name: "city" });
+    expect((r.result as { noteTitle?: string }).noteTitle).toBeUndefined();
+    expect(r.success).toBe(true);
+  });
+});
+
+describe("extra words in a heading's parenthesis", () => {
+  it("reach the table's instructions", () => {
+    const [t] = tables("## Loot (1d2, roll twice and combine)\n1. a\n2. b");
+    expect(t.instructions).toBe("roll twice and combine");
+    const [k] = tables("## Tell (1d2, on the Kind's list)\n### Ghost\n1. x\n2. y");
+    expect(k.instructions).toBeUndefined();
+    const d66 = Array.from({ length: 36 }, (_, i) => `${Math.floor(i / 6) + 1}${(i % 6) + 1} e`).join("\n");
+    const [d] = tables(`## L (d66: roll ["1d6","1d6"], first die is the tens)\n${d66}`);
+    expect(d.instructions).toBeUndefined();
+  });
+
+  it("are returned by roll_table", async () => {
+    const story = noteStory({ content: "## Loot (1d2, roll twice and combine)\n1. a\n2. b" });
+    const { r } = await roll(story, { table_name: "Tables — Town" });
+    expect(r.contextForStory).toContain("roll twice and combine");
+  });
+});
+
+describe("hidden notes and the narrator", () => {
+  it("a refusal about a hidden note is hidden, and closest titles leave hidden notes out", async () => {
+    const hiddenStory = noteStory({ visibility: "hidden" });
+    for (const args of [
+      { table_name: "Tables — Town" },
+      { table_name: "Tables — Town", table: "Weather" },
+    ]) {
+      const { r } = await roll(hiddenStory, args);
+      expect(r.success).toBe(false);
+      expect(r.hiddenFromPlayer).toBe(true);
+      expect(publicSummary(r)).toBeNull();
+    }
+    const miss = await roll(hiddenStory, { table_name: "Town weather" });
+    expect(miss.r.contextForStory).not.toContain("Tables — Town");
+  });
+
+  it("the text around a table never reaches the narrator's summary", async () => {
+    const { r } = await roll(noteStory({}), { table_name: "Tables — Town", table: "Shops" });
+    expect(r.contextForStory).toContain("Around the table");
+    const summary = publicSummary(r) ?? "";
+    expect(summary).toContain("Smith".slice(0, 0) + "Tables");
+    expect(summary).not.toContain("Around the table");
+    expect(summary).not.toContain("Use when a town is met");
+  });
+});
+
 describe("the note list in the live block", () => {
   it("shows a parseable table note's sub-tables and dice on its one line, and a prose one plain", () => {
     const story = noteStory({});
