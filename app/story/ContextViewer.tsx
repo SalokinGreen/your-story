@@ -462,6 +462,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       // and generate_image appear only when pictures are on and a key is saved.
       imageToolAvailable: imageTool.available,
       imagesPerScene: imageTool.perScene,
+      // Shows where the drawer sits without rolling one.
+      drawer: storyData.sessionZeroActive ? undefined : "preview",
     });
     const contextMessages = gmPrompt.messages;
     setMessages(contextMessages);

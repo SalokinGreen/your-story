@@ -27,6 +27,7 @@ import {
   type OutcomeVerdict,
 } from "../observer";
 import type { ReplyLength } from "../ai_staged";
+import type { DiceDrawer } from "../diceDrawer";
 import type {
   Fact,
   JudgeId,
@@ -91,6 +92,8 @@ export interface GenerationFixture {
   /** The StoryData the GM is handed, as exported. */
   storySnapshot: Record<string, unknown>;
   playerLine: string;
+  /** The dice drawer the GM is handed this turn, when the case needs one (R5). */
+  drawer?: DiceDrawer;
   settings?: Record<string, unknown>;
   /**
    * What the engine answers when the GM calls a tool, so a run can go on to its

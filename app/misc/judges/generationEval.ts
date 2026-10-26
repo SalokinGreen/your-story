@@ -75,6 +75,7 @@ export function buildGenerationRequest(
     userChoice: fixture.playerLine,
     modelName: slot.model,
     usesNativeReasoning: slot.effort !== "none",
+    drawer: fixture.drawer,
   });
   return { messages, tools, story };
 }

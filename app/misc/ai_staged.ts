@@ -19,6 +19,7 @@ import {
   selectGMAdviceForTurn,
   formatGMAdviceNote,
 } from "@/app/misc/gmAdvice";
+import { formatDrawer, type DiceDrawer } from "@/app/misc/diceDrawer";
 import { formatOracleRecencyLine, MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
 import { parseTableNote, summarizeTables } from "@/app/misc/tableRoll";
 import { formatTintLine } from "@/app/misc/primaMateria";
@@ -1259,6 +1260,8 @@ export interface LiveBlockInput {
   goalsSection: string;
   threadsSection: string;
   oracleSection: string;
+  /** The dice drawer (diceDrawer.ts): per-turn, so the live block only. */
+  drawerSection?: string;
   /** The system's roll tool for this story (gmPromptChains.ts); story-level, so the cache holds. */
   rollToolSection?: string;
   combatSection: string;
@@ -1704,6 +1707,7 @@ export function buildLiveBlock(input: LiveBlockInput): string {
   if (input.goalsSection) out += input.goalsSection + "\n\n";
   if (input.threadsSection) out += input.threadsSection + "\n\n";
   if (input.oracleSection) out += input.oracleSection + "\n\n";
+  if (input.drawerSection) out += input.drawerSection + "\n\n";
   if (input.rollToolSection) out += input.rollToolSection + "\n\n";
   if (input.combatSection) out += input.combatSection + "\n";
   if (input.timersSection) out += input.timersSection + "\n";
@@ -1797,6 +1801,7 @@ export function buildGMStagePrompt({
   usesNativeReasoning = false,
   imageToolAvailable = false,
   imagesPerScene = 2,
+  drawer,
 }: {
   storyData: StoryData;
   userChoice: string;
@@ -1807,6 +1812,9 @@ export function buildGMStagePrompt({
   // turn, so the base messages stay byte-identical across its rounds.
   imageToolAvailable?: boolean;
   imagesPerScene?: number; // The per-scene cap the prompt states
+  // The turn's dice drawer (drawn once by generateStoryTurnOnce), or "preview"
+  // for the context viewer. Absent in session zero.
+  drawer?: DiceDrawer | "preview";
   customMaxContext?: number; // Memory Size slider - this is the main context control now
   customMaxOutput?: number; // Response Length - the output reserved out of the model's window
   modelName?: string; // Used to get model's actual context limit
@@ -2673,6 +2681,7 @@ Write immersive prose. The player should experience the story, not see game mech
     goalsSection: gmGoalsSection,
     threadsSection: gmThreadsSection,
     oracleSection: gmOracleSection,
+    drawerSection: drawer ? formatDrawer(drawer) : undefined,
     rollToolSection: buildRollToolSection(storyData),
     combatSection,
     timersSection,

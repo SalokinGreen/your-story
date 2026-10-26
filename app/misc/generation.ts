@@ -141,7 +141,8 @@ import { kindOnlyFlag } from "@/app/misc/judges/publicView";
 import type { ConfirmedFinding, Fact } from "@/app/misc/judges/types";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
-import { newNameTurn, type NameTurnState } from "@/app/misc/names/accept";
+import { newNameTurn, pushOffered, type NameTurnState } from "@/app/misc/names/accept";
+import { drawDrawer, type DiceDrawer } from "@/app/misc/diceDrawer";
 import { appendToLastUser, buildNarrationContext } from "@/app/misc/campaign/narrationContext";
 import {
   executeGMTools,
@@ -3228,6 +3229,13 @@ async function generateStoryTurnOnce(
         // edited this turn prove nothing to the name check.
         const turnStartLore = storyData.lore ?? [];
         lastTurnStartLore = turnStartLore;
+        // The dice drawer (randomness plan R3): drawn once for the turn, none in
+        // session zero (this flag is read before start_game flips it), the same
+        // object in every prompt build below. Its names go on the ledger now.
+        const turnDrawer: DiceDrawer | undefined = sessionZeroTurn
+          ? undefined
+          : drawDrawer(storyData);
+        if (turnDrawer) pushOffered(storyData, turnDrawer.names);
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
@@ -3269,6 +3277,7 @@ async function generateStoryTurnOnce(
               knowledgeNote: options.knowledgeNote,
               imageToolAvailable: !!options.imageToolContext?.enabled,
               imagesPerScene: options.imageToolContext?.maxPerScene,
+              drawer: turnDrawer,
               // Skip the literal <thinking> prefill for reasoning-tier models
               // (they emit CoT natively); keep it for effort:"none" models.
               usesNativeReasoning: gmReasoningEffort !== "none",

@@ -589,3 +589,26 @@ the old oracle cases, and the played session. Both spend the author's keys.
   place), then a number is appended. The unrolled-name check builds its texts
   once per check (`createNameChecker`). `unrolled_name` is in
   `RUNG1_CHECKS` (`judges/evalFormat.ts`).
+
+### 2026-10-26, slice R3
+
+- **The meaning pair** is `drawMeaningPair(rng)` in `mythic.ts`: the `EVENT_ACTIONS`
+  table (what `generateEventMeaning` uses) and `MEANING_TABLE_DESCRIPTOR_1`, both
+  already there; no new text. The tables were not exported, so the helper lives
+  beside them.
+- **The drawer is `drawDrawer(story, rng)`** with `rollNames(story, "person", 3, { rng })`
+  (R2's options-object signature). `generateStoryTurnOnce` draws once after the
+  `turnStartLore` capture, only when `sessionZeroTurn` is false (the flag read
+  before `start_game` flips it, so the start-game turn has none), and pushes the
+  three names with `pushOffered` onto the working story at the draw. A tier or
+  Observer retry runs `generateStoryTurnOnce` again and draws a fresh drawer; the
+  discarded attempt's names stay on the ledger (harmless: they are still
+  accepted, and `rollNames` avoids them).
+- **Other callers:** `buildGMStagePrompt` has three callers (generation, the
+  context viewer, the generation eval). The reword and precomputed-retry paths do
+  not rebuild the GM prompt, so they need no drawer. The live block is not sent to
+  party phones or online guests (`buildPlayerView`, the snapshot).
+- **The context viewer** shows the preview line, but not in session zero.
+- **Test limit:** the mock fetch cannot script a context-overflow error, so the
+  overflow rebuild is covered by two `buildGMStagePrompt` calls with one drawer
+  object being byte-identical, and the multi-round case by a recorded two-round turn.
