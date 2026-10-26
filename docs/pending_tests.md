@@ -10,6 +10,36 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-26 — Randomness R1 to R5: the eval rerun and one played session
+
+Both spend the author's keys, so neither was run. The plan-only run
+(`node scripts/eval-generation.mjs`, no `--go`) lists all 14 cases and makes
+no call.
+
+- **Rerun the generation cases.** `node scripts/eval-generation.mjs --go --only
+  names-new-npc-uses-drawer,table-undescribed-room-rolls-note,tripwire-pending-event-resolved,drawer-quiet-turn-forces-nothing,roll-vs-narrate-ask-gossip,oracle-unestablished-cellar --out evals/generation-randomness.json`.
+  Expected: the new gossip clause leaves `roll-vs-narrate-ask-gossip` at or
+  below its earlier failing count (the GM narrates what the innkeeper says), and
+  `oracle-unestablished-cellar` does not rise by more than 2 of 20 on two runs;
+  the four new cases fail in 2 of 20 runs or fewer. Failure looks like: gossip
+  rising (the clause pushed the GM off the oracle on facts nobody knows),
+  `names-new-npc-uses-drawer` failing with "add_npc name ... was not from the
+  drawer or a roll" (the GM invents names), or `drawer-quiet-turn-forces-nothing`
+  failing with a drawer name in the prose (the drawer is too strong: turn down
+  the names, not the rule). The report's `runDetails` holds each run's prose and
+  calls.
+- **Play one session (about an hour) and count.** Distinct NPC names introduced,
+  tables rolled (`roll_table` in the Debug Logs), and surprises per hour from
+  every source (interrupted scenes, fate_question doubles, tripwire events: the
+  Debug Logs lines `Tripwire ...`). Expected: no repeated names beyond the
+  story's own, every new NPC name from the drawer or a roll, tables rolled for
+  rooms and rumours the notes did not describe, and about one to three surprises
+  an hour, not one every few turns. Failure looks like: the same two or three
+  invented names again (R2 not holding), the drawer's names turning up in scenes
+  that did not need anyone (too strong: "too strong is too random"), or more
+  than about six surprises an hour (turn the tripwire odds down; the design's one
+  knob).
+
 ## 2026-10-26 — DeepSeek V4 Flash as the default (decisions 257–258)
 
 The eval ran DeepSeek through DeepInfra's own API; nothing has run the shipped

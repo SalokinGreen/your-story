@@ -47,6 +47,8 @@ export interface GenerationRecord {
   calls: string[];
   /** The visible prose of every round, thinking removed. */
   prose: string;
+  /** Every call with its parsed arguments, in order (the report keeps them truncated). */
+  callArgs?: ObservedCall[];
   rounds: number;
   /** Rules of `expect` this run broke; empty means it passed. */
   failures: string[];
@@ -116,13 +118,42 @@ export function checkArgumentRules(rules: GenerationArgumentRules, calls: readon
   return failures;
 }
 
+/** Every add_npc name is from the drawer or a roll's result ("drawer"), or a roll's result ("rolled"). Pure. */
+export function checkNameFrom(
+  mode: "drawer" | "rolled",
+  observed: { callArgs?: readonly ObservedCall[]; results?: readonly { name: string; result: string }[] },
+  drawer?: { names: readonly string[] },
+): string[] {
+  const rolled = (observed.results ?? [])
+    .filter((r) => r.name === "generate_name" || r.name === "roll_table")
+    .map((r) => r.result.toLowerCase());
+  const offered = mode === "drawer" ? (drawer?.names ?? []).map((n) => n.toLowerCase()) : [];
+  const failures: string[] = [];
+  for (const call of (observed.callArgs ?? []).filter((c) => c.name === "add_npc")) {
+    const name = typeof call.args.name === "string" ? call.args.name.trim().toLowerCase() : "";
+    if (!name) continue;
+    const fromDice =
+      offered.some((n) => name.includes(n) || n.includes(name)) || rolled.some((text) => text.includes(name));
+    if (!fromDice) failures.push(`add_npc name "${String(call.args.name)}" was not from the drawer or a roll`);
+  }
+  return failures;
+}
+
 /** The rules of `expect` a run broke, as sentences. Pure. */
 export function checkGenerationExpect(
   expect: GenerationExpect,
-  observed: { calls: readonly string[]; prose: string; callArgs?: readonly ObservedCall[] },
+  observed: {
+    calls: readonly string[];
+    prose: string;
+    callArgs?: readonly ObservedCall[];
+    /** The answers the run's tool calls got, by tool name. */
+    results?: readonly { name: string; result: string }[];
+  },
   argumentRules?: GenerationArgumentRules,
+  drawer?: { names: readonly string[] },
 ): string[] {
   const failures: string[] = [];
+  if (expect.nameFrom) failures.push(...checkNameFrom(expect.nameFrom, observed, drawer));
   if (argumentRules) failures.push(...checkArgumentRules(argumentRules, observed.callArgs ?? []));
   const called = new Set(observed.calls);
   for (const name of expect.calls ?? []) {
@@ -193,6 +224,7 @@ export async function runGenerationOnce(
   const { messages, tools, story } = buildGenerationRequest(fixture, slot);
   const calls: string[] = [];
   const callArgs: ObservedCall[] = [];
+  const results: { name: string; result: string }[] = [];
   const proseParts: string[] = [];
   const used = new Set<number>();
   let rounds = 0;
@@ -239,16 +271,18 @@ export async function runGenerationOnce(
         // unreadable arguments: the rules see an empty call
       }
       callArgs.push({ name, args });
+      const answer = scriptedResultFor(fixture, name, used);
+      results.push({ name, result: answer });
       history.push({
         role: "tool",
         tool_call_id: call.id ?? `call_${calls.length}`,
-        content: scriptedResultFor(fixture, name, used),
+        content: answer,
       });
     }
   }
 
   const prose = proseParts.join("\n\n");
-  const failures = error ? [] : checkGenerationExpect(fixture.expect, { calls, prose, callArgs }, fixture.expectArguments);
+  const failures = error ? [] : checkGenerationExpect(fixture.expect, { calls, prose, callArgs, results }, fixture.expectArguments, fixture.drawer);
   const ledger = getTurnCostReport(costTurnId);
   return {
     fixtureId: fixture.id,
@@ -257,6 +291,7 @@ export async function runGenerationOnce(
     run,
     calls,
     prose,
+    callArgs,
     rounds,
     failures,
     passed: !error && failures.length === 0,
@@ -339,6 +374,36 @@ export interface GenerationReport {
   generatedAt: string;
   runsPerCase: number;
   cases: GenerationCaseScore[];
+  /** Every run, with its prose (first 2,000 characters) and its tool calls (arguments truncated). */
+  runDetails?: GenerationRunDetail[];
+}
+
+export interface GenerationRunDetail {
+  fixtureId: string;
+  slot: string;
+  run: number;
+  passed: boolean;
+  failures: string[];
+  prose: string;
+  calls: { name: string; arguments: string }[];
+}
+
+export const RUN_PROSE_CHARS = 2000;
+export const RUN_ARGUMENT_CHARS = 300;
+
+export function runDetailOf(r: GenerationRecord): GenerationRunDetail {
+  return {
+    fixtureId: r.fixtureId,
+    slot: r.slot,
+    run: r.run,
+    passed: r.passed,
+    failures: r.failures,
+    prose: r.prose.slice(0, RUN_PROSE_CHARS),
+    calls: (r.callArgs ?? r.calls.map((name) => ({ name, args: {} }))).map((c) => ({
+      name: c.name,
+      arguments: JSON.stringify(c.args).slice(0, RUN_ARGUMENT_CHARS),
+    })),
+  };
 }
 
 export function buildGenerationReport(
@@ -366,7 +431,7 @@ export function buildGenerationReport(
       costUsd: mine.reduce((sum, r) => sum + r.costUsd, 0),
     };
   });
-  return { v: 1, generatedAt: meta.generatedAt, runsPerCase: meta.runs, cases };
+  return { v: 1, generatedAt: meta.generatedAt, runsPerCase: meta.runs, cases, runDetails: records.map(runDetailOf) };
 }
 
 /**

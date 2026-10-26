@@ -136,6 +136,12 @@ export interface GenerationExpect {
    * runner checks them against the visible prose it collected.
    */
   narrationExcludes?: string[];
+  /**
+   * Every `add_npc` name must come from the engine's dice. `"drawer"`: a name
+   * in the fixture's `drawer.names`, or in a `generate_name` / `roll_table`
+   * result of the run. `"rolled"`: only the latter.
+   */
+  nameFrom?: "drawer" | "rolled";
 }
 
 export type EvalFixture = JudgeFixture | GenerationFixture;
@@ -310,6 +316,26 @@ function parseGenerationFixture(o: Record<string, unknown>, errors: string[]): G
     }
     if (keys.every((k) => expectRaw[k] === undefined)) {
       errors.push("expect needs at least one of calls, callsAny, noCalls, proseMatching, proseNotMatching, narrationExcludes");
+    }
+  }
+  if (isRecord(expectRaw) && expectRaw.nameFrom !== undefined && expectRaw.nameFrom !== "drawer" && expectRaw.nameFrom !== "rolled") {
+    errors.push("expect.nameFrom must be drawer or rolled");
+  }
+  if (isRecord(expectRaw) && expectRaw.nameFrom === "drawer" && !isRecord(o.drawer)) {
+    errors.push("expect.nameFrom drawer needs a drawer");
+  }
+  if (o.drawer !== undefined) {
+    const d = o.drawer;
+    const m = isRecord(d) ? d.meaning : undefined;
+    if (
+      !isRecord(d) ||
+      !Array.isArray(d.names) ||
+      d.names.some((x) => typeof x !== "string") ||
+      !isRecord(m) ||
+      typeof m.action !== "string" ||
+      typeof m.description !== "string"
+    ) {
+      errors.push("drawer must be { names: string[], meaning: { action, description } }");
     }
   }
   if (o.scriptedToolResponses !== undefined && !Array.isArray(o.scriptedToolResponses)) {

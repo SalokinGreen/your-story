@@ -79,8 +79,11 @@ function promptDigests(story: StoryData): string[] {
 // story gets it; the other fourteen are untouched.
 // 2026-10-26 (randomness R2): the system prompt again, by design: the Naming section
 // says names are rolled (generate_name, a name table), not invented.
+// 2026-10-26 (randomness R5): the system prompt again, by design: roll chain step 3
+// says a person who knows the answer is narrated, not asked of the oracle, with the
+// cellar example. Every story gets it; the other fourteen are untouched.
 const BEFORE: string[] = [
-  "system:27664:5e155faea382d886",
+  "system:27928:6e1f0848554f58af",
   "user:9575:ec82a88c82afe716",
   "assistant:39:44c002ba5a7f3e3a",
   "user:65:21f6cbf4db8f7103",
