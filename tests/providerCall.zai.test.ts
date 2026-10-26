@@ -352,17 +352,39 @@ describe("GLM 5.3 through DeepInfra", () => {
     expect((await deepInfra({ maxTokens: 8000 })).body.max_tokens).toBe(8000);
   });
 
-  it("leaves the other DeepInfra models without a reasoning parameter", async () => {
+  // The other DeepInfra models take reasoning_effort as OpenRouter's scale
+  // (probed 2026-10-26): "none" is sent, not left out, because Kimi and Qwen
+  // think unless told not to; "normal" goes out as "medium".
+  it.each([
+    ["none", "none"],
+    ["low", "low"],
+    ["normal", "medium"],
+    ["high", "high"],
+    ["xhigh", "xhigh"],
+  ] as const)("sends the other DeepInfra models effort %s as reasoning_effort %s", async (effort, sentEffort) => {
+    const fetchMock = stubFetch();
+    await generateNonStreaming({
+      messages: [{ role: "user", content: "verdict?" }],
+      model: "DeepInfra DeepSeek V4 Flash",
+      deepinfraKey: "di-key",
+      maxTokens: 200,
+      reasoningEffort: effort,
+    });
+    const request = sent(fetchMock);
+    expect(request.body.reasoning_effort).toBe(sentEffort);
+    // A thinking request keeps the 4,096 floor, so its thinking cannot eat a
+    // short cap; "none" does not think and keeps the cap it asked for.
+    expect(request.body.max_tokens).toBe(effort === "none" ? 200 : 4096);
+  });
+
+  it("leaves a DeepInfra call with no effort at the model's default", async () => {
     const fetchMock = stubFetch();
     await generateNonStreaming({
       messages: [{ role: "user", content: "verdict?" }],
       model: "DeepInfra GLM 4.6",
       deepinfraKey: "di-key",
       maxTokens: 200,
-      reasoningEffort: "none",
     });
-    const request = sent(fetchMock);
-    expect(request.body.reasoning_effort).toBeUndefined();
-    expect(request.body.max_tokens).toBe(200);
+    expect(sent(fetchMock).body.reasoning_effort).toBeUndefined();
   });
 });

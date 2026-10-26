@@ -222,6 +222,7 @@ const originalFetch = global.fetch;
 
 afterEach(() => {
   global.fetch = originalFetch;
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -420,6 +421,28 @@ describe("the background observer never rewrites (decision 221) - generateStoryT
     // before the player gets it back and the full-turn retry at a higher tier
     // is still on the table - the case the check was built for.
     const RETRY_NARRATION = "You parry, and the blade skates off your bracer.";
+    // The shipped ladder (decision 257) is one model, tiers 2 and 3 the same
+    // call, so there would be nothing heavier to escalate to. Advanced is set
+    // to a different call here, which is the scenario this test is about.
+    const tierStorage = new Map<string, string>([
+      [
+        "reasoningTierOverrides",
+        JSON.stringify([null, null, null, { modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" }]),
+      ],
+    ]);
+    const storageStub = {
+      getItem: (key: string) => tierStorage.get(key) ?? null,
+      setItem: (key: string, value: string) => void tierStorage.set(key, String(value)),
+      removeItem: (key: string) => void tierStorage.delete(key),
+    };
+    vi.stubGlobal("localStorage", storageStub);
+    vi.stubGlobal("sessionStorage", storageStub);
+    vi.stubGlobal("window", {
+      localStorage: storageStub,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    });
     // Two rounds per attempt: the prose, then the same prose again once the M2
     // roll-invariant gate (combat is a gated scene) has asked for a roll and the
     // GM has declined. No dice are thrown, which is what lets the retry run: a

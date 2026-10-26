@@ -6,7 +6,7 @@
  *  - the narration's calls (the story continuation, the choices, the
  *    choices re-run after an Observer rewrite, and the rewrite itself when the
  *    Observer is unpinned) carry the Default slot's effort (decision 118),
- *    "none" until the player picks one, and "none" again when Default's model
+ *    the shipped "normal" until the player picks one, and the shipped effort again when Default's model
  *    falls back;
  *  - the side agents carry "none", or their pin's own effort;
  *  - the tier classifier runs on the side-agent model at its effort
@@ -273,15 +273,15 @@ describe("the side agents carry none, or their pin's effort (decision 53)", () =
 });
 
 describe("the narration's calls carry Default's effort (decisions 53 and 118)", () => {
-  it("the story continuation and the choices: none by default", async () => {
+  it("the story continuation and the choices: Default's shipped effort (normal) by default", async () => {
     const calls = await runTurn({ gmRound: "", extra: { skipChoices: false } });
     const story = calls.filter(isNarrationStream);
     const choices = calls.filter(isChoices);
     expect(story).toHaveLength(1);
     expect(choices).toHaveLength(1);
     expect(story[0].body.model).toBe(NARRATION_MODEL_KEY);
-    expect(story[0].body.reasoningEffort).toBe("none");
-    expect(choices[0].body.reasoningEffort).toBe("none");
+    expect(story[0].body.reasoningEffort).toBe("normal");
+    expect(choices[0].body.reasoningEffort).toBe("normal");
   });
 
   it("the story continuation and the choices: Default's effort, for the shipped model", async () => {
@@ -298,8 +298,8 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
     const calls = await runTurn({ gmRound: "", extra: { skipChoices: false } });
     const story = calls.filter(isNarrationStream);
     expect(story.map((c) => c.body.model)).toEqual([NARRATION_MODEL_KEY]);
-    expect(story.map((c) => c.body.reasoningEffort)).toEqual(["none"]);
-    expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["none"]);
+    expect(story.map((c) => c.body.reasoningEffort)).toEqual(["normal"]);
+    expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["normal"]);
   });
 
   it("the story continuation and the choices: Default's model and effort, for a model the player picked", async () => {
@@ -311,13 +311,13 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
     expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["normal"]);
   });
 
-  it("falls back to none with the model, when Default's saved model is one the catalog dropped", async () => {
+  it("falls back to the shipped effort with the model, when Default's saved model is one the catalog dropped", async () => {
     stubBrowserStorage(defaultSlotStorage("Grok Code Fast 1", "high"));
     const calls = await runTurn({ gmRound: "", extra: { skipChoices: false } });
     const story = calls.filter(isNarrationStream);
     expect(story.map((c) => c.body.model)).toEqual([NARRATION_MODEL_KEY]);
-    expect(story.map((c) => c.body.reasoningEffort)).toEqual(["none"]);
-    expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["none"]);
+    expect(story.map((c) => c.body.reasoningEffort)).toEqual(["normal"]);
+    expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["normal"]);
   });
 
   describe("the Observer's rewrite and the choices re-run after it", () => {
@@ -335,7 +335,7 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
 
       const rewrites = calls.filter(isRewrite);
       expect(rewrites).toHaveLength(1);
-      expect(rewrites[0].body.model).toBe(NARRATION_MODEL_KEY);
+      expect(rewrites[0].body.model).toBe("GLM 5.3");
       expect(rewrites[0].body.reasoningEffort).toBe("high");
 
       // The judges stay on the side-agent default at none.
@@ -357,14 +357,14 @@ describe("the narration's calls carry Default's effort (decisions 53 and 118)", 
       // both the narrator's call.
       const choices = calls.filter(isChoices);
       expect(choices).toHaveLength(2);
-      expect(choices[1].body.model).toBe(NARRATION_MODEL_KEY);
+      expect(choices[1].body.model).toBe("GLM 5.3");
       expect(choices[1].body.reasoningEffort).toBe("high");
     });
 
-    it("take none when no narration effort was chosen", async () => {
+    it("take the shipped effort (normal) when no narration effort was chosen", async () => {
       const calls = await runTurn({ gmRound: LONG_NARRATION, respond, extra: REWRITING_OBSERVER });
-      expect(calls.filter(isRewrite).map((c) => c.body.reasoningEffort)).toEqual(["none"]);
-      expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["none", "none"]);
+      expect(calls.filter(isRewrite).map((c) => c.body.reasoningEffort)).toEqual(["normal"]);
+      expect(calls.filter(isChoices).map((c) => c.body.reasoningEffort)).toEqual(["normal", "normal"]);
     });
 
     it("keep a pinned Observer's own model and effort for the rewrite, but not for the choices", async () => {

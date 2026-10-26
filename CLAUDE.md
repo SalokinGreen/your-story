@@ -447,7 +447,7 @@ always runs **before** the story stage:
    tool-carrying requests only, so this tool-less call keeps just the
    `session_id` (`:narration`) and the stable block's byte-identity. The narrator
    no longer sees lore, memory or the summary (a quality risk the plan leaves open). Its fixed system message (`NARRATOR_SYSTEM_PROMPT`, GM prompt plan G4) names the grammatical person (second, unless a style note or the earlier narration uses another), says to write only what the character perceives, and gives the excluded case with an invented example (hidden text is never narrated, not even by hint); the continuation prompt repeats person and perception. The stable block also carries the player's own style notes (`player_notes`, which override the default person, tense and style; never `author_notes`). It runs on the **narration model** (`getEffectiveNarrationModelKey()`,
-   default GLM 5.3 through OpenRouter, decision 50), not the GM's tier model.
+   default DeepSeek V4 Flash through OpenRouter, decision 257), not the GM's tier model.
 3. **The choices stage** — a separate call on the narration model
    (`generateChoicesWithRetry` → `parseChoices`), only when
    `storyData.autoGenerateChoices` is on. It is off by default.
@@ -584,13 +584,22 @@ synced four-entry `reasoningTierOverrides` array (it keeps every other entry
 byte for byte, so a newer build's model survives), and read from tier 1 and
 tier 3 (`getSlotOverride`, `getEffectiveSlot`); an array an older build wrote
 with differing tiers 0–2 shows as "Mixed" (`getDefaultSlotMix`). The default
-ladder (`REASONING_TIERS`, decision 122) is GLM 5.3 for tiers 0 and 1 (effort
-`none`, which GLM gets as `low`), GLM 5.3 for tier 2 (combat and rules,
-`high`) and Claude Sonnet 5.5 for tier 3 (session zero, boss fights,
-campaign-shaping calls, `xhigh`); tier 2 never runs below `high` whatever the
-Default effort (`atLeastEffort` in `getEffectiveTiers`, decision 123). All are
-OpenRouter models, so one OpenRouter key runs the lot (a Z.ai-only player
-picks "GLM 5.3 (Z.ai)" in both slots). **Narration follows Default**:
+ladder (`REASONING_TIERS`, decisions 257–258, replacing 122) is "DeepSeek V4
+Flash (OpenRouter)" (`deepseek/deepseek-v4-flash`, DeepInfra asked first
+through `openRouterProviderOrder`, which `providerCall.ts` sends as
+`provider: {order, allow_fallbacks: true}`) on every tier: tiers 0 and 1 at
+`normal` (OpenRouter's `medium`), tier 2 (combat and rules) and tier 3
+(session zero, boss fights, campaign-shaping calls) at `high`; tier 2 never
+runs below `high` whatever the Default effort (`atLeastEffort` in
+`getEffectiveTiers`, decision 123). With one model on every tier the
+Observer's escalation retry from tier 2 and the error step-down "by model"
+have nowhere to go on the shipped ladder (the turn is kept, or fails). It is
+an OpenRouter model, so one OpenRouter key runs the lot (a Z.ai-only player
+picks "GLM 5.3 (Z.ai)" in both slots). **DeepInfra takes `reasoning_effort`**
+on every model (none/low/medium/high/xhigh, `normal` sent as `medium`,
+`none` sent explicitly because Kimi, Qwen 3.6 and Nemotron think unless told
+not to; DeepSeek V4 and Gemma 4 think only when asked; GLM-5.3 keeps its own
+low/high/max branch); before 2026-10-26 it was sent none at all. **Narration follows Default**:
 `getEffectiveNarrationModelKey`/`Effort` return the Default slot, and the old
 `narrationModelOverride`/`narrationEffortOverride` keys are still stored and
 synced for older builds but no longer read on the play path. The ambiguity
