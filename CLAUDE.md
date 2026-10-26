@@ -38,7 +38,8 @@ factions and threads), random ids and keys
 during render (6.3–6.5), the dead Embeddings toggle (6.9), online guests
 receiving the GM's secrets (6.12), and the
 stale Google tool filter (6.14, partly fixed 2026-10-22: `start_game` and the
-challenge and scene tools now reach Gemini, the rest of the list is still
+challenge and scene tools now reach Gemini; 2026-10-26, randomness R1: `roll_table`,
+`generate_name` and `resolve_random_event` too; the rest of the list is still
 dropped). The unoffered GM tools (6.10) were deleted on 2026-10-23 (decision 128). Four more were found on 2026-10-22 (decision 65): rules notes listed
 by title only while the prompt, comments and docs say pinned (6.15), hidden
 note text reaching the narrator (6.16, fixed for the separate narration call and rewrites by campaign slice 2, 2026-10-25), `calculate` evaluating `min(12,10)`
@@ -461,8 +462,9 @@ provider's response into one shape. They know nothing about `StoryData`, prompts
 standalone build has no API routes**: `providerFetch()` calls the provider
 in-process when `isStandalone()`. Google gets a filtered tool list
 (`GOOGLE_ESSENTIAL_TOOLS`), which is still stale (§6.14: it has `start_game`,
-`confirm_setup`, `ask_question` and the challenge tools now, not the plan,
-timer, thread or goal tools).
+`confirm_setup`, `ask_question`, the challenge tools, `roll_table`,
+`generate_name` and `resolve_random_event` now, not the plan, timer, thread or
+goal tools).
 
 **Claude reaches the app through OpenRouter** (Haiku, Sonnet and Opus 5.5,
 `anthropic/…` ids; decision 10) and has its own branch in `providerCall.ts`,
@@ -960,10 +962,26 @@ report's §11.3. The ones that shape play:
   dropped by one). The starters' "Running it" notes no longer tell the GM to
   write a plan.
 - `fate_question` / `roll_table` — the Mythic-style oracle (weighted by a 1–9
-  chaos factor) and the 45 **built-in** Mythic element tables. The
-  adventure's own tables are `StoryLore` notes with `type: "table"` that name
-  a die and list results in prose; the GM rolls them with `formula_roll`
-  after reading the note.
+  chaos factor) and the **built-in** Mythic element tables (their names are
+  listed in the system prompt's Tables section, `MYTHIC_TABLE_NAMES`, not in
+  the tool description). The adventure's own tables are `StoryLore` notes with
+  `type: "table"`. **`roll_table` rolls a table note in one call** (randomness
+  plan R1, decision 259): `table_name` is a built-in name or the note's title
+  (found as `read_notes` finds one), `table` names one sub-table (a heading or
+  "A > B") when the note holds several. `tableRoll.ts` parses a bounded
+  contract (`## Name (1dN)`, d66, `(…, on the Kind's list)` with `###` Kinds, a
+  `Roll 1dN:` lead-in, `N.` / `a-b.` / `NN` entries, multi-line entries); the
+  result carries the entry plus the text around the table for the GM to apply.
+  An unparsable layout, an ambiguous note (the refusal lists its sub-tables)
+  and a missing sub-table are refused, and the GM falls back to `read_notes` +
+  `formula_roll`. A note whose `visibility` is not `always_reveal` is rolled
+  hidden (`hiddenFromPlayer`, so the narrator never sees it). The live block's
+  Tables list shows each parseable note's sub-tables and dice. One exported
+  `ORACLE_USE_TOOL_NAMES` (`mythic.ts`) is the set of tools that count as
+  oracle or table use, read by the recency counter, the observer and the
+  combined judge; the M2 roll gate is unchanged. `tests/tableRoll.packs.test.ts`
+  rolls every built-in table note 200 times and lists, as an allow-list, the
+  ones the engine cannot roll (the miss tables and creation prompts).
 - `roll_portent` — Prima Materia's second oracle (`primaMateria.ts`): two
   archetypes and a relation, an engine-chosen Frame, and the story's Tint.
   It answers "what is going on here", not yes/no. Its `pm_*` tables were

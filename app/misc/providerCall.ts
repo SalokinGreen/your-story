@@ -208,6 +208,11 @@ export const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "formula_roll",
   "opposed_formula",
   "fate_question",
+  // Table notes in one call, names, and a random event's meaning: the
+  // randomness plan (R1) wants Gemini to have the same randomness as the rest.
+  "roll_table",
+  "generate_name",
+  "resolve_random_event",
   // The roll gate's message names it (gateMessages.ts), so Gemini must have it.
   "gm_roll",
   // Required alongside the dice tools, not optional: they report numbers and

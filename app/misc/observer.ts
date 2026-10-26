@@ -136,6 +136,7 @@ import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
 import { parseTaggedContent, extractVisibleText } from "./turnTimeline";
 import { deAiifyText } from "./deAiify";
 import { logger } from "./logger";
+import { ORACLE_USE_TOOL_NAMES } from "./mythic";
 import { SideCallCostContext } from "./turnCost";
 import { callSideModel, ProviderKeys } from "./sideModelCall";
 import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
@@ -1880,14 +1881,7 @@ export async function checkOutcomeMismatch(
   };
 }
 
-// The two tool names that count as "consulted the oracle/a table" - either
-// one is enough, they serve the same purpose (letting randomness rather
-// than narrative convenience decide an uncertain outcome).
-export const ORACLE_OR_TABLE_TOOL_NAMES = new Set([
-  "fate_question",
-  "roll_table",
-  "roll_portent",
-]);
+
 
 interface ToolUsageJudgment {
   missedOracleOrTable: boolean;
@@ -1992,7 +1986,7 @@ export async function checkToolUsageGaps(
   if (!narration.trim()) return [];
 
   const usedOracleOrTable = toolNames.some((name) =>
-    ORACLE_OR_TABLE_TOOL_NAMES.has(name),
+    ORACLE_USE_TOOL_NAMES.has(name),
   );
   const usedSceneIncrement = toolNames.includes("increment_scene");
 

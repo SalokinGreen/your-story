@@ -15,6 +15,7 @@ export const TOOL_LABELS: Record<string, string> = {
   calculate: "Calculating",
   fate_question: "Consulting fate",
   roll_table: "Rolling on a table",
+  resolve_random_event: "Resolving a random event",
   roll_portent: "Consulting the portents",
   generate_name: "Rolling up a name",
   generate_image: "Painting a picture",

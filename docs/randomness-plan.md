@@ -437,3 +437,45 @@ the old oracle cases, and the played session. Both spend the author's keys.
   oracle nudge's own counter is never faked.
 - **`generate_name` loses its pointer parameters,** and `nameGenerator.ts`'s
   pointer code goes. The design's "three full names" makes them dead.
+
+---
+
+## Decisions made during implementation
+
+### 2026-10-26, slice R1
+
+- **`parseTableNote` returns `noteInstructions` as well as `tables`.** The
+  plan's type had only `instructions` per table. A note's intro and its closing
+  "Use when …" paragraph belong to the whole note, not to the last table, so
+  they come back as `noteInstructions` and `roll_table` appends them after the
+  table's own text (capped at 700 characters). `selectTable` takes the `tables`
+  array, as the plan wrote it.
+- **A per-Kind list is its children.** A `## X (1d6, on the Kind's list)` heading
+  with `### Kind` blocks yields one table per Kind, path `["X", "Kind"]`, the die
+  inherited from the parent and the parent's text copied to each as
+  `instructions`. `selectTable` with `"X"` matches several and lists them, so
+  the GM names the Kind. The live-block summary counts such a heading once
+  ("Feature d6 by 7 sub-headings").
+- **Entries must cover the die exactly** (`min…max`, no gap, no overlap; a d66
+  needs all 36 keys), or the note is `ok: false` with the reason. The shipped
+  packs all pass (`tests/tableRoll.packs.test.ts`); only the four miss tables
+  and the eleven creation-prompt notes are on the allow-list, by title prefix.
+- **A built-in name wins over a note title.** `roll_table` tries an exact
+  built-in name first, as the plan says. "Names" therefore rolls the Mythic
+  table; a story's names note is reached by its full title (R2 moves names
+  onto the notes anyway).
+- **Title matching** is its own small helper in `gmExecutor.ts` (`findTableNotes`),
+  following `read_notes` (exact title, then the part after a built-in's " — ",
+  then containment), because `read_notes`' matcher is local to its function. Several
+  matches are refused and listed.
+- **`checkTableShape`** keeps all its own checks and adds one: the engine must
+  parse the note, finding as many top-level tables as the note has `##` headings.
+- **The built-in table names in the system prompt** are generated from
+  `MYTHIC_TABLE_NAMES` (45 names, one comma-separated line), so the list cannot
+  drift from the code. The system prompt's digest in
+  `tests/campaign.oldSaves.test.ts` was retaken by design; the other fourteen
+  are untouched.
+- **`resolve_random_event` had no label** in `gmToolLabels.ts`; added while
+  asserting the six places for it.
+- **Measured tool budgets** after the cut and the new `table` parameter: default
+  list 9,889 tokens (was 9,997), Fantastic Realms 11,357 (was 11,465).

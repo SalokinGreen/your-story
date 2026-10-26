@@ -28,13 +28,14 @@
 import type { ObserverFlag, ObserverFlagType } from "../structs";
 import { logger } from "../logger";
 import { callSideModel } from "../sideModelCall";
+import { ORACLE_USE_TOOL_NAMES } from "../mythic";
 import { getEffectiveTiers, TOP_TIER } from "../reasoningTiers";
 import { escapeRegExp } from "../compaction";
 import type { ReplyLength } from "../ai_staged";
 import {
   OUTCOME_CHECK_TOOL_NAMES,
   OUTCOME_TIER_LABELS,
-  ORACLE_OR_TABLE_TOOL_NAMES,
+  
   TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD,
   extractJsonObject,
   formatCharacterContextBlock,
@@ -203,7 +204,7 @@ export function selectJudges(turn: JudgeTurn): JudgeId[] {
   }
   if (
     on("oracle_gap").enabled &&
-    !turn.toolNames.some((n) => ORACLE_OR_TABLE_TOOL_NAMES.has(n))
+    !turn.toolNames.some((n) => ORACLE_USE_TOOL_NAMES.has(n))
   ) {
     picked.push("oracle_gap");
   }

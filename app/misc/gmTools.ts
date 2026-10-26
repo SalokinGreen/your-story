@@ -214,7 +214,8 @@ export interface RollPortentParams {
  * Uses weighted random selection
  */
 export interface RollTableParams {
-  table_name: string; // Name of table to roll on
+  table_name: string; // A table note's title, or a built-in table name
+  table?: string; // Which table of a note that holds several (heading, or "A > B")
   reason: string; // What this roll determines
   display_name?: string; // Optional UI label
 }
@@ -1253,7 +1254,7 @@ const fateQuestionTool: ToolSchema = {
   type: "function",
   function: {
     name: "fate_question",
-    description: `Mythic-style yes/no oracle for anything about the world you have not established: is the door locked, did the guard notice, does the rope hold. Use it often; several a scene is normal. Not for facts already in your notes, the sheet or earlier narration. Pick the likelihood you honestly believe (50/50 only for truly even odds). The chaos factor raises the odds of unexpected results; a Random Event may trigger.
+    description: `Mythic-style yes/no oracle for anything about the world you have not established: is the door locked, did the guard notice, does the rope hold. Not for facts already in your notes, the sheet or earlier narration. Pick the likelihood you honestly believe (50/50 only for truly even odds). The chaos factor raises the odds of unexpected results; a Random Event may trigger.
 Results, best to worst: Exceptional Yes (yes, and more: swing the fiction hard); Normal Yes (plainly yes, ordinary scale, not a triumph); Yes, but (it happens at a price you must name); No, but (it doesn't happen but something is salvageable, which you must name); Normal No (plainly no, not a disaster); Exceptional No (no, and worse). Read results literally: a "but" that names nothing is just a plain yes or no.`,
     parameters: {
       type: "object",
@@ -1295,15 +1296,17 @@ const rollTableTool: ToolSchema = {
   type: "function",
   function: {
     name: "roll_table",
-    description: `Roll on a built-in table for open-ended content instead of taking your first idea: loot, encounters, rumours, weather, complications, NPC or location detail. This adventure's own tables are notes (type "table"): check for one first and roll it yourself with \`formula_roll\`.
-Built-in tables: character_appearance, character_personality, character_background, character_motivations, character_identity, character_skills, character_traits_flaws, character_actions_combat, character_actions_general, creature_abilities, creature_descriptors, dungeon, dungeon_traps, forest, city, cavern, terrain, domicile, gods, legends, noble_house, civilization, army, magic_item, scavenging_results, plot_twists, cryptic_message, curses, visions_dreams, smells, sounds, adventure_tone, names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions.`,
+    description: `Roll a table for open-ended content instead of taking your first idea: loot, rumours, complications, NPC or place detail. table_name is a table note's title (check your notes first) or a built-in table (listed under Tables in your instructions). The engine rolls the die and returns the entry.`,
     parameters: {
       type: "object",
       properties: {
         table_name: {
           type: "string",
-          description:
-            "Built-in table name (case-insensitive, partial match OK)",
+          description: "A table note's title, or a built-in table name",
+        },
+        table: {
+          type: "string",
+          description: "Which table of a note that holds several: its heading, or \"A > B\"",
         },
         reason: {
           type: "string",

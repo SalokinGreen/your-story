@@ -178,7 +178,9 @@ import {
   MYTHIC_TABLE_NAMES,
   ElementCategory,
   markOracleConsulted,
+  ORACLE_USE_TOOL_NAMES,
 } from "./mythic";
+import { dieLabel, parseTableNote, rollTable, selectTable, tablePathLabel } from "./tableRoll";
 import {
   currentTint,
   formatPortentForModel,
@@ -530,6 +532,11 @@ export interface GMRollTableResult {
   reason: string;
   displayName?: string;
   tableNotFound?: boolean;
+  /** Set when the roll was on a table note (randomness plan R1). */
+  noteTitle?: string;
+  tablePath?: string;
+  roll?: number;
+  instructions?: string;
 }
 
 export interface GMRollPortentResult {
@@ -990,16 +997,7 @@ export type SetupConfirmationAnswer =
   | { dismissed: true } // the card was closed without a decision
   | { stopped: true }; // Stop: the turn is cancelled
 
-// Tools whose successful execution counts as "the GM consulted the oracle"
-// for the recency counter in the prompt's Oracle State section. Same pair
-// the observer's missing_oracle_or_table check watches (observer.ts) - both
-// serve the same purpose of letting randomness rather than narrative
-// convenience settle an uncertain question.
-const ORACLE_TOOL_NAMES = new Set([
-  "fate_question",
-  "roll_table",
-  "roll_portent",
-]);
+
 
 /**
  * Whether a `success: false` result means something actually went wrong, or
@@ -1683,7 +1681,7 @@ export async function executeGMTools(
     // roll_table returns from three places (custom table, built-in table,
     // table-not-found) and only the successful ones should count as having
     // consulted the oracle.
-    if (result.success && ORACLE_TOOL_NAMES.has(result.toolName)) {
+    if (result.success && ORACLE_USE_TOOL_NAMES.has(result.toolName)) {
       markOracleConsulted(modified);
     }
 
@@ -3396,20 +3394,22 @@ function executeRollPortent(
 }
 
 /**
- * Execute a roll on a built-in AGMT element table.
- *
- * Adventure-specific tables are NOT handled here any more - they're notes
- * (`type: "table"`), and the GM rolls them itself: read the note, roll the
- * die it names with `formula_roll`, read off the matching entry. This tool
- * now covers only the built-in element tables, which have no note to read.
+ * Execute a roll on a table: a built-in AGMT element table first, then one of
+ * this adventure's table notes (`type: "table"`), found by title the way
+ * `read_notes` finds one and rolled in one call when its layout is one the
+ * parser reads (tableRoll.ts). A layout it cannot read is refused with a
+ * pointer back to read-and-roll with `formula_roll`; a note with several
+ * sub-tables and no `table` is refused with the list, never rolled on the
+ * first one.
  */
 function executeRollTable(
   toolCallId: string,
   params: RollTableParams,
   storyData: StoryData
 ): GMToolResult {
+  const rawName = typeof params.table_name === "string" ? params.table_name : "";
   // Try as AGMT element table (normalize name: spaces to underscores, lowercase)
-  const normalizedName = params.table_name.toLowerCase().replace(/\s+/g, "_");
+  const normalizedName = rawName.toLowerCase().replace(/\s+/g, "_");
 
   const isAgmtTable = (MYTHIC_TABLE_NAMES as string[]).includes(normalizedName);
 
@@ -3417,7 +3417,7 @@ function executeRollTable(
     // Roll on the AGMT element table
     // (isAgmtTable already confirmed normalizedName is a member of MYTHIC_TABLE_NAMES)
     const result = generateElement(normalizedName as ElementCategory);
-    const prettifiedName = params.table_name
+    const prettifiedName = rawName
       .replace(/_/g, " ")
       .replace(/\b\w/g, (l: string) => l.toUpperCase());
 
@@ -3441,54 +3441,162 @@ function executeRollTable(
     };
   }
 
-  // Not a built-in table. The likeliest reason is that the GM reached for
-  // one of this adventure's own tables out of habit, so if a note by that
-  // name exists, point straight at it rather than reporting a dead end.
-  const noteMatch = findTableNote(storyData, params.table_name);
   const displayName = params.display_name || "Table Roll";
-  const guidance = noteMatch
-    ? `[This adventure's table "${noteMatch.title}" is a note, not a built-in table. Read it with \`read_notes\`, roll the die it names with \`formula_roll\`, and read off the entry that came up.]`
-    : `[There's no built-in table called "${params.table_name}". If this adventure has one, it's a note - find it with \`search_notes\`, then roll it yourself with \`formula_roll\`. Otherwise pick a built-in table from the tool description, or just decide.]`;
-
-  return {
+  const refuse = (
+    text: string,
+    extra: Partial<GMRollTableResult> = {}
+  ): GMToolResult => ({
     toolName: "roll_table",
     toolCallId,
     success: false,
     result: {
       type: "roll_table",
-      tableName: params.table_name,
+      tableName: rawName,
       result: "",
       reason: params.reason,
       displayName: params.display_name,
-      tableNotFound: true,
+      ...extra,
     } as GMRollTableResult,
-    contextForStory: `[${displayName}: Table "${params.table_name}" not found]\n${guidance}`,
+    contextForStory: `[${displayName}: ${text}]`,
+  });
+
+  // Not a built-in table: one of this adventure's table notes.
+  const found = findTableNotes(storyData, rawName);
+  if (found.length > 1) {
+    return refuse(
+      `"${rawName}" matches several table notes: ${found
+        .map((n) => `"${n.title}"`)
+        .join(", ")}. Call again with the exact title.`,
+      { tableNotFound: true }
+    );
+  }
+  if (found.length === 0) {
+    const close = closestTableTitles(storyData, rawName);
+    return refuse(
+      `Table "${rawName}" not found. ${
+        close.length
+          ? `Closest table notes: ${close.map((t) => `"${t}"`).join(", ")}. `
+          : ""
+      }Use a built-in table named under Tables in your instructions, a table note's title, or decide it yourself.`,
+      { tableNotFound: true }
+    );
+  }
+
+  const note = found[0];
+  const parsed = parseTableNote(note.content);
+  if (!parsed.ok) {
+    return refuse(
+      `"${note.title}" can't be rolled in one call (${parsed.reason}). Read it with \`read_notes\`, roll the die it names with \`formula_roll\`, and read off the entry that came up.`,
+      { noteTitle: note.title }
+    );
+  }
+  const picked = selectTable(parsed.tables, params.table);
+  if (!picked.ok) {
+    const list = picked.candidates.map((c) => `"${c}"`).join(", ");
+    return refuse(
+      params.table
+        ? `"${note.title}" has no single table "${params.table}". Its tables: ${list}. Call again with \`table\` set to one of them.`
+        : `"${note.title}" holds several tables: ${list}. Call again with \`table\` set to the one you want.`,
+      { noteTitle: note.title }
+    );
+  }
+
+  const table = picked.table;
+  const { roll, entry } = rollTable(table);
+  const label = tablePathLabel(table.path);
+  const rolledOn = `${note.title}${label ? ` > ${label}` : ""}`;
+  const instructions = [table.instructions, parsed.noteInstructions]
+    .filter((x): x is string => !!x)
+    .join(" ")
+    .slice(0, 700);
+  let contextForStory = `[${displayName}: ${rolledOn} (${dieLabel(
+    table.die
+  )}) rolled ${roll}: "${entry.text}"]`;
+  contextForStory += `\n[Reason: ${params.reason}]`;
+  if (instructions) {
+    contextForStory += `\n[Around the table, for you to apply: ${instructions}]`;
+  }
+
+  // A note the player may not read ahead of play keeps its roll private, as
+  // gm_roll does: publicSummary returns null for a hidden result.
+  const hidden =
+    note.visibility !== undefined && note.visibility !== "always_reveal";
+  return {
+    toolName: "roll_table",
+    toolCallId,
+    success: true,
+    ...(hidden ? { hiddenFromPlayer: true } : {}),
+    result: {
+      type: "roll_table",
+      tableName: rolledOn,
+      result: entry.text,
+      reason: params.reason,
+      displayName: params.display_name,
+      noteTitle: note.title,
+      tablePath: label || undefined,
+      roll,
+      instructions: instructions || undefined,
+    } as GMRollTableResult,
+    contextForStory,
   };
 }
 
+const normalizeTableTitle = (title: string): string =>
+  (title || "")
+    .toLowerCase()
+    .replace(/\.md$/i, "")
+    .replace(/\s+[–—-]\s+/g, " — ")
+    .replace(/[_\s]+/g, " ")
+    .trim();
+
 /**
- * Finds a `type: "table"` note by name, tolerating the same loose matching
- * the old custom-table lookup did (case, whitespace, underscores, partial
- * names) so a near-miss still redirects the GM to the right note.
+ * The enabled `type: "table"` notes a name points at, by the same loose
+ * matching `read_notes` uses: the whole title (case, spacing, dashes and a
+ * ".md" suffix ignored), then the part after a built-in note's " — " prefix,
+ * then a title that contains the name or is contained in it. The first rule
+ * that matches anything decides; several matches are returned so the caller
+ * can refuse and list them.
  */
-function findTableNote(
-  storyData: StoryData,
-  name: string
-): StoryLore | undefined {
-  const wanted = name.toLowerCase().replace(/[_\s]+/g, " ").trim();
-  if (!wanted) return undefined;
-
-  const tableNotes = (storyData.lore || []).filter((l) => l.type === "table");
-  const normalize = (title: string) =>
-    (title || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
-
-  return (
-    tableNotes.find((l) => normalize(l.title) === wanted) ||
-    tableNotes.find((l) => {
-      const title = normalize(l.title);
-      return title.includes(wanted) || wanted.includes(title);
-    })
+function findTableNotes(storyData: StoryData, name: string): StoryLore[] {
+  const wanted = normalizeTableTitle(name);
+  if (!wanted) return [];
+  const notes = (storyData.lore || []).filter(
+    (l) => l.type === "table" && l.enabled !== false
   );
+  const exact = notes.filter((l) => normalizeTableTitle(l.title) === wanted);
+  if (exact.length) return exact;
+  const byName = notes.filter((l) => {
+    if (!l.libraryNoteId?.startsWith("builtin:")) return false;
+    const t = normalizeTableTitle(l.title);
+    const at = t.indexOf(" — ");
+    return at >= 0 && t.slice(at + 3) === wanted;
+  });
+  if (byName.length) return byName;
+  return notes.filter((l) => {
+    const t = normalizeTableTitle(l.title);
+    return t.includes(wanted) || wanted.includes(t);
+  });
+}
+
+/** Up to three table-note titles sharing the most words with a missed name. */
+function closestTableTitles(storyData: StoryData, name: string): string[] {
+  const words = new Set(
+    normalizeTableTitle(name)
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length > 1)
+  );
+  return (storyData.lore || [])
+    .filter((l) => l.type === "table" && l.enabled !== false)
+    .map((l) => ({
+      title: l.title,
+      score: normalizeTableTitle(l.title)
+        .split(/[^a-z0-9]+/)
+        .filter((w) => words.has(w)).length,
+    }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((x) => x.title);
 }
 
 /**
