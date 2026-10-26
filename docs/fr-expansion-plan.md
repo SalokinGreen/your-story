@@ -555,3 +555,48 @@ included): clean.
   master, so I **replaced** E4's own entry in each (legends `5b0ea4cf…`, foes
   table `32e8f6b0…`); Larkenfell's realm note shipped in E3, so I **appended**
   (`db5c3f19…`, three entries).
+
+### 2026-10-26 — E5 (the Wolfwillow Crossing starter)
+
+Judgment calls the plan left to the builder. None changes the plan's scope.
+
+- **Callings, one per preset.** Maro Quillfeather is a Sellsword (Veteran;
+  Battered Shield, item, sturdy; Tough; Hard Eyes; move *Hold the Line*),
+  Ilsabet Thorn a Witch (Hedge-Craft; Herbs and Brews, item, blessed; Familiar,
+  the jackdaw; Cunning; move *Brew*) and Jory Wick a Bard (Silver Tongue;
+  Fiddle, item, returning; Quick Wit; Charming; move *Encore*). Each is the
+  calling's signature plus three of its kit, as FR — Callings says, so the old
+  freeform feats (Knows Every Road, I Owe the Marlows, Whispers to Beasts, Quick
+  Fingers and the rest) became background and gear lines. Jory is a Bard, not a
+  Rogue, because the fiddle is the hero; the Rogue path stays open to him with
+  the GM's nod. No preset takes a Larkenfell local calling: none of the three
+  is a village reeve or a barrow's warden, and the Running it note offers both
+  to a hero built from scratch. Each sheet gains a **Calling** line, the move
+  (once per rest, no die), an Items line with qualities and the empty
+  Conditions and Scars lines of the template; `authorNotes` tells the GM which
+  feats are items and to play the move with `manage_feats use`.
+- **The journey is beat 3, not an eighth beat.** The campaign record has no
+  place for a challenge, so the Hushwood trail is written into the third beat's
+  summary and the starter's "Running it" note: three rounds, route DC 3,
+  Supplies from the "Fantastic Realms party" set (start 3, Hettie refills by 2
+  on request, Dunstan Pike's hut on the way back). No new clock, part or id.
+- **The legend is beat 6 and the secret.** The Barrow King's phases (DC 6 with
+  6 hearts, DC 5 at 4, DC 4 at 2) and weakness are in the sixth beat, the
+  "Running it" note and the king's secret `truth` (all GM-only; the shared
+  notes keep calling him the Barrow King). Hollin Greycrown stays only in GM
+  notes and the record's secret, danger, person and clue text. The dead
+  claim that the Mire Troll was a legend there is gone (it is a 5-heart foe).
+- **Re-read against the core.** "Running it" now says only players roll (a foe
+  is a stat line), points to the moves and the Larkenfell local callings, and
+  the Thin Mile line counts the three newer realms. The rest rule, XP table
+  and level cost already agreed with E1-E4. No built-in pack note changed, so
+  no note-history hash was appended (starter notes are not in the history).
+- **Clocks unchanged.** `clk_ww_king` ticks on a rest and `clk_ww_goblins` on
+  a scene; both triggers fire in Fantastic Realms.
+- **Tests:** `tests/systems.fantasticRealms.starter.test.ts` (new, 7): the
+  calling, signature and kit of each hero, the move on the sheet and in the
+  `authorNotes`, item qualities, the journey and legend text, and the player's
+  card holding no name, "king" or "tally". `campaign.starters`' banned list
+  already covers "Hollin", "Greycrown" and "king".
+- **Still owed to the author:** the browser screenshot (a seeded Fantastic
+  Realms story's Meters panel and the presets picker) and the APK.

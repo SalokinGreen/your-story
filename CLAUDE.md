@@ -924,12 +924,19 @@ report's §11.3. The ones that shape play:
   Cloud-Reader). `REALM_IDS`/`FANTASTIC_REALMS_RESTS` have six entries, so
   `take_rest` knows them; the foes-by-realm table has six d12s; the core's
   rests line, Magic, Callings, Travel and the Crossroads name them. **FR —
-  Legends** now holds the six legends (one per realm, Emberwing, Hollin
-  Greycrown, the Weeping Colossus, Maurelle the Drowned Queen, Vulgrim Cinderhide
+  Legends** now holds the six legends (one per realm, Emberwing, the Barrow King
+  (name lost in the shared notes), the Weeping Colossus, Maurelle the Drowned Queen, Vulgrim Cinderhide
   and Ouranth the Stormwhale): a lair, a weakness, the roster's stat line as
   phase 1 and `**Name, Phase n** — DC · words · Hearts mark (m) · Threat:` lines
   whose marks descend (`tests/systems.fantasticRealms.legends.test.ts`). Every
   changed note's new hash is appended to the history.
+  **The starter grown (slice E5, `docs/fr-expansion-plan.md`):** the three
+  pre-made heroes follow callings (Maro the Sellsword, Ilsabet the Witch, Jory
+  the Bard: the signature plus three of the kit, item feats with qualities, the
+  calling move on the sheet and in `authorNotes`); the Hushwood trail (beat 3)
+  is a three-round tally journey on the "Fantastic Realms party" Supplies, and
+  the barrow king (beat 6) is run as FR — Legends' Barrow King, whose name
+  stays only in GM-only text (`tests/systems.fantasticRealms.starter.test.ts`).
   **Its campaign** is an
   `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
   Week, the barrow king's front (a hidden clock on `rest`) and the goblins'
