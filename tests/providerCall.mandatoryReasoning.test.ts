@@ -167,8 +167,8 @@ describe("the narration effort follows a Default saved under a retired key", () 
     expect(getEffectiveNarrationEffort()).toBe("high");
   });
 
-  it("still falls back to none when the saved model was dropped outright", () => {
+  it("still falls back to the shipped effort (normal) when the saved model was dropped outright", () => {
     saveDefault("Grok Code Fast 1", "high");
-    expect(getEffectiveNarrationEffort()).toBe("none");
+    expect(getEffectiveNarrationEffort()).toBe("normal");
   });
 });

@@ -86,14 +86,13 @@ export interface ReasoningTier {
  * same holds for a provider's HTTP error on a streamed round; only a non-200
  * from the proxy itself, or the subscription bridge's 502, takes fallbackTier.)
  *
- * The defaults (decisions 50 and 122) are GLM 5.3 for the three lower tiers
- * (tiers 0 and 1 at "none", which GLM gets as "low" because it always thinks;
- * tier 2, combat and rules, at "high") and Claude Sonnet 5.5 for boss fights
- * and campaign-shaping calls. Settings shows them as two slots, Default
- * (tiers 0-2) and Advanced (tier 3); the engine still picks a tier per turn.
- * Both are OpenRouter models, so one OpenRouter key runs the whole ladder.
- * providerCall.ts translates each effort for its model: GLM 5.3 takes
- * "high" as "high", and Sonnet's "xhigh" goes out as OpenRouter's "xhigh".
+ * The defaults (decision 257, replacing 122) are DeepSeek V4 Flash through
+ * OpenRouter on every tier: tiers 0 and 1 at "normal" (OpenRouter's
+ * "medium"), tier 2, combat and rules, and tier 3, boss fights and
+ * campaign-shaping calls, at "high". Settings shows them as two slots,
+ * Default (tiers 0-2) and Advanced (tier 3); the engine still picks a tier
+ * per turn. It is an OpenRouter model, so one OpenRouter key runs the whole
+ * ladder and the Haiku side agents.
  *
  * All entries have supportsToolCalling: true in AI_MODELS — required since
  * GM adjudication calls dice/state tools mid-turn (DeepSeek R1 variants
@@ -102,36 +101,36 @@ export interface ReasoningTier {
  */
 export const REASONING_TIERS: ReasoningTier[] = [
   {
-    modelKey: "GLM 5.3",
-    reasoningEffort: "none",
+    modelKey: "DeepSeek V4 Flash (OpenRouter)",
+    reasoningEffort: "normal",
     note: "banter, descriptions, NPC chatter",
   },
   {
-    modelKey: "GLM 5.3",
-    reasoningEffort: "none",
+    modelKey: "DeepSeek V4 Flash (OpenRouter)",
+    reasoningEffort: "normal",
     note: "ordinary skill checks and everyday GM calls",
   },
   {
-    modelKey: "GLM 5.3",
+    modelKey: "DeepSeek V4 Flash (OpenRouter)",
     reasoningEffort: "high",
     note: "rules adjudication, combat",
   },
   {
-    modelKey: "Claude Sonnet 5.5",
-    reasoningEffort: "xhigh",
+    modelKey: "DeepSeek V4 Flash (OpenRouter)",
+    reasoningEffort: "high",
     note: "boss fights, campaign-shaping calls",
   },
 ];
 
 /**
- * Default's shipped model (decisions 50 and 122). Narration follows the
+ * Default's shipped model (decisions 50, 122 and 257). Narration follows the
  * Default slot (getEffectiveNarrationModelKey), so this is the model the
  * story-continuation call and the choices call run on until the player picks
  * one for Default. When the GM's own final round already wrote the prose,
  * that round's tier model wrote it instead (generation.ts,
  * gmFinalStoryContent).
  */
-export const NARRATION_MODEL_KEY: AIModelKey = "GLM 5.3";
+export const NARRATION_MODEL_KEY: AIModelKey = "DeepSeek V4 Flash (OpenRouter)";
 
 export const SCENE_BASELINE_TIER = 1;
 export const MAX_TIER3_CALLS_PER_SCENE = 3;

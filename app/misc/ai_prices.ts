@@ -311,6 +311,28 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
+  "DeepSeek V4 Flash (OpenRouter)": {
+    name: "DeepSeek V4 Flash (OpenRouter)",
+    original_model: "DeepSeek V4 Flash (OpenRouter)",
+    model: "deepseek/deepseek-v4-flash",
+    maxTokens: 1048576,
+    maxOutputTokens: 65536,
+    // DeepInfra's listing on OpenRouter (fp8), the one the eval of 2026-10-26
+    // measured; checked against /api/v1/models/deepseek/deepseek-v4-flash/endpoints.
+    inputPrice: 0.09,
+    outputPrice: 0.18,
+    cachedInputPrice: 0.018,
+    provider: "openrouter",
+    openRouterProviderOrder: ["DeepInfra"],
+    supportsToolCalling: true,
+    finetunes: [],
+    strengths: ["very cheap", "long context", "tool calling"],
+    weaknesses: [],
+    description:
+      "DeepSeek V4 Flash through your OpenRouter key, served by DeepInfra first. The app's default GM and narrator (decision 257): the steadiest GM in the 2026-10-26 eval at a fraction of GLM 5.3's price.",
+    bannerUrl: undefined,
+  },
+
   "GLM 5.3 Flash": {
     name: "GLM 5.3 Flash",
     original_model: "GLM 5.3 Flash",
@@ -1549,6 +1571,12 @@ export interface AIModelConfig {
     | "zai"
     | "claude-cli";
   supportsToolCalling?: boolean; // Whether this model supports function calling
+  /**
+   * OpenRouter only: the upstream providers to try first, sent as
+   * `provider: {order, allow_fallbacks: true}`, so the model runs on the
+   * listing that was measured instead of the cheapest one (some serve fp4).
+   */
+  openRouterProviderOrder?: readonly string[];
   /**
    * OpenRouter marks this model's reasoning `mandatory`: it cannot be turned
    * off, and an explicit `reasoning: {effort: "none"}` is rejected (OpenRouter's

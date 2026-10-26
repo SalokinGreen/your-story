@@ -579,6 +579,25 @@ function applyReasoningEffort(
     return;
   }
 
+  // DeepInfra's OpenAI endpoint takes reasoning_effort none/low/medium/high/
+  // xhigh on every model we list (probed 2026-10-26; a model with no
+  // reasoning ignores it). Defaults differ: DeepSeek V4 and Gemma 4 do not
+  // think unless asked, Kimi, Qwen 3.6 and Nemotron think unless told "none",
+  // so "none" is sent explicitly. A call with no effort is left at the
+  // model's default (callSideModel always sends one).
+  if (provider === "deepinfra" && reasoningEffort) {
+    const effortMap: Record<string, string> = {
+      none: "none",
+      low: "low",
+      normal: "medium",
+      high: "high",
+      xhigh: "xhigh",
+    };
+    const mapped = effortMap[reasoningEffort];
+    if (mapped) requestBody.reasoning_effort = mapped;
+    return;
+  }
+
   if (!reasoningEffort || reasoningEffort === "none") return;
 
   if (provider === "mistral") {
@@ -597,7 +616,7 @@ function applyReasoningEffort(
       requestBody.reasoning = { effort: mapped };
     }
   }
-  // deepinfra/google: no confirmed lever for the models this app targets -
+  // google: no confirmed lever for the models this app targets -
   // left as a no-op rather than guessing at an unverified param.
 }
 
@@ -758,6 +777,12 @@ function applyCacheKey(requestBody: Record<string, unknown>, provider: Provider,
     // warm cache, for the whole session. OpenRouter caps the id at 128 chars.
     requestBody.session_id = cacheKey.slice(0, 128);
   }
+}
+
+/** A model's preferred OpenRouter upstreams, falling back to any other. */
+function applyProviderOrder(requestBody: Record<string, unknown>, provider: Provider, config: AIModelConfig): void {
+  if (provider !== "openrouter" || !config.openRouterProviderOrder?.length) return;
+  requestBody.provider = { order: [...config.openRouterProviderOrder], allow_fallbacks: true };
 }
 
 /**
@@ -1239,6 +1264,7 @@ async function requestNonStreaming(
 
     applyReasoningEffort(requestBody, provider, body.reasoningEffort, isClaude, thinksAlways);
     applyCacheKey(requestBody, provider, body.cacheKey);
+    applyProviderOrder(requestBody, provider, config);
 
     const response = await postChatRequest(endpoint, headers, requestBody, provider, signal);
 
@@ -1487,6 +1513,7 @@ export function generateStream(
         }
 
         applyCacheKey(requestBody, provider, body.cacheKey);
+        applyProviderOrder(requestBody, provider, config);
 
         const response = await postChatRequest(
           endpoint,

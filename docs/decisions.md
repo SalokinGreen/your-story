@@ -464,3 +464,12 @@ The author: "We need to grow the Endless Realms rules a lot more." (Fantastic Re
 | 255 | "A team burn (two sure successes) measured as very strong. How strong should it be?" | **"Both feats, one sure success each (Recommended)."** Two sure successes, but neither burned feat adds its usual die: a sure hit, while a strong hit still needs the dice. Rejected: as drafted; one sure success and two dice. |
 | 256 | "Should hearth improvements work in the dice, or only in the fiction?" | **"Party feats (Recommended)."** Each improvement is a shared feat any hero may name, freely at the hearth and once per adventure away from it, tracked by the engine. Rejected: fiction only. |
 
+
+### DeepSeek V4 Flash as the default (2026-10-26)
+
+After the first live evals on a temporary DeepInfra key ([`research/model-eval-2026-10-26.md`](research/model-eval-2026-10-26.md)): DeepSeek V4 Flash failed about 10% of the GM prompt cases (31 of 300 runs), GLM 5.3 20%, DeepSeek V4 Pro 10–16%. Replaces decision 122's ladder.
+
+| # | question | decision |
+|---|---|---|
+| 257 | "Okay new defaults. Deepseek flash normal for normal and high for advanced." | **DeepSeek V4 Flash on every tier:** Default (tiers 0–2) at `normal`, tier 2 kept at `high` by decision 123, Advanced (tier 3) at `high`. Narration follows Default. The side agents stay on Claude Haiku 5.5 (decision 51) and rewrite confirmation on GLM 5.3. The eval could not tell the efforts apart (DeepInfra is sent no effort, see the research note), so `normal` and `high` are the author's choice, not a measured one. |
+| 258 | "Which provider should the new default DeepSeek V4 Flash run through?" | **"OpenRouter (Recommended)."** `deepseek/deepseek-v4-flash` as the catalog key "DeepSeek V4 Flash (OpenRouter)", with DeepInfra asked first (`openRouterProviderOrder`, fallbacks allowed), the listing the eval measured; so one OpenRouter key still runs the GM, the narrator and the side agents. Rejected: DeepInfra direct (two keys to start); DeepSeek's own API (V4 Flash retired there, peak-hour pricing). |

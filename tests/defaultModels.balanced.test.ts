@@ -2,10 +2,9 @@
  * The "Balanced" defaults the author chose on 2026-10-21 (docs/decisions.md,
  * decisions 50 and 51):
  *
- *  - the reasoning ladder starts on GLM 5.3 (tiers 0, 1 and 2; decision 122
- *    moved the light tiers off Haiku) and Claude Sonnet 5.5 (tier 3), with the
- *    narration following the Default slot (decision 118), all through
- *    OpenRouter;
+ *  - the reasoning ladder is DeepSeek V4 Flash through OpenRouter on every
+ *    tier (decision 257, which replaced decision 122's GLM 5.3 and Sonnet),
+ *    with the narration following the Default slot (decision 118);
  *  - an unpinned side agent runs on its own default, Claude Haiku 5.5, no
  *    matter what the narration voice or the GM's tier model is - unless the
  *    player has no key for that default's provider, when it runs on the
@@ -48,10 +47,11 @@ import {
   resetClaudeCliStatusCache,
   setOnlineSessionActive,
 } from "@/app/misc/claudeCliModels";
-import { generateNonStreaming, isAnthropicViaOpenRouter } from "@/app/misc/providerCall";
+import { generateNonStreaming, generateStream, isAnthropicViaOpenRouter } from "@/app/misc/providerCall";
 import { estimateTurnCost } from "@/app/misc/turnCostEstimate";
 
 const SONNET_SUBSCRIPTION = "Claude Sonnet (subscription)";
+const DEEPSEEK = "DeepSeek V4 Flash (OpenRouter)";
 
 class MemoryStorage {
   private map = new Map<string, string>();
@@ -104,27 +104,27 @@ afterEach(() => {
 });
 
 describe("the default ladder (decision 50)", () => {
-  it("is GLM 5.3, GLM 5.3, GLM 5.3 (high), Sonnet (decision 122)", () => {
+  it("is DeepSeek V4 Flash (OpenRouter) on every tier: normal, normal, high, high (decision 257)", () => {
     expect(REASONING_TIERS.map((t) => [t.modelKey, t.reasoningEffort])).toEqual([
-      ["GLM 5.3", "none"],
-      ["GLM 5.3", "none"],
-      ["GLM 5.3", "high"],
-      ["Claude Sonnet 5.5", "xhigh"],
+      [DEEPSEEK, "normal"],
+      [DEEPSEEK, "normal"],
+      [DEEPSEEK, "high"],
+      [DEEPSEEK, "high"],
     ]);
   });
 
-  it("narrates on GLM 5.3", () => {
-    expect(NARRATION_MODEL_KEY).toBe("GLM 5.3");
+  it("narrates on DeepSeek V4 Flash (OpenRouter)", () => {
+    expect(NARRATION_MODEL_KEY).toBe(DEEPSEEK);
   });
 
   it("resolves from a fresh profile with nothing saved", () => {
     expect(getEffectiveTiers().map((t) => t.modelKey)).toEqual(
       REASONING_TIERS.map((t) => t.modelKey),
     );
-    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
-    expect(resolveTier(0)).toMatchObject({ modelKey: "GLM 5.3", reasoningEffort: "none" });
-    expect(resolveTier(2)).toMatchObject({ modelKey: "GLM 5.3", reasoningEffort: "high" });
-    expect(resolveTier(3)).toMatchObject({ modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" });
+    expect(getEffectiveNarrationModelKey()).toBe(DEEPSEEK);
+    expect(resolveTier(0)).toMatchObject({ modelKey: DEEPSEEK, reasoningEffort: "normal" });
+    expect(resolveTier(2)).toMatchObject({ modelKey: DEEPSEEK, reasoningEffort: "high" });
+    expect(resolveTier(3)).toMatchObject({ modelKey: DEEPSEEK, reasoningEffort: "high" });
   });
 
   it("only names real catalog keys, so none is swapped for DeepSeek V4 Flash", () => {
@@ -156,17 +156,17 @@ describe("the default ladder (decision 50)", () => {
       JSON.stringify([null, null, { modelKey: "Grok 4.5", reasoningEffort: "high" }, null]),
     );
     expect(getEffectiveTiers()[2].modelKey).toBe("Grok 4.5");
-    expect(getEffectiveTiers()[3].modelKey).toBe("Claude Sonnet 5.5");
+    expect(getEffectiveTiers()[3].modelKey).toBe(DEEPSEEK);
     // Narration is Default's tier 1, which the player left unset.
-    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
+    expect(getEffectiveNarrationModelKey()).toBe(DEEPSEEK);
   });
 
   it("keeps a saved narration voice in storage, and no longer plays it (decision 118)", () => {
     localStorage.setItem("narrationModelOverride", "Mistral Small 4");
     localStorage.setItem("narrationEffortOverride", "high");
     expect(localStorage.getItem("narrationModelOverride")).toBe("Mistral Small 4");
-    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
-    expect(getEffectiveNarrationEffort()).toBe("none");
+    expect(getEffectiveNarrationModelKey()).toBe(DEEPSEEK);
+    expect(getEffectiveNarrationEffort()).toBe("normal");
   });
 });
 
@@ -204,31 +204,72 @@ describe("the default efforts reach OpenRouter in a form each model accepts", ()
     return JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
   }
 
-  it("tiers 0 and 1: GLM 5.3's effort none goes out as low, never the 400-ing none", async () => {
+  it("tiers 0 and 1: DeepSeek V4 Flash's effort normal goes out as OpenRouter's medium", async () => {
     for (const tier of [REASONING_TIERS[0], REASONING_TIERS[1]]) {
       const body = await sentBody(String(tier.modelKey), tier.reasoningEffort);
-      expect(body.model).toBe("z-ai/glm-5.3");
-      expect(body.reasoning).toEqual({ effort: "low" });
+      expect(body.model).toBe("deepseek/deepseek-v4-flash");
+      expect(body.reasoning).toEqual({ effort: "medium" });
     }
   });
 
-  it("tier 2: GLM 5.3 gets high, as OpenRouter's high", async () => {
-    const tier = REASONING_TIERS[2];
-    const body = await sentBody(String(tier.modelKey), tier.reasoningEffort);
-    expect(body.model).toBe("z-ai/glm-5.3");
-    expect(body.reasoning).toEqual({ effort: "high" });
-  });
-
-  it("tier 3: Sonnet gets xhigh, as OpenRouter's xhigh", async () => {
-    const tier = REASONING_TIERS[3];
-    const body = await sentBody(String(tier.modelKey), tier.reasoningEffort);
-    expect(body.model).toBe("anthropic/claude-sonnet-5.5");
-    expect(body.reasoning).toEqual({ effort: "xhigh" });
+  it("tiers 2 and 3: DeepSeek V4 Flash gets high, as OpenRouter's high", async () => {
+    for (const tier of [REASONING_TIERS[2], REASONING_TIERS[3]]) {
+      const body = await sentBody(String(tier.modelKey), tier.reasoningEffort);
+      expect(body.model).toBe("deepseek/deepseek-v4-flash");
+      expect(body.reasoning).toEqual({ effort: "high" });
+    }
   });
 
   it("the narration model, with no effort of its own, is never sent effort none", async () => {
     const body = await sentBody(NARRATION_MODEL_KEY, undefined);
-    expect(body.reasoning).toEqual({ effort: "low" });
+    expect(body.model).toBe("deepseek/deepseek-v4-flash");
+    expect(body.reasoning).not.toEqual({ effort: "none" });
+  });
+
+  it("an OpenRouter request for the default model prefers DeepInfra and allows fallbacks", async () => {
+    const body = await sentBody(DEEPSEEK, "normal");
+    expect(body.provider).toEqual({ order: ["DeepInfra"], allow_fallbacks: true });
+  });
+
+  it("a model without a provider order carries no provider key", async () => {
+    for (const key of ["GLM 5.3", SIDE_AGENT_DEFAULT_MODEL_KEY]) {
+      const body = await sentBody(key, "low");
+      expect("provider" in body, key).toBe(false);
+    }
+  });
+
+  it("the streaming path sends the same provider order, and a model without one sends none", async () => {
+    const sse = 'data: {"choices":[{"index":0,"delta":{"content":"hi"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
+    const encoder = new TextEncoder();
+    async function streamedBody(model: string) {
+      const fetchMock = vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode(sse));
+            controller.close();
+          },
+        }),
+        text: async () => sse,
+      }));
+      vi.stubGlobal("fetch", fetchMock);
+      const reader = generateStream({
+        messages: MESSAGES,
+        model,
+        openRouterKey: "test-key",
+        reasoningEffort: "normal",
+        maxTokens: 8000,
+      }).getReader();
+      while (!(await reader.read()).done) {
+        /* drain */
+      }
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      return JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    }
+    expect((await streamedBody(DEEPSEEK)).provider).toEqual({ order: ["DeepInfra"], allow_fallbacks: true });
+    expect("provider" in (await streamedBody("GLM 5.3"))).toBe(false);
   });
 
   it("the side-agent default is a Claude-via-OpenRouter model, so a short verdict gets room to think", async () => {
@@ -277,7 +318,7 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
     expect(resolveSideCallModel(null).model).toBe("Claude Haiku 5.5");
   });
 
-  it("is what the turn cost estimate prices every side agent at, and the narrator (and the rewrite) at GLM 5.3", () => {
+  it("is what the turn cost estimate prices every side agent at, and the narrator (and the rewrite) at DeepSeek V4 Flash", () => {
     const lines = estimateTurnCost().lines;
     const modelOf = (stage: string) => lines.find((l) => l.stage === stage)?.modelKey;
     for (const stage of [
@@ -289,9 +330,9 @@ describe("an unpinned side agent runs on Claude Haiku 5.5 (decision 51)", () => 
     ]) {
       expect(modelOf(stage), stage).toBe("Claude Haiku 5.5");
     }
-    expect(modelOf("narration")).toBe("GLM 5.3");
-    expect(modelOf("choices")).toBe("GLM 5.3");
-    expect(modelOf("observer_rewrite")).toBe("GLM 5.3");
+    expect(modelOf("narration")).toBe(DEEPSEEK);
+    expect(modelOf("choices")).toBe(DEEPSEEK);
+    expect(modelOf("observer_rewrite")).toBe(DEEPSEEK);
   });
 
   it("prices the Reflection line at the Reflection pin, not at the Memory Keeper's", () => {
@@ -432,7 +473,7 @@ describe("the Observer's rewrite follows the narration voice, not the judges (de
         String(getEffectiveNarrationModelKey()),
         getEffectiveNarrationEffort(),
       ),
-    ).toEqual({ model: "GLM 5.3", reasoningEffort: "none" });
+    ).toEqual({ model: DEEPSEEK, reasoningEffort: "normal" });
     // ...and takes the effort the player set for the voice with it (decision 53).
     setNarrator("GLM 5.3", "high");
     expect(
@@ -525,7 +566,7 @@ describe("a side agent without a key for the default falls to the narration voic
   });
 
   it("follows a Z.ai key to the Z.ai entry of GLM, but not to the OpenRouter entry the voice defaults to", () => {
-    // Fresh profile: the voice is "GLM 5.3" (OpenRouter), which a Z.ai key cannot call.
+    // Fresh profile: the voice is DeepSeek V4 Flash (OpenRouter), which a Z.ai key cannot call.
     expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     setNarrator("GLM 5.3 (Z.ai)");
     expect(resolveSideCallModel(null, { zaiKey: "z" })).toEqual({ model: "GLM 5.3 (Z.ai)", reasoningEffort: "none" });
@@ -542,8 +583,8 @@ describe("a side agent without a key for the default falls to the narration voic
   });
 
   it("stays on Haiku, to fail visibly, when the voice is one the player has no key for either", () => {
-    // Only a Mistral key, voice on the default GLM 5.3 (OpenRouter).
-    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
+    // Only a Mistral key, voice on the default DeepSeek V4 Flash (OpenRouter).
+    expect(getEffectiveNarrationModelKey()).toBe(DEEPSEEK);
     expect(resolveSideCallModel(null, MISTRAL_ONLY)).toEqual({ model: "Claude Haiku 5.5", reasoningEffort: "none" });
     // A custom model's UUID is an OpenRouter model, which this player cannot call.
     setNarrator(CUSTOM_MODEL_UUID);
