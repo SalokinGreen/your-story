@@ -6380,6 +6380,19 @@ export function generateComplexMeaning(): {
 }
 
 /**
+ * One action word and one descriptor word for the dice drawer
+ * (randomness plan R3): the event-meaning action table and the first
+ * descriptor table, drawn with the caller's own RNG.
+ */
+export function drawMeaningPair(rng: () => number = Math.random): {
+  action: string;
+  description: string;
+} {
+  const at = (t: readonly string[]) => t[Math.min(t.length - 1, Math.floor(rng() * t.length))];
+  return { action: at(EVENT_ACTIONS), description: at(MEANING_TABLE_DESCRIPTOR_1) };
+}
+
+/**
  * Generate a detail (Descriptor + Subject)
  * @returns Descriptor and subject pair for adding detail
  */

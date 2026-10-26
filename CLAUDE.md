@@ -487,7 +487,8 @@ prompt with nothing per-turn in it; one user message, the stable block
 part after `summarizedThroughIndex`), its last message marked
 `cacheBreakpoint: "prefix"`; then ONE user message, the live block and the
 player's action (`buildLiveBlock`: the character sheet, the campaign plan,
-the system's roll tool (`buildRollToolSection`: `feat_roll`, `action_roll`, `ask_for_roll` or `formula_roll`, from the resolved system), the note-title lists (`renderNoteTitleList`: a built-in pack's notes on one line per category with the shared prefix said once, its creation prompts under their own heading, the story's own notes one line each), memory, NPCs, goals, threads, the oracle line, combat,
+the system's roll tool (`buildRollToolSection`: `feat_roll`, `action_roll`, `ask_for_roll` or `formula_roll`, from the resolved system), the note-title lists (`renderNoteTitleList`: a built-in pack's notes on one line per category with the shared prefix said once, its creation prompts under their own heading, the story's own notes one line each), memory, NPCs, goals, threads, the oracle line, the dice drawer
+(`diceDrawer.ts`, randomness R3: three rolled names and one Mythic meaning pair, drawn once per turn by `generateStoryTurnOnce`, the same object in every prompt build, names pushed onto the name ledger at the draw, never in `StoryData`, a tool result or the narration context, and none in session zero), combat,
 timers, pending events and moves, then the setup blocks, the Observer,
 progress, repetition and knowledge notes, the pacing note and the GM tip),
 marked `"turn"`. **The system prompt's rules are two chains** (GM prompt slice 2,
