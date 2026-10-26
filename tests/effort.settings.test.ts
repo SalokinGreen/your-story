@@ -100,8 +100,8 @@ describe("the five efforts", () => {
 });
 
 describe("the narration's effort is Default's (decisions 53 and 118)", () => {
-  it("defaults to none when nothing is saved", () => {
-    expect(getEffectiveNarrationEffort()).toBe("none");
+  it("defaults to the shipped normal when nothing is saved", () => {
+    expect(getEffectiveNarrationEffort()).toBe("normal");
   });
 
   it("is the effort the player gave Default, for every effort", () => {
@@ -111,7 +111,7 @@ describe("the narration's effort is Default's (decisions 53 and 118)", () => {
     }
   });
 
-  it("applies to the default model and to one the player picked", () => {
+  it("applies to a model the player picked for Default", () => {
     setSlotOverride("default", { modelKey: "GLM 5.3", reasoningEffort: "normal" });
     expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
     expect(getEffectiveNarrationEffort()).toBe("normal");
@@ -131,15 +131,15 @@ describe("the narration's effort is Default's (decisions 53 and 118)", () => {
     // A phone or the web build cannot: the model is the shipped one, and the
     // effort chosen for the subscription model goes with it.
     fakeCli.platform = false;
-    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
-    expect(getEffectiveNarrationEffort()).toBe("none");
+    expect(getEffectiveNarrationModelKey()).toBe("DeepSeek V4 Flash (OpenRouter)");
+    expect(getEffectiveNarrationEffort()).toBe("normal");
   });
 
   it("falls back to the shipped effort during an online session (decision 29)", () => {
     setSlotOverride("default", { modelKey: SONNET_SUBSCRIPTION, reasoningEffort: "xhigh" });
     setOnlineSessionActive(true);
-    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
-    expect(getEffectiveNarrationEffort()).toBe("none");
+    expect(getEffectiveNarrationModelKey()).toBe("DeepSeek V4 Flash (OpenRouter)");
+    expect(getEffectiveNarrationEffort()).toBe("normal");
   });
 
   it("falls back when the catalog dropped Default's saved model", () => {
@@ -151,8 +151,8 @@ describe("the narration's effort is Default's (decisions 53 and 118)", () => {
         ),
       ),
     );
-    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
-    expect(getEffectiveNarrationEffort()).toBe("none");
+    expect(getEffectiveNarrationModelKey()).toBe("DeepSeek V4 Flash (OpenRouter)");
+    expect(getEffectiveNarrationEffort()).toBe("normal");
   });
 });
 
@@ -186,8 +186,8 @@ describe("the saved narration voice and effort (replaced by Default, decision 11
   it("are no longer used: the narration follows Default", () => {
     localStorage.setItem("narrationModelOverride", "Mistral Small 4");
     localStorage.setItem("narrationEffortOverride", "xhigh");
-    expect(getEffectiveNarrationModelKey()).toBe("GLM 5.3");
-    expect(getEffectiveNarrationEffort()).toBe("none");
+    expect(getEffectiveNarrationModelKey()).toBe("DeepSeek V4 Flash (OpenRouter)");
+    expect(getEffectiveNarrationEffort()).toBe("normal");
 
     setSlotOverride("default", { modelKey: "Claude Sonnet 5.5", reasoningEffort: "low" });
     expect(getEffectiveNarrationModelKey()).toBe("Claude Sonnet 5.5");

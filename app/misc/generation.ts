@@ -3610,10 +3610,12 @@ async function generateStoryTurnOnce(
             const cap = sentMaxTokens(
               gmModel,
               getGMStageOutputTokens(options.customMaxOutput, gmModel),
+              gmReasoningEffort,
             );
             const raised = sentMaxTokens(
               gmModel,
               getGMStageOutputTokens(options.customMaxOutput, gmModel, 2),
+              gmReasoningEffort,
             );
             if (raised > cap) {
               gmOutputCapMultiplier = 2;

@@ -465,6 +465,15 @@ The author: "We need to grow the Endless Realms rules a lot more." (Fantastic Re
 | 256 | "Should hearth improvements work in the dice, or only in the fiction?" | **"Party feats (Recommended)."** Each improvement is a shared feat any hero may name, freely at the hearth and once per adventure away from it, tracked by the engine. Rejected: fiction only. |
 
 
+### DeepSeek V4 Flash as the default (2026-10-26)
+
+After the first live evals on a temporary DeepInfra key ([`research/model-eval-2026-10-26.md`](research/model-eval-2026-10-26.md)): DeepSeek V4 Flash failed about 10% of the GM prompt cases (31 of 300 runs), GLM 5.3 20%, DeepSeek V4 Pro 10–16%. Replaces decision 122's ladder.
+
+| # | question | decision |
+|---|---|---|
+| 257 | "Okay new defaults. Deepseek flash normal for normal and high for advanced." | **DeepSeek V4 Flash on every tier:** Default (tiers 0–2) at `normal`, tier 2 kept at `high` by decision 123, Advanced (tier 3) at `high`. Narration follows Default. The side agents stay on Claude Haiku 5.5 (decision 51) and rewrite confirmation on GLM 5.3. The first passes sent DeepInfra no effort, so they ran Flash without thinking (about 10% failed); after the fix, `normal` failed 3/50 and `high` 7/50, too few runs to rank the two. The author confirmed `normal` for Default ("Okay flash at normal. That's good."). A thinking request now keeps the 4,096 `max_tokens` floor (`requestThinks`, `providerCall.ts`), or an Observer rewrite's 1,100-token cap is spent on thinking. |
+| 258 | "Which provider should the new default DeepSeek V4 Flash run through?" | **"OpenRouter (Recommended)."** `deepseek/deepseek-v4-flash` as the catalog key "DeepSeek V4 Flash (OpenRouter)", with DeepInfra asked first (`openRouterProviderOrder`, fallbacks allowed), the listing the eval measured; so one OpenRouter key still runs the GM, the narrator and the side agents. Rejected: DeepInfra direct (two keys to start); DeepSeek's own API (V4 Flash retired there, peak-hour pricing). |
+
 ### Interview — real randomness for the GM (2026-10-26)
 
 The author: "I also am not happy with the oracle tables use, the GM should use the tables a lot more for randomness because LLM randomness isn't random enough." Design: [`randomness-design.md`](randomness-design.md).

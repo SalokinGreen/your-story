@@ -152,7 +152,10 @@ describe("reading a slot", () => {
 
   it("Advanced is tier 3", () => {
     expect(getSlotOverride("advanced")).toBeNull();
-    expect(getEffectiveSlot("advanced")).toEqual({ modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" });
+    expect(getEffectiveSlot("advanced")).toEqual({
+      modelKey: "DeepSeek V4 Flash (OpenRouter)",
+      reasoningEffort: "high",
+    });
     setSlotOverride("advanced", { modelKey: "Claude Opus 5.5", reasoningEffort: "high" });
     expect(getSlotOverride("advanced")).toEqual({ modelKey: "Claude Opus 5.5", reasoningEffort: "high" });
     expect(getEffectiveSlot("advanced")).toEqual({ modelKey: "Claude Opus 5.5", reasoningEffort: "high" });
@@ -222,12 +225,12 @@ describe("combat's effort floor (decision 123)", () => {
 
   it("runs tier 2 at high with Default at none, and the other tiers as saved", () => {
     setSlotOverride("default", { modelKey: "GLM 5.3", reasoningEffort: "none" });
-    expect(getEffectiveTiers().map((t) => t.reasoningEffort)).toEqual(["none", "none", "high", "xhigh"]);
+    expect(getEffectiveTiers().map((t) => t.reasoningEffort)).toEqual(["none", "none", "high", "high"]);
   });
 
   it("runs tier 2 at xhigh with Default at xhigh", () => {
     setSlotOverride("default", { modelKey: "GLM 5.3", reasoningEffort: "xhigh" });
-    expect(getEffectiveTiers().map((t) => t.reasoningEffort)).toEqual(["xhigh", "xhigh", "xhigh", "xhigh"]);
+    expect(getEffectiveTiers().map((t) => t.reasoningEffort)).toEqual(["xhigh", "xhigh", "xhigh", "high"]);
   });
 
   it("applies on a fresh profile too, and to a different Default model", () => {
@@ -243,17 +246,24 @@ describe("combat's effort floor (decision 123)", () => {
 });
 
 describe("nextDistinctTier", () => {
-  it("on the shipped ladder: up from 0 is 2, down from 1 is null, up from 2 is 3", () => {
+  it("on the shipped ladder (decision 257): up from 0 or 1 is 2, up from 2 is null (tier 3 is the same call), down from 3 is 1", () => {
     const tiers = getEffectiveTiers();
     expect(nextDistinctTier(0, "up", tiers)).toBe(2);
     expect(nextDistinctTier(1, "up", tiers)).toBe(2);
-    expect(nextDistinctTier(2, "up", tiers)).toBe(3);
+    expect(nextDistinctTier(2, "up", tiers)).toBeNull();
     expect(nextDistinctTier(1, "down", tiers)).toBeNull();
     expect(nextDistinctTier(0, "down", tiers)).toBeNull();
     // Tier 1 differs from tier 2 by effort alone, so that counts.
     expect(nextDistinctTier(2, "down", tiers)).toBe(1);
-    expect(nextDistinctTier(3, "down", tiers)).toBe(2);
+    expect(nextDistinctTier(3, "down", tiers)).toBe(1);
     expect(nextDistinctTier(3, "up", tiers)).toBeNull();
+  });
+
+  it("with a different model in Advanced, up from 2 is 3 and down from 3 is 2", () => {
+    setSlotOverride("advanced", { modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" });
+    const tiers = getEffectiveTiers();
+    expect(nextDistinctTier(2, "up", tiers)).toBe(3);
+    expect(nextDistinctTier(3, "down", tiers)).toBe(2);
   });
 
   it("with Default at xhigh everywhere, up from 1 is 3 (tier 2 is the same call)", () => {
@@ -267,14 +277,20 @@ describe("nextDistinctTier", () => {
 
   it("returns null when every tier above is the same call", () => {
     const same = { modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" };
-    localStorage.setItem(KEY, JSON.stringify([same, same, same, null]));
+    localStorage.setItem(KEY, JSON.stringify([same, same, same, same]));
     expect(nextDistinctTier(1, "up", getEffectiveTiers())).toBeNull();
   });
 
   it('by "model" (the error step-down) skips tiers on the same model, whatever their effort', () => {
+    // Shipped (decision 257): one model on every tier, so a failing model has
+    // nowhere else to go; it must not retry itself at another effort.
+    const shipped = getEffectiveTiers();
+    expect(nextDistinctTier(2, "down", shipped, "model")).toBeNull();
+    expect(nextDistinctTier(3, "down", shipped, "model")).toBeNull();
+    // A player who put another model in Advanced: tiers 0-2 stay one model,
+    // so a failure at tier 2 has nowhere lower to go, and tier 3 steps down.
+    setSlotOverride("advanced", { modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" });
     const tiers = getEffectiveTiers();
-    // Shipped: tiers 0–2 are all GLM 5.3, so GLM failing at tier 2 has nowhere
-    // lower to go; it must not retry GLM at a lower effort.
     expect(nextDistinctTier(2, "down", tiers, "model")).toBeNull();
     expect(nextDistinctTier(3, "down", tiers, "model")).toBe(2);
     localStorage.setItem(
@@ -341,7 +357,12 @@ describe("observerRetryTier", () => {
     expect(observerRetryTier(2, state(2, 3), getEffectiveTiers())).toBeNull();
   });
 
-  it("still asks for Advanced while the scene has top-tier calls left", () => {
+  it("still asks for Advanced while the scene has top-tier calls left, when Advanced is a different call", () => {
+    setSlotOverride("advanced", { modelKey: "Claude Sonnet 5.5", reasoningEffort: "xhigh" });
     expect(observerRetryTier(2, state(2, 0), getEffectiveTiers())).toBe(3);
+  });
+
+  it("on the shipped ladder, from tier 2 has nowhere to go: Advanced is the same call", () => {
+    expect(observerRetryTier(2, state(2, 0), getEffectiveTiers())).toBeNull();
   });
 });

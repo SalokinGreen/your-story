@@ -10,6 +10,29 @@ it. A session that confirms an entry deletes it; entries only leave this
 file by being tested, not by ageing out. See `CLAUDE.md` → "What a cloud
 session cannot do".
 
+## 2026-10-26 — DeepSeek V4 Flash as the default (decisions 257–258)
+
+The eval ran DeepSeek through DeepInfra's own API; nothing has run the shipped
+route, `deepseek/deepseek-v4-flash` through OpenRouter. Needs an OpenRouter key.
+
+- **Play three turns of a new story on default settings** (Settings → AI untouched,
+  only an OpenRouter key). Expected: each turn finishes; Debug Logs show the GM
+  rounds on `deepseek/deepseek-v4-flash`, and the OpenRouter activity page shows
+  DeepInfra as the provider. Failure looks like: a 400 naming `provider`, or
+  another provider in the activity page (the order was ignored).
+- **A turn with a roll and a follow-up round** (attack someone). Expected: the
+  roll tool runs and the next round answers. Failure looks like: a 400 about
+  `reasoning_content` or reasoning on the second round (an upstream that wants
+  DeepSeek's reasoning passed back; most likely only when OpenRouter falls back
+  off DeepInfra).
+- **Session zero, step by step, to the setup card.** It runs at `high` with the
+  setup gate's `tool_choice: "required"`. Expected: the questions arrive as
+  question cards. Failure looks like: a 400 on the forced tool choice (then add
+  the model to `modelRejectsForcedToolChoice`).
+- **An Observer rewrite** (write a long "I attack…" line so the agency or length
+  judge flags it). Expected: "Revised after a check", not a kept flag with
+  "cut off at the token limit" in the Debug Logs.
+
 ## 2026-10-25 — GM prompts slice 5: the dawn judge and the length wording
 
 No model was called. The dawn judge ships off (the phrase table is live), so
