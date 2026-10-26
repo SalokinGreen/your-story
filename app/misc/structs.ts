@@ -932,6 +932,10 @@ export interface StoryData {
   // Private like the drawer: stripped from online snapshots
   // (withoutPrivateRandomness). Optional, so old saves need no backfill.
   nameLedger?: string[];
+  // The names of the last few turns' dice drawers (the last 9). Accepted like
+  // the ledger, but never avoided by rollNames, so drawers cannot starve a
+  // small name table. Private like the ledger.
+  recentDrawerNames?: string[];
   // The built-in name list's style, recorded the first time generate_name is
   // given one (names/builtinLists.ts). Unset means "fantasy".
   nameStyle?: "fantasy" | "modern" | "historical-european" | "nordic";
@@ -1125,6 +1129,9 @@ export interface AGMTState {
   // The turn a quiet-run tripwire last rolled (tripwires.ts), so the oracle
   // nudge's own counter is never faked. Unset until the first roll.
   lastQuietRunRoll?: number;
+  // The scene part index at the last tripwire roll of any kind (tripwires.ts):
+  // at most one roll per three player turns. Unset until the first roll.
+  lastTripwireRoll?: number;
   // Prima Materia's tonal register (see primaMateria.ts). Distinct from
   // chaosFactor/tension, which are both *intensity* dials - this tracks
   // what KIND of moment the story is in, and is what stops the GM drifting

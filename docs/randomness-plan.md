@@ -664,3 +664,33 @@ the old oracle cases, and the played session. Both spend the author's keys.
   the table case adds a "Toll-house rooms" d6 table note; the tripwire case has
   a pending tripwire event. All four are on the Tallow Gate story, none has been
   run (the author's go).
+### 2026-10-26, slice R4 engine-review fixes
+
+- **Travel is no longer `textCrosses` on a phrase table.** `TRAVEL_CHECK` is
+  gone; `travelCrossing(gmProse, playerLines)` strips quoted text (straight and
+  curly; an unclosed quote runs to its line's end), drops any sentence with a
+  question mark, speech or recap marker, plan, condition or negation, then
+  accepts only (a) a journey verb (travel, journey, ride, sail, fly, drive,
+  trek, hike, take the train/bus/ferry/boat...) with a preposition and a
+  destination that is a settlement word or a capitalised proper noun, (b) "set
+  out/off for", "leave for", "head out for", "make for" the same way, (c) "spend
+  the week on the road", (d) a time skip that opens the sentence ("The next
+  morning", "By nightfall", "Hours later"). "Walk", "head" and "march" are no
+  longer journey verbs, and "the inn" or "the bar" is not a destination: the
+  cautious side.
+- **Player turns, not parts.** `playerTurnsSince(story, partIndex)` counts user
+  parts after an index. `lastOracleTurn`, `lastQuietRunRoll` and the new
+  `lastTripwireRoll` all stay in scene-part-index units (the unit the oracle
+  already used) and are read through that count. `QUIET_RUN_TURNS` = 6 player
+  turns. Assumes the turn's own user part is already in `scene.parts` when the
+  tripwire runs.
+- **Base.** With neither `lastOracleTurn` nor `lastQuietRunRoll` set, the first
+  look stamps `lastQuietRunRoll` and counts nothing; session zero (the
+  start-game turn included) stamps it every turn. `evaluateTripwire` now writes
+  those two stamps (it was pure before).
+- **One roll per three player turns** (`TRIPWIRE_MIN_GAP`), any kind, logged as a
+  skip.
+- **Drawer names are not ledger names.** `StoryData.recentDrawerNames` (last 9,
+  `pushDrawerNames`) is accepted by the name check but `rollNames` does not
+  avoid it; stripped from guest snapshots with the ledger. A test narrows a
+  Fantastic Realms story to one realm and rolls after ten drawers.

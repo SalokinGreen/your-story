@@ -33,9 +33,12 @@ export function withoutPrivateFindings(story: StoryData): StoryData {
  * story is untouched, and a story with neither is returned as it is.
  */
 export function withoutPrivateRandomness(story: StoryData): StoryData {
-  if (story.nameLedger === undefined && story.nameStyle === undefined) return story;
+  if (story.nameLedger === undefined && story.nameStyle === undefined && story.recentDrawerNames === undefined) {
+    return story;
+  }
   const copy = { ...story };
   delete copy.nameLedger;
+  delete copy.recentDrawerNames;
   delete copy.nameStyle;
   return copy;
 }
