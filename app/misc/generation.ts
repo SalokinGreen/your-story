@@ -18,6 +18,7 @@ import {
 } from "@/app/misc/providerCall";
 import {
   StoryData,
+  StoryLore,
   CommandResponse,
   Choice,
   ScenePart,
@@ -2579,6 +2580,7 @@ async function generateStoryTurnOnce(
     const storyBeforeJudgeView = snapshotJudgeView(storyData);
     // The name check's state at the end of the GM's rounds, for the prose flag.
     let lastNameTurn: NameTurnState | undefined;
+    let lastTurnStartLore: StoryLore[] | undefined;
     let gmStoryContext = "";
     let gmFinalStoryContent = ""; // NEW: GM's final prose content (when no tool calls)
     // Decision 240: the prose a pause released (polished, verbatim) and the raw
@@ -3221,6 +3223,11 @@ async function generateStoryTurnOnce(
         // What the name check knows this turn (names/accept.ts): the player's
         // line, then the notes the GM makes and the answers it is given.
         let nameTurn = newNameTurn([gmUserChoice]);
+        // The lore as the turn began. The batches replace the story's arrays and
+        // never edit these, so the reference stays what it was: notes made or
+        // edited this turn prove nothing to the name check.
+        const turnStartLore = storyData.lore ?? [];
+        lastTurnStartLore = turnStartLore;
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
@@ -3813,6 +3820,7 @@ async function generateStoryTurnOnce(
                 setupPlayers: options.setupPlayers,
                 turnLedger,
                 nameTurn,
+                turnStartLore,
               },
             );
             const gmExecution =
@@ -5211,7 +5219,7 @@ async function generateStoryTurnOnce(
         prose: storyContent,
         nameCheck: {
           story: storyData,
-          notesCreatedThisTurn: lastNameTurn?.notesCreatedThisTurn ?? [],
+          turnStartLore: lastTurnStartLore,
           playerTextThisTurn: lastNameTurn?.playerTextThisTurn ?? [],
         },
         system: resolveSystem(storyData).system,

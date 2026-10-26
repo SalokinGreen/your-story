@@ -302,7 +302,7 @@ function executeWrite(
   const candidate = existing ? mergeForEdit(stripState(part, existing), p.data) : p.data;
   const v = validatePart(part, candidate, ctxFor(story, record, !isEdit));
   if (!v.ok) return result(toolCallId, p, false, v.error);
-  if (part === "location" && opts.rejectName) {
+  if ((part === "location" || part === "faction") && opts.rejectName) {
     const nextName = (v.value as { name?: string }).name;
     const oldName = existing && typeof existing.name === "string" ? existing.name : undefined;
     if (nextName && nextName !== oldName) {

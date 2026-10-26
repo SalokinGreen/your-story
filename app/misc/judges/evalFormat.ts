@@ -149,6 +149,7 @@ const RUNG1_CHECKS: ReadonlySet<string> = new Set<Rung1Check>([
   "pacing_clock",
   "pacing_spotlight",
   "repeated_phrase",
+  "unrolled_name",
 ]);
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;

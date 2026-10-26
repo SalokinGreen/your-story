@@ -5,6 +5,7 @@
  */
 import type { StoryData } from "../structs";
 import { parseTableNote, rollTable, selectTable } from "../tableRoll";
+import { resolveSystem } from "../systems/resolve";
 import { recordNames } from "./accept";
 import {
   BUILTIN_NAME_LISTS,
@@ -29,7 +30,7 @@ function pick<T>(items: readonly T[], rng: () => number): T {
 }
 
 /** A table entry as a name: its text up to a dash or parenthesis. */
-function entryName(text: string): string {
+export function entryName(text: string): string {
   return text.split(/\s[—–-]\s|\s\(/)[0].replace(/[.,;:]+$/, "").trim();
 }
 
@@ -59,6 +60,8 @@ function rollFromLists(kind: NameKind, style: NameStyle, rng: () => number): str
  * the ledger, none twice. Declared or story tables first, the built-in lists
  * (the story's `nameStyle`, else fantasy) when there are none or they run dry.
  */
+const PLACE_SUFFIXES = ["Cross", "Hollow", "Ford", "Reach", "Rest", "Bridge", "End", "Fell", "Marsh", "Gate", "Hill", "Wick"];
+
 export function rollNames(
   story: StoryData,
   kind: NameKind,
@@ -66,25 +69,45 @@ export function rollNames(
   options: RollNamesOptions = {},
 ): string[] {
   const rng = options.rng ?? Math.random;
-  const style = options.style ?? story.nameStyle ?? DEFAULT_NAME_STYLE;
+  const style =
+    options.style ??
+    story.nameStyle ??
+    resolveSystem(story).system?.defaultNameStyle ??
+    DEFAULT_NAME_STYLE;
   const sources = options.style ? [] : nameSourcesFor(story, kind);
-  const taken = new Set(
-    [...recordNames(story), ...(story.nameLedger ?? [])].map((n) => n.trim().toLowerCase()),
-  );
+  const record = new Set(recordNames(story).map((n) => n.trim().toLowerCase()));
+  const ledger = new Set((story.nameLedger ?? []).map((n) => n.trim().toLowerCase()));
   const out: string[] = [];
-  const take = (name: string | null): void => {
+  const chosen = new Set<string>();
+  // Names the story already has are never offered; ledger names only when
+  // nothing else is left (`allowLedger`); a name is never offered twice in a call.
+  const take = (name: string | null, allowLedger: boolean): void => {
     if (!name) return;
     const key = name.toLowerCase();
-    if (taken.has(key)) return;
-    taken.add(key);
+    if (chosen.has(key) || record.has(key) || (!allowLedger && ledger.has(key))) return;
+    chosen.add(key);
     out.push(name);
   };
-  for (let attempts = 0; out.length < count && attempts < count * 25; attempts++) {
-    take(sources.length > 0 ? rollFromSource(pick(sources, rng), rng) : rollFromLists(kind, style, rng));
-  }
+  const fromSources = (): string | null =>
+    sources.length > 0 ? rollFromSource(pick(sources, rng), rng) : rollFromLists(kind, style, rng);
+
+  for (let i = 0; out.length < count && i < count * 25; i++) take(fromSources(), false);
   // A small table can run dry: top up from the built-in lists.
-  for (let attempts = 0; out.length < count && attempts < count * 50; attempts++) {
-    take(rollFromLists(kind, style, rng));
+  for (let i = 0; out.length < count && i < count * 50; i++) take(rollFromLists(kind, style, rng), false);
+  // Then let the ledger's names come back, then combine list words.
+  for (let i = 0; out.length < count && i < count * 25; i++) take(fromSources(), true);
+  const list = BUILTIN_NAME_LISTS[style];
+  for (let i = 0; out.length < count && i < count * 50; i++) {
+    take(
+      kind === "place"
+        ? `${pick(list.family, rng)} ${pick(PLACE_SUFFIXES, rng)}`
+        : `${pick(list.given, rng)} ${pick(list.family, rng)}`,
+      true,
+    );
+  }
+  // Never an empty answer: number what is left.
+  for (let n = 2; out.length < count; n++) {
+    take(`${rollFromLists(kind, style, rng)} ${n}`, true);
   }
   return out;
 }

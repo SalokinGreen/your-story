@@ -1039,12 +1039,16 @@ report's §11.3. The ones that shape play:
   rename) and a `campaign` location add or rename refuse a name that is not
   accepted (`isNameAccepted`, `accept.ts`): on the ledger (also with a title
   in front or shortened to part of it), an NPC or campaign place or group (or a
-  word of one), in a note that is not a table and was not made this turn, or
-  anything a player wrote (their lines, earlier and this turn's question
-  answers, `player_name`, couch seat names). The refusal reads "That name
+  word of one), in the story's own text (premise, intro, summary, memory, goals, threads,
+  the campaign record, the GM's prose of earlier turns), in a note that is not a
+  table as it stood when the turn began (`GMToolContext.turnStartLore`, so a
+  note made or edited this turn proves nothing), a name a table roll returned
+  (`roll_table` puts name-like entries on the ledger), a role label made only
+  of common descriptive words ("Innkeeper", `roleWords.ts`), or anything a
+  player wrote (their lines, earlier and this turn's question answers and
+  setup-card change requests, `player_name`, couch seat names). The refusal reads "That name
   wasn't rolled. Use one of: A, B, C, or call generate_name." and puts the three
-  on the ledger. `GMToolContext.nameTurn` (`notesCreatedThisTurn`,
-  `playerTextThisTurn`) is carried across a turn's rounds like the clock ledger.
+  on the ledger. `GMToolContext.nameTurn` (`playerTextThisTurn`) is carried across a turn's rounds like the clock ledger.
   Sources (`sources.ts`, `rollNames` in `roll.ts`), first tier that has any: a
   story's own non-built-in table note with Names in its title (first plus family
   names composed when it has both), then `BuiltinSystem.nameSources` (a starter's
@@ -1052,8 +1056,11 @@ report's §11.3. The ones that shape play:
   first plus family, each Fantastic Realms realm's list by
   `systemState.fantasticRealms.realm`, pooled when unset or the realm has no
   list), then the built-in lists (`builtinLists.ts`, four styles, original text;
-  an explicit `style` asks for them and is remembered as `nameStyle`). The
-  Designer's campaign writes are not checked. A prose name nothing gave is only
+  an explicit `style` asks for them and is remembered as `nameStyle`). A system
+  can declare `realWorldPlaces` (Blood & Bone: campaign locations and factions
+  are not checked, people are) and a `defaultNameStyle` ("modern") for the
+  fallback lists. The Designer's campaign writes are not checked. No name regex
+  uses lookbehind (iOS before 16.4); a test scans `names/` and `rung1.ts`. A prose name nothing gave is only
   a rung-1 `unrolled_name` line in the Debug Logs (never verified, never
   re-asked). `nameGenerator.ts` and its pointer rolls are gone.
 - `create_thread` / `update_thread` / `resolve_thread` / `abandon_thread`

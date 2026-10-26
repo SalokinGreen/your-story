@@ -544,3 +544,48 @@ the old oracle cases, and the played session. Both spend the author's keys.
 - **Measured tool budgets** after R2: default list 9,711 tokens (was 9,889 after
   R1), Fantastic Realms 11,179 (was 11,357). The system prompt's digest in
   `tests/campaign.oldSaves.test.ts` was retaken again for the new Naming section.
+
+### 2026-10-26, slice R2 review fixes
+
+- **Established text is wide.** `isNameAccepted` also reads the premise, intro,
+  scene summary, memory, goals, threads, the whole campaign record as JSON, and
+  the GM's prose in parts before this turn (earlier-turn prose counts; the
+  rung-1 flag is what caught an invention at the time). Names are compared
+  whole-word, case-, accent- and apostrophe-insensitively (`normalizeForNames`).
+- **Same-turn notes** are decided by `GMToolContext.turnStartLore`, the lore
+  array captured in `generation.ts` before the first batch (batches replace the
+  array and never edit it) and passed by reference; `notesCreatedThisTurn` and
+  the executor's title tracking are gone. A note made, edited or renamed this
+  turn proves nothing; a renamed note keeps its names (they are read from the
+  start-of-turn copy). Without a context the executor uses the lore its batch
+  started with. `Rung1Turn.nameCheck` carries the same `turnStartLore`.
+- **Table rolls reach the ledger.** A `roll_table` on a note, and a built-in
+  `names` roll, push the entry when it reads as a name (at most four words and
+  forty characters, no sentence punctuation), so a rumour or hook entry does not
+  push real names off the ledger. The plan's "characters" built-in does not
+  exist; only `names` is a name table among the Mythic tables.
+- **The setup card's change request is player text** (this turn's
+  `playerTextThisTurn`, and later from the `confirm_setup` tool result).
+  Only the later-turn reading is tested; the push in the executor is a four-line
+  branch that needs a ready setup to run.
+- **Containment both ways.** A wanted name that contains a ledger or record
+  name, or is contained in one, is accepted ("Captain Anka Dorn", "Hob" for
+  "Old Hob").
+- **Role labels.** A name made only of words in `names/roleWords.ts` (about 400
+  newly written roles, descriptors and function words) is accepted unrolled:
+  "Innkeeper", "Hooded Stranger", "The Old Guard". A proper name still has to be
+  rolled. The prose flag ignores those words too, so "old Brannoch Voss" is
+  still flagged. Cost: a surname that is also a trade (Baker, Smith) passes.
+- **Real places.** `BuiltinSystem.realWorldPlaces` (Blood & Bone) turns the
+  campaign location and faction check off, because the GM names real streets and
+  stations; people are still checked. `BuiltinSystem.defaultNameStyle` ("modern"
+  for Blood & Bone) picks the fallback list when the story has no `nameStyle`.
+  Campaign `faction` writes now go through the same hook as locations (a place
+  list is used for the offered names).
+- **No lookbehind** anywhere in the name code; the prefix is a capture group.
+  `tests/names.test.ts` scans `app/misc/names/` and `judges/rung1.ts`.
+- **`rollNames` never comes up short:** the ledger's names are allowed back,
+  then two list words are combined (a family name and a place suffix for a
+  place), then a number is appended. The unrolled-name check builds its texts
+  once per check (`createNameChecker`). `unrolled_name` is in
+  `RUNG1_CHECKS` (`judges/evalFormat.ts`).

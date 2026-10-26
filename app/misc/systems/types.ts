@@ -144,4 +144,9 @@ export interface BuiltinSystem {
   rests?: Record<string, string>;
   // Where a new person's or place's name is rolled from (names/sources.ts).
   nameSources?: NameSourceDecl[];
+  // Every setting of the system is the real world: a campaign location or
+  // faction is named from the map, so only people's names are checked.
+  realWorldPlaces?: boolean;
+  // The built-in name list's style when the story has none ("modern").
+  defaultNameStyle?: "fantasy" | "modern" | "historical-european" | "nordic";
 }

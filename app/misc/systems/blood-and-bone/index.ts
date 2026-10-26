@@ -189,6 +189,10 @@ export const BLOOD_AND_BONE: BuiltinSystem = {
     buildLastResort(RULES_NOTES),
   ],
   sheetTemplate: BLOOD_AND_BONE_SHEET_TEMPLATE,
+  // Modern horror in the real world: places come from the map, names from a
+  // modern list when no table answers.
+  realWorldPlaces: true,
+  defaultNameStyle: "modern",
   // A starter's own list first (Grave Watcher's town), then the People table.
   nameSources: [
     {

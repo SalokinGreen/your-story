@@ -13,8 +13,9 @@
 import { checkNarrationConsistency } from "../consistencyCheck";
 import { escapeRegExp } from "../compaction";
 import { findRepeatedPhrases } from "../storyProgressObserver";
-import type { StoryData } from "../structs";
-import { isNameAccepted } from "../names/accept";
+import type { StoryData, StoryLore } from "../structs";
+import { createNameChecker } from "../names/accept";
+import { isRoleLabel } from "../names/roleWords";
 import type { BuiltinSystem } from "../systems/types";
 import { collectTurnFacts } from "./facts";
 import type {
@@ -59,7 +60,8 @@ export interface Rung1Turn {
   /** The story and the turn's name state, for the unrolled-name flag (R2). Omitted: no flag. */
   nameCheck?: {
     story: StoryData;
-    notesCreatedThisTurn: readonly string[];
+    /** The story's lore as it stood when the turn began (notes made this turn prove nothing). */
+    turnStartLore?: readonly StoryLore[];
     playerTextThisTurn: readonly string[];
   };
 }
@@ -317,8 +319,10 @@ const NOT_NAMES = new Set(
 /** What may precede the first word of a sentence or a quotation. */
 const SENTENCE_END = /[.!?…:;\n"“”‘(—–-]/;
 
+// No lookbehind (iOS before 16.4 has none): the character before a run is
+// captured as group 1 and the run itself as group 2.
 const NAME_RUN =
-  /(?<![\p{L}\p{N}'’-])\p{Lu}[\p{L}'’-]*(?: \p{Lu}[\p{L}'’-]*){0,2}(?![\p{L}\p{N}])/gu;
+  /(^|[^\p{L}\p{N}'’-])(\p{Lu}[\p{L}'’-]*(?: \p{Lu}[\p{L}'’-]*){0,2})(?![\p{L}\p{N}])/gu;
 
 /**
  * A capitalised run in the prose that no record, ledger or player text knows
@@ -331,21 +335,25 @@ function unrolledNameHits(turn: Rung1Turn): Rung1Hit[] {
   const check = turn.nameCheck;
   if (!check || !turn.prose.trim()) return [];
   const text = turn.prose.replace(/[*_]+/g, "");
-  const ctx = {
-    notesCreatedThisTurn: [...check.notesCreatedThisTurn],
+  // The texts are read once, however many runs the prose has.
+  const accepted = createNameChecker(check.story, {
+    turnStartLore: check.turnStartLore,
     playerTextThisTurn: [...check.playerTextThisTurn],
-  };
+  });
   const flagged: string[] = [];
   for (const m of text.matchAll(NAME_RUN)) {
-    const before = text.slice(0, m.index).replace(/[ 	]+$/, "");
+    const start = (m.index ?? 0) + m[1].length;
+    const before = text.slice(0, start).replace(/[ \t]+$/, "");
     const prev = before.slice(-1);
     if (before === "" || SENTENCE_END.test(prev)) continue;
-    const words = m[0].split(" ").filter((w) => !NOT_NAMES.has(w.toLowerCase().replace(/[’]/g, "'")));
+    const words = m[2]
+      .split(" ")
+      .filter((w) => !NOT_NAMES.has(w.toLowerCase().replace(/’/g, "'")) && !isRoleLabel(w));
     if (words.length === 0) continue;
     const run = words.join(" ");
     if (flagged.some((f) => f.toLowerCase() === run.toLowerCase())) continue;
-    if (isNameAccepted(run, check.story, ctx)) continue;
-    if (words.some((w) => isNameAccepted(w, check.story, ctx))) continue;
+    if (accepted(run)) continue;
+    if (words.some((w) => accepted(w))) continue;
     flagged.push(run);
     if (flagged.length >= 5) break;
   }
