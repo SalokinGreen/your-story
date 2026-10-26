@@ -87,6 +87,25 @@ export interface SystemTurnEndCheck {
   message: string;
 }
 
+/**
+ * Where a system's names come from (randomness plan R2, decision 260): one
+ * table note and the table paths rolled and joined with a space. The note is
+ * named by its built-in id (`noteId`, the story's `libraryNoteId`) or, for a
+ * starter's own note, its exact title. A source whose note the story does not
+ * hold is skipped.
+ */
+export interface NameSourceDecl {
+  kind: "person" | "place";
+  noteId?: string;
+  noteTitle?: string;
+  /** Table paths, each rolled once: [["First names"], ["Family names"]]. */
+  compose: string[][];
+  /** Fantastic Realms: only while the story is in this realm (or none is set). */
+  realm?: string;
+  /** A starter's source: only for a story in this setting. Listed before the system's own. */
+  setting?: string;
+}
+
 export interface BuiltinSystem {
   id: string;
   title: string;
@@ -123,4 +142,6 @@ export interface BuiltinSystem {
   stepHints?: Partial<Record<string, string>>;
   // Realm id to the condition of a rest there (take_rest).
   rests?: Record<string, string>;
+  // Where a new person's or place's name is rolled from (names/sources.ts).
+  nameSources?: NameSourceDecl[];
 }

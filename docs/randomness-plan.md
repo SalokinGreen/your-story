@@ -489,3 +489,58 @@ the old oracle cases, and the played session. Both spend the author's keys.
   asserting the six places for it.
 - **Measured tool budgets** after the cut and the new `table` parameter: default
   list 9,889 tokens (was 9,997), Fantastic Realms 11,357 (was 11,465).
+
+### 2026-10-26, slice R2
+
+- **`NameSourceDecl`** (in `systems/types.ts`) names its note by `noteId` (the
+  story's `libraryNoteId`) or by exact `noteTitle`, with an optional `setting`
+  (a starter's source, listed before the system's) and `realm`. Grave Watcher's
+  note has no library id (a starter note), so it is declared by title. A source
+  whose note the story does not hold, or whose table path does not resolve in
+  the note, is skipped, so Grave Watcher (which has no People table) falls
+  through to its own note and a story that deleted a note falls through to the
+  built-in lists.
+- **A story-own Names note is read heuristically** (`composeFromNote`): with one
+  "first/given" and one "family/surname" table the two are composed; otherwise
+  each table not named like a place is a person source and each place-like one a
+  place source. Grave Watcher's own note therefore matches rule 1 and its
+  declaration is a backstop.
+- **Tiers, not a pool across tiers.** `rollNames` uses the first tier that has a
+  source (story's own, else declared, else the built-in lists) and draws a
+  random source of that tier per name; a table that runs dry is topped up from
+  the lists.
+- **An explicit `style` asks for the built-in lists** in that style, even in a
+  story with declared tables, and is remembered as `nameStyle` the first time.
+  Without one, the story's `nameStyle` (else fantasy) only matters for the
+  fallback.
+- **Lists:** 80 given names, about 50 family names and 40 place names per style
+  (a person is given plus family, so `generate_name` returns three full names).
+  `OVERUSED_NAMES` (the names a model reaches for) is exported and a test holds
+  that no list contains one.
+- **Acceptance is a little looser than the plan's wording.** A rolled name with a
+  title in front ("Captain Anka Dorn"), or shortened to a word of it, still
+  counts as rolled; a candidate that is a word of an existing NPC or campaign
+  place or group ("Hob" for "Old Hob") counts as in the record. Both are
+  whole-word, case-insensitive and accent-safe.
+- **The turn's player words** are `GMToolContext.nameTurn`
+  (`notesCreatedThisTurn` and `playerTextThisTurn`), seeded by
+  `generation.ts` with the player's line and filled by `executeGMTools` from new
+  lore titles (any tool, so `merge_lore` and `duplicate_lore` count too) and
+  from answered `ask_question` results. A note the GM only edits this turn is
+  not tracked (the plan's loophole, left open).
+- **Campaign locations** are checked through a new optional
+  `CampaignWriteOptions.rejectName` on `executeCampaign`, passed only by the GM
+  executor, so the Designer's writes and the starters are never refused.
+- **`unrolled_name`** needs the story and the turn's name state, so
+  `Rung1Turn` gained an optional `nameCheck`; only the final (post-narration)
+  call passes it. The pre-narration re-ask path passes none, so the flag can
+  never re-ask. It skips a run at the start of a sentence or quotation, ignores
+  common words and titles, and one known word clears a whole run.
+- **`nameGenerator.ts` and `tests/nameGenerator.test.ts` were deleted whole**
+  (the pointer code, `collectUsedInitials` included: nothing else read it).
+- **`resolve`-side fallout:** the B&B core still says "instead of ... calling
+  generate_name"; it is a hashed built-in note and the sentence is harmless, so
+  it was left alone.
+- **Measured tool budgets** after R2: default list 9,711 tokens (was 9,889 after
+  R1), Fantastic Realms 11,179 (was 11,357). The system prompt's digest in
+  `tests/campaign.oldSaves.test.ts` was retaken again for the new Naming section.

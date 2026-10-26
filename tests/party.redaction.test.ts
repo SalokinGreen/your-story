@@ -61,6 +61,8 @@ const FORBIDDEN = {
   judgeFinding: "LEAK_JUDGE_FINDING",
   summary: "LEAK_SCENE_SUMMARY",
   apiKey: "sk-or-v1-LEAKEDKEY",
+  // The name ledger is the engine's private randomness (randomness plan R2).
+  nameLedger: "LEAK_LEDGER_NAME",
   // The campaign record: only publicCampaignView's fields (the CAMPAIGN_OK
   // strings below) reach a phone; a canary sits in every other field.
   campaignSecret: "LEAK_CAMPAIGN_SECRET",
@@ -110,6 +112,8 @@ function story(): StoryData {
     player_summary: "",
     author_notes: FORBIDDEN.authorNotes,
     memory: [FORBIDDEN.memory],
+    nameLedger: [FORBIDDEN.nameLedger, "Kestrel Voss"],
+    nameStyle: "nordic",
     npcs: [{ name: "Ilse", description: FORBIDDEN.npcSecret }],
     lore: [
       note("The Bell", FORBIDDEN.secretNote, { type: "secret" }),

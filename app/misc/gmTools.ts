@@ -221,17 +221,12 @@ export interface RollTableParams {
 }
 
 /**
- * Generate Name - roll the *constraints* for a new name, not the name itself.
- * The engine picks starting letters (steering clear of initials already in
- * play), syllable counts and seed sounds; the GM writes a name that fits.
- * See nameGenerator.ts for why the split falls this way.
+ * Generate Name - roll three names for a new person or place (randomness plan
+ * R2). The names are the engine's; the GM picks one. See names/.
  */
 export interface GenerateNameParams {
-  kind?: "person" | "place" | "faction" | "creature" | "object";
-  parts?: number; // How many name parts to roll (1-3)
-  flavor?: string; // Style hint, echoed back untouched ("Norse-ish", "corpo surname")
-  starts_with?: string[]; // Per-part locked initials; omit/"?" to roll that part
-  syllables?: number[]; // Per-part locked syllable counts
+  kind?: "person" | "place";
+  style?: "fantasy" | "modern" | "historical-european" | "nordic";
   reason?: string; // What's being named
 }
 
@@ -1353,32 +1348,19 @@ const generateNameTool: ToolSchema = {
   type: "function",
   function: {
     name: "generate_name",
-    description: `Roll pointers for a name you are about to invent; you write the name. Use for any new NPC, place, faction, creature or object, especially when your first idea is a familiar one (Elara, Kael, Thorne). The starting letter and syllable count per part are BINDING; the engine steers away from letters already used in this story. Seed sounds are inspiration only: reshape them to fit the world. parts: 2 for given + family name, 3 with a middle name, 1 for mononyms and most places. \`flavor\` names the register ("Norse-ish") and is echoed back; starts_with and syllables lock values only when they must be fixed.`,
+    description: `Roll three names for a new person or place, from this adventure's name tables or the built-in lists. Use one as it is: add_npc and campaign locations refuse a name that was not rolled (or one the story or a player already gave).`,
     parameters: {
       type: "object",
       properties: {
         kind: {
           type: "string",
-          enum: ["person", "place", "faction", "creature", "object"],
-          description: "What's being named (default: person)",
+          enum: ["person", "place"],
+          description: "Default: person",
         },
-        parts: {
-          type: "number",
-          description: "1-3 (default: 2 for a person, else 1)",
-        },
-        flavor: {
+        style: {
           type: "string",
-          description: "Style hint, echoed back (e.g. 'Norse-ish')",
-        },
-        starts_with: {
-          type: "array",
-          items: { type: "string" },
-          description: "Optional locked starting letters per part; '?' lets the engine roll",
-        },
-        syllables: {
-          type: "array",
-          items: { type: "number" },
-          description: "Optional locked syllable counts (1-4) per part",
+          enum: ["fantasy", "modern", "historical-european", "nordic"],
+          description: "Built-in list style, remembered for the story",
         },
         reason: {
           type: "string",

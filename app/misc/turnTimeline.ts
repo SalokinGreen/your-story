@@ -112,7 +112,6 @@ const NARRATOR_VISIBLE_TOOLS = new Set([
   "fate_question",
   "roll_table",
   "roll_portent",
-  "generate_name",
   // system state the player can see
   "manage_track",
   "manage_meter",

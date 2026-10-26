@@ -140,6 +140,7 @@ import { kindOnlyFlag } from "@/app/misc/judges/publicView";
 import type { ConfirmedFinding, Fact } from "@/app/misc/judges/types";
 import { deAiifyText } from "@/app/misc/deAiify";
 import { newTurnLedger } from "@/app/misc/campaign/clocks";
+import { newNameTurn, type NameTurnState } from "@/app/misc/names/accept";
 import { appendToLastUser, buildNarrationContext } from "@/app/misc/campaign/narrationContext";
 import {
   executeGMTools,
@@ -2576,6 +2577,8 @@ async function generateStoryTurnOnce(
     let gmResults: GMToolResult[] = [];
     // The story as this attempt found it, for the judge layer's rung-1 checks.
     const storyBeforeJudgeView = snapshotJudgeView(storyData);
+    // The name check's state at the end of the GM's rounds, for the prose flag.
+    let lastNameTurn: NameTurnState | undefined;
     let gmStoryContext = "";
     let gmFinalStoryContent = ""; // NEW: GM's final prose content (when no tool calls)
     // Decision 240: the prose a pause released (polished, verbatim) and the raw
@@ -3215,6 +3218,9 @@ async function generateStoryTurnOnce(
         // trigger per turn, across rounds). Kept here, handed to every batch
         // and replaced by the one it returns.
         let turnLedger = newTurnLedger();
+        // What the name check knows this turn (names/accept.ts): the player's
+        // line, then the notes the GM makes and the answers it is given.
+        let nameTurn = newNameTurn([gmUserChoice]);
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
@@ -3806,6 +3812,7 @@ async function generateStoryTurnOnce(
                 abortSignal: options.abortSignal,
                 setupPlayers: options.setupPlayers,
                 turnLedger,
+                nameTurn,
               },
             );
             const gmExecution =
@@ -3818,6 +3825,10 @@ async function generateStoryTurnOnce(
                     rawExecution,
                   );
             if (gmExecution.turnLedger) turnLedger = gmExecution.turnLedger;
+            if (gmExecution.nameTurn) {
+              nameTurn = gmExecution.nameTurn;
+              lastNameTurn = nameTurn;
+            }
 
             // Stopped during the batch (the signal fired, or Stop on the
             // setup card): the executor committed nothing, and neither do we.
@@ -5198,6 +5209,11 @@ async function generateStoryTurnOnce(
         storyAfter: storyData,
         results: options.precomputedGMResults ? [] : gmResults,
         prose: storyContent,
+        nameCheck: {
+          story: storyData,
+          notesCreatedThisTurn: lastNameTurn?.notesCreatedThisTurn ?? [],
+          playerTextThisTurn: lastNameTurn?.playerTextThisTurn ?? [],
+        },
         system: resolveSystem(storyData).system,
         // Without this turn's own part: when the text was not held the page
         // has already pushed it, and it would count itself.

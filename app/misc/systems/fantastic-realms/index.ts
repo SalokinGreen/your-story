@@ -109,4 +109,12 @@ export const FANTASTIC_REALMS: BuiltinSystem = {
   crossSettingScope: CROSSROADS_SCOPE,
   stepHints: { history: FANTASTIC_REALMS_HISTORY_HINT },
   rests: FANTASTIC_REALMS_RESTS,
+  // One source per realm that has a names table; a story with no realm set
+  // pools them, and so does a realm without one.
+  nameSources: ["aurelane", "larkenfell", "gloamreach"].map((realm) => ({
+    kind: "person" as const,
+    noteId: "builtin:fantastic-realms:table-names",
+    compose: [[`${realm[0].toUpperCase()}${realm.slice(1)} names`]],
+    realm,
+  })),
 };

@@ -13,6 +13,8 @@
 import { checkNarrationConsistency } from "../consistencyCheck";
 import { escapeRegExp } from "../compaction";
 import { findRepeatedPhrases } from "../storyProgressObserver";
+import type { StoryData } from "../structs";
+import { isNameAccepted } from "../names/accept";
 import type { BuiltinSystem } from "../systems/types";
 import { collectTurnFacts } from "./facts";
 import type {
@@ -54,6 +56,12 @@ export interface Rung1Turn {
   priorParts?: readonly PriorPartView[];
   /** Couch or party players, when there are two or more. */
   players?: readonly { id: string; name: string; aliases?: readonly string[] }[];
+  /** The story and the turn's name state, for the unrolled-name flag (R2). Omitted: no flag. */
+  nameCheck?: {
+    story: StoryData;
+    notesCreatedThisTurn: readonly string[];
+    playerTextThisTurn: readonly string[];
+  };
 }
 
 function factIdsFor(facts: readonly Fact[], kind: Fact["source"]["kind"], ref: string): string[] {
@@ -294,6 +302,64 @@ function repeatedPhraseHit(turn: Rung1Turn): Rung1Hit[] {
   ];
 }
 
+/** Capitalised words that are not names: pronouns, titles, calendar words, interjections. */
+const NOT_NAMES = new Set(
+  (
+    "i i'm i'll i've i'd the a an and but or so if as at in on of to for with from by he she it they we you " +
+    "his her its their my your our him them this that these those there here then now what who whom whose where when why how " +
+    "yes no oh ah okay ok well hey please thank thanks sorry hello goodbye mr mrs ms miss dr lord lady sir madam captain " +
+    "king queen prince princess father mother brother sister saint master mistress god gods goddess mister " +
+    "monday tuesday wednesday thursday friday saturday sunday january february march april may june july " +
+    "august september october november december christmas north south east west"
+  ).split(" "),
+);
+
+/** What may precede the first word of a sentence or a quotation. */
+const SENTENCE_END = /[.!?…:;\n"“”‘(—–-]/;
+
+const NAME_RUN =
+  /(?<![\p{L}\p{N}'’-])\p{Lu}[\p{L}'’-]*(?: \p{Lu}[\p{L}'’-]*){0,2}(?![\p{L}\p{N}])/gu;
+
+/**
+ * A capitalised run in the prose that no record, ledger or player text knows
+ * (randomness plan R2). Conservative on purpose: a flag for the Debug Logs
+ * only, never verified, never re-asked, never a rewrite. A run at the start of
+ * a sentence or a quotation is skipped, a run is judged by its words that are
+ * not common words, and one known word clears the whole run.
+ */
+function unrolledNameHits(turn: Rung1Turn): Rung1Hit[] {
+  const check = turn.nameCheck;
+  if (!check || !turn.prose.trim()) return [];
+  const text = turn.prose.replace(/[*_]+/g, "");
+  const ctx = {
+    notesCreatedThisTurn: [...check.notesCreatedThisTurn],
+    playerTextThisTurn: [...check.playerTextThisTurn],
+  };
+  const flagged: string[] = [];
+  for (const m of text.matchAll(NAME_RUN)) {
+    const before = text.slice(0, m.index).replace(/[ 	]+$/, "");
+    const prev = before.slice(-1);
+    if (before === "" || SENTENCE_END.test(prev)) continue;
+    const words = m[0].split(" ").filter((w) => !NOT_NAMES.has(w.toLowerCase().replace(/[’]/g, "'")));
+    if (words.length === 0) continue;
+    const run = words.join(" ");
+    if (flagged.some((f) => f.toLowerCase() === run.toLowerCase())) continue;
+    if (isNameAccepted(run, check.story, ctx)) continue;
+    if (words.some((w) => isNameAccepted(w, check.story, ctx))) continue;
+    flagged.push(run);
+    if (flagged.length >= 5) break;
+  }
+  if (flagged.length === 0) return [];
+  return [
+    {
+      check: "unrolled_name",
+      verified: false,
+      evidence: `Names in the prose that no roll, record or player gave: ${flagged.join(", ")}`,
+      factIds: [],
+    },
+  ];
+}
+
 /** Runs every rung-1 check on a turn. Never throws on a missing part of the story. */
 export function runRung1(turn: Rung1Turn): Rung1Hit[] {
   const facts = turn.facts ?? collectTurnFacts(turn.storyBefore, turn.storyAfter, turn.results);
@@ -305,6 +371,7 @@ export function runRung1(turn: Rung1Turn): Rung1Hit[] {
     ...pacingClockHit(turn, facts),
     ...spotlightHit(turn),
     ...repeatedPhraseHit(turn),
+    ...unrolledNameHits(turn),
   ];
 }
 

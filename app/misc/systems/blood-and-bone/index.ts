@@ -189,6 +189,20 @@ export const BLOOD_AND_BONE: BuiltinSystem = {
     buildLastResort(RULES_NOTES),
   ],
   sheetTemplate: BLOOD_AND_BONE_SHEET_TEMPLATE,
+  // A starter's own list first (Grave Watcher's town), then the People table.
+  nameSources: [
+    {
+      kind: "person",
+      noteTitle: "Grave Watcher — Names",
+      compose: [["First names"], ["Family names"]],
+      setting: "grave-watch",
+    },
+    {
+      kind: "person",
+      noteId: "builtin:blood-and-bone:oracles-people",
+      compose: [["Names"]],
+    },
+  ],
   creationNoteId: "builtin:blood-and-bone:character-creation",
   creationSteps: BLOOD_AND_BONE_CREATION_STEPS,
   meterSets: BLOOD_AND_BONE_METER_SETS,

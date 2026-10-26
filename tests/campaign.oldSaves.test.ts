@@ -77,8 +77,10 @@ function promptDigests(story: StoryData): string[] {
 // 2026-10-26 (randomness R1): the system prompt again, by design: the Tables section
 // rolls table notes with roll_table and lists the built-in table names. Every
 // story gets it; the other fourteen are untouched.
+// 2026-10-26 (randomness R2): the system prompt again, by design: the Naming section
+// says names are rolled (generate_name, a name table), not invented.
 const BEFORE: string[] = [
-  "system:27716:6c6a4e9b02fa2a6d",
+  "system:27664:5e155faea382d886",
   "user:9575:ec82a88c82afe716",
   "assistant:39:44c002ba5a7f3e3a",
   "user:65:21f6cbf4db8f7103",

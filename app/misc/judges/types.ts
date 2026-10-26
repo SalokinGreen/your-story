@@ -77,7 +77,8 @@ export type Rung1Check =
   | "secret_phrase"
   | "pacing_clock"
   | "pacing_spotlight"
-  | "repeated_phrase";
+  | "repeated_phrase"
+  | "unrolled_name";
 
 export interface Rung1Hit {
   check: Rung1Check;

@@ -326,6 +326,20 @@ describe("NetSession", () => {
     expect(JSON.stringify(storyData)).toContain("LEAK_DRAFT");
   });
 
+  it("sends a guest no name ledger and no name style (randomness R2)", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const snapshot = vi.fn();
+    guest.onSnapshot(snapshot);
+    const storyData = fakeStoryData({ nameLedger: ["LEAK_LEDGER_NAME"], nameStyle: "nordic" } as never);
+    host.broadcastSnapshot(storyData);
+    const sent = JSON.stringify(snapshot.mock.calls[0][0]);
+    expect(sent).not.toContain("LEAK_LEDGER_NAME");
+    expect(sent).not.toContain("nameLedger");
+    expect(sent).not.toContain("nameStyle");
+    // The host keeps its own.
+    expect(storyData.nameLedger).toEqual(["LEAK_LEDGER_NAME"]);
+  });
+
   it("sends a guest the campaign's player view and no secret, doom, hidden clock or beat (slice 6)", async () => {
     const { canaryCampaign, HIDDEN, PUBLIC } = await import("./helpers/campaignCanaries");
     const { publicCampaignView } = await import("../app/misc/campaign/publicView");
