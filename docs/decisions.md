@@ -464,3 +464,14 @@ The author: "We need to grow the Endless Realms rules a lot more." (Fantastic Re
 | 255 | "A team burn (two sure successes) measured as very strong. How strong should it be?" | **"Both feats, one sure success each (Recommended)."** Two sure successes, but neither burned feat adds its usual die: a sure hit, while a strong hit still needs the dice. Rejected: as drafted; one sure success and two dice. |
 | 256 | "Should hearth improvements work in the dice, or only in the fiction?" | **"Party feats (Recommended)."** Each improvement is a shared feat any hero may name, freely at the hearth and once per adventure away from it, tracked by the engine. Rejected: fiction only. |
 
+
+### Interview — real randomness for the GM (2026-10-26)
+
+The author: "I also am not happy with the oracle tables use, the GM should use the tables a lot more for randomness because LLM randomness isn't random enough." Design: [`randomness-design.md`](randomness-design.md).
+
+| # | question | decision |
+|---|---|---|
+| 259 | "How should the engine put real randomness in front of the GM?" | **"Both but the draw every turn needs to be very light. Too strong is too random."** A small engine-rolled drawer in every turn's live block, offered as material rather than orders, plus one-call rolls on any table note. Rejected: drawer only; on demand only. |
+| 260 | "Names: LLMs reuse the same few (Elara, Kael). What should the engine do?" | **"Names only from tables (Recommended)."** A new named person or place takes a name the engine rolled from the setting's name tables; the engine flags one that wasn't. Rejected: offer, don't require; leave as today. |
+| 261 | "Should the engine check for surprises on its own schedule, OSR-style, even when the GM doesn't ask?" | **"Tripwires (Recommended)."** The engine rolls a chance of a random event when play crosses a line (a new scene, travel, time passing, a rest, a run of turns with no oracle) and hands the GM an event to work in. Rejected: every N turns; Mythic's own only. |
+| 262 | "You confirmed Flash at normal for Default. What about Advanced?" | **"Keep high (Recommended)."** As in decision 257. |
