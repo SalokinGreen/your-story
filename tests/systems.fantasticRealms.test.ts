@@ -65,12 +65,12 @@ describe("Fantastic Realms content", () => {
 
   it("makes every table pass the shape check", () => {
     const tables = allNotes.filter((n) => n.type === "table");
-    expect(tables.length).toBe(7);
+    expect(tables.length).toBe(10);
     for (const t of tables) expect(checkTableShape(t.title, t.content), t.title).toEqual([]);
   });
 
   it("writes every realm foe as a parseable stat line on the XP scale", () => {
-    expect(REALM_NOTES.length).toBe(3);
+    expect(REALM_NOTES.length).toBe(6);
     for (const note of REALM_NOTES) {
       const lines = note.content.split("\n").filter((l) => l.startsWith("**") && l.includes(" — DC "));
       expect(lines.length, note.title).toBe(12);
@@ -91,7 +91,7 @@ describe("Fantastic Realms content", () => {
 
   it("gives each realm a rest condition", () => {
     const rests = sys.rests ?? {};
-    expect(Object.keys(rests).sort()).toEqual(["aurelane", "gloamreach", "larkenfell"]);
+    expect(Object.keys(rests).sort()).toEqual(["aurelane", "emberhold", "gloamreach", "hollow-sky", "larkenfell", "thornmere"]);
     for (const note of REALM_NOTES) expect(note.content).toContain("**Rest:**");
   });
 

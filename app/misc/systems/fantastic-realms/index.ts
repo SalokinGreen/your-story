@@ -1,7 +1,7 @@
 /**
  * Fantastic Realms, the second built-in system (docs/fantastic-realms-design.md,
  * decisions 201-219): light fantasy where words are power. Two packs (the
- * rules, and a world of three realms meeting at the Crossroads), one starter,
+ * rules, and a world of six realms meeting at the Crossroads), one starter,
  * the sheet template, the creation steps and the hero meter set. The text is
  * original (decision 3). Not registered in systems/index.ts here: the
  * registration is its own step.
@@ -70,7 +70,7 @@ export const FANTASTIC_REALMS_CROSSROADS_PACK: BuiltinPack = {
   systemId: FANTASTIC_REALMS_ID,
   title: "Fantastic Realms — The Crossroads",
   description:
-    "A world of realms with different rules, meeting at the Waymeet: bright Aurelane, folk Larkenfell and grim Gloamreach, with their people, places, troubles, local magic and callings, twelve foes each, and tables for miscasts, names, foes, treasure and the road.",
+    "A world of realms with different rules, meeting at the Waymeet: bright Aurelane, folk Larkenfell, grim Gloamreach, drowned Thornmere, volcanic Emberhold and the cloud-islands of the Hollow Sky, with their people, places, troubles, local magic and callings, twelve foes each, and tables for miscasts, names, foes, treasure and the road.",
   notes: FANTASTIC_REALMS_WORLD_NOTES,
 };
 

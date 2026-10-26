@@ -23,7 +23,7 @@ A calling is an optional path, offered at the feats step of character creation. 
 
 **A freeform hero** instead picks one personal move of the same size (a once-per-rest flourish of their own, in a sentence), so neither path is worth more. It is counted the same way.
 
-Add every feat with manage_feats add as usual (a gear feat as kind "item", a spell as "spell"). Each realm note adds two local callings in this same shape (Aurelane: Herald, Dragon-Sworn; Larkenfell: Reeve, Barrow-Warden; Gloamreach: Lamplighter, Penitent); a hero may take one in its realm.
+Add every feat with manage_feats add as usual (a gear feat as kind "item", a spell as "spell"). Each realm note adds two local callings in this same shape (Aurelane: Herald, Dragon-Sworn; Larkenfell: Reeve, Barrow-Warden; Gloamreach: Lamplighter, Penitent; Thornmere: Fen-Pilot, Bell-Diver; Emberhold: Forgewright, Ash-Delver; the Hollow Sky: Sky-Rigger, Cloud-Reader); a hero may take one in its realm.
 
 ## The twelve
 

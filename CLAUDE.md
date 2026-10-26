@@ -876,8 +876,8 @@ report's §11.3. The ones that shape play:
   the Rules pack: FR — Magic (forty example spell feats, miscasts, healing),
   Gear (the twelve qualities and what each does), Conditions (sixteen, with cures,
   and scars), Callings (twelve, each a signature, a kit of five, eight path feats
-  and a move), Bestiary (the twenty foe words, tactics, phases), Legends (a stub
-  that E4 fills), Travel (a journey is a `tally` challenge; Supplies), Downtime
+  and a move), Bestiary (the twenty foe words, tactics, phases), Legends (the
+  six, filled in E4), Travel (a journey is a `tally` challenge; Supplies), Downtime
   (and the hearth as party feats) and Group play. Each is under the 2,500-token
   read cap. The core was rewritten with an operational section (one harm budget
   per roll, down, helping, team burns, healing, conditions, miscasts, items,
@@ -900,6 +900,22 @@ report's §11.3. The ones that shape play:
   treasure and foes tables grew (`checkTableShape` now accepts a d12). Magic,
   Callings and Travel point at them. The three new notes ride in the Crossroads
   pack, so the loader offers them to existing stories.
+  **Three new realms and the six legends (slice E4, decision 252):** Thornmere
+  (a drowned kingdom of fen-cities; rest: a dry night under a roof), Emberhold
+  (a volcanic realm of forge-halls; a day at a forge-hall's hearth) and the
+  Hollow Sky (cloud-islands under the sky-wheel; one turn of it, about six hours;
+  realm id `hollow-sky`) are `world/realms/thornmere.ts`, `emberhold.ts` and
+  `hollow-sky.ts` in E3's shape (a realm note and a tables note each, two local
+  callings: Fen-Pilot, Bell-Diver; Forgewright, Ash-Delver; Sky-Rigger,
+  Cloud-Reader). `REALM_IDS`/`FANTASTIC_REALMS_RESTS` have six entries, so
+  `take_rest` knows them; the foes-by-realm table has six d12s; the core's
+  rests line, Magic, Callings, Travel and the Crossroads name them. **FR —
+  Legends** now holds the six legends (one per realm, Emberwing, Hollin
+  Greycrown, the Weeping Colossus, Maurelle the Drowned Queen, Vulgrim Cinderhide
+  and Ouranth the Stormwhale): a lair, a weakness, the roster's stat line as
+  phase 1 and `**Name, Phase n** — DC · words · Hearts mark (m) · Threat:` lines
+  whose marks descend (`tests/systems.fantasticRealms.legends.test.ts`). Every
+  changed note's new hash is appended to the history.
   **Its campaign** is an
   `adventure_path` (`wolfwillow-crossing/campaign.ts`): seven beats over Lantern
   Week, the barrow king's front (a hidden clock on `rest`) and the goblins'

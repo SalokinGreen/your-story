@@ -138,7 +138,7 @@ Roll for what the heroes meet (or pick). The realm note holds its stat line and 
 9. A Hedge-Folk Tithe-Taker with a polite ledger.
 10. A Scarecrow of the Last Furrow, one field closer each night.
 11. A Mire Troll under the bridge, hungry for a toll.
-12. Hollin Greycrown, the Barrow King, awake and wanting his oath kept.
+12. The Barrow King, awake and wanting his oath kept.
 
 ## Gloamreach foes (1d12)
 
@@ -154,6 +154,51 @@ Roll for what the heroes meet (or pick). The realm note holds its stat line and 
 10. The Pale Magistrate, reading a charge in an empty courtyard.
 11. A Hollow Bishop at the head of a procession of the sleepless.
 12. The Weeping Colossus, walking, in the distance.
+
+## Thornmere foes (1d12)
+
+1. A Reed Cutpurse in a passing punt, hand already in a bag.
+2. A Leech Swarm waiting in the shallows of a ford.
+3. Three Mudcrawler Boggarts, tying ankles under a jetty.
+4. A Lamp-Eel glowing over a mud-bank where no channel runs.
+5. A band of Stilt-Raiders striding out of the fog.
+6. A Bell-Drowned Revenant, walking toward the sound of a bell.
+7. A Peat Witch with a kettle and a bargain.
+8. A Tide-Court Assassin in a gondola with its lamp out.
+9. A Mirror-Water Double wearing the face of the nearest friend.
+10. A Mere-Gar surging under a boat.
+11. The Great Mere-Serpent coiled round a causeway.
+12. Maurelle, the Drowned Queen, sending a summons.
+
+## Emberhold foes (1d12)
+
+1. Three Ash Scrappers on a slag-heap, tools in hand.
+2. A Slag Rat Swarm flooding through a vent.
+3. A Cinder Imp spitting sparks at a thatched stall.
+4. A Pit Bandit crew on the Glass Road, wagon-wheels cut.
+5. A Clinker Hound pack, hungry on the ash plain.
+6. A Guild Debt-Collector with a list and a deadline.
+7. A Lava Salamander in a crack across the road.
+8. A Rune-Forged Guardian at a door whose masters are dead.
+9. A Smoke-Wraith seeping out of a flue.
+10. An Oathbreaker Smith, offering the blade of a lifetime.
+11. A Basalt Giant walking through the wall.
+12. Vulgrim Cinderhide, the Unquenched, in a hall gone cold.
+
+## Hollow Sky foes (1d12)
+
+1. A Cloud Gull Flock over the deck's open hatch.
+2. A Kite-Thief on a drifting current, watching your pouch.
+3. A Wind Imp, undoing every knot in the rigging.
+4. A Tether-Cutter crew creeping along the mooring chains.
+5. A Rime Sprite on a frozen shroud.
+6. A Sky Corsair Captain and her crew, grappling the skiff.
+7. A Thunder Elemental inside a storm-cell.
+8. A Gale Harpy singing from a cloud-bank.
+9. A Hollow Siren wearing a lost friend's face on a far mooring.
+10. A Skyhook Brute swinging across on a line.
+11. A Cloud Roc diving for the largest prize.
+12. Ouranth, the Stormwhale, rising from the cloud.
 
 Use when a fight is needed, an ambush is due, or the road has been too quiet. Read the realm note for the foe's stat line, then run it by its words.`,
 );

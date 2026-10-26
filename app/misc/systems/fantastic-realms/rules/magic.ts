@@ -53,7 +53,10 @@ A healing spell clears a condition that names no cure, or one whose named cure i
 - **Aurelane.** Bright, courtly, sanctioned. Done in public with a flourish. Miscasts lean to attention and glory gone wrong.
 - **Larkenfell.** Folk-magic and bargains: hedge-charms, knots, words said over bread. Miscasts lean to the hedge-folk taking their price.
 - **Gloamreach.** Rare and costly. Few cast, and everyone remembers what it cost. Miscasts lean to marks and hollowness.
-Each realm note has a "Magic here" section, and its tables note a d12 miscast table. Outside the three realms, use the lean above.
+- **Thornmere.** Tide-work: bells, brine and names said over water. Miscasts lean to the water answering back.
+- **Emberhold.** Work-magic: rune and hammer, heat and name. Miscasts lean to heat, flaws in the work and debts.
+- **The Hollow Sky.** Wind-magic: sung, tied and whistled. Miscasts lean to gusts, falls and the sky answering back.
+Each realm note has a "Magic here" section, and its tables note a d12 miscast table. Outside the six realms, use the lean above.
 
 ## Learning magic
 A spell is gained like any feat: at creation, when the concept supports it, or at a level, from what happened ("Ghost-Touched" after a night in a barrow). A teacher, a bargain or a scar turned into a feat all work.

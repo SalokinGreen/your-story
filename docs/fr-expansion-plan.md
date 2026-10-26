@@ -502,3 +502,56 @@ Judgment calls the plan left to the builder. None changes the plan's scope.
   realm-foe test in `systems.fantasticRealms.test.ts` now expects exactly 12
   and seven table notes; the "hedges" test in the rules test now checks the
   pointers.
+
+### 2026-10-25 — E4 (three new realms and the six legends)
+
+Judgment calls the plan left to the builder. None changes the plan's scope.
+
+- **E3's shape, exactly.** Each new realm is a realm note (1,600 to 1,660
+  tokens) and a tables note (1,045 to 1,095 tokens, type `table`): Thornmere's
+  callings are the Fen-Pilot and Bell-Diver, Emberhold's the Forgewright and
+  Ash-Delver, the Hollow Sky's the Sky-Rigger and Cloud-Reader; twelve foes
+  each (five mooks, five champions, one at 5 hearts, one legend), a tactics
+  line under every one. The Hollow Sky's realm id is `hollow-sky` (the rest key
+  `take_rest` matches), and its note says to pass that id. Titles: "FR —
+  Thornmere", "FR — Emberhold", "FR — The Hollow Sky" (and "... tables").
+- **Legends (1,720 tokens, under the cap).** Six, one per realm. The first line
+  of each is the realm roster's last line verbatim (DC 6, 6 hearts, XP 6000),
+  which the plan's old "first phase is DC 4 or 5" building rule contradicted, so
+  the stub's rule was rewritten: a later phase may be easier to hit and still
+  worse to face. Marks follow the 6-heart rule (phase 2 at 4, phase 3 at 2; the
+  Weeping Colossus has two phases, mark 3). Each legend has a lair and a
+  weakness, the weakness lowering the DC by 1 for a scene or ending a threat.
+  The phase line format is `**Name, Phase n** — DC n · Words · Hearts mark (m) ·
+  Threat: ...`, the one FR — Bestiary already documents.
+- **The core's rests line names the new realms** (and `hollow-sky`), a pinned
+  note change of about 60 tokens (2,320 against 3,000), so the GM can pass the
+  right id; the history of the core gained its fourth hash and
+  `tests/systems.noteUpdate.test.ts` expects four. Magic, Callings, Travel and the
+  Crossroads note (now "The six realms") also changed; the shared foes table
+  grew three d12s. Each changed note's new hash is appended (earlier hashes kept);
+  the six new notes start a history of one.
+- **Tests:** `tests/systems.fantasticRealms.legends.test.ts` (new: rests, the pack,
+  the foes table, the history, the legends' token cap, one legend per realm,
+  descending marks); the E3 realm test's regexes now accept a multi-word realm
+  name (`[\w ]+`), the local-callings list has six entries, and table notes are
+  ten.
+
+### 2026-10-25 — E4 fix: no starter secret in the shared notes
+
+The Wolfwillow Crossing campaign hides the barrow king's name (secret
+`sec_ww_king`, key phrases "Hollin", "Greycrown", "king"), and built-in rules
+and realm notes are player-visible, so FR — Legends, the Larkenfell roster line
+and the Larkenfell foes table (E3 had already shipped the name in the last two)
+now call him **The Barrow King**. The legend says his name is lost and finding
+it is a story in itself. The other five legends and every E4 note were checked
+against both Wolfwillow secrets' key phrases ("lantern promise", "grandfather"
+included): clean.
+
+- **Test:** `tests/systems.fantasticRealms.legends.test.ts` fails when any note
+  in either Fantastic Realms pack contains a Wolfwillow secret key phrase,
+  except an explicit allow-list of one word, "king" (the legend's title).
+- **History:** the legends and foes-table hashes of E4 were never shipped on
+  master, so I **replaced** E4's own entry in each (legends `5b0ea4cf…`, foes
+  table `32e8f6b0…`); Larkenfell's realm note shipped in E3, so I **appended**
+  (`db5c3f19…`, three entries).
